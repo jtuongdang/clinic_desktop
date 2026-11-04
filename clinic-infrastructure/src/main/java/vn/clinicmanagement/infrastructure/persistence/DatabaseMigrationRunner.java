@@ -162,16 +162,13 @@ public class DatabaseMigrationRunner {
         return sb.toString();
     }
 
-    private static void executeSqlScript(Connection conn, String sqlContent) throws SQLException {
+    static void executeSqlScript(Connection conn, String sqlContent) throws SQLException {
         // GO là dấu phân tách batch của sqlcmd, không phải cú pháp T-SQL gửi qua JDBC.
         // Chỉ tách khi GO đứng riêng trên một dòng; hỗ trợ cả LF và CRLF.
-        String[] batches = sqlContent.split("(?im)^[\\t ]*GO[\\t ]*\\r?$");
+        List<String> batches = SqlServerBatchSplitter.split(sqlContent);
         try (Statement stmt = conn.createStatement()) {
             for (String batch : batches) {
-                String trimmed = batch.trim();
-                if (!trimmed.isEmpty()) {
-                    stmt.execute(trimmed);
-                }
+                stmt.execute(batch);
             }
         }
     }
