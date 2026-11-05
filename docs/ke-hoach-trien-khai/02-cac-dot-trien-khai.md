@@ -1,155 +1,126 @@
 # 02 — Các đợt triển khai
 
-Lộ trình được chia theo dependency để mỗi đợt có thể nghiệm thu thành một vertical slice.
+Lộ trình theo vertical slice và phụ thuộc nghiệp vụ. Trạng thái được cập nhật theo mã nguồn đã kiểm tra trong checkout; việc có code local chưa thay thế review, test và nghiệm thu.
 
 ---
 
-## Đợt 0 — Nền tảng chạy, CSDL, Migration và Khung giao dịch
+## Đợt 0 — Nền tảng, CSDL, giao dịch và xác thực
 
-**Trạng thái:** `[~] Đang làm (Hoàn thành 70% - Đã xong CSDL, Migration & Core DOCX)`  
+**Trạng thái:** `[x] Hoàn tất theo phạm vi nền tảng đã thống nhất`
 **Phụ thuộc:** Không.
 
-### Việc đã hoàn thành:
-- [x] **CSDL SQL Server:** Khởi tạo thành công 100% CSDL `clinicDb` trên Microsoft SQL Server: **49 bảng**, **80 khóa ngoại (Foreign Keys)**, Non-clustered Indexes.
-- [x] **Migration Runner:** Xây dựng `DatabaseMigrationRunner` và các script `V1__Initial_Clinic_Schema.sql`, `V2__Seed_Initial_Data.sql`, cơ chế idempotent theo dõi qua `__schema_migrations`.
-- [x] **Seed Data Chuẩn:** Nạp dữ liệu danh mục ban đầu (Cơ sở, 5 Khoa, 8 Phòng khám, tài khoản `admin` & `tiennv`, thuốc, ICD-10, dịch vụ).
-- [x] **Nâng cấp Domain:** Đã bổ sung 3 Enums (`KetQuaDieuTri`, `HuongXuTri`, `DoiTuongKham`) và hơn 30 trường y tế chuyên sâu.
-- [x] **Core Xuất Tài Liệu DOCX:** Đã xây dựng trọn vẹn bộ thư viện OpenXML thuần Java (`DocxDocument`, `DocxTable`, `DocxExportService`, `DocxManager`) không phụ thuộc Apache POI cồng kềnh.
+- [x] Maven multi-module và các module Clean Architecture.
+- [x] SQL Server JDBC connection và migration runner; migrations hiện có V1–V3.
+- [x] Application primitives: `Result<T>`, `Command`, `Query`, handlers và transaction boundary.
+- [x] JDBC transaction manager / unit of work.
+- [x] Đăng nhập nối application với repository nhân viên từ SQL Server.
 
-### Việc cần hoàn tất để kết thúc Đợt 0:
-- [ ] **Khung Application cơ sở (`clinic-application`):**
-  - Tạo cấu trúc package: `commands/`, `queries/`, `dtos/`, `common/Result.java`.
-- [ ] **Quản lý Giao dịch (Unit of Work):**
-  - Xây dựng `TransactionManager` / `UnitOfWork` bọc `java.sql.Connection` quản lý `setAutoCommit(false)`, `commit()`, `rollback()` qua JDBC thuần.
-- [ ] **Quy chuẩn Concurrency Desktop (SwingWorker):**
-  - Xây dựng lớp trợ giúp `AsyncActionExecutor` hoặc Base SwingWorker xử lý: Bắt đầu ➔ Bật Loading Indicator ➔ Chạy ngầm ➔ Trả kết quả lên EDT ➔ Tắt Loading.
-- [ ] **Xác thực Đăng nhập thật (`LoginForm`):**
-  - Tạo `LoginCommand` và `NhanVienRepositoryImpl` xác thực tài khoản SQL Server bằng mã hóa BCrypt; chấm dứt tình trạng đăng nhập giả lập.
-
-**Qua đợt khi:** Đăng nhập thành công bằng tài khoản `admin`/`tiennv` lưu trong SQL Server; kết nối và transaction JDBC hoạt động chuẩn.
+**Lưu ý vận hành:** trước khi sử dụng dữ liệu thật vẫn cần hoàn thiện bảo mật, quyền hạn, cấu hình secret và audit ở Đợt 7/Phân hệ 08. Hoàn tất Đợt 0 không đồng nghĩa ứng dụng đạt điều kiện production.
 
 ---
 
-## Đợt 1 — Định danh, danh mục nền và đăng ký bệnh nhân
+## Đợt 1 — Hồ sơ bệnh nhân, BHYT và tiếp nhận vào hàng đợi
 
-**Trạng thái:** `[ ] Chưa làm`  
+**Trạng thái:** `[~] Luồng đã có trong checkout; chờ commit, kiểm thử và nghiệm thu`
 **Phụ thuộc:** Đợt 0.
 
-**Model:** `NhanVien`, `VaiTro`, `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `CoSo`, `Khoa`, `PhongKham`, `DanhMucDichVu`, `ICD`, `DoiTuongKham`.  
-**UI:** `LoginForm`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `CatalogPanel`.
+**Model chính:** `BenhNhan`, `BaoHiem`, `CoSo`, `Khoa`, `PhongKham`, `LuotKham`.
+**UI chính:** `LoginForm`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel`.
 
-### Chi tiết công việc:
-- [ ] **Tầng Repository (`clinic-infrastructure`):**
-  - `NhanVienRepositoryImpl`, `BenhNhanRepositoryImpl`, `BaoHiemRepositoryImpl`, `DanhMucDichVuRepositoryImpl`, `ICDRepositoryImpl`, `PhongKhamRepositoryImpl`.
-- [ ] **Tầng Use Cases (`clinic-application`):**
-  - `RegisterPatientCommand` & `UpdatePatientCommand`: Lưu trọn vẹn **15 trường thông tin y tế thực chiến** (Đối tượng, BHYT 5 năm, người liên hệ, địa chỉ 3 cấp, nghề nghiệp,...).
-  - `SearchPatientsQuery`: Tra cứu tức thì theo CCCD / Số điện thoại / Mã BN / Họ tên; thuật toán cảnh báo trùng hồ sơ.
-  - `GetActiveRoomsQuery` & `GetCatalogsQuery`: Nạp danh mục phòng khám và bảng giá dịch vụ vào Cache bộ nhớ khi app khởi động.
-- [ ] **Tích hợp Desktop Swing (`clinic-desktop`):**
-  - Nối `PatientRegistrationFormPanel` vào `RegisterPatientCommand` qua `SwingWorker`.
-  - Thay thế danh sách phòng khám fix cứng bằng dữ liệu từ bảng `PhongKham` SQL Server.
+- [x] Trong checkout có repository bệnh nhân, bảo hiểm, phòng khám và hàng đợi.
+- [x] Có use cases đăng ký, tìm bệnh nhân và đọc hàng đợi.
+- [x] Form Tiếp đón được nối qua composition root và dùng SwingWorker cho các thao tác được tích hợp.
+- [ ] Chạy build/test phù hợp và kiểm tra luồng đăng ký, tìm lại hồ sơ, cập nhật bệnh nhân, bảo hiểm, lượt khám và queue trên DB thử nghiệm.
+- [ ] Kiểm thử rollback khi một bước ghi thất bại; kiểm tra lỗi trùng CCCD và tính duy nhất khi ghi đồng thời.
+- [ ] Review, commit phần thay đổi hiện còn local; đồng bộ tài liệu phân hệ sau nghiệm thu.
 
-**Qua đợt khi:** Đăng ký bệnh nhân mới từ form Desktop, khởi động lại ứng dụng dữ liệu vẫn hiển thị chính xác trên danh sách tìm kiếm.
+**Qua đợt khi:** form đăng ký/tìm kiếm tạo hoặc chọn đúng hồ sơ; lượt khám và hàng đợi được lưu nhất quán; đọc lại sau restart đúng; kiểm thử xác nhận transaction rollback.
 
 ---
 
-## Đợt 2 — Tiếp đón, lịch hẹn và hàng đợi lượt khám
+## Đợt 2 — Lịch hẹn, sinh hiệu và vòng đời lượt khám
 
-**Trạng thái:** `[ ] Chưa làm`  
+**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
 **Phụ thuộc:** Đợt 1.
 
-**Model:** `LichHen`, `LuotKham`, `SinhHieu`, `NguonLich`, `TrangThaiLuotKham`.  
-**UI:** `ReceptionPanel`, `ClinicRoomStatusPanel`, dialog Lịch hẹn.
+**Model:** `LichHen`, `LuotKham`, `SinhHieu`, trạng thái lượt khám.
+**UI:** `ReceptionPanel`, `ClinicRoomStatusPanel`, `ExaminationPanel`, màn hình/dialog lịch hẹn.
 
-- [ ] `CreateEncounterCommand`: Tiếp nhận bệnh nhân (Walk-in hoặc từ Lịch hẹn), cấp số thứ tự khám an toàn (Thread-safe sequence).
-- [ ] `RecordVitalSignsCommand`: Nhập mạch, nhiệt độ, huyết áp, nhịp thở, SpO2, chiều cao, cân nặng.
-- [ ] Nối bảng hàng đợi phòng khám với cơ chế tự động làm mới (Periodic Refresh hoặc Trigger Event).
-- [ ] Chuyển trạng thái lượt khám: `CHO_KHAM` ➔ `DANG_KHAM` ➔ `CHUYEN_PHONG` ➔ `HOAN_TAT`.
-
-**Qua đợt khi:** Tạo lượt khám mới tại bàn tiếp đón, bệnh nhân xuất hiện ngay lập tức trong danh sách chờ của Bàn khám chuyên khoa tương ứng.
+- [ ] Đặt, đổi, hủy lịch; đánh dấu đến/không đến; chuyển lịch thành lượt khám mà không tạo trùng.
+- [ ] Ghi sinh hiệu có thời điểm và nhân viên thực hiện.
+- [ ] Chuyển trạng thái lượt khám theo quy tắc nghiệp vụ, có kiểm soát tranh chấp khi nhiều người thao tác.
+- [ ] Tự làm mới queue hoặc cập nhật sau sự kiện; hiển thị lỗi/mất kết nối.
 
 ---
 
 ## Đợt 3 — Khám lâm sàng, EMR và kê đơn
 
-**Trạng thái:** `[ ] Chưa làm`  
+**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
 **Phụ thuộc:** Đợt 2.
 
-**Model:** `LuotKham`, `ChanDoan`, `ICD`, `SinhHieu`, `TienSuBenh`, `DonThuoc`, `ChiTietDonThuoc`, `KetQuaDieuTri`, `HuongXuTri`.  
-**UI:** `DoctorStationPanel`, `ExaminationPanel`, `MedicalRecordTabPanel`, `PrescriptionOrderPanel`.
+**Model:** `ChanDoan`, `ICD`, `TienSuBenh`, `DonThuoc`, `ChiTietDonThuoc`, kết quả và hướng xử trí.
+**UI:** `DoctorStationPanel`, `ExaminationPanel`, các clinical tabs.
 
-- [ ] Nạp thông tin bệnh nhân đang được gọi khám lên giao diện Bác sĩ.
-- [ ] `SaveDraftEmrCommand`: Lưu nháp diễn tiến bệnh, tiền sử, triệu chứng lâm sàng.
-- [ ] Tìm kiếm và chọn mã chẩn đoán chính / chẩn đoán phụ từ bảng `ICD`.
-- [ ] Kê đơn thuốc: Tìm kiếm thuốc từ kho thật, kiểm tra an toàn qua `ClinicalDrugSafetyService` (cảnh báo dị ứng, tương tác).
-- [ ] `SignAndLockEmrCommand`: Ký số / Hoàn thành khám, cập nhật `KetQuaDieuTri`, `HuongXuTri`, khóa bệnh án chống sửa đổi trái phép.
-- [ ] **Gắn nút xuất tài liệu DOCX:** Tích hợp `DocxExportService` cho phép in Đơn thuốc điện tử và Bệnh án ngoại trú ra file `.docx`.
-
-**Qua đợt khi:** Bác sĩ khám xong, kê đơn, khóa bệnh án, xuất file đơn thuốc `.docx` chuẩn Bộ Y Tế và lưu thành công vào CSDL.
+- [ ] Nạp lượt khám đang chờ và đúng phạm vi bác sĩ/cơ sở.
+- [ ] Lưu nháp khám và chẩn đoán ICD từ danh mục thật.
+- [ ] Kê đơn, kiểm tra dữ liệu thuốc và các cảnh báo domain đã được xác nhận.
+- [ ] Hoàn tất/khóa hồ sơ theo trạng thái và quyền; lưu lịch sử thay đổi.
+- [ ] Tích hợp xuất DOCX với dữ liệu đã persist; xác nhận mẫu với người phụ trách nghiệp vụ.
 
 ---
 
-## Đợt 4 — Chỉ định dịch vụ, CLS và kết quả
+## Đợt 4 — Chỉ định dịch vụ và cận lâm sàng
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 3 và danh mục dịch vụ của Đợt 1.
+**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
+**Phụ thuộc:** Đợt 3.
 
-**Model:** `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu`.  
+**Model:** `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu`.
 **UI:** `ServiceOrderPanel`, `LabOrderTabPanel`, `ParaclinicalOrderPanel`.
 
-- [ ] Bác sĩ chỉ định các dịch vụ kỹ thuật (Xét nghiệm máu, X-Quang, Siêu âm).
-- [ ] Màn hình phòng xét nghiệm/CĐHA tiếp nhận chỉ định, cập nhật trạng thái `DANG_THUC_HIEN`.
-- [ ] Nhập trị số xét nghiệm, kết luận chẩn đoán hình ảnh và đính kèm đường dẫn ảnh chụp.
-- [ ] Duyệt kết quả và đẩy ngược trở lại màn hình Bác sĩ điều trị.
-
-**Qua đợt khi:** Bác sĩ nhận được thông báo có kết quả CLS và xem được kết quả xét nghiệm ngay trên hồ sơ khám bệnh.
+- [ ] Tạo/hủy chỉ định có người thao tác, lý do và trạng thái.
+- [ ] Tiếp nhận, nhập, duyệt và trả kết quả; bảo toàn lịch sử sau duyệt.
+- [ ] Xác định thiết kế lưu kết quả hình ảnh/file trước khi triển khai UI.
 
 ---
 
-## Đợt 5 — Kho Dược, cấp phát thuốc (FEFO) và quản lý tồn kho
+## Đợt 5 — Kho, nhà thuốc và cấp phát
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 3, danh mục thuốc/vật tư và Unit of Work của Đợt 0.
+**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
+**Phụ thuộc:** Đợt 3.
 
-**Model:** `Item`, `Kho`, `TonKho`, `PhieuNhapKho`, `ChiTietNhapKho`, `PhieuXuatKho`, `ChiTietXuatKho`, `InventoryTransaction`, `FefoAllocationService`.  
-**UI:** `PharmacyDispensePanel`, `PharmacyTicketTablePanel`.
+**Model:** `Item`, `Kho`, `TonKho`, phiếu nhập/xuất, lô hàng, `InventoryTransaction`, `FefoAllocationService`.
+**UI:** `PharmacyDispensePanel` và các pharmacy components.
 
-- [ ] Nhà thuốc tiếp nhận đơn thuốc đã được bác sĩ duyệt hoặc hóa đơn đã thanh toán.
-- [ ] Thực thi thuật toán **FEFO** tự động trừ số lượng từ các lô có hạn dùng gần nhất trước.
-- [ ] Quản lý giao dịch nguyên tử (Atomic): Cập nhật `TonKho` + Tạo `PhieuXuatKho` + Ghi `InventoryTransaction` trong cùng một Transaction JDBC.
-- [ ] Cảnh báo thuốc hết hạn hoặc tồn kho dưới định mức an toàn.
-
-**Qua đợt khi:** Cấp phát đơn thuốc thành công, tồn kho trong bảng `TonKho` bị trừ chính xác theo từng lô và không xảy ra bán âm kho.
+- [ ] Quản lý nhập kho/lô/hạn dùng và nhà cung cấp.
+- [ ] Cấp phát đơn đã duyệt; kiểm tra tồn theo lô và transaction nguyên tử.
+- [ ] Kiểm kê, điều chỉnh có lý do và audit; ngăn tồn kho âm.
+- [ ] Cảnh báo cận hạn/hết hạn và dưới định mức.
 
 ---
 
-## Đợt 6 — Viện phí, thu ngân, hóa đơn và công nợ
+## Đợt 6 — Viện phí và thu ngân
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 3, 4, 5.
+**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
+**Phụ thuộc:** Đợt 3; kết nối Đợt 4–5 theo nguồn chi phí.
 
-**Model:** `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`.  
-**UI:** `BillingInvoicePanel`, `MedicalBillingSlipPanel`.
+**Model:** `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`.
+**UI:** `BillingInvoicePanel`, phiếu thu và các màn hình liên quan.
 
-- [ ] Tự động gom toàn bộ chi phí (Tiền khám + Tiền CLS + Tiền thuốc) thành Hóa đơn viện phí `HoaDon`.
-- [ ] Tính toán tự động quyền lợi BHYT (ví dụ: đúng tuyến 80%, 100%) và số tiền bệnh nhân cùng chi trả.
-- [ ] Thu ngân xác nhận thu tiền, ghi nhận `PhieuThu`, in hóa đơn viện phí.
-- [ ] Quản lý số dư tạm ứng và ghi nhận nợ vào `CongNoBenhNhan`.
-
-**Qua đợt khi:** Thu ngân in được phiếu thu chuẩn, doanh thu và công nợ đối soát khớp 100% với các dịch vụ đã thực hiện.
+- [ ] Tổng hợp khoản thu từ dịch vụ đã thực hiện và thuốc đã cấp.
+- [ ] Chốt cách tính giá, BHYT, đồng chi trả, giảm trừ, làm tròn và tạm ứng với nghiệp vụ.
+- [ ] Hỗ trợ thu một phần/nhiều lần, hoàn/điều chỉnh có chứng từ; không sửa âm thầm hóa đơn đã thu.
+- [ ] Đối soát báo cáo với dữ liệu giao dịch.
 
 ---
 
-## Đợt 7 — Quản trị nhân sự, payroll, báo cáo tổng hợp và đóng gói
+## Đợt 7 — Quản trị, bảo mật, báo cáo và phát hành
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 0–6.
+**Trạng thái:** `[ ] Chưa nghiệm thu`
+**Phụ thuộc:** Các luồng nghiệp vụ cần báo cáo/quản trị.
 
-**Model:** `NhanVien`, `ChamCong`, `KyLuong`, `BangLuong`, `NhatKyHeThong`.  
-**UI:** `SystemConfigPanel`, `ClinicReportPanel`, phân hệ chấm công.
-
-- [ ] Chấm công nhân sự theo ca làm việc, tính toán bảng lương tự động từ ngày công và hoa hồng dịch vụ.
-- [ ] Báo cáo hoạt động khám chữa bệnh: Lượt khám, cơ cấu bệnh tật ICD-10.
-- [ ] Báo cáo tài chính doanh thu, viện phí, BHYT.
-- [ ] Báo cáo kho dược: Báo cáo Nhập - Xuất - Tồn, thẻ kho chi tiết.
-- [ ] Đóng gói cài đặt ứng dụng Desktop (.jar / native installer) kèm hướng dẫn vận hành.
+- [ ] Quản lý nhân viên, vai trò, phạm vi cơ sở/khoa và quyền theo use case.
+- [ ] Ghi audit an toàn; che/mask thông tin nhạy cảm trong log.
+- [ ] CRUD danh mục có validation và kiểm soát hiệu lực.
+- [ ] Báo cáo vận hành, viện phí, BHYT và kho theo định nghĩa nghiệp vụ đã duyệt.
+- [ ] Bảo vệ secret/cấu hình DB, hướng dẫn backup/restore và đóng gói ứng dụng.
+- [ ] Kiểm tra build/test/release bằng cấu hình CI và môi trường thử nghiệm.

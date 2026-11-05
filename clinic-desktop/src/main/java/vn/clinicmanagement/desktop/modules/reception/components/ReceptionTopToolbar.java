@@ -18,6 +18,7 @@ import java.awt.geom.RoundRectangle2D;
  * - Nút loa phát thanh "Gọi Số Tiếp Theo"
  */
 public class ReceptionTopToolbar extends JPanel {
+    private String nextQueueMessage;
 
     public ReceptionTopToolbar() {
         setLayout(new BorderLayout());
@@ -85,9 +86,11 @@ public class ReceptionTopToolbar extends JPanel {
         callBox.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                String message = nextQueueMessage == null || nextQueueMessage.isBlank()
+                        ? "Hiện không có người bệnh đang chờ trong hàng đợi."
+                        : "Mời số " + nextQueueMessage + " vào tiếp đón.";
                 JOptionPane.showMessageDialog(ReceptionTopToolbar.this,
-                        "Hệ thống tự động phát loa gọi số thứ tự tiếp theo tại Cửa số 2:\n" +
-                        "\"Xin mời số thứ tự 22000326 vào cửa số 2 tiếp đón!\"",
+                        message,
                         "Gọi Số Đón Tiếp Tự Động", JOptionPane.INFORMATION_MESSAGE);
             }
         });
@@ -98,6 +101,8 @@ public class ReceptionTopToolbar extends JPanel {
         add(leftGroup, BorderLayout.WEST);
         add(rightGroup, BorderLayout.EAST);
     }
+
+    public void setNextQueueNumber(String queueNumber) { nextQueueMessage = queueNumber; }
 
     private JButton createActionButton(String title, Icon icon) {
         JButton btn = new JButton(title, icon);

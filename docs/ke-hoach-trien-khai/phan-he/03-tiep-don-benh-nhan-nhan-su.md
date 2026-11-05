@@ -1,62 +1,47 @@
-# Phân hệ 03 — Tiếp đón, hồ sơ bệnh nhân và nhân sự
+# Phân hệ 03 — Hồ sơ bệnh nhân, BHYT và Tiếp đón
 
-**Trạng thái:** `[~] Đang chuẩn bị kết nối DB` (Schema CSDL SQL Server đã có sẵn các bảng `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `TienSuBenh`, `LuotKham`, `SinhHieu`, `NhanVien`)  
-**Đợt:** 1 (Bệnh nhân & Tiếp đón), sau đó nhân sự mở rộng ở Đợt 7.  
-**Domain:** `patient`, `identity`, `facility`, `encounter`.
+**Trạng thái:** `[~] Có triển khai trong checkout; chờ commit và nghiệm thu`
+**Đợt:** 1; quản trị nhân sự mở rộng ở Đợt 7.
+**Domain:** `patient`, `identity`, `facility`, `appointment`.
 
----
+> Các repository/use case/UI của Tiếp đón hiện có thay đổi chưa commit. Trạng thái này mô tả checkout đang rà soát, không khẳng định branch đã chia sẻ hoặc release đã có chức năng.
 
-## 1. Hiện có
+## Hiện có trong source
 
-- **Models Bệnh nhân (Đã nâng cấp):** `BenhNhan`, `BenhNhanCoSo`, `BaoHiem`, `TienSuBenh`, `DoiTuongKham` (Enum mới).
-- **Models Nhân sự & Cơ sở:** `NhanVien`, `ChucVu`, `Khoa`, `PhongKham`, `CoSo`, `NhanVienKhoa`, `NhanVienVaiTro`, `VaiTro`.
-- **CSDL SQL Server:** Các bảng quan hệ tương ứng đã được khởi tạo và kiểm tra ràng buộc toàn vẹn qua Migration V1 & V2.
-- **UI Desktop:** `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel`, `ReceptionTopToolbar`, `ReceptionFooterBar`.
+- **Application:** `RegisterPatientCommand`/`RegisterPatientHandler`, `SearchPatientsQuery`/handler, use case đọc hàng đợi.
+- **Infrastructure:** repository bệnh nhân, bảo hiểm, phòng khám và hàng đợi JDBC.
+- **Desktop:** `ReceptionCompositionRoot`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel` và các thành phần toolbar/footer.
+- **Luồng lưu:** handler kiểm tra dữ liệu bắt buộc, bệnh nhân và BHYT; trong transaction ghi bệnh nhân, thẻ bảo hiểm, lượt khám và số thứ tự hàng đợi.
+- **Tìm kiếm:** theo mã bệnh nhân, CCCD, số điện thoại hoặc họ tên; chi tiết thực tế tùy truy vấn hiện triển khai.
 
----
+## Quy tắc nghiệp vụ cần bảo vệ
 
-## 2. Chi tiết 15 Trường Y Tế Form Đăng Ký Cần Nối Vào Domain & CSDL
+1. Hồ sơ hiện hữu phải được chọn/cập nhật, không tạo bệnh nhân thứ hai chỉ vì tên hoặc cách viết khác nhau.
+2. CCCD trùng phải trả thông báo nghiệp vụ hướng dẫn tìm hồ sơ cũ. Kiểm tra trước khi ghi hiện chưa đủ để chống hai yêu cầu đồng thời; cần unique index phù hợp ở SQL Server và ánh xạ lỗi unique.
+3. Đăng ký, cập nhật bảo hiểm và tạo lượt khám phải nguyên tử: lỗi ở bất kỳ bước nào thì rollback toàn bộ.
+4. Chỉ nhận phòng khám đang hoạt động và có quan hệ cơ sở/khoa hợp lệ.
+5. Thông tin BHYT cần validation theo trường bắt buộc và ngày hiệu lực; quy tắc hưởng/quyền lợi phải được xác nhận bởi nghiệp vụ, không suy diễn chỉ từ giá trị form.
+6. Kiểm tra tuổi, số điện thoại, CCCD, lịch sử chỉnh sửa và quyền xem dữ liệu theo policy được thống nhất.
 
-Màn hình `PatientRegistrationFormPanel` cần đọc và lưu đầy đủ 15 trường y tế thực chiến:
+## Công việc còn lại
 
-1. **`doiTuongKham`** ➔ `LuotKham.doiTuongKham` (Enum: `BHYT`, `VIEN_PHI`, `YEU_CAU`, `MIEN_PHI`).
-2. **`lyDoKham`** ➔ `LuotKham.lyDoKham` (Lý do vào viện/triệu chứng ban đầu).
-3. **`maDkbd`** ➔ `BaoHiem.maDkbd` (Mã cơ sở đăng ký khám chữa bệnh ban đầu).
-4. **`mucHuong`** ➔ `BaoHiem.mucHuong` (Mức hưởng bảo hiểm: 80%, 95%, 100%).
-5. **`ngayDu5Nam`** ➔ `BaoHiem.ngayDu5Nam` (Ngày miễn cùng chi trả theo luật BHYT).
-6. **`dungTuyen`** ➔ `BaoHiem.dungTuyen` (Trạng thái đúng tuyến / thông tuyến).
-7. **`nguoiLienHe`** ➔ `BenhNhan.nguoiLienHe` (Họ tên người thân/giám hộ).
-8. **`moiQuanHe`** ➔ `BenhNhan.moiQuanHeNguoiLienHe` (Quan hệ: Bố/Mẹ/Vợ/Chồng/Khác).
-9. **`soDienThoaiNguoiLienHe`** ➔ `BenhNhan.soDienThoaiNguoiLienHe`.
-10. **`ngheNghiep`** ➔ `BenhNhan.ngheNghiep`.
-11. **`danToc`** ➔ `BenhNhan.danToc` (Mặc định: "Kinh").
-12. **`quocTich`** ➔ `BenhNhan.quocTich` (Mặc định: "Việt Nam").
-13. **`diaChi`** ➔ `BenhNhan.diaChi` (Số nhà, tổ dân phố, đường).
-14. **`phuongXa`, `quanHuyen`, `tinhThanh`** ➔ `BenhNhan` (Địa chỉ hành chính chuẩn).
-15. **`maThe`** ➔ `BaoHiem.maThe` (Mã số thẻ 15 ký tự).
+- [ ] Commit/review phần thay đổi Tiếp đón vào branch nguồn dùng để triển khai.
+- [ ] Thêm unit test cho validation, cập nhật hồ sơ cũ, dữ liệu BHYT và các nhánh lỗi.
+- [ ] Chạy integration test trên SQL Server thử nghiệm cho save/search/queue và rollback.
+- [ ] Bảo đảm chống trùng CCCD ở DB; migration phải dừng an toàn nếu dữ liệu mẫu hiện có xung đột, không tự xóa/gộp.
+- [ ] Kiểm thử UI: lỗi không xóa form, thao tác DB ngoài EDT, refresh queue sau đăng ký.
+- [ ] Xác nhận các trường form ánh xạ đúng schema/entity; không dùng nhãn “đồng bộ 100%” nếu chưa có test mapping.
+- [ ] Xác nhận xem `ClinicRoomStatusPanel` có yêu cầu refresh/polling, hành vi khi DB mất kết nối và quy trình tiếp tục.
 
----
+## Nhân sự
 
-## 3. Backlog Kỹ Thuật Tầng Application & Infrastructure
+`NhanVien` và đăng nhập nền tảng đã có repository/application wiring trong source. CRUD nhân sự, phân ca, khóa/mở tài khoản, quản lý vai trò và phân quyền vẫn thuộc backlog quản trị ở Đợt 7/Phân hệ 08; không xem việc đăng nhập hoạt động là đã hoàn tất quản trị nhân sự.
 
-- [ ] **`clinic-application` Use Cases:**
-  - `RegisterPatientCommand` & `RegisterPatientCommandHandler`: Tiếp nhận thông tin từ form, validate ngày sinh, CCCD, lưu `BenhNhan` và `BaoHiem` trong một transaction.
-  - `SearchPatientsQuery` & `SearchPatientsQueryHandler`: Tìm kiếm đa tiêu chí (Mã BN, CCCD, Điện thoại, Họ tên) trả về `List<PatientSummaryDto>`.
-  - `CreateEncounterCommand`: Tiếp nhận vào hàng đợi phòng khám, cấp số thứ tự khám tăng dần trong ngày.
-- [ ] **`clinic-infrastructure` Repositories:**
-  - `BenhNhanRepositoryImpl`: Thao tác CRUD bảng `BenhNhan`, tìm kiếm tối ưu bằng Index trên `cccd`, `soDienThoai`.
-  - `BaoHiemRepositoryImpl`: Thao tác bảng `BaoHiem`.
-  - `LuotKhamRepositoryImpl`: Thao tác bảng `LuotKham`, sinh mã lượt khám `LK-yyMMdd-XXXX`.
-  - `PhongKhamRepositoryImpl`: Truy vấn danh sách phòng khám đang hoạt động từ bảng `PhongKham`.
-- [ ] **Tích hợp giao diện `clinic-desktop`:**
-  - Áp dụng `SwingWorker` khi nhấn nút "Lưu hồ sơ" hoặc "Tìm kiếm" để hiển thị loading spinner, không làm đơ giao diện.
-  - Tự động điền dữ liệu khi quét mã QR thẻ BHYT / CCCD gắn chip (nếu có thiết bị).
+## Nghiệm thu Đợt 1
 
----
-
-## 4. Nghiệm thu
-
-- [ ] Đăng ký bệnh nhân thành công, thông tin được lưu vĩnh viễn vào SQL Server bảng `BenhNhan` và `BaoHiem`.
-- [ ] Khởi động lại ứng dụng, tra cứu theo CCCD hoặc SĐT tìm lại được đúng bệnh nhân.
-- [ ] Tiếp nhận bệnh nhân vào phòng khám: Bệnh nhân lập tức hiển thị trên bảng hàng đợi `ReceptionPanel` với số thứ tự duy nhất.
-- [ ] Cảnh báo trùng lặp khi nhập CCCD đã tồn tại trong hệ thống.
+- [ ] Đăng ký bệnh nhân tổng hợp trên DB thử nghiệm, restart ứng dụng và tìm lại chính xác.
+- [ ] Chọn hồ sơ cũ và cập nhật; không nhân đôi hồ sơ.
+- [ ] Tạo lượt khám, cấp queue number không trùng trong cùng phạm vi phòng/ngày.
+- [ ] Mô phỏng lỗi ghi và xác nhận patient/insurance/visit cùng rollback.
+- [ ] Hai đăng ký đồng thời cùng CCCD không thể tạo hai hồ sơ active.
+- [ ] Kiểm tra form giữ dữ liệu và hiển thị lỗi thân thiện.

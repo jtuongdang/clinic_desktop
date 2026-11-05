@@ -1,61 +1,40 @@
 # 00 — Hiện trạng và nguyên tắc phân tích
 
-**Cập nhật:** 04/11/2026 (Phiên cập nhật sau Migration CSDL SQL Server & Nâng cấp Domain)  
-**Mục đích:** Chốt điểm xuất phát chính xác theo thực tế mã nguồn và CSDL để điều phối kế hoạch triển khai không bị chệch hướng.
+**Cập nhật:** 05/11/2026
+**Phạm vi:** Clinic Management Desktop — Java, Maven, JDBC, SQL Server, Java Swing.
 
-## Tóm tắt hiện trạng thực tế
+> Trạng thái dưới đây phản ánh mã nguồn trong checkout tại ngày cập nhật. Một phần luồng Tiếp đón đang là thay đổi chưa commit; “có trong checkout” không đồng nghĩa đã được build, kiểm thử tích hợp hoặc nghiệm thu.
 
-- **Kiến trúc:** Dự án Maven multi-module Java 17 chuẩn Clean Architecture: `clinic-domain`, `clinic-application`, `clinic-infrastructure`, `clinic-desktop`.
-- **Domain Layer (`clinic-domain`):**
-  - Đã chuẩn hóa 17 subpackages, 129 files, 34 enums, bao quát toàn bộ thực thể y tế.
-  - Vừa được bổ sung 3 Enums thực chiến: `KetQuaDieuTri`, `HuongXuTri`, `DoiTuongKham` cùng hơn 30 trường dữ liệu y tế chuyên sâu (`BenhNhan`, `BaoHiem`, `LuotKham`, `ChanDoan`, `ChiTietDonThuoc`, `ChiDinhDichVu`, `HoaDon`, `Item`).
-  - Đầy đủ Repository Interfaces và Domain Services (`FefoAllocationService`, `ClinicalDrugSafetyService`,...).
-- **Cơ sở dữ liệu & Migration (`clinic-infrastructure`):**
-  - **ĐÃ THỰC THI THÀNH CÔNG 100% TRÊN MICROSOFT SQL SERVER (`clinicDb`):**
-    + **49 bảng** dữ liệu quan hệ hoàn chỉnh.
-    + **80 khóa ngoại (Foreign Keys)** ràng buộc toàn vẹn quan hệ cha-con.
-    + Cơ chế Idempotent Tracking qua bảng `__schema_migrations`.
-    + Dữ liệu ban đầu (Seed Data): Đầy đủ cơ sở, 5 khoa, 8 phòng khám, 2 tài khoản nhân viên (`admin`, `tiennv`), danh mục ICD-10, dịch vụ kỹ thuật, thuốc và tồn kho theo lô FEFO.
-  - Có sẵn `DatabaseConnection` quản lý kết nối JDBC và `DatabaseMigrationRunner` tự động chạy script khi khởi động.
-- **Desktop UI Layer (`clinic-desktop`):**
-  - Đã có khung giao diện Swing phong phú: `LoginForm`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `DoctorStationPanel`, `PharmacyDispensePanel`, `BillingInvoicePanel`, `ClinicReportPanel`, `SystemConfigPanel`.
-  - **Module xuất tài liệu DOCX (`core/docx`):** Đã hoàn thiện 100% bộ engine OpenXML thuần Java (Zero-dependency) gồm `DocxDocument`, `DocxTable`, `DocxExportService`, `DocxManager`, sẵn sàng gắn nút xuất đơn thuốc, bệnh án, giấy hẹn.
-  - *Khoảng cách hiện tại:* Các panel giao diện chủ yếu dùng mock data hoặc danh sách cố định, chưa nối vào use cases thực tế.
-- **Application Layer (`clinic-application`):**
-  - Hiện đang là thư mục trống trong `src/main/java`, cần khẩn trương xây dựng Command/Query Handlers, DTOs, và Transaction Boundaries.
+## Hiện trạng theo lớp
 
-## Mức độ theo lớp
-
-| Lớp | Trạng thái thực tế | Việc cần làm tiếp theo |
+| Lớp | Bằng chứng trong source | Đánh giá hiện tại |
 |---|---|---|
-| **Domain** | Đã nâng cấp toàn diện các trường thực chiến y tế và enums | Hoàn thiện unit test kiểm chứng Business Invariants (FEFO, Drug Safety, EMR Lock). |
-| **CSDL (SQL Server)** | **Hoàn thành 100% Migration (49 bảng, 80 FKs, Seed Data)** | Bảo trì các script migration bổ sung (nếu có thay đổi schema trong tương lai). |
-| **Infrastructure** | Có `DatabaseConnection` và `DatabaseMigrationRunner` đã chạy tốt | Xây dựng JDBC Repositories implementations, Unit of Work / Transaction Manager qua JDBC. |
-| **Application** | Chưa có code | Xây dựng Use cases, DTOs, Validation, Authorization và điều phối giao dịch. |
-| **Desktop** | Nhiều UI prototype + Đã xong core DOCX export engine | Thay thế Mock Data bằng `SwingWorker` gọi Application Services, hiển thị Loading/Error. |
-| **Test/Release** | Test source hiện chỉ có `.gitkeep` | Viết Integration tests cho Repository và End-to-end slice test. |
+| `clinic-domain` | Các model chia theo `patient`, `identity`, `facility`, `appointment`, `examination`, `prescription`, `inventory`, `billing`, `service`, `system` và các miền khác. | Nền model rộng; từng invariant và nghiệp vụ chưa thể xem là đã hoàn thiện chỉ vì có entity. |
+| `clinic-application` | Có `Result`, `Command`/`Query`, handlers xác thực và Tiếp đón, cùng `TransactionBoundary`. | Đã có use case cho đăng nhập và đăng ký/tìm kiếm bệnh nhân, hàng đợi; cần test và mở rộng cho các luồng còn lại. |
+| `clinic-infrastructure` | Có JDBC connection, migration runner, `JdbcTransactionManager`, `JdbcUnitOfWork`, repository nhân viên, bệnh nhân, bảo hiểm, phòng khám và hàng đợi. | Có vertical slice persistence cho xác thực/Tiếp đón; migration/schema thực tế phải được xác minh trên DB thử nghiệm khi thay đổi. |
+| `clinic-desktop` | Có Swing UI cho auth, dashboard, reception, doctor/examination, paraclinical, pharmacy, billing, catalog, reports và system. | Độ hoàn thiện khác nhau theo phân hệ. UI prototype hoặc dữ liệu mẫu chưa chứng minh luồng nghiệp vụ end-to-end. |
+| Kiểm thử | Các `src/test` hiện chỉ có `.gitkeep`, chưa có test tự động của Clinic modules trong checkout. | Cần bổ sung test và chạy `mvn clean verify`; chưa xác nhận build trong lần rà soát này. |
 
-## Nguyên tắc nối model với màn hình & Thiết kế kỹ thuật
+## Luồng đã có trong checkout
 
-1. **Nguyên tắc Clean Architecture:**
-   - Mọi thao tác ghi (Write) và đọc (Read) từ Swing UI bắt buộc phải đi qua Application Service (`clinic-application`).
-   - Tuyệt đối **KHÔNG** cho phép UI gọi trực tiếp JDBC Connection hoặc tự áp đặt quy tắc nghiệp vụ Domain.
-2. **Quy tắc luồng xử lý UI (Swing Concurrency & EDT Safety):**
-   - Mọi thao tác truy vấn CSDL hoặc chạy tác vụ nặng **bắt buộc phải chạy nền** thông qua `SwingWorker` hoặc `CompletableFuture`.
-   - Tuyệt đối không block Event Dispatch Thread (EDT) làm đơ giao diện Swing. Mọi panel phải có trạng thái trực quan: Loading spinner/progress bar, Empty state, và Error notification.
-3. **Quản lý Transaction (Unit of Work):**
-   - Với các ca ghi đa bảng (ví dụ: Xuất kho = trừ `TonKho` + tạo `PhieuXuatKho` + ghi `InventoryTransaction`), Application layer quản lý Transaction Scope thông qua Connection gắn với `ThreadLocal` hoặc Connection context để đảm bảo tính nguyên tử (ACID).
-4. **Phân định Aggregate Root vs Form con:**
-   - Model con (`ChiTietDonThuoc`, `ChiTietHoaDon`, `ChiTietNhapKho`) nằm trực tiếp trong aggregate cha và form thao tác chính, không mở cửa sổ CRUD độc lập.
-5. **Đồng bộ dữ liệu Form - Domain:**
-   - Các trường mới bổ sung (ví dụ: 15 trường trên màn hình Đăng ký bệnh nhân) phải được map 1-1 chính xác vào DTO và Entity trước khi lưu xuống SQL Server.
+- **Xác thực:** `AuthenticationCompositionRoot` nối `LoginForm` tới application handler và `NhanVienRepositoryImpl`.
+- **Tiếp đón:** `ReceptionCompositionRoot` nối form với use cases đăng ký/tìm bệnh nhân và hàng đợi. Đăng ký tạo/cập nhật bệnh nhân, thông tin bảo hiểm và lượt khám trong một transaction theo code hiện có.
+- Các thay đổi Tiếp đón trên đang chưa commit. Cần kiểm thử, review và đồng bộ tài liệu trước khi coi Đợt 1 đã nghiệm thu hoặc giao Agent từ branch/commit khác.
 
-## Nguồn đối chiếu trong workspace
+## Nguyên tắc đánh giá hoàn thiện
 
-- `clinic-domain/src/main/java/vn/clinicmanagement/domain/**`
-- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/**`
-- `clinic-application/src/main/java`
-- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/**`
-- `clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql`
-- `clinic-infrastructure/src/main/resources/migrations/V2__Seed_Initial_Data.sql`
-- `UI_CODING_STANDARDS.md`, `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `docs/UI_DOMAIN_MAPPING_ANALYSIS.md`
+1. Đánh giá theo luồng **màn hình → application use case → domain rule → repository/JDBC → CSDL → đọc lại/hiển thị**, không dựa riêng vào sự tồn tại của model hoặc panel.
+2. Chỉ đánh dấu hoàn tất khi có tiêu chí nghiệp vụ, xử lý lỗi, kiểm thử phù hợp và bằng chứng chạy được. Ghi riêng trạng thái code local, commit, test và nghiệm thu.
+3. UI không gọi JDBC trực tiếp. I/O và tác vụ dài chạy ngoài Swing EDT; cập nhật UI trên EDT.
+4. Các thao tác ghi nhiều bảng phải dùng transaction, có rollback và test tính nguyên tử.
+5. Dùng dữ liệu tổng hợp trong kiểm thử; không đưa dữ liệu bệnh nhân thật vào fixture, log hoặc báo cáo phát triển.
+6. Quy tắc BHYT, thanh toán, thuốc, quyền truy cập và biểu mẫu pháp quy phải được xác nhận với người phụ trách nghiệp vụ trước khi tuyên bố tuân thủ.
+
+## Nguồn đối chiếu
+
+- `clinic-domain/src/main/java/vn/clinicmanagement/domain/`
+- `clinic-application/src/main/java/vn/clinicmanagement/application/`
+- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/`
+- `clinic-infrastructure/src/main/resources/migrations/`
+- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/`
+- `README.md`, `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `UI_CODING_STANDARDS.md`

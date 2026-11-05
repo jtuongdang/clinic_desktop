@@ -35,9 +35,10 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 
 ## Ưu tiên tổng thể
 
-1. Khóa an toàn và chạy được môi trường dev/test; hoàn thiện xác thực.
-2. Xây vertical slice có persistence qua patient registration và visit queue.
-3. Hoàn thiện EMR và dịch vụ/CLS.
-4. Hoàn thiện kho, cấp phát và viện phí bằng transaction.
-5. Hoàn thiện quản trị, payroll, báo cáo và tích hợp mở rộng.
+1. Review, commit và kiểm thử vertical slice Tiếp đón đang có trong checkout; xác nhận transaction, persistence, queue và lỗi dữ liệu trùng.
+2. Xây lịch hẹn, vòng đời lượt khám, sinh hiệu và luồng EMR có lưu trữ thật.
+3. Hoàn thiện chỉ định/kết quả CLS, kho/cấp phát và viện phí theo phụ thuộc nghiệp vụ.
+4. Bổ sung quyền tập trung, audit, quản trị, báo cáo và hardening cấu hình trước khi cân nhắc dữ liệu thật.
+
+Tài liệu task pilot cho AI coding agents: [AI_AGENT_PILOT_TASKS.md](../AI_AGENT_PILOT_TASKS.md).
 
