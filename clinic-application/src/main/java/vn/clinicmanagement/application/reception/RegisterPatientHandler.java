@@ -7,6 +7,7 @@ import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.domain.patient.PatientIdentityConflictException;
 import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
 import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
 import vn.clinicmanagement.domain.repositories.IPhongKhamRepository;
@@ -74,6 +75,9 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
 
                 return Result.success(new RegistrationReceipt(patient.getId(), patient.getMaBenhNhanFormat(),
                         visit.getId(), visit.getSoThuTu() == null ? 0 : visit.getSoThuTu(), visit.getSoThuTuDisplay()));
+            } catch (PatientIdentityConflictException ex) {
+                return Result.failure("PATIENT_DUPLICATE_CCCD",
+                        "CCCD đã có hồ sơ. Hãy tìm người bệnh và chọn hồ sơ hiện có.");
             } catch (RuntimeException ex) {
                 return Result.failure("PATIENT_REGISTRATION_FAILED", "Không thể lưu đăng ký. Dữ liệu chưa được ghi; hãy thử lại.");
             }

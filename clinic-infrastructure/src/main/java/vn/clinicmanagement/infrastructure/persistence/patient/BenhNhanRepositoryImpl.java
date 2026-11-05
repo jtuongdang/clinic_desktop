@@ -3,6 +3,7 @@ package vn.clinicmanagement.infrastructure.persistence.patient;
 import vn.clinicmanagement.domain.common.IUnitOfWork;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.domain.patient.PatientIdentityConflictException;
 import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
 import vn.clinicmanagement.domain.repositories.ISpecification;
 import vn.clinicmanagement.domain.repositories.PagedResult;
@@ -273,8 +274,20 @@ public final class BenhNhanRepositoryImpl implements IBenhNhanRepository {
 
     private static String escapeLike(String value) { return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace("[", "\\["); }
 
-    private static IllegalStateException persistenceFailure(SQLException ex) {
+    static RuntimeException persistenceFailure(SQLException ex) {
+        if (isDuplicateKey(ex)) return new PatientIdentityConflictException();
         return new IllegalStateException("Lỗi truy cập dữ liệu bệnh nhân.", ex);
+    }
+
+    private static boolean isDuplicateKey(SQLException exception) {
+        for (SQLException current = exception; current != null; current = current.getNextException()) {
+            if (current.getErrorCode() == 2601 || current.getErrorCode() == 2627) return true;
+            for (Throwable cause = current.getCause(); cause != null; cause = cause.getCause()) {
+                if (cause instanceof SQLException sqlCause
+                        && (sqlCause.getErrorCode() == 2601 || sqlCause.getErrorCode() == 2627)) return true;
+            }
+        }
+        return false;
     }
 
     @FunctionalInterface private interface SqlBinder { void bind(PreparedStatement statement) throws SQLException; }

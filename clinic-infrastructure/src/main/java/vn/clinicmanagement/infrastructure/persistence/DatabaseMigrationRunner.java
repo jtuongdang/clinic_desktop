@@ -24,6 +24,8 @@ import java.util.List;
  * 2. Tự động quét và thực thi tuần tự các file migration trong `migrations/`:
  *    - V1__Initial_Clinic_Schema.sql (Khởi tạo toàn bộ cấu trúc bảng, PK, FK, Index)
  *    - V2__Seed_Initial_Data.sql (Nạp dữ liệu danh mục ban đầu)
+ *    - V3__Repair_Demo_Account_Passwords.sql (Sửa hash tài khoản demo)
+ *    - V4__Enforce_Active_Patient_CCCD_Uniqueness.sql (Định danh CCCD duy nhất cho hồ sơ hoạt động)
  * 3. Đảm bảo tính Idempotent: Chỉ chạy những script chưa được áp dụng.
  */
 public class DatabaseMigrationRunner {
@@ -33,7 +35,8 @@ public class DatabaseMigrationRunner {
     private static final String[] MIGRATION_FILES = {
             "migrations/V1__Initial_Clinic_Schema.sql",
             "migrations/V2__Seed_Initial_Data.sql",
-            "migrations/V3__Repair_Demo_Account_Passwords.sql"
+            "migrations/V3__Repair_Demo_Account_Passwords.sql",
+            "migrations/V4__Enforce_Active_Patient_CCCD_Uniqueness.sql"
     };
 
     /**
