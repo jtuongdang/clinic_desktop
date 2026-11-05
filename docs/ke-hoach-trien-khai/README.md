@@ -27,6 +27,7 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [01 — Ma trận model–màn hình](01-ma-tran-model-man-hinh.md) | Domain models, UI hiện có, màn hình cần bổ sung, mức ưu tiên. |
 | [02 — Các đợt triển khai](02-cac-dot-trien-khai.md) | Lộ trình theo dependency, deliverable và điều kiện qua đợt. |
 | [03 — Model task board](03-model-task-board.md) | Trạng thái task theo model family, dependency, bằng chứng và blocker. |
+| [Operations and release runbook](../OPERATIONS_RUNBOOK.md) | Hướng dẫn build/test, cấu hình, migration, launch và backup/restore rehearsal cho local hoặc controlled test deployment; ghi rõ gate chưa đạt. |
 | [Phase 0 — Review domain events](phase0-domain-events-review.md) | Vòng đời sự kiện miền, transaction timing, persistence, UI và test gaps. |
 | [Phase 0 — Review repository contracts](phase0-repository-contract-review.md) | Map model repository từ domain port tới adapter, use case, transaction và test. |
 | [Phase 0 — Review error mapping](phase0-error-mapping-review.md) | Map lỗi từ domain/Application/JDBC tới thông báo Swing và rủi ro dữ liệu. |
