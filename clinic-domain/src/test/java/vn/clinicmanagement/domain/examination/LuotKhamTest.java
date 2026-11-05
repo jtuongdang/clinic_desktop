@@ -19,6 +19,38 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class LuotKhamTest {
 
     @Test
+    void startExamTransitionsWaitingVisitAndRegistersStartEvent() {
+        LuotKham visit = visitInState(TrangThaiLuotKham.CHO_KHAM);
+
+        visit.startExam();
+
+        assertEquals(TrangThaiLuotKham.DANG_KHAM, visit.getTrangThai());
+        assertNotNull(visit.getThoiGianBatDauKham());
+        assertEquals(1, visit.getDomainEvents().size());
+        LuotKhamStartedEvent event = assertInstanceOf(
+                LuotKhamStartedEvent.class, visit.getDomainEvents().get(0));
+        assertEquals(42, event.getVisitId());
+        assertEquals(7, event.getPatientId());
+        assertEquals(11, event.getDoctorId());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TrangThaiLuotKham.class, mode = EnumSource.Mode.EXCLUDE, names = "CHO_KHAM")
+    void startExamRejectsNonWaitingStateWithoutChangingVisitOrEvents(TrangThaiLuotKham initialState) {
+        LuotKham visit = visitInState(initialState);
+        LocalDateTime startTime = LocalDateTime.of(2026, 10, 20, 9, 15);
+        visit.setThoiGianBatDauKham(startTime);
+        visit.registerDomainEvent(new LuotKhamStartedEvent(42, 7, 11));
+        List<?> eventsBefore = visit.getDomainEvents();
+
+        assertThrows(IllegalStateException.class, visit::startExam);
+
+        assertEquals(initialState, visit.getTrangThai());
+        assertEquals(startTime, visit.getThoiGianBatDauKham());
+        assertEquals(eventsBefore, visit.getDomainEvents());
+    }
+
+    @Test
     void completeExamTransitionsActiveVisitAndRegistersCompletionEvent() {
         LuotKham visit = visitInState(TrangThaiLuotKham.DANG_KHAM);
 
