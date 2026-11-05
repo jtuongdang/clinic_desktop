@@ -182,3 +182,17 @@ Theo hướng dẫn của gói task (*"Run relevant checks when the sandbox perm
 2. **Mọi nhận định đều trỏ tới đường dẫn file/số dòng hoặc được gắn nhãn rõ ràng là khuyến nghị (`[Khuyến nghị / Recommendation]`):** **ĐẠT (PASS)** — Xem Mục 2, 3, 4, 5 (trích dẫn chính xác file và dòng) và Mục 6 (gắn nhãn `[Khuyến nghị / Recommendation]`).
 3. **Mô tả thời điểm giao dịch, hành vi lỗi/thử lại và khoảng trống kiểm thử mà không áp đặt kiến trúc Outbox hay kiến trúc khác khi chưa có bằng chứng:** **ĐẠT (PASS)** — Xem Mục 4.1, 4.2, 4.3, 5 và 6.1.
 4. **Ghi nhận chính xác lệnh kiểm định Maven mặc định và kết quả/blocker:** **ĐẠT (PASS)** — Xem Mục 7.1.
+
+---
+
+## 8. Phụ lục cập nhật sau review — `PLAT-EVENT-PUBLISHER-01` (06/11/2026)
+
+> Phần 1–7 ở trên là snapshot lịch sử của review ban đầu; kết luận tại thời điểm đó được giữ nguyên. Phụ lục này ghi nhận trạng thái sau tích hợp cục bộ, không thay thế hay diễn giải lại các kết luận lịch sử.
+
+ClinicOrchestrator task `0a565269-28b5-491a-85b6-abbe5ed81323` được tích hợp cục bộ bằng commit `5dba0e6`. `clinic-application` hiện có `InProcessDomainEventPublisher`: publisher đồng bộ trên luồng gọi, phân phối tới handler đăng ký theo đúng lớp sự kiện, giữ thứ tự đăng ký và truyền lỗi handler ra ngoài, dừng dispatch khi handler ném lỗi. Sáu unit test dùng sự kiện tổng hợp bao phủ exact-class dispatch, thứ tự/luồng gọi, không handler, kiểm tra null, truyền lỗi và tính độc lập giữa các instance.
+
+**Ranh giới implementation:** đây là primitive dispatch in-process độc lập. Chưa có cơ chế thu thập sự kiện từ aggregate và dispatch gắn với transaction; publisher chưa được đăng ký/nối vào transaction manager, `UnitOfWork`, use case hay workflow lâm sàng/audit. Các test hiện tại không xác nhận aggregate event ID/payload hoặc chấp nhận payload sự kiện nghiệp vụ, và chưa có đăng ký handler nghiệp vụ thực.
+
+**Còn lại dưới `PLAT-EVENT-01`:** (1) thiết kế/kiểm thử thu thập và dispatch event đúng ranh giới transaction, gồm hành vi rollback; (2) xác định và kiểm thử event ID/payload hợp lệ sau khi aggregate có định danh; (3) wiring handler thực theo contract nghiệp vụ/audit đã được duyệt; (4) xác định hành vi retry và liệu có cần outbox. Không có retry hoặc outbox được triển khai trong task publisher này. Parent `PLAT-EVENT-01` tiếp tục `[~]` In progress.
+
+**Bằng chứng kiểm định được ghi nhận:** configured JDK 17 `mvn -Djava.awt.headless=true clean verify` thành công với **252 tests, 0 failures, 0 errors, 4 SQL Server opt-in skips** trên 56 Surefire XML reports. Kết quả này là baseline verify mặc định; bốn skip là test SQL Server opt-in, không thuộc dispatcher.
