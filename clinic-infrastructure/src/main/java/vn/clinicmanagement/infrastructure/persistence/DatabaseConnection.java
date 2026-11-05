@@ -25,10 +25,7 @@ public class DatabaseConnection {
     private static String dbUser;
     private static String dbPassword;
     private static String dbDriver;
-
-    static {
-        loadConfiguration();
-    }
+    private static boolean configurationLoaded;
 
     private DatabaseConnection() {}
 
@@ -60,6 +57,13 @@ public class DatabaseConnection {
         }
     }
 
+    private static synchronized void loadConfigurationIfNeeded() {
+        if (!configurationLoaded) {
+            loadConfiguration();
+            configurationLoaded = true;
+        }
+    }
+
     private static void overrideFromEnvironment(String key, java.util.function.Consumer<String> setter) {
         String value = System.getenv(key);
         if (value != null && !value.isBlank()) setter.accept(value.trim());
@@ -77,6 +81,7 @@ public class DatabaseConnection {
      * Gán thông tin kết nối tách rời
      */
     public static void configure(String url, String username, String password) {
+        loadConfigurationIfNeeded();
         dbUrl = url;
         dbUser = username;
         dbPassword = password;
@@ -89,6 +94,13 @@ public class DatabaseConnection {
      */
     public static Connection getConnection() throws SQLException {
         // 1. Ưu tiên sử dụng chuỗi kết nối gán trực tiếp
+        if (CUSTOM_CONNECTION_STRING != null && !CUSTOM_CONNECTION_STRING.isEmpty()) {
+            autoRegisterDriver(CUSTOM_CONNECTION_STRING);
+            return DriverManager.getConnection(CUSTOM_CONNECTION_STRING);
+        }
+
+        loadConfigurationIfNeeded();
+
         if (CUSTOM_CONNECTION_STRING != null && !CUSTOM_CONNECTION_STRING.isEmpty()) {
             autoRegisterDriver(CUSTOM_CONNECTION_STRING);
             return DriverManager.getConnection(CUSTOM_CONNECTION_STRING);
@@ -130,24 +142,34 @@ public class DatabaseConnection {
      * @return true nếu kết nối thành công, false nếu lỗi
      */
     public static boolean testConnection() {
+        return testConnection(DatabaseConnection::getConnection);
+    }
+
+    static boolean testConnection(ConnectionSupplier connectionSupplier) {
         System.out.println("--------------------------------------------------");
         System.out.println("Đang kiểm tra kết nối tới cơ sở dữ liệu...");
-        try (Connection conn = getConnection()) {
+        try (Connection conn = connectionSupplier.get()) {
             if (conn != null && !conn.isClosed()) {
                 System.out.println(" KẾT NỐI THÀNH CÔNG!");
-                System.out.println("  • Database Product: " + conn.getMetaData().getDatabaseProductName());
-                System.out.println("  • Database Version: " + conn.getMetaData().getDatabaseProductVersion());
-                System.out.println("  • Connected User   : " + conn.getMetaData().getUserName());
                 System.out.println("--------------------------------------------------");
                 return true;
             }
-        } catch (SQLException e) {
-            System.err.println(" KẾT NỐI THẤT BẠI!");
-            System.err.println("  • Mã lỗi : " + e.getErrorCode());
-            System.err.println("  • Chi tiết: " + e.getMessage());
-            System.out.println("--------------------------------------------------");
+        } catch (SQLException exception) {
+            printConnectionFailure();
+            return false;
         }
+        printConnectionFailure();
         return false;
+    }
+
+    private static void printConnectionFailure() {
+        System.err.println(" KẾT NỐI THẤT BẠI!");
+        System.out.println("--------------------------------------------------");
+    }
+
+    @FunctionalInterface
+    interface ConnectionSupplier {
+        Connection get() throws SQLException;
     }
 
     /**
