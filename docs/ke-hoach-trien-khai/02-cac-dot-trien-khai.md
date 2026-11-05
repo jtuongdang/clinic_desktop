@@ -1,126 +1,150 @@
 # 02 — Các đợt triển khai
 
-Lộ trình theo vertical slice và phụ thuộc nghiệp vụ. Trạng thái được cập nhật theo mã nguồn đã kiểm tra trong checkout; việc có code local chưa thay thế review, test và nghiệm thu.
+Lộ trình đã duyệt gồm **10 giai đoạn (Phase 0–9)**, chia theo vertical slice và dependency nghiệp vụ. Trạng thái dưới đây phản ánh bằng chứng trong checkout; code/model/UI hiện diện không tự được tính là nghiệm thu.
 
----
+## Phase 0 — Nền tảng, schema, giao dịch và xác thực
 
-## Đợt 0 — Nền tảng, CSDL, giao dịch và xác thực
-
-**Trạng thái:** `[x] Hoàn tất theo phạm vi nền tảng đã thống nhất`
+**Trạng thái:** `[~]` Có nền tảng trong source; chưa có bằng chứng hoàn tất kiểm thử/phát hành.
 **Phụ thuộc:** Không.
 
-- [x] Maven multi-module và các module Clean Architecture.
-- [x] SQL Server JDBC connection và migration runner; migrations hiện có V1–V3.
-- [x] Application primitives: `Result<T>`, `Command`, `Query`, handlers và transaction boundary.
-- [x] JDBC transaction manager / unit of work.
-- [x] Đăng nhập nối application với repository nhân viên từ SQL Server.
+**Model/phạm vi:** Migration/schema; `Result`, command/query, handler; transaction boundary; `NhanVien`, `VaiTro`; xác thực.
+**Deliverable:** Maven modules; SQL Server JDBC, migration runner V1–V4, transaction manager/unit of work; luồng đăng nhập nối application/repository.
 
-**Lưu ý vận hành:** trước khi sử dụng dữ liệu thật vẫn cần hoàn thiện bảo mật, quyền hạn, cấu hình secret và audit ở Đợt 7/Phân hệ 08. Hoàn tất Đợt 0 không đồng nghĩa ứng dụng đạt điều kiện production.
+- [ ] Build/review bằng cấu hình dự án và xác nhận migration từ DB thử nghiệm sạch.
+- [ ] Xác nhận transaction manager/rollback, cấu hình secret, audit và cơ chế cấp quyền trước khi dùng dữ liệu thật.
 
----
+**Điều kiện qua phase:** Build và test CI đạt; migrations chạy idempotent trên DB thử nghiệm; xác thực/persistence và rollback có test phù hợp; cấu hình secret và quyền được xác nhận.
 
-## Đợt 1 — Hồ sơ bệnh nhân, BHYT và tiếp nhận vào hàng đợi
+## Phase 1 — Hồ sơ bệnh nhân, BHYT và tiếp đón vào hàng đợi
 
-**Trạng thái:** `[~] Luồng đã có trong checkout; chờ commit, kiểm thử và nghiệm thu`
-**Phụ thuộc:** Đợt 0.
+**Trạng thái:** `[~]` Có phần triển khai và test regression cục bộ; chưa nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 0.
 
-**Model chính:** `BenhNhan`, `BaoHiem`, `CoSo`, `Khoa`, `PhongKham`, `LuotKham`.
-**UI chính:** `LoginForm`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel`.
+**Model/phạm vi:** `BenhNhan`, `BaoHiem`, `CoSo`, `Khoa`, `PhongKham`, `LuotKham`; CCCD/điện thoại; số thứ tự hàng đợi.
+**UI/use cases:** `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel`; đăng ký, tìm kiếm, queue.
 
-- [x] Trong checkout có repository bệnh nhân, bảo hiểm, phòng khám và hàng đợi.
-- [x] Có use cases đăng ký, tìm bệnh nhân và đọc hàng đợi.
-- [x] Form Tiếp đón được nối qua composition root và dùng SwingWorker cho các thao tác được tích hợp.
-- [ ] Chạy build/test phù hợp và kiểm tra luồng đăng ký, tìm lại hồ sơ, cập nhật bệnh nhân, bảo hiểm, lượt khám và queue trên DB thử nghiệm.
-- [ ] Kiểm thử rollback khi một bước ghi thất bại; kiểm tra lỗi trùng CCCD và tính duy nhất khi ghi đồng thời.
-- [ ] Review, commit phần thay đổi hiện còn local; đồng bộ tài liệu phân hệ sau nghiệm thu.
+- Source hiện có handler đăng ký/tìm kiếm/đọc queue, JDBC repositories và Swing composition root; queue/search chưa có test trên feature branch hiện tại.
+- [x] Có migration V4 unique active CCCD; các test hiện tại xác nhận phone validation, nhánh duplicate application và ánh xạ lỗi unique index bằng synthetic data.
+- UI source có hướng dẫn khi CCCD trùng, tìm kiếm bằng CCCD và giữ dữ liệu form; chưa có desktop test xác nhận tương tác UI.
+- [ ] Xác nhận save/search/queue trên SQL Server thử nghiệm, cập nhật hồ sơ/BHYT và đọc lại đúng sau restart.
+- [ ] Chứng minh rollback khi bước ghi lỗi, cấp queue không trùng dưới concurrency và xử lý duplicate CCCD đồng thời qua DB.
+- [ ] Chạy kiểm thử UI phù hợp; review và đồng bộ code lên remote trước khi ghi nhận publication (remote feature ref hiện chưa có).
 
-**Qua đợt khi:** form đăng ký/tìm kiếm tạo hoặc chọn đúng hồ sơ; lượt khám và hàng đợi được lưu nhất quán; đọc lại sau restart đúng; kiểm thử xác nhận transaction rollback.
+**Điều kiện qua phase:** Luồng đăng ký/chọn-cập nhật/tìm kiếm chạy từ UI đến SQL Server và đọc lại sau restart; BHYT/visit/queue nhất quán; rollback và concurrency được test; UI lỗi không mất dữ liệu. Test hiện tại chưa đáp ứng các tiêu chí này.
 
----
+## Phase 2 — Lịch hẹn, sinh hiệu và vòng đời lượt khám
 
-## Đợt 2 — Lịch hẹn, sinh hiệu và vòng đời lượt khám
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 1.
 
-**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
-**Phụ thuộc:** Đợt 1.
+**Model/phạm vi:** `LichHen`, `NguonLich`, `LuotKham`, `SinhHieu`, trạng thái lượt khám.
+**UI/use cases:** Tiếp đón, `ClinicRoomStatusPanel`, `ExaminationPanel`, màn hình/dialog lịch hẹn.
 
-**Model:** `LichHen`, `LuotKham`, `SinhHieu`, trạng thái lượt khám.
-**UI:** `ReceptionPanel`, `ClinicRoomStatusPanel`, `ExaminationPanel`, màn hình/dialog lịch hẹn.
+- [ ] Đặt, đổi, hủy, check-in/no-show; chuyển lịch thành lượt khám không tạo bản ghi trùng.
+- [ ] Ghi sinh hiệu với thời điểm và nhân viên thực hiện.
+- [ ] Chuyển trạng thái theo quy tắc nghiệp vụ, kiểm soát thao tác đồng thời.
 
-- [ ] Đặt, đổi, hủy lịch; đánh dấu đến/không đến; chuyển lịch thành lượt khám mà không tạo trùng.
-- [ ] Ghi sinh hiệu có thời điểm và nhân viên thực hiện.
-- [ ] Chuyển trạng thái lượt khám theo quy tắc nghiệp vụ, có kiểm soát tranh chấp khi nhiều người thao tác.
-- [ ] Tự làm mới queue hoặc cập nhật sau sự kiện; hiển thị lỗi/mất kết nối.
+**Điều kiện qua phase:** Lịch/lượt khám/sinh hiệu persist và đọc lại đúng; các chuyển trạng thái hợp lệ được test, gồm conflict, hủy và restart.
 
----
+## Phase 3 — Khám lâm sàng và EMR
 
-## Đợt 3 — Khám lâm sàng, EMR và kê đơn
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 2.
 
-**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
-**Phụ thuộc:** Đợt 2.
+**Model/phạm vi:** `ChanDoan`, `ICD`, `TienSuBenh`, `SinhHieu`, phần khám của `LuotKham`, kết quả/hướng xử trí, khóa EMR và lịch sử.
+**UI/use cases:** `DoctorStationPanel`, `ExaminationPanel`, clinical tabs/dialogs.
 
-**Model:** `ChanDoan`, `ICD`, `TienSuBenh`, `DonThuoc`, `ChiTietDonThuoc`, kết quả và hướng xử trí.
-**UI:** `DoctorStationPanel`, `ExaminationPanel`, các clinical tabs.
+- [ ] Tải đúng queue/lượt khám theo phạm vi bác sĩ/cơ sở.
+- [ ] Lưu nháp khám, sinh hiệu và chẩn đoán ICD từ danh mục persist.
+- [ ] Hoàn tất/khóa/mở theo quyền và trạng thái; ghi lịch sử thay đổi.
+- [ ] Xuất tài liệu từ dữ liệu đã persist, xác nhận biểu mẫu với nghiệp vụ.
 
-- [ ] Nạp lượt khám đang chờ và đúng phạm vi bác sĩ/cơ sở.
-- [ ] Lưu nháp khám và chẩn đoán ICD từ danh mục thật.
-- [ ] Kê đơn, kiểm tra dữ liệu thuốc và các cảnh báo domain đã được xác nhận.
-- [ ] Hoàn tất/khóa hồ sơ theo trạng thái và quyền; lưu lịch sử thay đổi.
-- [ ] Tích hợp xuất DOCX với dữ liệu đã persist; xác nhận mẫu với người phụ trách nghiệp vụ.
+**Điều kiện qua phase:** Hồ sơ được lưu/đọc lại, quyền và audit được kiểm tra; khóa EMR ngăn sửa trái phép; có test cho workflow và phục hồi sau restart.
 
----
+## Phase 4 — Kê đơn và an toàn thuốc
 
-## Đợt 4 — Chỉ định dịch vụ và cận lâm sàng
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 3.
 
-**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
-**Phụ thuộc:** Đợt 3.
+**Model/phạm vi:** `DonThuoc`, `ChiTietDonThuoc`, `Item`, `ClinicalDrugSafetyService` và cảnh báo đã được nghiệp vụ xác nhận.
+**UI/use cases:** `PrescriptionOrderPanel`, `PrescriptionOrderTabPanel`.
 
-**Model:** `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu`.
-**UI:** `ServiceOrderPanel`, `LabOrderTabPanel`, `ParaclinicalOrderPanel`.
+- [ ] Nạp thuốc/danh mục và lưu đơn gắn đúng lượt khám/bác sĩ.
+- [ ] Kiểm tra an toàn, liều dùng, trạng thái duyệt/hủy/sửa theo yêu cầu nghiệp vụ.
+- [ ] Nối đơn đã duyệt với cấp phát ở Phase 6.
+
+**Điều kiện qua phase:** Đơn và chi tiết persist, đọc lại chính xác; các cảnh báo/trạng thái có test và được xác nhận bởi nghiệp vụ.
+
+## Phase 5 — Chỉ định dịch vụ và cận lâm sàng
+
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 3.
+
+**Model/phạm vi:** `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu`.
+**UI/use cases:** `ServiceOrderPanel`, `LabOrderTabPanel`, `ParaclinicalOrderPanel`.
 
 - [ ] Tạo/hủy chỉ định có người thao tác, lý do và trạng thái.
-- [ ] Tiếp nhận, nhập, duyệt và trả kết quả; bảo toàn lịch sử sau duyệt.
-- [ ] Xác định thiết kế lưu kết quả hình ảnh/file trước khi triển khai UI.
+- [ ] Tiếp nhận, nhập, duyệt, trả kết quả; giữ lịch sử sau duyệt.
+- [ ] Chốt cách lưu file/hình ảnh trước khi triển khai quy trình liên quan.
 
----
+**Điều kiện qua phase:** Chỉ định/kết quả nối lượt khám, persist và truy vết được; test chuyển trạng thái, quyền và audit.
 
-## Đợt 5 — Kho, nhà thuốc và cấp phát
+## Phase 6 — Kho, nhà thuốc và cấp phát
 
-**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
-**Phụ thuộc:** Đợt 3.
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 4; kết nối chi phí với Phase 7.
 
-**Model:** `Item`, `Kho`, `TonKho`, phiếu nhập/xuất, lô hàng, `InventoryTransaction`, `FefoAllocationService`.
-**UI:** `PharmacyDispensePanel` và các pharmacy components.
+**Model/phạm vi:** `Item`, `Kho`, `TonKho`, lô, phiếu nhập/xuất, nhà cung cấp, `InventoryTransaction`, `FefoAllocationService`.
+**UI/use cases:** `PharmacyDispensePanel` và pharmacy components.
 
-- [ ] Quản lý nhập kho/lô/hạn dùng và nhà cung cấp.
-- [ ] Cấp phát đơn đã duyệt; kiểm tra tồn theo lô và transaction nguyên tử.
-- [ ] Kiểm kê, điều chỉnh có lý do và audit; ngăn tồn kho âm.
-- [ ] Cảnh báo cận hạn/hết hạn và dưới định mức.
+- [ ] Nhập hàng, quản lý lô/hạn dùng và nhà cung cấp.
+- [ ] Cấp phát đơn đã duyệt theo FEFO, trong transaction nguyên tử.
+- [ ] Kiểm kê/điều chỉnh có lý do và audit; ngăn tồn âm.
+- [ ] Cảnh báo hết hạn/cận hạn và dưới định mức.
 
----
+**Điều kiện qua phase:** Sổ tồn và giao dịch khớp sau nhập/xuất/điều chỉnh; test concurrency, rollback và không âm kho.
 
-## Đợt 6 — Viện phí và thu ngân
+## Phase 7 — Viện phí, thu ngân và payroll
 
-**Trạng thái:** `[ ] Chưa nghiệm thu end-to-end`
-**Phụ thuộc:** Đợt 3; kết nối Đợt 4–5 theo nguồn chi phí.
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 3; nhận nguồn phí từ Phase 5–6; payroll phụ thuộc dữ liệu nhân sự ở Phase 8.
 
-**Model:** `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`.
-**UI:** `BillingInvoicePanel`, phiếu thu và các màn hình liên quan.
+**Model/phạm vi:** `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`; payroll/ca và thù lao nhân viên theo domain hiện có.
+**UI/use cases:** `BillingInvoicePanel`, phiếu thu, màn hình payroll cần hoàn thiện.
 
-- [ ] Tổng hợp khoản thu từ dịch vụ đã thực hiện và thuốc đã cấp.
-- [ ] Chốt cách tính giá, BHYT, đồng chi trả, giảm trừ, làm tròn và tạm ứng với nghiệp vụ.
-- [ ] Hỗ trợ thu một phần/nhiều lần, hoàn/điều chỉnh có chứng từ; không sửa âm thầm hóa đơn đã thu.
-- [ ] Đối soát báo cáo với dữ liệu giao dịch.
+- [ ] Tổng hợp chi phí dịch vụ đã thực hiện và thuốc đã cấp.
+- [ ] Chốt giá, BHYT, đồng chi trả, giảm trừ, làm tròn, tạm ứng và payroll với nghiệp vụ.
+- [ ] Thu nhiều lần, hoàn/điều chỉnh có chứng từ; giữ nguyên audit hóa đơn đã thu.
+- [ ] Đối soát báo cáo với giao dịch nguồn.
 
----
+**Điều kiện qua phase:** Tính tiền/payroll tái lập được từ dữ liệu nguồn, có chứng từ và audit; test điều chỉnh/hoàn/đối soát.
 
-## Đợt 7 — Quản trị, bảo mật, báo cáo và phát hành
+## Phase 8 — Cơ sở, nhân sự, bảo mật và cấu hình
 
-**Trạng thái:** `[ ] Chưa nghiệm thu`
-**Phụ thuộc:** Các luồng nghiệp vụ cần báo cáo/quản trị.
+**Trạng thái:** `[ ]` Chưa có bằng chứng quản trị hoàn chỉnh.
+**Phụ thuộc:** Phase 0; các phase nghiệp vụ cần phân quyền phải được tích hợp trước phát hành.
 
-- [ ] Quản lý nhân viên, vai trò, phạm vi cơ sở/khoa và quyền theo use case.
-- [ ] Ghi audit an toàn; che/mask thông tin nhạy cảm trong log.
-- [ ] CRUD danh mục có validation và kiểm soát hiệu lực.
-- [ ] Báo cáo vận hành, viện phí, BHYT và kho theo định nghĩa nghiệp vụ đã duyệt.
-- [ ] Bảo vệ secret/cấu hình DB, hướng dẫn backup/restore và đóng gói ứng dụng.
-- [ ] Kiểm tra build/test/release bằng cấu hình CI và môi trường thử nghiệm.
+**Model/phạm vi:** `CoSo`, `Khoa`, `PhongKham`, `NhanVien`, `VaiTro`, `PhanQuyenCoSo`, `MaTranPhanQuyen`, `CaTruc`, cấu hình/audit.
+**UI/use cases:** quản trị cơ sở/phòng, quản lý tài khoản/role và `SystemConfigPanel`.
+
+- [ ] CRUD nhân viên/cơ sở/khoa/phòng và hiệu lực danh mục.
+- [ ] Quản lý vai trò/phạm vi; áp quyền ở application/use case, không chỉ ẩn UI.
+- [ ] Audit thao tác, che dữ liệu nhạy cảm, bảo vệ secret và cấu hình DB.
+- [ ] Quy trình backup/restore và cấu hình triển khai được xác nhận.
+
+**Điều kiện qua phase:** Quyền được kiểm tra trên use case và persistence; audit/cấu hình được rà soát; backup/restore được diễn tập ở môi trường thử nghiệm.
+
+## Phase 9 — Danh mục, báo cáo, tài liệu và phát hành
+
+**Trạng thái:** `[ ]` Chưa có bằng chứng phát hành được nghiệm thu.
+**Phụ thuộc:** Các phase cung cấp dữ liệu cho danh mục/báo cáo; Phase 8 cho quyền và cấu hình.
+
+**Model/phạm vi:** danh mục dùng chung; giao dịch khám, CLS, kho, viện phí, nhân sự; DOCX/in ấn/xuất dữ liệu.
+**UI/use cases:** catalog CRUD, `ClinicReportPanel`, print preview và tích hợp phát hành.
+
+- [ ] CRUD danh mục có validation, hiệu lực và quyền.
+- [ ] Định nghĩa chỉ số báo cáo, truy vấn và đối soát với nguồn; áp phạm vi dữ liệu.
+- [ ] Kiểm tra mẫu in/xuất, encoding và tính nhất quán với dữ liệu đã persist.
+- [ ] Build/test/release trên CI và môi trường thử nghiệm; ghi nhận review, artifact và hướng dẫn vận hành.
+
+**Điều kiện qua phase:** Báo cáo/tài liệu đối soát được, quyền đúng; build/test/release có bằng chứng tái lập và checklist vận hành được duyệt.

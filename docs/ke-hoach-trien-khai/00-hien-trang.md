@@ -3,23 +3,33 @@
 **Cập nhật:** 05/11/2026
 **Phạm vi:** Clinic Management Desktop — Java, Maven, JDBC, SQL Server, Java Swing.
 
-> Trạng thái dưới đây phản ánh mã nguồn trong checkout tại ngày cập nhật. Một phần luồng Tiếp đón đang là thay đổi chưa commit; “có trong checkout” không đồng nghĩa đã được build, kiểm thử tích hợp hoặc nghiệm thu.
+> Trạng thái phản ánh source và lịch sử Git quan sát được trong checkout. Code đã commit trên máy vẫn chưa đồng nghĩa với đã được đẩy lên remote, phát hành, hoặc nghiệm thu end-to-end.
 
 ## Hiện trạng theo lớp
 
 | Lớp | Bằng chứng trong source | Đánh giá hiện tại |
 |---|---|---|
-| `clinic-domain` | Các model chia theo `patient`, `identity`, `facility`, `appointment`, `examination`, `prescription`, `inventory`, `billing`, `service`, `system` và các miền khác. | Nền model rộng; từng invariant và nghiệp vụ chưa thể xem là đã hoàn thiện chỉ vì có entity. |
-| `clinic-application` | Có `Result`, `Command`/`Query`, handlers xác thực và Tiếp đón, cùng `TransactionBoundary`. | Đã có use case cho đăng nhập và đăng ký/tìm kiếm bệnh nhân, hàng đợi; cần test và mở rộng cho các luồng còn lại. |
-| `clinic-infrastructure` | Có JDBC connection, migration runner, `JdbcTransactionManager`, `JdbcUnitOfWork`, repository nhân viên, bệnh nhân, bảo hiểm, phòng khám và hàng đợi. | Có vertical slice persistence cho xác thực/Tiếp đón; migration/schema thực tế phải được xác minh trên DB thử nghiệm khi thay đổi. |
-| `clinic-desktop` | Có Swing UI cho auth, dashboard, reception, doctor/examination, paraclinical, pharmacy, billing, catalog, reports và system. | Độ hoàn thiện khác nhau theo phân hệ. UI prototype hoặc dữ liệu mẫu chưa chứng minh luồng nghiệp vụ end-to-end. |
-| Kiểm thử | Các `src/test` hiện chỉ có `.gitkeep`, chưa có test tự động của Clinic modules trong checkout. | Cần bổ sung test và chạy `mvn clean verify`; chưa xác nhận build trong lần rà soát này. |
+| `clinic-domain` | Model theo patient, identity, facility, appointment, examination, prescription, inventory, billing, service, system và các miền khác; repository interfaces. | Nền model rộng. Sự tồn tại của model không chứng minh luồng nghiệp vụ hoàn chỉnh. |
+| `clinic-application` | `AuthenticateUserHandler`; reception handlers `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler`; `TransactionBoundary`, `CommandHandler`, `QueryHandler`. | Auth và một phần Tiếp đón có use case. Các use case khác còn cần nối, kiểm thử và nghiệm thu. |
+| `clinic-infrastructure` | JDBC, `DatabaseMigrationRunner`, `JdbcTransactionManager`, `JdbcUnitOfWork`; repositories `NhanVienRepositoryImpl`, `BenhNhanRepositoryImpl`, `BaoHiemRepositoryImpl`, `PhongKhamRepositoryImpl`, `ReceptionQueueRepositoryImpl`. | Có persistence cho auth và một phần Tiếp đón. Chưa có bằng chứng tích hợp SQL Server cho toàn bộ tiêu chí Tiếp đón. |
+| `clinic-desktop` | Swing UI cho auth, dashboard, reception, doctor/examination, paraclinical, pharmacy, billing, catalog, reports và system. Tiếp đón nối handlers qua `ReceptionCompositionRoot`; các thao tác tìm kiếm/tải/lưu dùng `SwingWorker`. | Độ hoàn thiện khác nhau. Panel hoặc wiring không tự chứng minh persistence/restart/E2E. Không có test file trong `clinic-desktop/src/test`. |
 
-## Luồng đã có trong checkout
+## Migration và kiểm thử trong checkout
 
-- **Xác thực:** `AuthenticationCompositionRoot` nối `LoginForm` tới application handler và `NhanVienRepositoryImpl`.
-- **Tiếp đón:** `ReceptionCompositionRoot` nối form với use cases đăng ký/tìm bệnh nhân và hàng đợi. Đăng ký tạo/cập nhật bệnh nhân, thông tin bảo hiểm và lượt khám trong một transaction theo code hiện có.
-- Các thay đổi Tiếp đón trên đang chưa commit. Cần kiểm thử, review và đồng bộ tài liệu trước khi coi Đợt 1 đã nghiệm thu hoặc giao Agent từ branch/commit khác.
+- Migration runner đăng ký tuần tự bốn file: `V1__Initial_Clinic_Schema.sql`, `V2__Seed_Initial_Data.sql`, `V3__Repair_Demo_Account_Passwords.sql`, `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql`.
+- Runner hiện có tách batch tại `GO` đứng riêng trên một dòng (regex hỗ trợ LF/CRLF). Không có migration-runner test trong feature branch hiện tại và chưa có bằng chứng chạy migration trên SQL Server thử nghiệm. Một commit task địa phương `74490b3` thêm `SqlServerBatchSplitter` cùng test, nhưng ref đó không nằm trong ancestry của `feature/patient-reception-workflow`; không tính test ấy vào trạng thái branch này.
+- Có đúng ba test source trong các module hiện rà soát:
+  - Domain: `PhoneNumberTest` — định dạng/prefix số di động Việt Nam và đầu vào không hợp lệ.
+  - Application: `RegisterPatientDuplicateCccdTest` — lỗi trùng CCCD lúc insert trả hướng dẫn, gọi transaction failure path, và không ghi BHYT/lượt khám.
+  - Infrastructure: `BenhNhanRepositoryImplTest` — ánh xạ lỗi unique index CCCD, không nhầm unique key mã bệnh nhân, không để lộ giá trị trùng.
+- Chưa có test desktop. Ba test trên không chứng minh SQL Server save/search/queue, đọc lại sau restart, rollback nhiều bảng khi lỗi ghi tổng quát, hoặc queue concurrency.
+
+## Tiếp đón và trạng thái Git
+
+- `ReceptionCompositionRoot` nối `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler` với JDBC repositories. Handler đăng ký ghi bệnh nhân, bảo hiểm tùy chọn và lượt khám trong transaction boundary.
+- Search query tra cứu hồ sơ và BHYT gần nhất; queue repository ghi lượt khám, cấp số theo phòng/ngày bằng khóa giao dịch SQL, và đọc hàng đợi/tóm tắt phòng. Các hành vi này có trong source nhưng chưa có E2E SQL Server/restart acceptance.
+- Checkout đang ở `orchestrator/sync-approved-10-phase-roadmap-with-verified-reposit`; feature branch local `feature/patient-reception-workflow` ở `37adb7e` (commit `fix(patient): scope duplicate error to CCCD index`). Lịch sử feature gồm phone validation (`fa4acff`), duplicate-patient UI (`9cf4005`), CCCD uniqueness/V4 (`9987000`) và xử lý lỗi unique index (`37adb7e`). Commit GO-splitting kèm test (`74490b3`) có trên ref local `orchestrator/task-311f480b`, tách khỏi ancestry feature branch.
+- Remote refs hiện có `origin/main` và `origin/feature/jdbc-transaction-tests-maven-ci`; không có remote ref cho `feature/patient-reception-workflow`. Các thay đổi nói trên là commit/ref local, chưa có bằng chứng được publish lên remote hoặc phát hành. Trong lúc đồng bộ tài liệu, worktree có thay đổi ở bốn file roadmap được giao; không dùng trạng thái đó để mô tả source commit.
 
 ## Nguyên tắc đánh giá hoàn thiện
 
@@ -32,9 +42,8 @@
 
 ## Nguồn đối chiếu
 
-- `clinic-domain/src/main/java/vn/clinicmanagement/domain/`
-- `clinic-application/src/main/java/vn/clinicmanagement/application/`
-- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/`
-- `clinic-infrastructure/src/main/resources/migrations/`
-- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/`
+- `clinic-domain/src/main/java/vn/clinicmanagement/domain/` và `clinic-domain/src/test/`
+- `clinic-application/src/main/java/vn/clinicmanagement/application/` và `clinic-application/src/test/`
+- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/`, `clinic-infrastructure/src/main/resources/migrations/` và `clinic-infrastructure/src/test/`
+- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/` và `clinic-desktop/src/test/`
 - `README.md`, `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `UI_CODING_STANDARDS.md`
