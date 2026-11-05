@@ -8,7 +8,7 @@
 
 ## 1. Kết luận điều hành
 
-Project đã vượt qua trạng thái “chỉ có UI tĩnh”: có kiểm thử tự động, xác thực tài khoản, nền tảng role/scope/authorization/audit một phần, và luồng tiếp đón có lưu/đọc dữ liệu bệnh nhân, BHYT, liên kết cơ sở, lượt khám và hàng đợi. Mức độ hoàn thiện còn khác biệt lớn giữa các phân hệ. Lượt kiểm định Maven xác nhận build và test mặc định; hai lượt SQL Server riêng xác nhận một phạm vi migration/persistence tổng hợp cụ thể. Các bằng chứng này không xác nhận toàn bộ desktop UI, mọi luồng nghiệp vụ, hoặc khả năng vận hành với dữ liệu thật.
+Project đã vượt qua trạng thái “chỉ có UI tĩnh”: có kiểm thử tự động, xác thực tài khoản, nền tảng role/scope/authorization/audit một phần, và luồng tiếp đón có lưu/đọc dữ liệu bệnh nhân, BHYT, liên kết cơ sở, lượt khám và hàng đợi. Mức độ hoàn thiện còn khác biệt lớn giữa các phân hệ. Lượt kiểm định Maven xác nhận build và test mặc định; task board ghi nhận riêng các lượt SQL Server opt-in có phạm vi migration, persistence và audit trên database tổng hợp. Các bằng chứng này không xác nhận toàn bộ desktop UI, mọi luồng nghiệp vụ, hoặc khả năng vận hành với dữ liệu thật.
 
 | Khía cạnh | Hiện trạng đã xác minh | Giới hạn chính |
 |---|---|---|
@@ -23,17 +23,18 @@ Project đã vượt qua trạng thái “chỉ có UI tĩnh”: có kiểm th�
 
 ### Kiểm định mặc định
 
-Lượt root JDK 17 mới nhất là `mvn -Djava.awt.headless=true clean verify`: **243 tests, 0 failures, 0 errors, 4 skipped**, trên cả năm module. Bốn lượt skip là các test SQL Server opt-in; chúng **không chạy** trong Maven verify mặc định. Kết quả này xác nhận build/test suite mặc định tại snapshot hiện tại, không xác nhận toàn bộ SQL Server hay giao diện desktop đang hiển thị đúng.
+Lượt root JDK 17 chạy trong lần cập nhật này là `mvn -Djava.awt.headless=true clean verify`: **243 tests, 0 failures, 0 errors, 4 skipped**, trên bốn module có test (`clinic-domain`, `clinic-application`, `clinic-infrastructure`, `clinic-desktop`); Maven kết thúc `BUILD SUCCESS`. Bốn test bị skip là `FreshDatabaseMigrationSqlServerTest`, `AuditSqlServerPersistenceTest`, `ReceptionSqlServerPersistenceTest` và `ReceptionSqlServerProcessRestartTest`. Đây là các test SQL Server opt-in; chúng **không chạy** trong Maven verify mặc định. Kết quả này xác nhận build/test suite mặc định tại snapshot hiện tại, không xác nhận toàn bộ SQL Server hay giao diện desktop đang hiển thị đúng.
 
 ### SQL Server opt-in riêng trên dữ liệu tổng hợp
 
 - `FreshDatabaseMigrationSqlServerTest` pass **1/1** trên database tổng hợp mới `clinic_test_v9_20261106`, áp dụng migration V1–V9 và kiểm tra ràng buộc liên kết bệnh nhân–cơ sở của V9.
 - `ReceptionSqlServerPersistenceTest` pass **1/1** riêng trên database tổng hợp nói trên. Bài test mới điền `PatientRegistrationFormPanel` trên Swing EDT, tạo lệnh qua converter thật, gọi composition/handler thật, rồi tìm và đọc lại toàn bộ trường bệnh nhân/BHYT được form hỗ trợ, liên kết cơ sở và lượt trong queue. Fixture dọn các dòng do nó tạo bằng soft delete.
-- Hai lượt trên là kiểm tra opt-in độc lập, không thuộc 243 test mặc định, không phải xác minh toàn bộ `ReceptionPanel` hoặc mọi trường hợp nghiệp vụ. Báo cáo nguồn ghi rõ chúng dùng dữ liệu tổng hợp và không nhắm tới `clinicDb`.
+- `AuditSqlServerPersistenceTest` pass **1/1** trên database tổng hợp `clinic_test_audit_20261105`: task board ghi nhận kiểm tra append-only V6 và rollback các ghi patient/insurance/visit khi audit insert bị từ chối. Đây là scope hẹp, không cấp quyền `AUDIT_READ`.
+- Các lượt trên là kiểm tra opt-in độc lập được ghi nhận trong `docs/ke-hoach-trien-khai/03-model-task-board.md`, không thuộc 243 test mặc định và không được chạy lại trong lần cập nhật tài liệu này. Chúng không xác minh toàn bộ `ReceptionPanel` hoặc mọi trường hợp nghiệp vụ; database được nêu đều là database tổng hợp, không phải `clinicDb`. Lần cập nhật này không kết nối database.
 
 ### UI và nghiệm thu
 
-Các test Swing/headless hiện nối form đăng ký với handler/persistence trên SQL Server tổng hợp, nhưng không chứng minh cửa sổ thực tế đã được nhìn thấy, layout hiển thị đúng, hay `ReceptionPanel` button/worker/dialog chạy trọn vẹn. Kế hoạch hiện trạng ghi cửa sổ Swing chưa được quan sát trực tiếp do máy chủ bị khóa; full UI visual/interaction E2E còn mở. Không có kết luận thị giác về UI trong báo cáo này.
+Các test Swing/headless có bằng chứng opt-in nối form đăng ký với handler/persistence trên SQL Server tổng hợp, nhưng lượt opt-in đó không chạy trong lần cập nhật này và không chứng minh cửa sổ thực tế đã được nhìn thấy, layout hiển thị đúng, hay `ReceptionPanel` button/worker/dialog chạy trọn vẹn. Kế hoạch hiện trạng ghi cửa sổ Swing chưa được quan sát trực tiếp; full UI visual/interaction acceptance còn mở. Không có kết luận thị giác về UI trong báo cáo này.
 
 ## 3. Hiện trạng theo lớp và luồng
 
@@ -73,8 +74,8 @@ Roadmap hiện có 10 phase, đánh số 0–9. Phase 0 nền tảng và Phase 1
 
 ## 6. Giới hạn của đánh giá
 
-- Báo cáo đối chiếu source và các tài liệu/bằng chứng được dẫn trong kế hoạch tính đến 06/11/2026. Lịch sử task/commit cục bộ không đồng nghĩa đã push, phát hành hoặc nghiệm thu.
-- Maven verify được phân biệt với hai lượt SQL Server opt-in; không kết nối database trong lần cập nhật báo cáo này.
+- Báo cáo đối chiếu source và các tài liệu/bằng chứng được dẫn trong kế hoạch tính đến 06/11/2026. Nhánh dự án `feature/patient-reception-workflow` hiện có local tại commit `ac4f09b054f9be665479ce4917111ea8fe048bae`; worktree của task tài liệu đang đứng trên nhánh `orchestrator/doc-state-refresh-02-reconcile-current-completion-ev` cùng commit. Không có bằng chứng push, phát hành hoặc GitHub-hosted CI run.
+- Maven verify được phân biệt với các lượt SQL Server opt-in được task board ghi nhận; không kết nối database trong lần cập nhật báo cáo này.
 - Không quan sát cửa sổ Swing trực tiếp; không đánh giá trực quan layout hay thao tác toàn desktop.
 - Không đánh giá tuân thủ pháp lý/nghiệp vụ y tế, BHYT, hóa đơn, an toàn thuốc, tích hợp ngoài hoặc khả năng vận hành production. Không có kết luận “production ready”.
 
@@ -85,3 +86,14 @@ Roadmap hiện có 10 phase, đánh số 0–9. Phase 0 nền tảng và Phase 1
 - [Model task board và bằng chứng](docs/ke-hoach-trien-khai/03-model-task-board.md)
 - `docs/ke-hoach-trien-khai/phase1-tiensuben-review.md`, `phase2-authz-enforcement-review.md`, `phase2-read-audit-decision.md` và các review/policy được các tài liệu trên dẫn chiếu
 - `README.md`, `clinic-application` authentication/authorization/reception handlers, `clinic-infrastructure` JDBC repositories/migrations, và `clinic-desktop` reception composition/UI/tests
+
+## 8. Guidance đã đọc cho lần cập nhật này
+
+- Orchestrator baseline `docs/PROJECT_CONVENTIONS.md` (nội dung được cung cấp trong task; không có bản sao tại repository path đó)
+- `README.md`
+- `DOMAIN_ANALYSIS.md`
+- `ERD_DIAGRAM.md`
+- `UI_CODING_STANDARDS.md`
+- `docs/ke-hoach-trien-khai/README.md`
+- `docs/ke-hoach-trien-khai/02-cac-dot-trien-khai.md`
+- `docs/ke-hoach-trien-khai/03-model-task-board.md`
