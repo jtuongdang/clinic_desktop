@@ -31,9 +31,10 @@
 6. **SEC-AUDIT-DESIGN-01 — complete:** schema/API/task decomposition được ghi tại `phase2-audit-implementation-proposal.md`; implementation và SQL rollback acceptance được theo dõi riêng ở SEC-AUDIT-01A–01D. `AUDIT_READ` giữ deny/no-purge.
 7. **SEC-AUTHZ-01A — foundation complete (`415f85d`, `a66acc7`):** action codes ổn định, domain/SQL defaults fail-closed, V7 constraint/index và giữ nguyên legacy rows; chưa seed grants, chưa bật guard. Root verify 134 tests pass, SQL Server V7 migration/persistence opt-in pass trên `clinic_test_audit_20261105`.
 8. **SEC-AUTHZ-02A — evaluator complete (`86ff835`):** dùng immutable Application context và default-deny decision service; xác minh session active, employee, role assignment, exact pair, resource pair và permission ở mỗi request. Synthetic tests và root full verify pass: 147 tests, 0 failures/errors, 4 SQL Server opt-in skips. Chưa gắn vào UI/use cases.
-9. **SEC-AUTHZ-02B/02C — use-case guards and repository filters (planned; scope inventory `6c9240b`):** gọi evaluator trên mọi command/query và lọc dữ liệu theo exact facility+department; kiểm thử allow/deny, cross-scope, revoked assignment. Chỉ grant ALLOW trong ma trận đã duyệt với scope `KHOA_PHONG`; unresolved DEC actions và `AUDIT_READ` luôn deny.
-10. **SEC-AUDIT-01A–01D — write path/integration (01A–01C complete; 01D complete):** V6 append-only writer, audit auth/session/reception trong transaction và SQL Server rollback test trên DB synthetic. Audit read vẫn bị từ chối.
-11. **SEC-UI-01 — screens and acceptance:** nối scope selector, lock overlay, logout confirmation và permission-aware navigation; headless Swing tests rồi desktop smoke check.
+9. **SEC-AUTHZ-02B — reception write guard (in progress):** nối evaluator vào patient/insurance/visit registration/update, revalidate session và scope ở Application; contract `phase2-reception-write-authorization-contract.md`. Không mở patient/queue reads trong task này.
+10. **SEC-AUTHZ-02C — protected read paths (blocked pending Owner technical decision):** nối patient search, queue and other protected reads with exact pair filters and successful-read audit before returning data; decision needed for audit/query transaction boundary. Chỉ grant ALLOW trong ma trận đã duyệt với scope `KHOA_PHONG`; unresolved DEC actions và `AUDIT_READ` luôn deny.
+11. **SEC-AUDIT-01A–01D — write path/integration (01A–01C complete; 01D complete):** V6 append-only writer, audit auth/session/reception trong transaction và SQL Server rollback test trên DB synthetic. Audit read vẫn bị từ chối.
+12. **SEC-UI-01 — screens and acceptance:** nối scope selector, lock overlay, logout confirmation và permission-aware navigation; headless Swing tests rồi desktop smoke check.
 
 ## 4. Gates và chính sách chưa duyệt
 
