@@ -133,7 +133,7 @@ These are appointment-specific gaps; the already-approved session, scope, audit,
 
 ## Concrete technical acceptance gates before any APPT implementation
 
-1. **Security first:** Complete and accept `SEC-01` per roadmap before opening appointment or other sensitive workflows. UI visibility is not an authorization guard. The implementation contract states this gate is still incomplete (`phase2-implementation-contract.md:37-54`; `02-cac-dot-trien-khai.md:34-42`; `03-model-task-board.md:57`).
+1. **Security first:** Complete and accept `SEC-01` per roadmap before opening appointment or other sensitive workflows. UI visibility is not an authorization guard. The implementation contract states this gate is still incomplete (`phase2-implementation-contract.md:37-53`; `02-cac-dot-trien-khai.md:34-42`; `03-model-task-board.md:57`).
 2. **Contract/model alignment:** Resolve the approved policies above; reconcile `NguonLich` enum versus the string field, the `100000` versus SQL `0` deposit defaults, nullable department, absent room/no-show/cancellation metadata, and ERD one-to-zero/one conversion versus non-unique SQL FK. Do not change schema or defaults without the approved contract.
 3. **Guarded lifecycle:** Domain/Application tests for valid and invalid booking, reschedule, cancel, confirm, check-in, no-show and conversion transitions, with scope, role, current status, actor and reason enforced at the Application boundary.
 4. **Persistence and concurrency:** Adapter plus synthetic database tests for create/update/readback, overlapping/concurrent booking under approved capacity, stale-version writes, cancellation/reschedule race, atomic audit/write, and repeat/concurrent appointment-to-visit conversion. No production DB/data.
