@@ -28,6 +28,7 @@ import java.util.List;
  *    - V4__Enforce_Active_Patient_CCCD_Uniqueness.sql (Định danh CCCD duy nhất cho hồ sơ hoạt động)
  *    - V5__Seed_Session_Timeout_Parameters.sql (Nạp tham số thời hạn phiên mặc định nếu chưa tồn tại)
  *    - V6__Enhance_Audit_Tables_Append_Only.sql (Bổ sung metadata và bảo vệ audit append-only)
+ *    - V7__Harden_Permission_Matrix_Defaults.sql (Default-deny và scope khoa cho ma trận phân quyền)
  *    - V7__Harden_Permission_Matrix_Defaults.sql (Mặc định fail-closed cho ma trận quyền)
  * 3. Đảm bảo tính Idempotent: Chỉ chạy những script chưa được áp dụng.
  */
