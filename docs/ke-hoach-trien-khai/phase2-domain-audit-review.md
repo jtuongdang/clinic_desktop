@@ -4,6 +4,8 @@
 **Phạm vi:** Kiểm tra độ sẵn sàng của Phase 2 (`SEC-01`, `AUD-01`, `AUTH-TEST-01`) đối chiếu giữa tài liệu (`DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `UI_CODING_STANDARDS.md`, `docs/ke-hoach-trien-khai/*`), schema SQL Server (`V1`–`V4`) và mã nguồn thực tế trong `clinic-domain`, `clinic-application`, `clinic-infrastructure`, `clinic-desktop`.  
 **Nguyên tắc:** Phân biệt rõ **sự tồn tại của model/interface/bảng CSDL** với **cơ chế lưu trữ (persistence) và cưỡng chế thực thi (runtime enforcement)**; không suy diễn chính sách lâm sàng/quản trị thay cho chủ dự án (Owner); chỉ sử dụng dữ liệu tổng hợp (synthetic data) và không lộ thông tin nhạy cảm/secret.
 
+> **Lưu ý về thời điểm:** Đây là snapshot rà soát ngày 05/11/2026, trước các đợt triển khai bảo mật tiếp theo; các mô tả “chưa thực thi” trong bảng dưới không phải trạng thái hiện tại. Từ sau snapshot này, hệ thống đã bổ sung lựa chọn role/scope khi đăng nhập, session lifecycle, evaluator default-deny, audit write và bảo vệ các luồng reception được nêu trong [`02-cac-dot-trien-khai.md`](02-cac-dot-trien-khai.md) và [`03-model-task-board.md`](03-model-task-board.md). Dùng hai tài liệu đó cùng [`phase2-authz-enforcement-review.md`](phase2-authz-enforcement-review.md) để biết trạng thái hiện hành; các Owner decision hiện hành nằm trong [`phase2-role-permission-matrix-approval.md`](phase2-role-permission-matrix-approval.md).
+
 ---
 
 ## 1. Tóm tắt điều hành và trạng thái Gate Phase 2
