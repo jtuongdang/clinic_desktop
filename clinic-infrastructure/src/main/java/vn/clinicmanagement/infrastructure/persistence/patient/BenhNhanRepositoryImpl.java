@@ -23,9 +23,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /** SQL Server persistence for the patient aggregate. */
 public final class BenhNhanRepositoryImpl implements IBenhNhanRepository {
+    private static final String ACTIVE_CCCD_UNIQUE_INDEX = "UX_BenhNhan_Active_CCCD";
+    private static final Pattern ACTIVE_CCCD_INDEX_IN_ERROR =
+            Pattern.compile("(?i)(?<![A-Z0-9_])" + Pattern.quote(ACTIVE_CCCD_UNIQUE_INDEX) + "(?![A-Z0-9_])");
     private static final String SELECT_COLUMNS = "SELECT id, maBenhNhanFormat, ho, ten, ngaySinh, gioiTinh, dienThoai, "
             + "email, soCCCD, diaChi, soNhaThonPho, noiSinh, ngayCapCCCD, noiCapCCCD, noiLamViec, ngheNghiep, "
             + "danToc, quocTich, maTinh, maHuyen, maXa, nguoiLienHeTen, nguoiLienHeDienThoai, version, "
@@ -275,19 +279,29 @@ public final class BenhNhanRepositoryImpl implements IBenhNhanRepository {
     private static String escapeLike(String value) { return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace("[", "\\["); }
 
     static RuntimeException persistenceFailure(SQLException ex) {
-        if (isDuplicateKey(ex)) return new PatientIdentityConflictException();
+        if (isActiveCccdDuplicate(ex)) return new PatientIdentityConflictException();
         return new IllegalStateException("Lỗi truy cập dữ liệu bệnh nhân.", ex);
     }
 
-    private static boolean isDuplicateKey(SQLException exception) {
+    private static boolean isActiveCccdDuplicate(SQLException exception) {
         for (SQLException current = exception; current != null; current = current.getNextException()) {
-            if (current.getErrorCode() == 2601 || current.getErrorCode() == 2627) return true;
+            if (isActiveCccdUniqueViolation(current)) return true;
             for (Throwable cause = current.getCause(); cause != null; cause = cause.getCause()) {
-                if (cause instanceof SQLException sqlCause
-                        && (sqlCause.getErrorCode() == 2601 || sqlCause.getErrorCode() == 2627)) return true;
+                if (cause instanceof SQLException sqlCause && isActiveCccdUniqueViolation(sqlCause)) return true;
             }
         }
         return false;
+    }
+
+    private static boolean isActiveCccdUniqueViolation(SQLException exception) {
+        int errorCode = exception.getErrorCode();
+        if (errorCode != 2601 && errorCode != 2627) return false;
+
+        // SQL Server includes the unique index/constraint name in duplicate-key errors.
+        // Inspect it only to classify the error; never copy the raw message, which may
+        // contain the duplicated CCCD, into an application-facing exception.
+        String message = exception.getMessage();
+        return message != null && ACTIVE_CCCD_INDEX_IN_ERROR.matcher(message).find();
     }
 
     @FunctionalInterface private interface SqlBinder { void bind(PreparedStatement statement) throws SQLException; }

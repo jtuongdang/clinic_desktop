@@ -12,9 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BenhNhanRepositoryImplTest {
     @Test
-    void mapsSqlServerDuplicateKeyErrorsWithoutLeakingTheDuplicateValue() {
+    void mapsOnlyTheActiveCccdIndexViolationWithoutLeakingTheDuplicateValue() {
         for (int errorCode : new int[]{2601, 2627}) {
-            SQLException sqlException = new SQLException("Duplicate key: synthetic-cccd-value", "23000", errorCode);
+            SQLException sqlException = new SQLException(
+                    "Cannot insert duplicate key row with unique index 'UX_BenhNhan_Active_CCCD'. "
+                            + "The duplicate key value is (CCCD:synthetic-cccd-value).",
+                    "23000", errorCode);
 
             RuntimeException failure = BenhNhanRepositoryImpl.persistenceFailure(sqlException);
 
@@ -23,6 +26,32 @@ class BenhNhanRepositoryImplTest {
             assertTrue(failure.getMessage().contains("Định danh"));
             assertFalse(failure.getMessage().contains("synthetic-cccd-value"));
         }
+    }
+
+    @Test
+    void doesNotMapOtherSqlServerUniqueKeysToDuplicateCccd() {
+        for (int errorCode : new int[]{2601, 2627}) {
+            SQLException sqlException = new SQLException(
+                    "Cannot insert duplicate key row with unique index 'UX_BenhNhan_MaBenhNhanFormat'. "
+                            + "The duplicate key value is (synthetic-patient-code).",
+                    "23000", errorCode);
+
+            RuntimeException failure = BenhNhanRepositoryImpl.persistenceFailure(sqlException);
+
+            assertFalse(failure instanceof PatientIdentityConflictException);
+            assertInstanceOf(IllegalStateException.class, failure);
+            assertTrue(failure.getCause() == sqlException);
+        }
+    }
+
+    @Test
+    void doesNotMapDuplicateCodesWithoutTheCccdIndexName() {
+        SQLException sqlException = new SQLException("Duplicate key: synthetic-value", "23000", 2601);
+
+        RuntimeException failure = BenhNhanRepositoryImpl.persistenceFailure(sqlException);
+
+        assertFalse(failure instanceof PatientIdentityConflictException);
+        assertInstanceOf(IllegalStateException.class, failure);
     }
 
     @Test
