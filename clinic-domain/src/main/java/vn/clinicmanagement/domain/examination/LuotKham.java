@@ -98,6 +98,9 @@ public class LuotKham extends BaseEntity<Integer> implements IAggregateRoot {
         if (emrLocked) {
             throw new EmrLockedException(getId() != null ? getId() : 0);
         }
+        if (this.trangThai != TrangThaiLuotKham.DANG_KHAM) {
+            throw new IllegalStateException("Lượt khám không ở trạng thái đang khám.");
+        }
         this.trangThai = TrangThaiLuotKham.HOAN_THANH;
         this.thoiGianKetThucKham = LocalDateTime.now();
         registerDomainEvent(new LuotKhamCompletedEvent(getId() != null ? getId() : 0, maBenhNhan, maBacSi != null ? maBacSi : 0));
