@@ -27,6 +27,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.Clock;
@@ -77,9 +78,12 @@ class ReceptionSqlServerPersistenceTest {
         int registeredPatientId = 0;
         int generatedCardId = 0;
         List<Integer> generatedVisitIds = new ArrayList<>();
+        int generatedEmployeeId = 0;
 
         try {
-            SessionLifecycleService lifecycle = syntheticLifecycle();
+            SyntheticActor actor = createSyntheticActor(generatedSuffix);
+            generatedEmployeeId = actor.employeeId();
+            SessionLifecycleService lifecycle = syntheticLifecycle(actor);
             AuthorizationContext authorizationContext = lifecycle.currentAuthorizationContext().orElseThrow();
             ReceptionCompositionRoot.Services services = ReceptionCompositionRoot.create(lifecycle);
             var room = services.getActiveRooms().handle(new GetActiveReceptionRoomsQuery(
@@ -180,7 +184,11 @@ class ReceptionSqlServerPersistenceTest {
             assertQueueContains(reloadedQueue, receipt.visitId(), registeredPatientId);
             assertQueueContains(reloadedQueue, updateReceipt.visitId(), registeredPatientId);
         } finally {
-            softDeleteGeneratedRecords(registeredPatientId, generatedCardId, generatedVisitIds);
+            try {
+                softDeleteGeneratedRecords(registeredPatientId, generatedCardId, generatedVisitIds);
+            } finally {
+                softDeleteGeneratedEmployee(generatedEmployeeId);
+            }
         }
     }
 
@@ -210,15 +218,117 @@ class ReceptionSqlServerPersistenceTest {
         DatabaseConnection.configure(targetUrl, username, credentialValue);
     }
 
-    private static SessionLifecycleService syntheticLifecycle() {
+    private static SessionLifecycleService syntheticLifecycle(SyntheticActor actor) {
         SessionLifecycleService lifecycle = new SessionLifecycleService(UserSession.getInstance(),
                 new SessionTimeoutPolicy(Duration.ofMinutes(15), Duration.ofHours(12)), Clock.systemUTC());
-        lifecycle.startSession(701, "synthetic-reception", "Synthetic Reception",
-                new RoleChoice(31, "RECEPTION", "Synthetic Reception"),
-                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+        lifecycle.startSession(actor.employeeId(), actor.username(), "Synthetic Reception",
+                new RoleChoice(actor.roleId(), "RECEPTIONIST", "Synthetic Receptionist"),
+                new WorkScopeChoice(actor.facilityId(), actor.facilityName(),
+                        actor.departmentId(), actor.departmentName()),
                 UUID.randomUUID().toString());
         return lifecycle;
     }
+
+    private static SyntheticActor createSyntheticActor(String suffix) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                int roleId = queryRequiredInt(connection,
+                        "SELECT id FROM VaiTro WHERE isDeleted=0 AND tenVaiTro=N'RECEPTIONIST'");
+                int facilityId;
+                int departmentId;
+                String facilityName;
+                String departmentName;
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "SELECT TOP 1 cs.id, cs.tenCoSo, k.id, k.tenKhoa FROM PhongKham p "
+                                + "INNER JOIN Khoa k ON k.id=p.maKhoa "
+                                + "INNER JOIN CoSo cs ON cs.id=k.maCoSo "
+                                + "WHERE p.hoatDong=1 AND p.isDeleted=0 AND k.hoatDong=1 AND k.isDeleted=0 "
+                                + "AND cs.hoatDong=1 AND cs.isDeleted=0 ORDER BY cs.id, k.id, p.id")) {
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (!result.next()) throw new AssertionError("No active seeded clinic room is available");
+                        facilityId = result.getInt(1);
+                        facilityName = result.getString(2);
+                        departmentId = result.getInt(3);
+                        departmentName = result.getString(4);
+                    }
+                }
+
+                String code = "SYNTH-RECEPTION-" + suffix;
+                String username = "synthetic-reception-" + suffix;
+                int employeeId;
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO NhanVien (maNhanVien, ho, ten, username, passwordHash, hoatDong, "
+                                + "ngayVaoLam, createdBy) OUTPUT INSERTED.id VALUES (?, N'Synthetic', "
+                                + "N'Reception', ?, 'synthetic-only', 1, CAST(GETDATE() AS DATE), NULL)")) {
+                    statement.setString(1, code);
+                    statement.setString(2, username);
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (!result.next()) throw new SQLException("Synthetic employee insert returned no identifier");
+                        employeeId = result.getInt(1);
+                    }
+                }
+                insertEmployeeAssignment(connection, "NhanVienVaiTro", "maVaiTro", employeeId, roleId);
+                insertEmployeeAssignment(connection, "PhanQuyenCoSo", "maCoSo", employeeId, facilityId);
+                insertEmployeeAssignment(connection, "NhanVienKhoa", "maKhoa", employeeId, departmentId);
+                connection.commit();
+                return new SyntheticActor(employeeId, username, roleId, facilityId, facilityName,
+                        departmentId, departmentName);
+            } catch (SQLException | RuntimeException ex) {
+                connection.rollback();
+                throw ex;
+            }
+        }
+    }
+
+    private static int queryRequiredInt(Connection connection, String sql) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
+            if (!result.next()) throw new SQLException("Required seeded authorization record is missing");
+            return result.getInt(1);
+        }
+    }
+
+    private static void insertEmployeeAssignment(Connection connection, String table, String scopeColumn,
+                                                 int employeeId, int scopeId) throws SQLException {
+        String sql = "INSERT INTO " + table + " (maNhanVien, " + scopeColumn + ") VALUES (?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, employeeId);
+            statement.setInt(2, scopeId);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void softDeleteGeneratedEmployee(int employeeId) throws SQLException {
+        if (employeeId <= 0) return;
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                for (String table : List.of("NhanVienVaiTro", "PhanQuyenCoSo", "NhanVienKhoa")) {
+                    try (PreparedStatement statement = connection.prepareStatement(
+                            "UPDATE " + table + " SET isDeleted=1, deletedAt=SYSDATETIME(), deletedBy=NULL, "
+                                    + "version=version+1 WHERE maNhanVien=? AND isDeleted=0")) {
+                        statement.setInt(1, employeeId);
+                        statement.executeUpdate();
+                    }
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE NhanVien SET isDeleted=1, deletedAt=SYSDATETIME(), deletedBy=NULL, "
+                                + "version=version+1 WHERE id=? AND isDeleted=0")) {
+                    statement.setInt(1, employeeId);
+                    statement.executeUpdate();
+                }
+                connection.commit();
+            } catch (SQLException | RuntimeException ex) {
+                connection.rollback();
+                throw ex;
+            }
+        }
+    }
+
+    private record SyntheticActor(int employeeId, String username, int roleId,
+                                  int facilityId, String facilityName,
+                                  int departmentId, String departmentName) {}
 
     private static boolean runMigrationsWithoutLogging() {
         PrintStream originalOut = System.out;
