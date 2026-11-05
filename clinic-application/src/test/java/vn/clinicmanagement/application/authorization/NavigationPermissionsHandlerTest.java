@@ -1,6 +1,7 @@
 package vn.clinicmanagement.application.authorization;
 
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
@@ -10,6 +11,10 @@ import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -77,6 +82,67 @@ class NavigationPermissionsHandlerTest {
         Result<Set<String>> result = new NavigationPermissionsHandler(repository(duplicateRows))
                 .handle(ROLE_ID, "ADMIN");
         assertTrue(result.isFailure());
+    }
+
+    @Test
+    void unexpectedRepositoryFailureLogsSafeDiagnosticsAndPreservesFailureResult() {
+        ISystemRepository failingRepository = new ISystemRepository() {
+            @Override public List<MaTranPhanQuyen> getMatrixByRoleId(int roleId) {
+                throw new IllegalStateException("synthetic navigation repository failure");
+            }
+            @Override public java.util.Optional<String> getSystemParameterValue(String key) {
+                return java.util.Optional.empty();
+            }
+        };
+
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            Result<Set<String>> result = new NavigationPermissionsHandler(failingRepository)
+                    .handle(ROLE_ID, "ADMIN");
+
+            assertTrue(result.isFailure());
+            assertEquals("NAVIGATION_PERMISSIONS_UNAVAILABLE", result.getError().orElseThrow().code());
+            assertEquals("Không thể tải quyền điều hướng.", result.getError().orElseThrow().message());
+            assertEquals(1, diagnostics.messages.size());
+            String message = diagnostics.messages.get(0);
+            assertTrue(message.contains("operation=NAVIGATION_LOAD_PERMISSIONS"));
+            assertTrue(message.contains("result=NAVIGATION_PERMISSIONS_UNAVAILABLE"));
+            assertTrue(message.contains("correlationId="));
+            String correlationId = message.substring(message.indexOf("correlationId=") + "correlationId=".length(),
+                    message.indexOf(' ', message.indexOf("correlationId=")));
+            assertDoesNotThrow(() -> UUID.fromString(correlationId));
+            assertTrue(message.contains("exceptions=[java.lang.IllegalStateException]"));
+            assertTrue(message.contains("NavigationPermissionsHandler#handle:"));
+            String frames = message.substring(message.indexOf("frames=[") + "frames=[".length(),
+                    message.lastIndexOf(']'));
+            assertTrue(frames.isEmpty() || frames.split(",").length <= 8);
+            assertFalse(message.contains("synthetic navigation repository failure"));
+            assertFalse(message.contains("IllegalStateException: synthetic"));
+        }
+    }
+
+    @Test
+    void ordinaryNavigationDenialDoesNotLogUnexpectedDiagnostics() {
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            Result<Set<String>> result = new NavigationPermissionsHandler(repository(List.of()))
+                    .handle(ROLE_ID, "ADMIN");
+            assertTrue(result.isFailure());
+            assertEquals("NAVIGATION_GRANTS_MISSING", result.getError().orElseThrow().code());
+            assertTrue(diagnostics.messages.isEmpty());
+        }
+    }
+
+    private static final class CapturedDiagnostics implements AutoCloseable {
+        private final Logger logger = Logger.getLogger(ApplicationFailureDiagnostics.class.getName());
+        private final List<String> messages = new ArrayList<>();
+        private final Handler handler = new Handler() {
+            @Override public void publish(LogRecord record) { messages.add(record.getMessage()); }
+            @Override public void flush() {}
+            @Override public void close() {}
+        };
+
+        private CapturedDiagnostics() { logger.addHandler(handler); }
+
+        @Override public void close() { logger.removeHandler(handler); }
     }
 
     private static void assertModules(String roleCode, String... modules) {

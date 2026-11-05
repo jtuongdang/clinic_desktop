@@ -2,6 +2,7 @@ package vn.clinicmanagement.application.authorization;
 
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.authorization.AuthorizationDecision.ReasonCode;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
 import vn.clinicmanagement.domain.identity.NhanVien;
@@ -12,9 +13,13 @@ import vn.clinicmanagement.domain.repositories.ISystemRepository;
 import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -238,6 +243,60 @@ class AuthorizationServiceTest {
         fixture.matrixFailure = true;
         assertReason(fixture.evaluate(fixture.request(MODULE, HanhDongQuyen.XEM,
                 FACILITY_ID, DEPARTMENT_ID)), ReasonCode.DEPENDENCY_FAILURE);
+    }
+
+    @Test
+    void unexpectedRepositoryFailureLogsSafeDiagnosticsAndKeepsDefaultDeny() {
+        Fixture fixture = new Fixture();
+        fixture.matrixFailure = true;
+
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            assertReason(fixture.evaluate(fixture.request(MODULE, HanhDongQuyen.XEM,
+                    FACILITY_ID, DEPARTMENT_ID)), ReasonCode.DEPENDENCY_FAILURE);
+
+            assertEquals(1, diagnostics.messages.size());
+            String message = diagnostics.messages.get(0);
+            assertTrue(message.contains("operation=AUTHORIZATION_EVALUATE"));
+            assertTrue(message.contains("result=DEPENDENCY_FAILURE"));
+            assertTrue(message.contains("correlationId="));
+            String correlationId = message.substring(message.indexOf("correlationId=") + "correlationId=".length(),
+                    message.indexOf(' ', message.indexOf("correlationId=")));
+            assertDoesNotThrow(() -> UUID.fromString(correlationId));
+            assertTrue(message.contains("exceptions=[java.lang.IllegalStateException]"));
+            assertTrue(message.contains("AuthorizationService#evaluate:"));
+            String frames = message.substring(message.indexOf("frames=[") + "frames=[".length(),
+                    message.lastIndexOf(']'));
+            assertTrue(frames.isEmpty() || frames.split(",").length <= 8);
+            assertFalse(message.contains("synthetic matrix failure"));
+            assertFalse(message.contains("IllegalStateException: synthetic"));
+        }
+    }
+
+    @Test
+    void ordinaryAuthorizationDenialDoesNotLogUnexpectedDiagnostics() {
+        Fixture fixture = new Fixture();
+        fixture.grants = List.of(grant(ROLE_ID, MODULE, HanhDongQuyen.XEM, false,
+                PhamViDuLieu.KHOA_PHONG));
+
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            assertReason(fixture.evaluate(fixture.request(MODULE, HanhDongQuyen.XEM,
+                    FACILITY_ID, DEPARTMENT_ID)), ReasonCode.PERMISSION_DENIED);
+            assertTrue(diagnostics.messages.isEmpty());
+        }
+    }
+
+    private static final class CapturedDiagnostics implements AutoCloseable {
+        private final Logger logger = Logger.getLogger(ApplicationFailureDiagnostics.class.getName());
+        private final List<String> messages = new ArrayList<>();
+        private final Handler handler = new Handler() {
+            @Override public void publish(LogRecord record) { messages.add(record.getMessage()); }
+            @Override public void flush() {}
+            @Override public void close() {}
+        };
+
+        private CapturedDiagnostics() { logger.addHandler(handler); }
+
+        @Override public void close() { logger.removeHandler(handler); }
     }
 
     @Test

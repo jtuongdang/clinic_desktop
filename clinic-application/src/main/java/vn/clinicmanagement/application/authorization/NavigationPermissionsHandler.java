@@ -1,5 +1,6 @@
 package vn.clinicmanagement.application.authorization;
 
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 /** Loads only active, approved, role-scoped XEM grants for desktop navigation. */
 public final class NavigationPermissionsHandler {
@@ -36,6 +38,9 @@ public final class NavigationPermissionsHandler {
         try {
             permissions = systemRepository.getMatrixByRoleId(roleId);
         } catch (RuntimeException ex) {
+            ApplicationFailureDiagnostics.logUnexpectedFailure(
+                    "NAVIGATION_LOAD_PERMISSIONS", "NAVIGATION_PERMISSIONS_UNAVAILABLE",
+                    UUID.randomUUID().toString(), ex);
             return Result.failure("NAVIGATION_PERMISSIONS_UNAVAILABLE", "Không thể tải quyền điều hướng.");
         }
         if (permissions == null) {

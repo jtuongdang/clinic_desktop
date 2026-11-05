@@ -1,6 +1,7 @@
 package vn.clinicmanagement.application.authorization;
 
 import vn.clinicmanagement.application.authorization.AuthorizationDecision.ReasonCode;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
 import vn.clinicmanagement.domain.identity.NhanVien;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /** Default-deny application boundary for role, assignment, scope, and matrix checks. */
 public final class AuthorizationService {
@@ -103,7 +105,9 @@ public final class AuthorizationService {
                 return AuthorizationDecision.deny(ReasonCode.PERMISSION_DENIED);
             }
             return AuthorizationDecision.allow();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException ex) {
+            ApplicationFailureDiagnostics.logUnexpectedFailure(
+                    "AUTHORIZATION_EVALUATE", "DEPENDENCY_FAILURE", UUID.randomUUID().toString(), ex);
             return AuthorizationDecision.deny(ReasonCode.DEPENDENCY_FAILURE);
         }
     }
