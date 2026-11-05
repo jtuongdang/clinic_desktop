@@ -28,7 +28,7 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Còn lại:** xác minh password/session policy, role/scope, kiểm tra quyền tập trung, audit đăng nhập/xem/sửa EMR/cấp phát/thu tiền và test quyền/audit.
 
 **Bằng chứng auth unit:** `AuthenticateUserHandlerTest` và `Pbkdf2PasswordHasherTest` được thêm tại commit `9ff7ddd`; các test này kiểm tra handler/verifier và không chứng minh persistence, access scope hoặc audit. SEC-01 vẫn chưa được chấp nhận.
-**Rà soát kiến trúc:** Hai task độc lập đã được review, build/scope validation và tích hợp local: [`phase2-auth-persistence-review.md`](phase2-auth-persistence-review.md) (Codex, `1d56186`) và [`phase2-desktop-session-review.md`](phase2-desktop-session-review.md) (Copilot, `fcf5cf9`). Chúng xác nhận session UI không phải authorization boundary, chưa có bằng chứng data-scope/audit enforcement và nêu các rủi ro xác thực. Rà soát domain/ERD/audit bằng Antigravity đang chạy; chưa có chính sách nghiệp vụ nào được giả định hoặc chấp thuận.
+**Rà soát kiến trúc:** Ba task độc lập đã qua review, build/scope validation và tích hợp local: [`phase2-auth-persistence-review.md`](phase2-auth-persistence-review.md) (Codex, `1d56186`), [`phase2-desktop-session-review.md`](phase2-desktop-session-review.md) (Copilot, `fcf5cf9`), và [`phase2-domain-audit-review.md`](phase2-domain-audit-review.md) (Antigravity, `367dd8f`). Chủ dự án đã xác nhận một role cho mỗi phiên, default-deny và scope theo cơ sở/khoa được gán. Đề xuất timeout/audit còn chờ duyệt tại [`phase2-security-policy-proposal.md`](phase2-security-policy-proposal.md); chưa có authorization/security code được triển khai.
 
 ## Phase 3 — Lịch hẹn và vòng đời lượt khám
 
