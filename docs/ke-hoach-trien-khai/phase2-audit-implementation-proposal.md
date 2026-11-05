@@ -269,6 +269,8 @@ Bảng dưới đây ánh xạ toàn bộ 5 nhóm sự kiện kiểm toán đã 
 
 Để đảm bảo thay đổi nhỏ, an toàn, kiểm chứng được từng bước và không vi phạm các chính sách đang chờ Owner quyết định, `SEC-AUDIT-01` được chia thành **4 bước triển khai tuần tự**:
 
+> **Trình tự thực thi được chốt sau proposal:** Hợp đồng `SEC-AUDIT-01A` (`499af521-2e87-4e98-ad9f-66e3ba280603`) đã gộp nội dung nền tảng của Bước 1 và Bước 2 dưới đây (typed entries, V6, writer và transaction tests) vào một task; task được tích hợp tại `681c37d`. Vì vậy, không giao lại Bước 2 cũ. Bước tiếp theo là nối event nghiệp vụ theo nội dung Bước 3. Các phần của Bước 4 chỉ chạy trong profile SQL Server synthetic được opt-in; chúng chưa được thực thi trong lượt `SEC-AUDIT-01A`.
+
 ### Bước 1 (`SEC-AUDIT-01A`): Migration Schema `V6`, Value Objects Kiểm toán Bất biến & Bộ lọc `AuditRedactor`
 1. **Phạm vi thực hiện:**
    - Đăng ký bổ sung `V5__Seed_Session_Timeout_Parameters.sql` (nếu chưa có trong mảng `MIGRATION_FILES` tại [`DatabaseMigrationRunner.java:35-40`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseMigrationRunner.java#L35-L40)) và tạo migration mới `V6__Enhance_Audit_Tables_Append_Only.sql`:
@@ -334,7 +336,9 @@ Theo đúng chỉ thị của gói task và [`phase2-implementation-contract.md:
 
 ## 8. Kiểm tra Phạm vi & Bằng chứng Task
 
-- **Phạm vi source:** Task Antigravity chỉ tạo tài liệu đề xuất này; không sửa Java, SQL migration hay test. Root bổ sung source reconciliation để sửa phát hiện V5 theo commit `f75a672` và làm rõ giới hạn `CHECK` append-only trước khi chấp nhận.
-- **Review Markdown:** `git diff --check` pass sau cập nhật tài liệu.
-- **Build context:** Orchestrator `mvn clean verify` chạy không headless và fail hai regression test Swing vốn assert JVM headless. Root đã xác minh code branch bằng `mvn -Djava.awt.headless=true clean verify`: 101 test, 0 failure/error, 3 SQL Server opt-in skips. Build này không xác nhận migration V5 trên SQL Server thật; opt-in fresh-database test chưa được chạy trong lượt này.
-- **Kết luận:** Đây là proposal kỹ thuật để chia bước SEC-AUDIT, không phải bằng chứng audit persistence đã triển khai hoặc `SEC-01` đã qua gate.
+- **Phạm vi source ban đầu:** Task Antigravity chỉ tạo tài liệu đề xuất này; không sửa Java, SQL migration hay test. Root bổ sung source reconciliation để sửa phát hiện V5 theo commit `f75a672` và làm rõ giới hạn của `CHECK` đối với append-only.
+- **Thiết kế được chấp nhận:** `SEC-AUDIT-01A` được chốt bằng contract `499af521-2e87-4e98-ad9f-66e3ba280603`; contract gom typed entries, V6, JDBC writer và transaction tests vào cùng foundation task. Không có business-event wiring, audit query/UI, quyền `AUDIT_READ`, retention/purge hoặc login lockout.
+- **Tích hợp code:** Copilot task `bdd776b1-a0c1-4282-a532-0ce36e1e0e77` thoát lỗi (lần đầu exit `124`, retry exit `1`) trước khi hoàn tất report. Root đã review/fix test assertion bắt nhầm `DELETE` trong tên cột `deletedAt`, bổ sung opt-in assertion sửa payload/xóa bị trigger chặn, rồi tích hợp source vào `feature/patient-reception-workflow` tại commit `681c37d`.
+- **Review phạm vi & semantics:** `git diff --check` pass; thay đổi chỉ thuộc audit application types/tests, migration V6, migration runner, JDBC audit writer/tests và fresh-database test. Entries chỉ nhận enum/ID/UTC instant/UUID/identifier đã giới hạn; không nhận free text nhạy cảm. Ghi cùng transaction tái dùng kết nối hiện hành và để exception lan truyền; ghi độc lập dùng supplier riêng, commit riêng và rollback riêng khi insert lỗi. Trigger SQL Server chặn mọi UPDATE/DELETE; migration không backfill legacy outcome hoặc thời gian UTC.
+- **Build:** Root JDK 17 `mvn -Djava.awt.headless=true clean verify` pass: 113 tests, 0 failures/errors, 3 SQL Server opt-in skips. Hai test kiểm tra trigger bằng JDBC được thêm vào opt-in test nhưng chưa chạy trên SQL Server trong lượt này. `git diff --check` pass.
+- **Kết luận:** Thiết kế đề xuất và persistence foundation `SEC-AUDIT-01A` đã hoàn tất. `SEC-01` chưa qua gate: authorization guards, business-event wiring, audit read access decision và end-to-end transaction/access evidence còn thiếu.
