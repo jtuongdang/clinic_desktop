@@ -26,7 +26,7 @@
 
 - `ReceptionCompositionRoot` nối các handler với JDBC. Test opt-in đã ghi patient+BHYT+visit+queue, tìm theo CCCD và đọc lại bằng composition mới. `ReceptionSqlServerProcessRestartTest` còn khởi động JVM con riêng và xác nhận search/BHYT/queue từ process thứ hai; đây chưa phải restart toàn bộ ứng dụng Swing.
 - SQL Server verification bổ sung: rollback đa bảng khi insert visit lỗi để lại 0 active rows cho patient/BHYT/visit; 8 đăng ký đồng thời nhận queue number duy nhất; hai đăng ký cùng CCCD cho đúng 1 commit và lỗi còn lại được ánh xạ `PATIENT_DUPLICATE_CCCD`. Các bản ghi test đã soft-delete.
-- Feature code snapshot là `df5a8da` (JVM process-restart test); trước đó có `99d709b` (SQL Server patient/BHYT update E2E), `75a218d` (headless existing-patient form update test), `fcfc62b` (SQL Server registration E2E), và các commit regression `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`. Đây là bằng chứng commit/test local; không phải phát hành hay nghiệm thu Phase 0/1.
+- Feature code snapshot là `df5a8da` (shaded-JAR packaging fix), bao gồm test JVM process-restart tại `3e3fe6f`; trước đó có `99d709b` (SQL Server patient/BHYT update E2E), `75a218d` (headless existing-patient form update test), `fcfc62b` (SQL Server registration E2E), và các commit regression `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`. Đây là bằng chứng commit/test local; không phải phát hành hay nghiệm thu Phase 0/1.
 - Còn thiếu: xác minh cửa sổ và thao tác toàn bộ ứng dụng Swing/UI-to-database E2E, fresh database migration acceptance, authorization/privacy/audit. Tiến trình Swing đã khởi tạo AWT event loop khi smoke test JDK 17, nhưng cửa sổ chưa được quan sát trực tiếp.
 
 ## Nguyên tắc đánh giá hoàn thiện

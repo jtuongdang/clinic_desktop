@@ -20,7 +20,7 @@
 - `PhoneNumberTest` kiểm tra định dạng số di động Việt Nam, prefix `0`/`+84`, dấu phân cách và đầu vào sai; đây chỉ là validation domain.
 - `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql` dừng nếu tồn tại CCCD trùng trên hồ sơ active trước khi tạo unique index. Test application kiểm tra nhánh duplicate không ghi BHYT/lượt khám; test infrastructure dùng lỗi tổng hợp xác nhận chỉ ánh xạ đúng index CCCD và không lộ giá trị trùng.
 - UI source nhận lỗi duplicate CCCD, hướng dẫn tìm hồ sơ hiện hữu, chạy tìm kiếm với CCCD và giữ form để tiếp tục. `PatientRegistrationFormPanelTest` bổ sung headless component coverage; commit `ea397f9` sửa giả định chọn phòng để kết quả test deterministic. Đây không phải end-to-end UI/JDBC test.
-- Evidence commits trong local history: `df5a8da` (distinct JVM persistence probe), `99d709b` (SQL Server update E2E), `75a218d` (headless existing patient update test), `fcfc62b` (SQL Server registration E2E), `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`. Migration runner đã được gọi trên SQL Server synthetic hiện hữu bởi test opt-in; database trống và migration failure safety cần acceptance riêng. Manual checks xác nhận rollback multi-table; 8 queue allocations đồng thời nhận số khác nhau; hai CCCD giống nhau có một success và một lỗi nghiệp vụ. Test records đã soft-delete.
+- Evidence commits trong local history: `3e3fe6f` (distinct JVM persistence probe), `99d709b` (SQL Server update E2E), `75a218d` (headless existing patient update test), `fcfc62b` (SQL Server registration E2E), `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`. Migration runner đã được gọi trên SQL Server synthetic hiện hữu bởi test opt-in; database trống và migration failure safety cần acceptance riêng. Manual checks xác nhận rollback multi-table; 8 queue allocations đồng thời nhận số khác nhau; hai CCCD giống nhau có một success và một lỗi nghiệp vụ. Test records đã soft-delete.
 
 ## Quy tắc nghiệp vụ cần bảo vệ
 
@@ -47,7 +47,7 @@
 
 ## Nghiệm thu Phase 1
 
-- [x] Đăng ký patient synthetic trên SQL Server, đọc lại search/BHYT/queue từ JVM process thứ hai qua opt-in test `ReceptionSqlServerProcessRestartTest` (`df5a8da`). Đây xác nhận cross-process persistence, chưa kiểm restart cửa sổ Swing.
+- [x] Đăng ký patient synthetic trên SQL Server, đọc lại search/BHYT/queue từ JVM process thứ hai qua opt-in test `ReceptionSqlServerProcessRestartTest` (`3e3fe6f`). Đây xác nhận cross-process persistence, chưa kiểm restart cửa sổ Swing.
 - [ ] Chọn hồ sơ cũ và cập nhật; không nhân đôi hồ sơ.
 - [ ] Tạo lượt khám, cấp queue number không trùng trong cùng phạm vi phòng/ngày.
 - [ ] Mô phỏng lỗi ghi và xác nhận patient/insurance/visit cùng rollback.
