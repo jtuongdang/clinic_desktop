@@ -37,6 +37,9 @@ public final class AuthorizationService {
         if (context == null || !context.isValid()) {
             return AuthorizationDecision.deny(ReasonCode.INVALID_CONTEXT);
         }
+        if (!ApprovedRoleCodes.isAllowed(context.roleCode())) {
+            return AuthorizationDecision.deny(ReasonCode.ROLE_INVALID);
+        }
         if (request.action() == null || request.targetFacilityId() <= 0 || request.targetDepartmentId() <= 0) {
             return AuthorizationDecision.deny(ReasonCode.INVALID_REQUEST);
         }

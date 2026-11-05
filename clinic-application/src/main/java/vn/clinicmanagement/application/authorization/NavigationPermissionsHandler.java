@@ -16,8 +16,6 @@ import java.util.UUID;
 
 /** Loads only active, approved, role-scoped XEM grants for desktop navigation. */
 public final class NavigationPermissionsHandler {
-    private static final Set<String> KNOWN_ROLE_CODES =
-            Set.of("ADMIN", "DOCTOR", "RECEPTIONIST", "PHARMACIST", "CASHIER", "LAB_TECH");
     private static final Set<String> APPROVED_MODULE_CODES = Set.of(
             "HOME", "PATIENT", "RECEPTION", "APPOINTMENT", "EMR", "CLS",
             "PRESCRIPTION", "INVENTORY", "BILLING", "CATALOG", "SYSTEM");
@@ -29,8 +27,7 @@ public final class NavigationPermissionsHandler {
     }
 
     public Result<Set<String>> handle(int roleId, String roleCode) {
-        String normalizedRoleCode = normalize(roleCode);
-        if (roleId <= 0 || normalizedRoleCode == null || !KNOWN_ROLE_CODES.contains(normalizedRoleCode)) {
+        if (roleId <= 0 || !ApprovedRoleCodes.isAllowed(roleCode)) {
             return Result.failure("NAVIGATION_ROLE_INVALID", "Không thể xác định vai trò điều hướng.");
         }
 

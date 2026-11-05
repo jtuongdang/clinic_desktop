@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AuthorizationServiceTest {
     private static final int EMPLOYEE_ID = 17;
     private static final int ROLE_ID = 4;
-    private static final String ROLE_CODE = "CLINICIAN";
+    private static final String ROLE_CODE = "DOCTOR";
     private static final int FACILITY_ID = 3;
     private static final int DEPARTMENT_ID = 8;
     private static final String MODULE = "RECEPTION";
@@ -40,6 +40,33 @@ class AuthorizationServiceTest {
 
         assertTrue(decision.allowed());
         assertEquals(ReasonCode.ALLOWED, decision.reasonCode());
+    }
+
+    @Test
+    void allowsEachApprovedRoleThroughTheFullAuthorizationFlow() {
+        for (String roleCode : List.of("ADMIN", "DOCTOR", "RECEPTIONIST", "PHARMACIST", "CASHIER", "LAB_TECH")) {
+            Fixture fixture = new Fixture();
+            fixture.useRoleCode(roleCode.equals("DOCTOR") ? " doctor " : roleCode);
+
+            AuthorizationDecision decision = fixture.evaluate(fixture.request(MODULE, HanhDongQuyen.XEM,
+                    FACILITY_ID, DEPARTMENT_ID));
+
+            assertTrue(decision.allowed(), roleCode);
+            assertEquals(ReasonCode.ALLOWED, decision.reasonCode(), roleCode);
+            assertEquals(1, fixture.matrixLookups, roleCode);
+        }
+    }
+
+    @Test
+    void deniesUnsupportedRoleCodesBeforeLoadingTheirMatchingGrant() {
+        for (String roleCode : List.of("NURSE", "HEAD_DOCTOR", "CLINICIAN")) {
+            Fixture fixture = new Fixture();
+            fixture.useRoleCode(roleCode);
+
+            assertReason(fixture.evaluate(fixture.request(MODULE, HanhDongQuyen.XEM,
+                    FACILITY_ID, DEPARTMENT_ID)), ReasonCode.ROLE_INVALID);
+            assertEquals(0, fixture.matrixLookups, roleCode);
+        }
     }
 
     @Test
@@ -358,6 +385,7 @@ class AuthorizationServiceTest {
         private boolean rolesFailure;
         private boolean scopesFailure;
         private boolean matrixFailure;
+        private int matrixLookups;
         private final AuthorizationService service;
 
         private Fixture() {
@@ -387,6 +415,7 @@ class AuthorizationServiceTest {
             ISystemRepository systemPort = new ISystemRepository() {
                 @Override
                 public List<MaTranPhanQuyen> getMatrixByRoleId(int roleId) {
+                    matrixLookups++;
                     if (matrixFailure) throw new IllegalStateException("synthetic matrix failure");
                     return grants;
                 }
@@ -405,6 +434,12 @@ class AuthorizationServiceTest {
 
         private AuthorizationRequest request(String module, HanhDongQuyen action, int facility, int department) {
             return new AuthorizationRequest(context, module, action, facility, department);
+        }
+
+        private void useRoleCode(String roleCode) {
+            context = context(ROLE_ID, roleCode, FACILITY_ID, DEPARTMENT_ID);
+            roles = List.of(role(ROLE_ID, roleCode));
+            session = activeSession(context);
         }
     }
 

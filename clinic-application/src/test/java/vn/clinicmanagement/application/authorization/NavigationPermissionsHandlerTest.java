@@ -24,7 +24,7 @@ class NavigationPermissionsHandlerTest {
     @Test
     void returnsApprovedXemModulesForEveryRole() {
         assertModules("ADMIN", "HOME", "CATALOG", "SYSTEM");
-        assertModules("DOCTOR", "HOME", "PATIENT", "RECEPTION", "APPOINTMENT", "EMR",
+        assertModules(" doctor ", "HOME", "PATIENT", "RECEPTION", "APPOINTMENT", "EMR",
                 "CLS", "PRESCRIPTION", "INVENTORY", "BILLING", "CATALOG");
         assertModules("RECEPTIONIST", "HOME", "PATIENT", "RECEPTION", "APPOINTMENT", "CATALOG");
         assertModules("PHARMACIST", "HOME", "PATIENT", "PRESCRIPTION", "INVENTORY", "CATALOG");
@@ -34,7 +34,16 @@ class NavigationPermissionsHandlerTest {
 
     @Test
     void rejectsMissingOrUnknownRoleWithoutLoadingPermissions() {
-        ISystemRepository repository = repository(null);
+        int[] lookups = {0};
+        ISystemRepository repository = new ISystemRepository() {
+            @Override public List<MaTranPhanQuyen> getMatrixByRoleId(int roleId) {
+                lookups[0]++;
+                return null;
+            }
+            @Override public java.util.Optional<String> getSystemParameterValue(String key) {
+                return java.util.Optional.empty();
+            }
+        };
         NavigationPermissionsHandler handler = new NavigationPermissionsHandler(repository);
 
         assertTrue(handler.handle(0, "ADMIN").isFailure());
@@ -42,6 +51,10 @@ class NavigationPermissionsHandlerTest {
         assertTrue(handler.handle(ROLE_ID, "Quản trị viên toàn hệ thống").isFailure());
         assertTrue(handler.handle(ROLE_ID, "UNKNOWN").isFailure());
         assertTrue(handler.handle(ROLE_ID, "RECEPTION").isFailure());
+        assertTrue(handler.handle(ROLE_ID, "NURSE").isFailure());
+        assertTrue(handler.handle(ROLE_ID, "HEAD_DOCTOR").isFailure());
+        assertTrue(handler.handle(ROLE_ID, "CLINICIAN").isFailure());
+        assertEquals(0, lookups[0]);
     }
 
     @Test
