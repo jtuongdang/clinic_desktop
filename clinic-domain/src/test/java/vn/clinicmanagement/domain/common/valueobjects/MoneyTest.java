@@ -47,6 +47,17 @@ class MoneyTest {
     }
 
     @Test
+    void comparesAndIdentifiesCurrencyCodesWithoutCaseDifferences() {
+        Money lowercase = new Money(new BigDecimal("10.00"), "usd");
+        Money uppercase = new Money(new BigDecimal("10.00"), "USD");
+
+        assertEquals(0, lowercase.compareTo(uppercase));
+        assertEquals(lowercase, uppercase);
+        assertEquals(lowercase.hashCode(), uppercase.hashCode());
+        assertEquals("USD", lowercase.getCurrency());
+    }
+
+    @Test
     void rejectsArithmeticAndComparisonAcrossDifferentCurrencies() {
         Money usd = new Money(BigDecimal.ONE, "USD");
         Money eur = new Money(BigDecimal.ONE, "EUR");
