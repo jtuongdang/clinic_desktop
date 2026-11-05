@@ -4,6 +4,7 @@ import vn.clinicmanagement.application.audit.AuditActionCode;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.authorization.AuthorizationDecision;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.QueryHandler;
 import vn.clinicmanagement.application.common.Result;
 
@@ -47,7 +48,14 @@ public final class GetReceptionQueueHandler implements QueryHandler<GetReception
             ReceptionReadAudit.success(audit, query.auditActorContext(), AuditActionCode.PATIENT_VIEW);
             return Result.success(snapshot);
         } catch (RuntimeException ex) {
+            ApplicationFailureDiagnostics.logUnexpectedFailure("RECEPTION_GET_QUEUE", "RECEPTION_QUEUE_FAILED",
+                    correlationId(query), ex);
             return Result.failure("RECEPTION_QUEUE_FAILED", "Không thể tải hàng đợi tiếp đón.");
         }
+    }
+
+    private static String correlationId(GetReceptionQueueQuery query) {
+        return query.auditActorContext() == null || query.auditActorContext().correlationId() == null
+                ? null : query.auditActorContext().correlationId().toString();
     }
 }

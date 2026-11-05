@@ -4,6 +4,7 @@ import vn.clinicmanagement.application.audit.AuditActionCode;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.authorization.AuthorizationDecision;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.QueryHandler;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.domain.facility.PhongKham;
@@ -40,7 +41,14 @@ public final class GetActiveReceptionRoomsHandler
             ReceptionReadAudit.success(audit, query.auditActorContext(), AuditActionCode.CATALOG_VIEW);
             return Result.success(result);
         } catch (RuntimeException ex) {
+            ApplicationFailureDiagnostics.logUnexpectedFailure("RECEPTION_GET_ACTIVE_ROOMS", "ROOM_CATALOG_FAILED",
+                    correlationId(query), ex);
             return Result.failure("ROOM_CATALOG_FAILED", "Không thể tải danh sách phòng khám.");
         }
+    }
+
+    private static String correlationId(GetActiveReceptionRoomsQuery query) {
+        return query.auditActorContext() == null || query.auditActorContext().correlationId() == null
+                ? null : query.auditActorContext().correlationId().toString();
     }
 }

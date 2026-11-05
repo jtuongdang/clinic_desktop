@@ -4,6 +4,7 @@ import vn.clinicmanagement.application.audit.AuditActionCode;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.authorization.AuthorizationDecision;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.QueryHandler;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
@@ -56,7 +57,14 @@ public final class SearchPatientsHandler implements QueryHandler<SearchPatientsQ
             ReceptionReadAudit.success(audit, query.auditActorContext(), AuditActionCode.PATIENT_SEARCH);
             return Result.success(matches);
         } catch (RuntimeException ex) {
+            ApplicationFailureDiagnostics.logUnexpectedFailure("RECEPTION_SEARCH_PATIENTS", "PATIENT_SEARCH_FAILED",
+                    correlationId(query), ex);
             return Result.failure("PATIENT_SEARCH_FAILED", FAILURE_MESSAGE);
         }
+    }
+
+    private static String correlationId(SearchPatientsQuery query) {
+        return query.auditActorContext() == null || query.auditActorContext().correlationId() == null
+                ? null : query.auditActorContext().correlationId().toString();
     }
 }

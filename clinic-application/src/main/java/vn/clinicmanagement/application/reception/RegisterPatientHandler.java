@@ -10,6 +10,7 @@ import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.authorization.AuthorizationDecision;
 import vn.clinicmanagement.application.authorization.AuthorizationRequest;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.CommandHandler;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
@@ -127,6 +128,8 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
             } catch (PatientIdentityConflictException ex) {
                 return registrationFailure();
             } catch (RuntimeException ex) {
+                ApplicationFailureDiagnostics.logUnexpectedFailure("RECEPTION_REGISTER_PATIENT",
+                        "PATIENT_REGISTRATION_FAILED", command.auditActorContext().correlationId().toString(), ex);
                 return Result.failure("PATIENT_REGISTRATION_FAILED", "Không thể lưu đăng ký. Dữ liệu chưa được ghi; hãy thử lại.");
             }
         });
