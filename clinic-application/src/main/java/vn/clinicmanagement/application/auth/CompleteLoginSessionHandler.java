@@ -5,6 +5,7 @@ import vn.clinicmanagement.application.audit.AuditOutcome;
 import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.CommandHandler;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
@@ -139,6 +140,8 @@ public final class CompleteLoginSessionHandler
                             correlationId,
                             occurredAtUtc));
                 } catch (RuntimeException ex) {
+                    ApplicationFailureDiagnostics.logUnexpectedFailure(
+                            "COMPLETE_LOGIN_SESSION", "AUTH_UNAVAILABLE", correlationId.toString(), ex);
                     return Result.failure("AUTH_UNAVAILABLE", UNAVAILABLE_MESSAGE);
                 }
             });
@@ -147,6 +150,8 @@ public final class CompleteLoginSessionHandler
             }
             return txResult;
         } catch (RuntimeException ex) {
+            ApplicationFailureDiagnostics.logUnexpectedFailure(
+                    "COMPLETE_LOGIN_SESSION", "AUTH_UNAVAILABLE", correlationId.toString(), ex);
             return Result.failure("AUTH_UNAVAILABLE", UNAVAILABLE_MESSAGE);
         }
     }

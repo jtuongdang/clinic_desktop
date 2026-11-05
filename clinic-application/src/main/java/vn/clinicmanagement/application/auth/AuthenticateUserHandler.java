@@ -6,6 +6,7 @@ import vn.clinicmanagement.application.audit.AuditReasonCode;
 import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.CommandHandler;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
@@ -61,6 +62,8 @@ public final class AuthenticateUserHandler implements CommandHandler<Authenticat
                         AuditOutcome.FAILURE, AuditReasonCode.AUTH_INVALID);
                 return Result.failure("AUTH_INVALID", INVALID_CREDENTIALS);
             } catch (RuntimeException ex) {
+                ApplicationFailureDiagnostics.logUnexpectedFailure(
+                        "AUTHENTICATE_USER", "AUTH_UNAVAILABLE", UUID.randomUUID().toString(), ex);
                 return Result.failure("AUTH_UNAVAILABLE", UNAVAILABLE_MESSAGE);
             }
         }
@@ -104,6 +107,8 @@ public final class AuthenticateUserHandler implements CommandHandler<Authenticat
             return Result.success(new AuthenticatedUser(employee.getId(), employee.getUsername(),
                     employee.getHoTen(), roles, scopes));
         } catch (RuntimeException ex) {
+            ApplicationFailureDiagnostics.logUnexpectedFailure(
+                    "AUTHENTICATE_USER", "AUTH_UNAVAILABLE", UUID.randomUUID().toString(), ex);
             return Result.failure("AUTH_UNAVAILABLE", UNAVAILABLE_MESSAGE);
         } finally {
             java.util.Arrays.fill(password, '\0');

@@ -9,6 +9,7 @@ import vn.clinicmanagement.application.audit.MedicalRecordAuditEntry;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
@@ -29,6 +30,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -139,20 +143,63 @@ class CompleteLoginSessionHandlerTest {
     @Test
     void auditFailureRollsBackLastLoginAndPreventsSessionCreation() {
         Fixture fixture = new Fixture();
-        fixture.audit.failure = new IllegalStateException("synthetic audit failure for synth.user.701");
+        String failureMarker = "synthetic audit exception marker synth.user.701 synthetic-password-marker";
+        fixture.audit.failure = new IllegalStateException(failureMarker);
 
-        Result<CompletedLoginSession> result = fixture.handler.handle(new CompleteLoginSessionCommand(
-                authenticatedUser(), ASSIGNED_ROLE_A, ASSIGNED_SCOPE_A));
+        Result<CompletedLoginSession> result;
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            result = fixture.handler.handle(new CompleteLoginSessionCommand(
+                    authenticatedUser(), ASSIGNED_ROLE_A, ASSIGNED_SCOPE_A, "synth-workstation-07", CORRELATION_ID));
+            assertEquals(1, diagnostics.messages.size());
+            String message = diagnostics.messages.get(0);
+            assertTrue(message.contains("operation=COMPLETE_LOGIN_SESSION result=AUTH_UNAVAILABLE"));
+            assertTrue(message.contains("correlationId=" + CORRELATION_ID));
+            assertFalse(message.contains(failureMarker));
+            assertFalse(message.contains("synth.user.701"));
+            assertFalse(message.contains("synthetic-password-marker"));
+        }
 
         assertTrue(result.isFailure());
         Result.ApplicationError error = result.getError().orElseThrow();
         assertEquals("AUTH_UNAVAILABLE", error.code());
         assertFalse(error.message().contains("synth.user.701"));
         assertFalse(error.message().contains("synthetic audit failure"));
+        assertFalse(error.message().contains("synthetic-password-marker"));
         assertEquals(1, fixture.transactions.calls.get());
         assertTrue(fixture.transactions.rolledBack.get());
         assertFalse(fixture.transactions.committed.get());
         assertNull(fixture.committedLoginAt.get());
+    }
+
+    @Test
+    void invalidRoleAndScopeSelectionsDoNotEmitUnexpectedDiagnostics() {
+        Fixture fixture = new Fixture();
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            fixture.handler.handle(new CompleteLoginSessionCommand(
+                    authenticatedUser(), new RoleChoice(99, "OTHER", "Vai trò khác"), ASSIGNED_SCOPE_A));
+            fixture.handler.handle(new CompleteLoginSessionCommand(
+                    authenticatedUser(), ASSIGNED_ROLE_A,
+                    new WorkScopeChoice(99, "Cơ sở khác", 88, "Khoa khác")));
+            assertTrue(diagnostics.messages.isEmpty());
+        }
+    }
+
+    private static final class CapturedDiagnostics implements AutoCloseable {
+        private final Logger logger = Logger.getLogger(ApplicationFailureDiagnostics.class.getName());
+        private final List<String> messages = new ArrayList<>();
+        private final Handler handler = new Handler() {
+            @Override public void publish(LogRecord record) { messages.add(record.getMessage()); }
+            @Override public void flush() {}
+            @Override public void close() {}
+        };
+
+        private CapturedDiagnostics() {
+            logger.addHandler(handler);
+        }
+
+        @Override public void close() {
+            logger.removeHandler(handler);
+        }
     }
 
     private static AuthenticatedUser authenticatedUser() {

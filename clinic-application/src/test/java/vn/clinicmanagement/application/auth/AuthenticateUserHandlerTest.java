@@ -8,6 +8,7 @@ import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.audit.MedicalRecordAuditEntry;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
+import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.identity.NhanVien;
@@ -29,8 +30,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -238,7 +243,8 @@ class AuthenticateUserHandlerTest {
 
     @Test
     void returnsSafeGenericUnavailableErrorForRepositoryAndAuditFailures() {
-        String syntheticDiagnostic = "synthetic repository diagnostic for " + SYNTHETIC_USERNAME;
+        String syntheticDiagnostic = "synthetic exception marker " + SYNTHETIC_USERNAME
+                + " synthetic-password-marker";
 
         Fixture lookupFailure = new Fixture();
         lookupFailure.lookupFailure = new IllegalStateException(syntheticDiagnostic);
@@ -253,10 +259,25 @@ class AuthenticateUserHandlerTest {
         List<Fixture> fixtures = List.of(lookupFailure, roleFailure, scopeFailure, auditFailureOnInvalid);
         List<AuthenticateUserCommand> commands = new ArrayList<>();
         List<Result<AuthenticatedUser>> results = new ArrayList<>();
-        for (Fixture fixture : fixtures) {
-            AuthenticateUserCommand command = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
-            commands.add(command);
-            results.add(fixture.handler.handle(command));
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            for (Fixture fixture : fixtures) {
+                AuthenticateUserCommand command = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
+                commands.add(command);
+                results.add(fixture.handler.handle(command));
+            }
+
+            assertEquals(4, diagnostics.messages.size());
+            for (String message : diagnostics.messages) {
+                assertTrue(message.contains("operation=AUTHENTICATE_USER result=AUTH_UNAVAILABLE"));
+                assertTrue(message.matches(
+                        ".*correlationId=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*"));
+                String correlationId = message.substring(message.indexOf("correlationId=")
+                        + "correlationId=".length()).split(" ", 2)[0];
+                assertDoesNotThrow(() -> UUID.fromString(correlationId));
+                assertFalse(message.contains(syntheticDiagnostic));
+                assertFalse(message.contains(SYNTHETIC_USERNAME));
+                assertFalse(message.contains("synthetic-password-marker"));
+            }
         }
 
         for (Result<AuthenticatedUser> result : results) {
@@ -266,6 +287,7 @@ class AuthenticateUserHandlerTest {
             assertEquals("Không thể xác thực lúc này. Hãy kiểm tra kết nối cơ sở dữ liệu.", error.message());
             assertFalse(error.message().contains(syntheticDiagnostic));
             assertFalse(error.message().contains(SYNTHETIC_USERNAME));
+            assertFalse(error.message().contains("synthetic-password-marker"));
         }
         assertEquals(0, lookupFailure.transactions.calls.get());
         assertEquals(0, lookupFailure.recordLoginCalls.get());
@@ -277,6 +299,44 @@ class AuthenticateUserHandlerTest {
             assertCommandBufferZeroized(commands.get(index));
             char[] verifierBuffer = fixtures.get(index).lastPasswordPassedToVerifier.get();
             if (verifierBuffer != null) assertCleared(verifierBuffer);
+        }
+    }
+
+    @Test
+    void expectedCredentialRoleAndScopeOutcomesDoNotEmitUnexpectedDiagnostics() {
+        Fixture invalidCredentials = new Fixture();
+        invalidCredentials.passwordVerified = false;
+        Fixture noRole = new Fixture();
+        noRole.roles = List.of();
+        Fixture noScope = new Fixture();
+        noScope.scopes = List.of();
+
+        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
+            assertEquals("AUTH_INVALID", invalidCredentials.handler.handle(
+                    commandWithSyntheticSecret(SYNTHETIC_USERNAME)).getError().orElseThrow().code());
+            assertEquals("AUTH_NO_ROLE", noRole.handler.handle(
+                    commandWithSyntheticSecret(SYNTHETIC_USERNAME)).getError().orElseThrow().code());
+            assertEquals("AUTH_NO_SCOPE", noScope.handler.handle(
+                    commandWithSyntheticSecret(SYNTHETIC_USERNAME)).getError().orElseThrow().code());
+            assertTrue(diagnostics.messages.isEmpty());
+        }
+    }
+
+    private static final class CapturedDiagnostics implements AutoCloseable {
+        private final Logger logger = Logger.getLogger(ApplicationFailureDiagnostics.class.getName());
+        private final List<String> messages = new ArrayList<>();
+        private final Handler handler = new Handler() {
+            @Override public void publish(LogRecord record) { messages.add(record.getMessage()); }
+            @Override public void flush() {}
+            @Override public void close() {}
+        };
+
+        private CapturedDiagnostics() {
+            logger.addHandler(handler);
+        }
+
+        @Override public void close() {
+            logger.removeHandler(handler);
         }
     }
 
