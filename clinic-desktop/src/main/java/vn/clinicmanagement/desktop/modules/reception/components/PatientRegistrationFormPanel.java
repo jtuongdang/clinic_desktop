@@ -24,37 +24,37 @@ import java.util.function.Consumer;
 public class PatientRegistrationFormPanel extends JPanel {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    private final JTextField txtSearchPhone = input(100);
-    private final JTextField txtSearchCccd = input(120);
-    private final JTextField txtPatientCode = input(105);
-    private final JTextField txtFullName = input(220);
+    private final JTextField txtSearchPhone = input("searchPhone", 100);
+    private final JTextField txtSearchCccd = input("searchCccd", 120);
+    private final JTextField txtPatientCode = input("patientCode", 105);
+    private final JTextField txtFullName = input("fullName", 220);
     private final JComboBox<String> cbGender = new JComboBox<>(new String[]{"Nam", "Nữ", "Khác"});
-    private final JTextField txtDateOfBirth = input(92);
+    private final JTextField txtDateOfBirth = input("dateOfBirth", 92);
     private final JTextField txtBirthPlace = input(150);
     private final JTextField txtStreet = input(150);
     private final JTextField txtProvinceCode = input(48);
     private final JTextField txtDistrictCode = input(48);
     private final JTextField txtWardCode = input(48);
-    private final JTextField txtAddress = input(180);
+    private final JTextField txtAddress = input("address", 180);
     private final JTextField txtOccupation = input(110);
-    private final JTextField txtPhone = input(100);
+    private final JTextField txtPhone = input("phone", 100);
     private final JTextField txtEmail = input(140);
     private final JComboBox<String> cbEthnicity = new JComboBox<>(new String[]{"Kinh", "Tày", "Thái", "Mường", "Khác"});
     private final JComboBox<String> cbNationality = new JComboBox<>(new String[]{"Việt Nam", "Khác"});
-    private final JTextField txtCccd = input(120);
+    private final JTextField txtCccd = input("cccd", 120);
     private final JTextField txtCccdIssueDate = input(92);
     private final JTextField txtCccdIssuePlace = input(165);
     private final JTextField txtWorkplace = input(150);
     private final JTextField txtContactName = input(120);
     private final JTextField txtContactPhone = input(100);
     private final JComboBox<String> cbRegistrationType = new JComboBox<>(new String[]{"Khám bệnh", "Tái khám", "Cấp cứu"});
-    private final JTextField txtReason = input(150);
+    private final JTextField txtReason = input("reason", 150);
     private final JComboBox<String> cbPayerType = new JComboBox<>(new String[]{"Viện phí", "BHYT", "Dịch vụ theo yêu cầu"});
     private final JCheckBox chkPriority = new JCheckBox("Ưu tiên");
     private final MedicalPopupChooser chooserService = new MedicalPopupChooser(new String[0], "", 200, 22);
     private final MedicalPopupChooser chooserClinicRoom = new MedicalPopupChooser(new String[0], "", 220, 22);
 
-    private final JTextField txtInsuranceNumber = input(205);
+    private final JTextField txtInsuranceNumber = input("insuranceNumber", 205);
     private final JTextField txtInsuranceStartDate = input(92);
     private final JTextField txtInsuranceEndDate = input(92);
     private final JTextField txtInsuranceRate = input(42);
@@ -90,6 +90,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         split.setBorder(null);
         add(split, BorderLayout.CENTER);
 
+        chooserClinicRoom.setName("clinicRoom");
         chooserClinicRoom.setOnSelectListener(name -> {
             if (onClinicRoomChanged != null) onClinicRoomChanged.accept(name);
         });
@@ -111,6 +112,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         bar.add(label("CCCD"));
         bar.add(txtSearchCccd);
         JButton search = new JButton("Tìm");
+        search.setName("searchButton");
         Runnable triggerSearch = this::triggerSearch;
         search.addActionListener(e -> triggerSearch.run());
         txtSearchPhone.addActionListener(e -> triggerSearch.run());
@@ -454,6 +456,12 @@ public class PatientRegistrationFormPanel extends JPanel {
         JLabel label = new JLabel(value);
         label.setFont(new Font("SansSerif", Font.PLAIN, 11));
         return label;
+    }
+
+    private static JTextField input(String name, int width) {
+        JTextField field = input(width);
+        field.setName(name);
+        return field;
     }
 
     private static JTextField input(int width) {
