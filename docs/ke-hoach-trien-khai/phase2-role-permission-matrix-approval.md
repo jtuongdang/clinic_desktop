@@ -1,25 +1,22 @@
 # Phê duyệt ma trận phân quyền Phase 2
 
-**Trạng thái:** Chủ dự án duyệt ma trận role/action đề xuất ngày 05/11/2026, đồng thời xác nhận scope mỗi phiên phải giới hạn đúng một cặp cơ sở–khoa. Đây là policy được duyệt để lập implementation contract; chưa có grant nào được seed cho tới khi implementation và kiểm thử đạt.
+**Trạng thái:** Chủ dự án duyệt ma trận role/action ngày 05/11/2026 và bổ sung các quyết định DEC-AUTHZ-01/02/04a/04b cùng ngày: chỉ `DOCTOR` ghi sinh hiệu; mở khóa EMR cần DOCTOR thứ hai cùng khoa; `RECEPTIONIST` có thể hủy lượt chưa chỉ định/chưa thu tiền và điều chuyển liên khoa trong cùng cơ sở; `DOCTOR` chỉ chuyển trong khoa đã chọn. Mọi scope phiên giới hạn đúng một cặp cơ sở–khoa. Đây là policy đầu vào cho implementation; các grant được seed riêng sau kiểm thử.
 
 **Tài liệu nguồn:** [Đề xuất ma trận vai trò](phase2-role-permission-matrix-proposal.md), [policy bảo mật Phase 2](phase2-security-policy-proposal.md), [implementation contract](phase2-implementation-contract.md).
 
 ## Quyết định đã duyệt
 
 1. Duyệt các ALLOW theo role/action ghi trong bảng 5.2 của ma trận. Hành động ghi `DENY`, hoặc đang chờ `DEC-AUTHZ-*`, tiếp tục `DENY` cho tới khi có quyết định riêng.
-2. Mỗi phiên có đúng một role và một cặp `(facilityId, departmentId)`. Mọi allow phải khớp **cả hai** ID đó ở Application boundary; không grant xem liên khoa trong cùng cơ sở và không grant toàn hệ thống.
-3. Quyết định `DEC-AUTHZ-03`: chọn phương án cô lập theo `KHOA_PHONG`. Hồ sơ hành chính, BHYT, tiền sử, lịch sử khám và hàng đợi đều chỉ trả về dữ liệu gắn với khoa của phiên. Không có thao tác mở xem liên khoa trong scope đã duyệt.
+2. Mỗi phiên có đúng một role và một cặp `(facilityId, departmentId)`. Mọi quyền đọc/ghi thông thường phải khớp **cả hai** ID đó ở Application boundary; không grant xem dữ liệu liên khoa hay toàn hệ thống. Riêng DEC-AUTHZ-04b chỉ cho phép RECEPTIONIST thực hiện use case điều chuyển lượt khám trong cùng cơ sở qua guard kiểm tra cả khoa nguồn/đích; quyền này không mở quyền đọc dữ liệu của khoa đích. DOCTOR chỉ điều chuyển trong khoa của phiên.
+3. Quyết định `DEC-AUTHZ-03`: chọn phương án cô lập theo `KHOA_PHONG`. Hồ sơ hành chính, BHYT, tiền sử, lịch sử khám và hàng đợi đều chỉ trả về dữ liệu gắn với khoa của phiên. Không có thao tác mở xem liên khoa trong scope đã duyệt; điều chuyển theo DEC-AUTHZ-04b là chuyển trạng thái có guard riêng, không tiết lộ hồ sơ khoa đích.
 4. Quyết định `DEC-AUTHZ-09`: bổ sung action codes `IN`, `XUAT_FILE`, `MO_KHOA_EMR`, `AUDIT_READ` vào domain contract/schema để có thể biểu đạt policy. Scope runtime chỉ cho phép `KHOA_PHONG`; các dòng legacy `TOAN_HE_THONG`, `CO_SO`, `CHI_NHANH` không tạo quyền rộng hơn scope phiên và phải bị từ chối khi đánh giá.
 5. Quyết định `DEC-AUTHZ-10`: `AUDIT_READ` bị từ chối cho mọi vai trò, kể cả `ADMIN`; không role nào được sửa ma trận để tự cấp `AUDIT_READ` hoặc tự cấp quyền cho chính role đang hoạt động. Không có màn hình quản trị quyền trong task này.
-6. Chỉ dùng sáu role đang có: `ADMIN`, `DOCTOR`, `RECEPTIONIST`, `PHARMACIST`, `CASHIER`, `LAB_TECH`. Không tự thêm `NURSE`, `HEAD_DOCTOR` hoặc role quản lý khác.
+6. Chỉ dùng sáu role đang có: `ADMIN`, `DOCTOR`, `RECEPTIONIST`, `PHARMACIST`, `CASHIER`, `LAB_TECH`. Không tự thêm `NURSE`, `HEAD_DOCTOR` hoặc role quản lý khác. Với DEC-AUTHZ-01, chỉ `DOCTOR` được ghi/sửa sinh hiệu trong `KHOA_PHONG`; `RECEPTIONIST` bị từ chối. Với DEC-AUTHZ-02, chỉ một `DOCTOR` khác cùng khoa được phê duyệt mở khóa EMR; người duyệt phải nhập lý do, xác thực lại và mọi thao tác phải được audit. Bác sĩ đã khóa không tự mở lại; `ADMIN` không được mở khóa. Với DEC-AUTHZ-04a, chỉ RECEPTIONIST được hủy lượt `CHO_KHAM` chưa có chỉ định/chưa thu tiền; có xác nhận, lý do và audit. Với DEC-AUTHZ-04b, RECEPTIONIST được điều chuyển giữa các khoa trong cùng cơ sở; DOCTOR chỉ trong khoa đã chọn. Cả hai workflow chưa có grant/use case và chỉ được triển khai sau khi SEC-01 gate đạt.
 
 ## Hành động tiếp tục bị từ chối
 
 Các quyết định sau chưa được chọn trong proposal; vì vậy những hành động tương ứng giữ `DENY` và không được seed trong đợt này:
 
-- `DEC-AUTHZ-01`: ai ghi sinh hiệu ở khâu tiếp đón/điều dưỡng.
-- `DEC-AUTHZ-02`: ai được mở khóa bệnh án.
-- `DEC-AUTHZ-04`: quyền hủy lượt khám và điều chuyển liên khoa.
 - `DEC-AUTHZ-05`: thu cọc, miễn giảm, hoàn tiền và hủy phiếu thu.
 - `DEC-AUTHZ-06`: phân tách người nhập và người duyệt kết quả CLS.
 - `DEC-AUTHZ-07`: phân tách kê, duyệt và cấp phát thuốc.
