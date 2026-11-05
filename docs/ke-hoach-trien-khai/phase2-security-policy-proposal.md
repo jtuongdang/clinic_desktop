@@ -1,6 +1,6 @@
 # Đề xuất chính sách bảo mật Phase 2
 
-**Trạng thái:** Bản đề xuất, chờ chủ dự án duyệt. Chưa triển khai policy/code.
+**Trạng thái:** Chủ dự án đã duyệt role/scope/session/audit policy dưới đây ngày 05/11/2026. Chưa triển khai code. Chính sách khóa tài khoản sau đăng nhập sai vẫn chờ quyết định riêng.
 **Căn cứ:** source review tại `phase2-auth-persistence-review.md`, `phase2-desktop-session-review.md`, `phase2-domain-audit-review.md` và lựa chọn của chủ dự án ngày 05/11/2026.
 
 ## Đã được chủ dự án xác nhận
@@ -8,21 +8,19 @@
 | Chủ đề | Quyết định |
 |---|---|
 | Nhiều vai trò | Mỗi phiên chọn đúng một vai trò đã được gán cho tài khoản. Role chưa được cấp quyền phải bị từ chối mặc định. |
-| Phạm vi dữ liệu | Chỉ truy cập cơ sở/khoa đã được gán cho tài khoản; chưa cấp quyền xem toàn hệ thống. |
+| Phạm vi dữ liệu | Mỗi phiên chọn đúng một cặp cơ sở/khoa từ assignment hợp lệ của tài khoản; không cấp quyền xem toàn hệ thống. |
+| Phiên làm việc | Tự khóa sau 15 phút không thao tác; hết phiên sau tối đa 12 giờ. Auto-lock che workspace, giữ bản nháp và yêu cầu xác thực lại cùng tài khoản/vai trò. |
+| Audit | Ghi nhận event set được liệt kê dưới đây; audit thay đổi nghiệp vụ trong cùng transaction, lỗi audit làm rollback; chỉ append; không purge tự động khi chưa chốt retention. Tra cứu audit phải có quyền riêng. |
 
-Hai quyết định trên là contract đầu vào đã được xác nhận. Việc có bắt buộc chọn một cơ sở/khoa làm ngữ cảnh làm việc cho mỗi phiên hay không vẫn cần quyết định; dù chọn phương án nào, thao tác chỉ được phép trên assignment hợp lệ của tài khoản.
+Các quyết định này là contract đầu vào cho Phase 2. Trong phiên, mọi Command/Query nhạy cảm vẫn phải được Application xác thực lại theo actor, role và cặp cơ sở/khoa đã chọn; UI không phải ranh giới phân quyền.
 
-## Nội dung cần duyệt
+## Quy tắc đã duyệt để triển khai
 
 ### 1. Chọn phạm vi làm việc khi đăng nhập
 
-**Đề xuất:** Sau khi xác thực, nếu tài khoản có nhiều cơ sở/khoa được gán, yêu cầu chọn một cặp cơ sở–khoa đang làm việc cho phiên đó. Nếu chỉ có một cặp thì tự chọn. Danh sách lựa chọn lấy từ assignment trong CSDL; UI không thể tự thêm scope. Mỗi Command/Query nhạy cảm phải được Application kiểm tra lại actor, role, cơ sở/khoa và tài nguyên đích.
-
-**Cần duyệt:** Khi một tài khoản có nhiều assignment hợp lệ, phiên cần chọn một cơ sở/khoa đang làm việc hay được thao tác trên mọi assignment đã cấp? Phòng khám là một phần của scope bắt buộc hay chỉ là lựa chọn vận hành?
+Sau xác thực và chọn một role, người dùng chọn một cặp cơ sở–khoa được gán. Nếu chỉ có một cặp hợp lệ, UI có thể chọn sẵn cặp đó. Danh sách lấy từ assignment trong CSDL; người dùng không thể tự thêm scope. Phòng khám được chọn trong cặp cơ sở/khoa; Application xác nhận phòng thuộc scope trước thao tác.
 
 ### 2. Timeout, khóa phiên và đăng xuất
-
-**Đề xuất:**
 
 - Tự khóa ứng dụng sau **15 phút không thao tác**; cấu hình qua `ThamSoHeThong`, không hardcode.
 - Giới hạn phiên tối đa **12 giờ**; hết hạn yêu cầu đăng nhập lại.
@@ -30,11 +28,9 @@ Hai quyết định trên là contract đầu vào đã được xác nhận. Vi
 - Đăng xuất chủ động xóa `UserSession`, đóng workspace và quay về `LoginForm`; cảnh báo rõ nếu form đang có dữ liệu chưa lưu.
 - Vô hiệu hóa tài khoản hoặc thu hồi role/scope có hiệu lực với thao tác nhạy cảm kế tiếp; Application kiểm tra trạng thái hiện hành, không tin dữ liệu role/scope do UI gửi lên.
 
-**Cần duyệt:** 15 phút / 12 giờ có phù hợp ca làm việc không? Auto-lock giữ form nháp sau khi che màn hình hay xóa form nháp khi phiên hết hạn?
-
 ### 3. Sự kiện và dữ liệu Audit
 
-**Đề xuất ghi nhận:**
+Ghi nhận các nhóm sự kiện đã duyệt:
 
 - Đăng nhập thành công/thất bại, đăng xuất, timeout/thu hồi phiên.
 - Từ chối quyền; xem/in/xuất hồ sơ bệnh nhân hoặc bệnh án.
@@ -42,19 +38,19 @@ Hai quyết định trên là contract đầu vào đã được xác nhận. Vi
 - Kê/duyệt/cấp phát thuốc; nhập/xuất/điều chỉnh tồn; lập hóa đơn, thu, hoàn tiền.
 - Thay đổi tài khoản, role, assignment cơ sở/khoa, ma trận quyền và cấu hình bảo mật.
 
-**Trường đề xuất:** actor ID, role hiệu lực, cơ sở/khoa hiệu lực, mã hành động, loại và ID bản ghi đích, thời điểm UTC, kết quả, mã lý do khi cần, workstation/correlation ID. Không ghi password/hash/token/connection string, CCCD/BHYT đầy đủ, hoặc nội dung lâm sàng tự do vào log hệ thống. Audit hồ sơ chỉ giữ định danh lượt khám cần thiết và mã hành động/lý do truy cập.
+Mỗi bản ghi audit lưu actor ID, role hiệu lực, cơ sở/khoa hiệu lực, mã hành động, loại và ID bản ghi đích, UTC time, kết quả, mã lý do khi cần, workstation/correlation ID. Không ghi password/hash/token/connection string, CCCD/BHYT đầy đủ hoặc nội dung lâm sàng tự do. Audit hồ sơ chỉ giữ định danh lượt khám cần thiết và mã hành động/lý do truy cập.
 
-**Cần duyệt:** Danh sách sự kiện trên có đủ không? Xem hồ sơ cần bắt buộc nhập lý do hay chỉ ghi actor/action/time? Ai được phép tra cứu audit?
+Tra cứu audit chỉ cho phép qua quyền riêng, mặc định từ chối. Implementation không tự gán quyền này cho role nào; cấp role cụ thể cần qua ma trận quyền đã được quản trị phê duyệt.
 
 ### 4. Tính nguyên tử, bất biến và thời hạn lưu Audit
 
-**Đề xuất:** Với thay đổi nghiệp vụ, ghi audit trong cùng transaction; nếu ghi audit thất bại thì rollback thay đổi. Audit chỉ thêm mới, không cho CRUD/sửa/xóa qua ứng dụng; trang tra cứu chỉ đọc và có kiểm tra quyền riêng. Chưa tự động purge audit cho đến khi có thời hạn được phê duyệt.
+Với thay đổi nghiệp vụ, ghi audit trong cùng transaction; nếu ghi audit thất bại thì rollback. Audit chỉ append, ứng dụng không cho sửa/xóa. Không purge tự động cho tới khi có retention được phê duyệt. Thời hạn lưu và role cụ thể có quyền tra cứu vẫn cần chốt trước khi cấu hình retention/cấp quyền.
 
-**Cần duyệt:** Có chấp nhận fail-closed (audit lỗi thì giao dịch sửa dữ liệu cũng thất bại) không? Cần lưu audit trong bao lâu và nhóm nào được tra cứu? Thời hạn phải được chủ dự án/đầu mối tuân thủ xác nhận trước khi cấu hình purge.
+## Chính sách còn cần quyết định riêng
 
-### 5. Khóa tài khoản khi đăng nhập sai
+### Khóa tài khoản khi đăng nhập sai
 
-**Đề xuất chờ xác nhận:** Tài liệu giao diện có nêu ngưỡng 5 lần sai; chưa đủ căn cứ để tự áp dụng vào hệ thống. Cần chốt ngưỡng, thời gian khóa, cách mở khóa và việc có ghi audit mỗi lần sai trước khi tạo migration/use case.
+Tài liệu giao diện có nêu ngưỡng 5 lần sai; ngưỡng, thời gian khóa, cách mở khóa và sự kiện audit cho lần đăng nhập thất bại chưa được duyệt. Không triển khai khóa tài khoản hoặc migration cho chính sách này trước khi chủ dự án chốt.
 
 ## Contract và kiểm thử sau khi duyệt
 
@@ -67,4 +63,4 @@ Hai quyết định trên là contract đầu vào đã được xác nhận. Vi
 
 ## Chốt trạng thái
 
-Phase 2 vẫn chưa đạt gate. Chỉ hai quyết định ở phần “Đã được chủ dự án xác nhận” được xem là hiện hành. Các giá trị và quy tắc chi tiết còn mở phải được duyệt hoặc chỉnh sửa trước khi đưa vào implementation contract.
+Các policy role/scope/session/audit đã được duyệt và có thể đưa vào implementation contract. Phase 2 vẫn đang triển khai; login lockout, audit retention cụ thể và role được cấp quyền tra cứu audit chưa được quyết định. Các hạng mục đó giữ default-deny/no-purge cho tới khi có quyết định.
