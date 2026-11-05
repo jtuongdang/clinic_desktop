@@ -88,16 +88,22 @@ class FreshDatabaseMigrationSqlServerTest {
                             "V5__Seed_Session_Timeout_Parameters.sql",
                             "V6__Enhance_Audit_Tables_Append_Only.sql",
                             "V7__Harden_Permission_Matrix_Defaults.sql",
-                            "V8__Seed_Approved_Permission_Grants.sql"
+                            "V8__Seed_Approved_Permission_Grants.sql",
+                            "V9__Enforce_Active_Patient_Facility_Uniqueness.sql"
                     ),
                     queryMigrationRecords(connection),
-                    "All V1-V8 migrations must be recorded as successful"
+                    "All V1-V9 migrations must be recorded as successful"
             );
 
             assertEquals(1, queryInt(
                     connection,
                     "SELECT COUNT(*) FROM sys.tables WHERE name = 'CoSo'"
             ), "V1 must create the representative CoSo table");
+            assertEquals(1, queryInt(
+                    connection,
+                    "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID('BenhNhanCoSo') " +
+                            "AND name = 'UX_BenhNhanCoSo_Active_Patient_Facility' AND is_unique = 1 AND has_filter = 1"
+            ), "V9 must enforce unique active patient-facility links");
             assertEquals(1, queryInt(
                     connection,
                     "SELECT COUNT(*) FROM sys.tables t "

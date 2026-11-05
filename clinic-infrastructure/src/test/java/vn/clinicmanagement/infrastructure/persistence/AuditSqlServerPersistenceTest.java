@@ -393,10 +393,11 @@ class AuditSqlServerPersistenceTest {
                         "V5__Seed_Session_Timeout_Parameters.sql",
                         "V6__Enhance_Audit_Tables_Append_Only.sql",
                         "V7__Harden_Permission_Matrix_Defaults.sql",
-                        "V8__Seed_Approved_Permission_Grants.sql"
+                        "V8__Seed_Approved_Permission_Grants.sql",
+                        "V9__Enforce_Active_Patient_Facility_Uniqueness.sql"
                 ),
                 queryMigrationRecords(connection),
-                "All V1-V8 migrations must be recorded as successful"
+                "All V1-V9 migrations must be recorded as successful"
         );
         assertEquals(
                 57,

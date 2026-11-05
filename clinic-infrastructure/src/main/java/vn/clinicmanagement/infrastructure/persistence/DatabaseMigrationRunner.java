@@ -30,6 +30,7 @@ import java.util.List;
  *    - V6__Enhance_Audit_Tables_Append_Only.sql (Bổ sung metadata và bảo vệ audit append-only)
  *    - V7__Harden_Permission_Matrix_Defaults.sql (Default-deny và scope khoa cho ma trận phân quyền)
  *    - V8__Seed_Approved_Permission_Grants.sql (Nạp allowlist quyền đã được duyệt)
+ *    - V9__Enforce_Active_Patient_Facility_Uniqueness.sql (Mỗi cặp bệnh nhân-cơ sở chỉ có một liên kết đang hoạt động)
  * 3. Đảm bảo tính Idempotent: Chỉ chạy những script chưa được áp dụng.
  */
 public class DatabaseMigrationRunner {
@@ -44,7 +45,8 @@ public class DatabaseMigrationRunner {
             "migrations/V5__Seed_Session_Timeout_Parameters.sql",
             "migrations/V6__Enhance_Audit_Tables_Append_Only.sql",
             "migrations/V7__Harden_Permission_Matrix_Defaults.sql",
-            "migrations/V8__Seed_Approved_Permission_Grants.sql"
+            "migrations/V8__Seed_Approved_Permission_Grants.sql",
+            "migrations/V9__Enforce_Active_Patient_Facility_Uniqueness.sql"
     };
 
     /**
