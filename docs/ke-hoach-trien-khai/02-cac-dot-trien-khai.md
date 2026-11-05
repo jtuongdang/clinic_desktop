@@ -7,8 +7,8 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Trạng thái:** `[~]` Nền tảng và wiring cơ bản có trong source; validation/release chưa hoàn tất.
 **Phụ thuộc:** Không.
 **Phạm vi:** Maven modules, application shell, schema/migrations, JDBC, transaction/unit of work và cấu hình môi trường.
-**Bằng chứng mới:** `JdbcTransactionManagerTest` kiểm tra commit/rollback/cleanup; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra tách batch `GO`; DateRange/Money regression tests được thêm ở `3f6ba31`. 11 test source hiện có tương ứng 55 test cases theo kết quả gần nhất (domain 16, application 17, infrastructure 17, desktop 5). `mvn clean verify` gần nhất trước DateRange/Money additions đã pass; lần chạy sau additions bị Maven shared-cache lock chặn trước khi compile.
-**Còn lại:** Lặp lại build/verify thành công và migrations trên SQL Server thử nghiệm sạch; cấu hình secret. Các kiểm thử transaction/splitter hiện có không chứng minh migration hay reception E2E trên SQL Server. Identity/access baseline nằm ở Phase 2.
+**Bằng chứng mới:** `JdbcTransactionManagerTest` kiểm tra commit/rollback/cleanup; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra tách batch `GO`; DateRange/Money regression tests có ở `3f6ba31`. `mvn clean verify` sau các additions pass trên code snapshot `3f6ba31`: 55 tests, 0 failures/errors/skips, năm Maven module thành công.
+**Còn lại:** Xác nhận migrations trên SQL Server thử nghiệm sạch; cấu hình secret. Các kiểm thử transaction/splitter hiện có không chứng minh migration hay reception E2E trên SQL Server. Identity/access baseline nằm ở Phase 2.
 **Gate:** build/migrations/repository transaction có thể tái lập trong môi trường thử nghiệm.
 
 ## Phase 1 — Bệnh nhân và tiếp đón

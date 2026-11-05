@@ -18,8 +18,8 @@
 
 - Migration runner đăng ký tuần tự bốn file: `V1__Initial_Clinic_Schema.sql`, `V2__Seed_Initial_Data.sql`, `V3__Repair_Demo_Account_Passwords.sql`, `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql`.
 - `DatabaseMigrationRunner` dùng `SqlServerBatchSplitter` để tách `GO` đứng riêng trên dòng; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra runner/splitter bằng test tự chứa. Chưa có bằng chứng chạy migration trên SQL Server thử nghiệm.
-- Tại HEAD `3f6ba31` có **11 test source** và **55 test case theo kết quả gần nhất được cung cấp**: domain 3 source/16 tests (`DateRangeTest`, `MoneyTest`, `PhoneNumberTest`); application 3/17 (`RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest`); infrastructure 4/17 (`BenhNhanRepositoryImplTest`, `DatabaseMigrationRunnerTest`, `JdbcTransactionManagerTest`, `SqlServerBatchSplitterTest`); desktop 1/5 (`PatientRegistrationFormPanelTest`).
-- Các test có bằng chứng targeted pass; `mvn clean verify` pass trước khi thêm `DateRangeTest`/`MoneyTest`. Sau các additions, lần chạy mới `mvn clean verify` dừng trước compile vì không lấy được lock `maven-clean-plugin` trong shared `~/.m2`; thử `mvn verify` cũng dừng tại `maven-resources-plugin` lock. Do đó chưa có kết quả full verify mới tại HEAD này.
+- Tại code snapshot `3f6ba31` có **11 test source / 55 test cases**: domain 3 source/16 tests (`DateRangeTest`, `MoneyTest`, `PhoneNumberTest`); application 3/17 (`RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest`); infrastructure 4/17 (`BenhNhanRepositoryImplTest`, `DatabaseMigrationRunnerTest`, `JdbcTransactionManagerTest`, `SqlServerBatchSplitterTest`); desktop 1/5 (`PatientRegistrationFormPanelTest`).
+- `mvn clean verify` chạy sau khi thêm `DateRangeTest`/`MoneyTest` và trên code snapshot `3f6ba31` đã pass: 55 tests, 0 failures/errors/skips; cả năm Maven module thành công. Commit tài liệu hiện tại không thay đổi source/test.
 - Các test unit/headless không chứng minh SQL Server save/search/queue, migration trên SQL Server, đọc lại sau restart, rollback đa bảng trong quy trình tiếp đón, hoặc queue/CCCD concurrency.
 
 ## Tiếp đón và trạng thái Git
@@ -27,7 +27,7 @@
 - `ReceptionCompositionRoot` nối `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler` với JDBC repositories. Handler đăng ký ghi bệnh nhân, bảo hiểm tùy chọn và lượt khám trong transaction boundary.
 - Search query tra cứu hồ sơ và BHYT gần nhất; queue repository ghi lượt khám, cấp số theo phòng/ngày bằng khóa giao dịch SQL, và đọc hàng đợi/tóm tắt phòng. Các hành vi này có trong source nhưng chưa có E2E SQL Server/restart acceptance.
 - Feature HEAD tại thời điểm cập nhật là `3f6ba31` (`DateRange`/`Money` regression tests), kế tiếp các commit `ea397f9` (headless reception form tests, deterministic room assumption corrected), `264bbae` (SQL Server GO splitter/migration runner tests), `ff2045a` (JDBC transaction tests) và `dba0da9` (model task board). Đây là bằng chứng commit/test local; không phải phát hành hay phase acceptance.
-- Số liệu inventory được đối chiếu với `src/test` ở cả bốn module; test total 55 là kết quả gần nhất được cung cấp. Latest full verify trước hai test DateRange/Money đã pass; lần chạy hiện tại bị chặn bởi shared Maven cache lock như ghi trên.
+- Số liệu inventory được đối chiếu với `src/test` ở cả bốn module; `mvn clean verify` xác nhận 55 tests pass tại source snapshot `3f6ba31`.
 
 ## Nguyên tắc đánh giá hoàn thiện
 

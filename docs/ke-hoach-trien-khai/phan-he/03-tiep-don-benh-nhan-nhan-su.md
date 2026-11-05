@@ -4,7 +4,7 @@
 **Phase:** 1; quản trị nhân sự mở rộng ở Phase 8.
 **Domain:** `patient`, `identity`, `facility`, `appointment`.
 
-> Feature HEAD tại task creation là `3f6ba31`. Current test inventory: 11 source files / 55 test cases per latest supplied results (domain 3/16, application 3/17, infrastructure 4/17, desktop 1/5). Recent commits include `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`, `dba0da9`. Latest `mvn clean verify` before DateRange/Money additions passed; requested post-addition verify could not start due shared Maven cache lock errors. Code/test commits do not equal phase acceptance. Phase 1 remains in progress because SQL Server save/search/queue, restart/recovery, multi-row reception rollback and E2E remain unproven.
+> Code snapshot at task creation was `3f6ba31`; current feature then received documentation-only commit `dbad2fd`. Test inventory: 11 source files / 55 test cases (domain 3/16, application 3/17, infrastructure 4/17, desktop 1/5). Recent commits include `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`, `dba0da9`. `mvn clean verify` after DateRange/Money additions passed with 55 tests and zero failures/errors/skips. Code/test commits do not equal phase acceptance. Phase 1 remains in progress because SQL Server save/search/queue, restart/recovery, multi-row reception rollback and E2E remain unproven.
 
 ## Hiện có trong source
 
