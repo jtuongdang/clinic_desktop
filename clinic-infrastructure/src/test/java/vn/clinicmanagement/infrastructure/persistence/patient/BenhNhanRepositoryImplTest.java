@@ -11,9 +11,13 @@ import vn.clinicmanagement.infrastructure.persistence.JdbcUnitOfWork;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -23,6 +27,54 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BenhNhanRepositoryImplTest {
+    private static final List<String> REGISTRATION_COLUMNS = List.of(
+            "ho", "ten", "ngaySinh", "gioiTinh", "dienThoai", "email", "soCCCD", "diaChi",
+            "nguoiLienHeTen", "nguoiLienHeDienThoai", "noiSinh", "soNhaThonPho", "ngayCapCCCD",
+            "noiCapCCCD", "noiLamViec");
+
+    @Test
+    void selectMapsEveryApprovedPatientRegistrationField() {
+        RegistrationJdbc jdbc = new RegistrationJdbc();
+        jdbc.selectRow = registrationRow();
+        Persistence persistence = persistence(jdbc);
+
+        Result<BenhNhan> result = persistence.transactions.inTransaction(
+                () -> Result.success(persistence.repository.getById(17).orElseThrow()));
+
+        assertTrue(result.isSuccess());
+        assertSelectedRegistrationColumns(jdbc.sql);
+        assertRegistrationFields(result.getValue().orElseThrow());
+    }
+
+    @Test
+    void insertAndUpdateBindEveryApprovedPatientRegistrationField() {
+        RegistrationJdbc jdbc = new RegistrationJdbc();
+        Persistence persistence = persistence(jdbc);
+        BenhNhan patient = syntheticRegistrationPatient();
+
+        Result<Integer> insertResult = persistence.transactions.inTransaction(() -> {
+            persistence.repository.add(patient);
+            return Result.success(patient.getId());
+        });
+
+        assertTrue(insertResult.isSuccess());
+        assertEquals(77, insertResult.getValue().orElseThrow());
+        assertSelectedRegistrationColumns(jdbc.sql);
+        assertInsertRegistrationBindings(jdbc.parameters);
+
+        patient.setId(17);
+        patient.setVersion(3L);
+        Result<Integer> updateResult = persistence.transactions.inTransaction(() -> {
+            persistence.repository.update(patient);
+            return Result.success(patient.getVersion().intValue());
+        });
+
+        assertTrue(updateResult.isSuccess());
+        assertEquals(4, updateResult.getValue().orElseThrow());
+        assertSelectedRegistrationColumns(jdbc.sql);
+        assertUpdateRegistrationBindings(jdbc.parameters);
+    }
+
     @Test
     void successfulDeleteAdvancesDatabaseAndEntityVersionsOnce() {
         SyntheticJdbc jdbc = new SyntheticJdbc(7);
@@ -164,6 +216,124 @@ class BenhNhanRepositoryImplTest {
         assertTrue(failure.getCause() == sqlException);
     }
 
+    private static Persistence persistence(RegistrationJdbc jdbc) {
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcTransactionManager transactions = transactionManager(unitOfWork, jdbc.connection);
+        BenhNhanRepositoryImpl repository = new BenhNhanRepositoryImpl(
+                new JdbcConnectionProvider(transactions), unitOfWork);
+        return new Persistence(transactions, repository);
+    }
+
+    private static Map<String, Object> registrationRow() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", 17);
+        row.put("ho", "Synthetic Nguyen");
+        row.put("ten", "An");
+        row.put("ngaySinh", Date.valueOf("1992-04-15"));
+        row.put("gioiTinh", "F");
+        row.put("dienThoai", "synthetic-phone-01");
+        row.put("email", "synthetic.person@example.invalid");
+        row.put("soCCCD", "synthetic-cccd-01");
+        row.put("diaChi", "Synthetic address");
+        row.put("nguoiLienHeTen", "Synthetic contact");
+        row.put("nguoiLienHeDienThoai", "synthetic-contact-phone-01");
+        row.put("noiSinh", "Synthetic birthplace");
+        row.put("soNhaThonPho", "Synthetic street");
+        row.put("ngayCapCCCD", null);
+        row.put("noiCapCCCD", "Synthetic issuing office");
+        row.put("noiLamViec", "Synthetic workplace");
+        row.put("version", 3L);
+        row.put("createdAt", null);
+        row.put("createdBy", null);
+        row.put("updatedAt", null);
+        row.put("updatedBy", null);
+        row.put("isDeleted", false);
+        row.put("deletedAt", null);
+        row.put("deletedBy", null);
+        return row;
+    }
+
+    private static BenhNhan syntheticRegistrationPatient() {
+        BenhNhan patient = new BenhNhan();
+        patient.setHo("Synthetic Nguyen");
+        patient.setTen("An");
+        patient.setNgaySinh(LocalDate.of(1992, 4, 15));
+        patient.setGioiTinh(vn.clinicmanagement.domain.common.enums.GioiTinh.F);
+        patient.setDienThoai(" synthetic-phone-01 ");
+        patient.setEmail("synthetic.person@example.invalid");
+        patient.setSoCCCD(" synthetic-cccd-01 ");
+        patient.setDiaChi("Synthetic address");
+        patient.setNguoiLienHeTen("Synthetic contact");
+        patient.setNguoiLienHeDienThoai("synthetic-contact-phone-01");
+        patient.setNoiSinh("Synthetic birthplace");
+        patient.setSoNhaThonPho("Synthetic street");
+        patient.setNgayCapCCCD(null);
+        patient.setNoiCapCCCD("Synthetic issuing office");
+        patient.setNoiLamViec("Synthetic workplace");
+        return patient;
+    }
+
+    private static void assertSelectedRegistrationColumns(String sql) {
+        assertTrue(sql.startsWith("SELECT") || sql.startsWith("INSERT") || sql.startsWith("UPDATE"));
+        for (String column : REGISTRATION_COLUMNS) {
+            assertTrue(sql.contains(column), "SQL should include patient registration column " + column);
+        }
+    }
+
+    private static void assertRegistrationFields(BenhNhan patient) {
+        assertEquals("Synthetic Nguyen", patient.getHo());
+        assertEquals("An", patient.getTen());
+        assertEquals(LocalDate.of(1992, 4, 15), patient.getNgaySinh());
+        assertEquals(vn.clinicmanagement.domain.common.enums.GioiTinh.F, patient.getGioiTinh());
+        assertEquals("synthetic-phone-01", patient.getDienThoai());
+        assertEquals("synthetic.person@example.invalid", patient.getEmail());
+        assertEquals("synthetic-cccd-01", patient.getSoCCCD());
+        assertEquals("Synthetic address", patient.getDiaChi());
+        assertEquals("Synthetic contact", patient.getNguoiLienHeTen());
+        assertEquals("synthetic-contact-phone-01", patient.getNguoiLienHeDienThoai());
+        assertEquals("Synthetic birthplace", patient.getNoiSinh());
+        assertEquals("Synthetic street", patient.getSoNhaThonPho());
+        assertNull(patient.getNgayCapCCCD());
+        assertEquals("Synthetic issuing office", patient.getNoiCapCCCD());
+        assertEquals("Synthetic workplace", patient.getNoiLamViec());
+    }
+
+    private static void assertInsertRegistrationBindings(Map<Integer, Object> parameters) {
+        assertEquals("Synthetic Nguyen", parameters.get(2));
+        assertEquals("An", parameters.get(3));
+        assertEquals(LocalDate.of(1992, 4, 15), parameters.get(4));
+        assertEquals("F", parameters.get(5));
+        assertEquals("synthetic-phone-01", parameters.get(6));
+        assertEquals("synthetic.person@example.invalid", parameters.get(7));
+        assertEquals("synthetic-cccd-01", parameters.get(8));
+        assertEquals("Synthetic address", parameters.get(9));
+        assertEquals("Synthetic street", parameters.get(10));
+        assertEquals("Synthetic birthplace", parameters.get(11));
+        assertNull(parameters.get(12));
+        assertEquals("Synthetic issuing office", parameters.get(13));
+        assertEquals("Synthetic workplace", parameters.get(14));
+        assertEquals("Synthetic contact", parameters.get(21));
+        assertEquals("synthetic-contact-phone-01", parameters.get(22));
+    }
+
+    private static void assertUpdateRegistrationBindings(Map<Integer, Object> parameters) {
+        assertEquals("Synthetic Nguyen", parameters.get(1));
+        assertEquals("An", parameters.get(2));
+        assertEquals(LocalDate.of(1992, 4, 15), parameters.get(3));
+        assertEquals("F", parameters.get(4));
+        assertEquals("synthetic-phone-01", parameters.get(5));
+        assertEquals("synthetic.person@example.invalid", parameters.get(6));
+        assertEquals("synthetic-cccd-01", parameters.get(7));
+        assertEquals("Synthetic address", parameters.get(8));
+        assertEquals("Synthetic street", parameters.get(9));
+        assertEquals("Synthetic birthplace", parameters.get(10));
+        assertNull(parameters.get(11));
+        assertEquals("Synthetic issuing office", parameters.get(12));
+        assertEquals("Synthetic workplace", parameters.get(13));
+        assertEquals("Synthetic contact", parameters.get(20));
+        assertEquals("synthetic-contact-phone-01", parameters.get(21));
+    }
+
     private static JdbcTransactionManager transactionManager(
             JdbcUnitOfWork unitOfWork, Connection connection) {
         try {
@@ -179,6 +349,87 @@ class BenhNhanRepositoryImplTest {
             return constructor.newInstance(unitOfWork, supplier);
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError("Could not configure synthetic JDBC transaction.", ex);
+        }
+    }
+
+    private record Persistence(JdbcTransactionManager transactions, BenhNhanRepositoryImpl repository) {}
+
+    private static final class RegistrationJdbc {
+        private final Connection connection;
+        private Map<String, Object> selectRow = Map.of();
+        private Map<Integer, Object> parameters = new LinkedHashMap<>();
+        private String sql = "";
+
+        private RegistrationJdbc() {
+            connection = (Connection) Proxy.newProxyInstance(
+                    Connection.class.getClassLoader(),
+                    new Class<?>[]{Connection.class},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "setAutoCommit", "commit", "rollback", "close" -> null;
+                        case "prepareStatement" -> prepareStatement((String) args[0]);
+                        case "isClosed" -> false;
+                        case "toString" -> "SyntheticRegistrationConnection";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    });
+        }
+
+        private PreparedStatement prepareStatement(String statement) {
+            sql = statement;
+            parameters = new LinkedHashMap<>();
+            return (PreparedStatement) Proxy.newProxyInstance(
+                    PreparedStatement.class.getClassLoader(),
+                    new Class<?>[]{PreparedStatement.class},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "setString", "setObject", "setInt", "setLong", "setDate", "setTimestamp",
+                                "setBoolean" -> {
+                            parameters.put((Integer) args[0], args[1]);
+                            yield null;
+                        }
+                        case "executeQuery" -> resultSet(statement.startsWith("SELECT") ? selectRow : Map.of());
+                        case "executeUpdate" -> 1;
+                        case "close" -> null;
+                        case "toString" -> "SyntheticRegistrationPreparedStatement";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    });
+        }
+
+        private ResultSet resultSet(Map<String, Object> row) {
+            int[] cursor = {-1};
+            return (ResultSet) Proxy.newProxyInstance(
+                    ResultSet.class.getClassLoader(),
+                    new Class<?>[]{ResultSet.class},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "next" -> ++cursor[0] == 0;
+                        case "getInt" -> {
+                            Object value = value(row, args[0], 77);
+                            yield value == null ? 0 : ((Number) value).intValue();
+                        }
+                        case "getLong" -> {
+                            Object value = value(row, args[0], 0L);
+                            yield value == null ? 0L : ((Number) value).longValue();
+                        }
+                        case "getString" -> {
+                            Object value = value(row, args[0], null);
+                            yield value == null ? null : value.toString();
+                        }
+                        case "getDate" -> value(row, args[0], null);
+                        case "getTimestamp" -> value(row, args[0], null);
+                        case "getObject" -> value(row, args[0], null);
+                        case "getBoolean" -> Boolean.TRUE.equals(value(row, args[0], false));
+                        case "close" -> null;
+                        case "toString" -> "SyntheticRegistrationResultSet";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    });
+        }
+
+        private Object value(Map<String, Object> row, Object column, Object scalar) {
+            return column instanceof String name ? row.get(name) : scalar;
         }
     }
 

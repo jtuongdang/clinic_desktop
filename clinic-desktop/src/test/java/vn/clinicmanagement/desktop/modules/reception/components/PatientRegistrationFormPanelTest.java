@@ -17,11 +17,13 @@ import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.core.session.UserSession;
 
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
+import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -78,6 +80,63 @@ class PatientRegistrationFormPanelTest {
 
             cccdField.setText("   ");
             assertEquals("", panel.maskedEnteredCccd());
+        });
+    }
+
+    @Test
+    void registrationFormMapsTheApprovedFifteenPatientFieldsToTheCommand() throws Exception {
+        onEdt(() -> {
+            PatientRegistrationFormPanel panel = new PatientRegistrationFormPanel();
+            panel.setClinicRooms(List.of(room(101, "Synthetic Room")));
+            findByName(panel, "fullName", JTextField.class).setText("  Synthetic   Nguyen  An ");
+            findByName(panel, "dateOfBirth", JTextField.class).setText("15/04/1992");
+            findByName(panel, "phone", JTextField.class).setText(" synthetic-phone-01 ");
+            findByName(panel, "address", JTextField.class).setText(" Synthetic address ");
+            findByName(panel, "cccd", JTextField.class).setText(" synthetic-cccd-01 ");
+            findByField(panel, "cbGender", JComboBox.class).setSelectedItem("Nữ");
+            findByField(panel, "txtBirthPlace", JTextField.class).setText(" Synthetic birthplace ");
+            findByField(panel, "txtStreet", JTextField.class).setText(" Synthetic street ");
+            findByField(panel, "txtCccdIssueDate", JTextField.class).setText("05/06/2011");
+            findByField(panel, "txtCccdIssuePlace", JTextField.class).setText(" Synthetic issuing office ");
+            findByField(panel, "txtWorkplace", JTextField.class).setText(" Synthetic workplace ");
+            findByField(panel, "txtEmail", JTextField.class).setText(" synthetic.person@example.invalid ");
+            findByField(panel, "txtContactName", JTextField.class).setText(" Synthetic contact ");
+            findByField(panel, "txtContactPhone", JTextField.class).setText(" synthetic-contact-phone-01 ");
+
+            startSyntheticSession(9);
+            BenhNhan patient = panel.toRegisterCommand(authorizationContext(), auditActorContext()).patient();
+
+            assertEquals("Synthetic Nguyen", patient.getHo());
+            assertEquals("An", patient.getTen());
+            assertEquals(LocalDate.of(1992, 4, 15), patient.getNgaySinh());
+            assertEquals(GioiTinh.F, patient.getGioiTinh());
+            assertEquals("synthetic-phone-01", patient.getDienThoai());
+            assertEquals("synthetic.person@example.invalid", patient.getEmail());
+            assertEquals("synthetic-cccd-01", patient.getSoCCCD());
+            assertEquals("Synthetic address", patient.getDiaChi());
+            assertEquals("Synthetic contact", patient.getNguoiLienHeTen());
+            assertEquals("synthetic-contact-phone-01", patient.getNguoiLienHeDienThoai());
+            assertEquals("Synthetic birthplace", patient.getNoiSinh());
+            assertEquals("Synthetic street", patient.getSoNhaThonPho());
+            assertEquals(LocalDate.of(2011, 6, 5), patient.getNgayCapCCCD());
+            assertEquals("Synthetic issuing office", patient.getNoiCapCCCD());
+            assertEquals("Synthetic workplace", patient.getNoiLamViec());
+
+            findByField(panel, "txtEmail", JTextField.class).setText("   ");
+            findByName(panel, "cccd", JTextField.class).setText("   ");
+            findByName(panel, "address", JTextField.class).setText("   ");
+            findByField(panel, "txtContactName", JTextField.class).setText("   ");
+            findByField(panel, "txtContactPhone", JTextField.class).setText("   ");
+            findByField(panel, "txtCccdIssueDate", JTextField.class).setText("   ");
+            BenhNhan optionalFieldsCleared =
+                    panel.toRegisterCommand(authorizationContext(), auditActorContext()).patient();
+
+            assertNull(optionalFieldsCleared.getEmail());
+            assertNull(optionalFieldsCleared.getSoCCCD());
+            assertNull(optionalFieldsCleared.getDiaChi());
+            assertNull(optionalFieldsCleared.getNguoiLienHeTen());
+            assertNull(optionalFieldsCleared.getNguoiLienHeDienThoai());
+            assertNull(optionalFieldsCleared.getNgayCapCCCD());
         });
     }
 
@@ -445,6 +504,13 @@ class PatientRegistrationFormPanelTest {
             }
         }
         throw new AssertionError("Component not found: " + name);
+    }
+
+    private static <T> T findByField(PatientRegistrationFormPanel panel, String name, Class<T> type)
+            throws ReflectiveOperationException {
+        Field field = PatientRegistrationFormPanel.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return type.cast(field.get(panel));
     }
 
     private static <T extends Component> T findByNameOrNull(Container root, String name, Class<T> type) {
