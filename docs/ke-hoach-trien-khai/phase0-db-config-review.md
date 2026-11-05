@@ -32,7 +32,7 @@ The checked-in example URL explicitly sets encryption on and `trustServerCertifi
 
 ### Error and logging behavior
 
-On missing configuration, `getConnection` returns a generic setup-oriented `SQLException` without identifying which required field is absent (`DatabaseConnection.java:97-106`). Resource-loading failures and driver class lookup failures are swallowed (`DatabaseConnection.java:38-48,112-125`). The optional `testConnection` helper prints the database product, version, connected user on success, and the raw `SQLException` message on failure (`DatabaseConnection.java:132-150`). Ordinary callers receive SQL exceptions from `DriverManager`; this class does not log them (`DatabaseConnection.java:90-107`). Whether callers elsewhere log exception text was not exhaustively audited.
+At the review baseline, the optional `testConnection` helper printed database product/version/user and raw `SQLException` details. Follow-up task `PLAT-DB-DIAG-01` (`2e7a3321`, integrated commit `0ea0286`) removed those fields and replaced failure output with a fixed message; fake-JDBC tests verify output redaction. On missing configuration, `getConnection` still returns a generic setup-oriented `SQLException` without identifying which field is absent. Resource-loading failures and driver class lookup failures are still swallowed. Ordinary callers receive SQL exceptions from `DriverManager`; this class does not log them. Whether callers elsewhere log exception text was not exhaustively audited.
 
 ## Current configuration test evidence
 
@@ -47,7 +47,7 @@ The live SQL Server tests are gated by explicit system-property opt-in: the rece
 - **Driver setting:** `DB_DRIVER` is accepted syntactically but unused when connecting. Unknown JDBC URL schemes receive no explicit driver-class attempt in `autoRegisterDriver` (`DatabaseConnection.java:112-125`).
 - **TLS:** The checked-in example trusts the server certificate. The repository does not establish a deployment-wide certificate-validation requirement, and driver behavior for URLs without TLS properties is unverified. Choosing the required TLS policy needs deployment requirements/owner input.
 - **Malformed or missing configuration:** Load errors are swallowed; partial settings can progress to driver invocation and fail later. There is no startup-time validation or focused test for missing/malformed fields (`DatabaseConnection.java:38-48,97-106`).
-- **Logging and diagnostics:** `testConnection` can print raw driver exception detail and connected-user metadata. No redaction behavior is shown here. It remains unverified whether downstream callers expose or log the exception message.
+- **Logging and diagnostics:** The specific `testConnection` raw detail exposure found by this review was fixed and tested. Safe presentation/logging behavior for database errors in downstream callers remains unverified.
 - **Reproducible launch:** README describes `mvn package` but not a concrete command for launching the shaded JAR with external configuration. The classpath-only lookup makes an adjacent properties file unsupported by the inspected implementation (`README.md:7-10`; `DatabaseConnection.java:38-47`; `clinic-desktop/pom.xml:58-60`).
 
 ## Smallest recommended implementation and test sequence
@@ -81,3 +81,4 @@ These steps validate behavior without selecting a production policy or claiming 
 - Root inspected `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` using JDK 17 `jar tf`: the archive contains `db.properties.example` and contains no entry named `db.properties`. This check proves only artifact contents; the JAR was not run against a database.
 - JDK check: `java_home -V` found JDK 17.0.17; the default Java was JDK 27, so the Maven command explicitly selected JDK 17.
 - The Codex task's source-level scope check passed with only its report in its task diff. Root subsequently updated the phase summary, task board, and index to integrate the report.
+- Follow-up `PLAT-DB-DIAG-01` used a fake JDBC driver; root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed after integration: **211 tests, 0 failures/errors, 4 expected SQL Server opt-in skips**. `git diff --check` passed. No SQL Server or real credentials were used for this task.
