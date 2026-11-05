@@ -86,6 +86,7 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                     patient.setVersion(persistedPatient.getVersion());
                     patient.setCreatedAt(persistedPatient.getCreatedAt());
                     patient.setCreatedBy(persistedPatient.getCreatedBy());
+                    patient.setUpdatedBy(command.createdBy());
                 }
 
                 if (existing) patients.update(patient);
@@ -99,8 +100,12 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                     card.setMaBenhNhan(patient.getId());
                     var currentCard = insuranceCards.getLatestByPatientId(patient.getId());
                     if (currentCard.isPresent()) {
-                        card.setId(currentCard.get().getId());
-                        card.setVersion(currentCard.get().getVersion());
+                        BaoHiem persistedCard = currentCard.get();
+                        card.setId(persistedCard.getId());
+                        card.setVersion(persistedCard.getVersion());
+                        card.setCreatedAt(persistedCard.getCreatedAt());
+                        card.setCreatedBy(persistedCard.getCreatedBy());
+                        card.setUpdatedBy(command.createdBy());
                         insuranceCards.update(card);
                         appendAudit(command.auditActorContext(), context, AuditActionCode.INSURANCE_UPDATED,
                                 AuditResourceType.INSURANCE, card.getId());

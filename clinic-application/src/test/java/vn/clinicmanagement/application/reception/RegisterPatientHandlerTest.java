@@ -13,6 +13,7 @@ import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
+import vn.clinicmanagement.domain.common.BaseEntity;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
@@ -35,6 +36,7 @@ import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 
 import java.lang.reflect.Proxy;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -72,8 +74,14 @@ class RegisterPatientHandlerTest {
     @Test
     void newPatientRegistrationPersistsPatientInsuranceAndVisitReceipt() {
         Fixture fixture = new Fixture();
+        LocalDateTime patientCreatedAt = LocalDateTime.of(2026, 5, 1, 8, 0);
+        LocalDateTime insuranceCreatedAt = LocalDateTime.of(2026, 5, 1, 8, 1);
         BenhNhan patient = validPatient();
+        patient.setCreatedAt(patientCreatedAt);
+        patient.setCreatedBy(ACTOR.employeeId());
         BaoHiem insurance = validInsurance();
+        insurance.setCreatedAt(insuranceCreatedAt);
+        insurance.setCreatedBy(ACTOR.employeeId());
         fixture.patientInsertId = 41;
         fixture.visit = visit(91, 7, "Q-007");
 
@@ -91,6 +99,20 @@ class RegisterPatientHandlerTest {
         assertEquals(1, fixture.insuranceAdds.get());
         assertEquals(0, fixture.insuranceUpdates.get());
         assertEquals(41, insurance.getMaBenhNhan());
+        assertNotNull(fixture.addedPatientMetadata);
+        assertNull(fixture.addedPatientMetadata.id());
+        assertEquals(0L, fixture.addedPatientMetadata.version());
+        assertEquals(patientCreatedAt, fixture.addedPatientMetadata.createdAt());
+        assertEquals(ACTOR.employeeId(), fixture.addedPatientMetadata.createdBy());
+        assertNull(fixture.addedPatientMetadata.updatedBy());
+        assertNull(fixture.updatedPatientMetadata);
+        assertNotNull(fixture.addedInsuranceMetadata);
+        assertNull(fixture.addedInsuranceMetadata.id());
+        assertEquals(0L, fixture.addedInsuranceMetadata.version());
+        assertEquals(insuranceCreatedAt, fixture.addedInsuranceMetadata.createdAt());
+        assertEquals(ACTOR.employeeId(), fixture.addedInsuranceMetadata.createdBy());
+        assertNull(fixture.addedInsuranceMetadata.updatedBy());
+        assertNull(fixture.updatedInsuranceMetadata);
         assertEquals(1, fixture.visitCalls.get());
         assertEquals(List.of(41, FACILITY_ID, DEPARTMENT_ID, ROOM_ID, "Khám bệnh",
                 "Synthetic reason", DoiTuongKham.BHYT, true, 5), fixture.visitArguments);
@@ -105,16 +127,26 @@ class RegisterPatientHandlerTest {
     @Test
     void existingPatientIsUpdatedAndNotInsertedAgain() {
         Fixture fixture = new Fixture();
+        LocalDateTime persistedPatientCreatedAt = LocalDateTime.of(2025, 2, 10, 8, 15);
+        LocalDateTime persistedInsuranceCreatedAt = LocalDateTime.of(2025, 2, 10, 8, 20);
         BenhNhan patient = validPatient();
         patient.setId(52);
         patient.setMaBenhNhanFormat("SYNTH-EXISTING-52");
+        patient.setCreatedAt(LocalDateTime.of(2026, 6, 1, 9, 0));
+        patient.setCreatedBy(99);
         fixture.duplicatePatient = validPatient();
         fixture.duplicatePatient.setId(52);
         fixture.duplicatePatient.setVersion(4L);
+        fixture.duplicatePatient.setCreatedAt(persistedPatientCreatedAt);
+        fixture.duplicatePatient.setCreatedBy(2);
         BaoHiem insurance = validInsurance();
+        insurance.setCreatedAt(LocalDateTime.of(2026, 6, 1, 9, 5));
+        insurance.setCreatedBy(98);
         BaoHiem currentInsurance = new BaoHiem();
         currentInsurance.setId(8);
         currentInsurance.setVersion(3L);
+        currentInsurance.setCreatedAt(persistedInsuranceCreatedAt);
+        currentInsurance.setCreatedBy(3);
         fixture.currentInsurance = currentInsurance;
         fixture.visit = visit(92, 8, "Q-008");
 
@@ -127,9 +159,28 @@ class RegisterPatientHandlerTest {
         assertEquals(1, fixture.patientUpdates.get());
         assertEquals(0, fixture.insuranceAdds.get());
         assertEquals(1, fixture.insuranceUpdates.get());
+        assertNotNull(fixture.updatedPatientMetadata);
+        assertEquals(52, fixture.updatedPatientMetadata.id());
+        assertEquals(4L, fixture.updatedPatientMetadata.version());
+        assertEquals(persistedPatientCreatedAt, fixture.updatedPatientMetadata.createdAt());
+        assertEquals(2, fixture.updatedPatientMetadata.createdBy());
+        assertEquals(ACTOR.employeeId(), fixture.updatedPatientMetadata.updatedBy());
+        assertEquals(4L, patient.getVersion());
+        assertEquals(persistedPatientCreatedAt, patient.getCreatedAt());
+        assertEquals(2, patient.getCreatedBy());
+        assertEquals(ACTOR.employeeId(), patient.getUpdatedBy());
         assertEquals(52, insurance.getMaBenhNhan());
+        assertNotNull(fixture.updatedInsuranceMetadata);
+        assertEquals(8, fixture.updatedInsuranceMetadata.id());
+        assertEquals(3L, fixture.updatedInsuranceMetadata.version());
+        assertEquals(persistedInsuranceCreatedAt, fixture.updatedInsuranceMetadata.createdAt());
+        assertEquals(3, fixture.updatedInsuranceMetadata.createdBy());
+        assertEquals(ACTOR.employeeId(), fixture.updatedInsuranceMetadata.updatedBy());
         assertEquals(8, insurance.getId());
         assertEquals(3L, insurance.getVersion());
+        assertEquals(persistedInsuranceCreatedAt, insurance.getCreatedAt());
+        assertEquals(3, insurance.getCreatedBy());
+        assertEquals(ACTOR.employeeId(), insurance.getUpdatedBy());
         assertEquals(1, fixture.visitCalls.get());
         assertEquals(1, fixture.transactions.calls);
         assertEquals(0, fixture.transactions.failures);
@@ -137,6 +188,52 @@ class RegisterPatientHandlerTest {
                 AuditActionCode.PATIENT_UPDATED, AuditResourceType.PATIENT, 52,
                 AuditActionCode.INSURANCE_UPDATED, AuditResourceType.INSURANCE, 8,
                 AuditActionCode.VISIT_REGISTERED, AuditResourceType.VISIT, 92);
+    }
+
+    @Test
+    void existingPatientWithoutExistingInsuranceUpdatesPatientMetadataAndAddsNewInsurance() {
+        Fixture fixture = new Fixture();
+        LocalDateTime persistedPatientCreatedAt = LocalDateTime.of(2025, 3, 15, 10, 30);
+        LocalDateTime newInsuranceCreatedAt = LocalDateTime.of(2026, 6, 2, 11, 0);
+        BenhNhan patient = validPatient();
+        patient.setId(52);
+        patient.setMaBenhNhanFormat("SYNTH-EXISTING-52");
+        patient.setCreatedAt(LocalDateTime.of(2026, 6, 2, 10, 59));
+        patient.setCreatedBy(99);
+        fixture.duplicatePatient = validPatient();
+        fixture.duplicatePatient.setId(52);
+        fixture.duplicatePatient.setVersion(6L);
+        fixture.duplicatePatient.setCreatedAt(persistedPatientCreatedAt);
+        fixture.duplicatePatient.setCreatedBy(2);
+        BaoHiem insurance = validInsurance();
+        insurance.setCreatedAt(newInsuranceCreatedAt);
+        insurance.setCreatedBy(ACTOR.employeeId());
+        fixture.visit = visit(95, 11, "Q-011");
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, insurance));
+
+        assertTrue(result.isSuccess());
+        assertEquals(0, fixture.patientAdds.get());
+        assertEquals(1, fixture.patientUpdates.get());
+        assertEquals(1, fixture.insuranceAdds.get());
+        assertEquals(0, fixture.insuranceUpdates.get());
+        assertNotNull(fixture.updatedPatientMetadata);
+        assertEquals(52, fixture.updatedPatientMetadata.id());
+        assertEquals(6L, fixture.updatedPatientMetadata.version());
+        assertEquals(persistedPatientCreatedAt, fixture.updatedPatientMetadata.createdAt());
+        assertEquals(2, fixture.updatedPatientMetadata.createdBy());
+        assertEquals(ACTOR.employeeId(), fixture.updatedPatientMetadata.updatedBy());
+        assertNotNull(fixture.addedInsuranceMetadata);
+        assertNull(fixture.addedInsuranceMetadata.id());
+        assertEquals(0L, fixture.addedInsuranceMetadata.version());
+        assertEquals(newInsuranceCreatedAt, fixture.addedInsuranceMetadata.createdAt());
+        assertEquals(ACTOR.employeeId(), fixture.addedInsuranceMetadata.createdBy());
+        assertNull(fixture.addedInsuranceMetadata.updatedBy());
+        assertNull(fixture.updatedInsuranceMetadata);
+        assertAuditEvents(fixture.auditEntries,
+                AuditActionCode.PATIENT_UPDATED, AuditResourceType.PATIENT, 52,
+                AuditActionCode.INSURANCE_CREATED, AuditResourceType.INSURANCE, 71,
+                AuditActionCode.VISIT_REGISTERED, AuditResourceType.VISIT, 95);
     }
 
     @Test
@@ -499,6 +596,10 @@ class RegisterPatientHandlerTest {
         private PhongKham room = activeRoom();
         private BenhNhan duplicatePatient;
         private BaoHiem currentInsurance;
+        private MetadataSnapshot addedPatientMetadata;
+        private MetadataSnapshot updatedPatientMetadata;
+        private MetadataSnapshot addedInsuranceMetadata;
+        private MetadataSnapshot updatedInsuranceMetadata;
         private int patientInsertId = 41;
         private boolean identityConflictOnInsert;
         private RuntimeException insuranceFailure;
@@ -517,6 +618,7 @@ class RegisterPatientHandlerTest {
                         patientAdds.incrementAndGet();
                         if (identityConflictOnInsert) throw new PatientIdentityConflictException();
                         BenhNhan patient = (BenhNhan) args[0];
+                        addedPatientMetadata = MetadataSnapshot.of(patient);
                         patient.setId(patientInsertId);
                         patient.setMaBenhNhanFormat("SYNTH-PATIENT-" + patientInsertId);
                         transactions.stage("patient");
@@ -524,6 +626,7 @@ class RegisterPatientHandlerTest {
                     }
                     case "update" -> {
                         patientUpdates.incrementAndGet();
+                        updatedPatientMetadata = MetadataSnapshot.of((BenhNhan) args[0]);
                         transactions.stage("patient");
                         yield null;
                     }
@@ -536,13 +639,16 @@ class RegisterPatientHandlerTest {
                     case "add" -> {
                         insuranceAdds.incrementAndGet();
                         if (insuranceFailure != null) throw insuranceFailure;
-                        ((BaoHiem) args[0]).setId(insuranceInsertId);
+                        BaoHiem card = (BaoHiem) args[0];
+                        addedInsuranceMetadata = MetadataSnapshot.of(card);
+                        card.setId(insuranceInsertId);
                         transactions.stage("insurance");
                         yield null;
                     }
                     case "update" -> {
                         insuranceUpdates.incrementAndGet();
                         if (insuranceFailure != null) throw insuranceFailure;
+                        updatedInsuranceMetadata = MetadataSnapshot.of((BaoHiem) args[0]);
                         transactions.stage("insurance");
                         yield null;
                     }
@@ -635,6 +741,14 @@ class RegisterPatientHandlerTest {
 
         private void stage(String write) {
             stagedWrites.add(write);
+        }
+    }
+
+    private record MetadataSnapshot(Integer id, Long version, LocalDateTime createdAt,
+                                    Integer createdBy, LocalDateTime updatedAt, Integer updatedBy) {
+        private static MetadataSnapshot of(BaseEntity<Integer> entity) {
+            return new MetadataSnapshot(entity.getId(), entity.getVersion(), entity.getCreatedAt(),
+                    entity.getCreatedBy(), entity.getUpdatedAt(), entity.getUpdatedBy());
         }
     }
 }
