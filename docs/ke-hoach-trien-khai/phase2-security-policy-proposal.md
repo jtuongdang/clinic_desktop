@@ -10,7 +10,7 @@
 | Nhiều vai trò | Mỗi phiên chọn đúng một vai trò đã được gán cho tài khoản. Role chưa được cấp quyền phải bị từ chối mặc định. |
 | Phạm vi dữ liệu | Chỉ truy cập cơ sở/khoa đã được gán cho tài khoản; chưa cấp quyền xem toàn hệ thống. |
 
-Hai quyết định trên sẽ là contract đầu vào cho task triển khai sau khi phần chính sách còn lại được duyệt.
+Hai quyết định trên là contract đầu vào đã được xác nhận. Việc có bắt buộc chọn một cơ sở/khoa làm ngữ cảnh làm việc cho mỗi phiên hay không vẫn cần quyết định; dù chọn phương án nào, thao tác chỉ được phép trên assignment hợp lệ của tài khoản.
 
 ## Nội dung cần duyệt
 
@@ -18,7 +18,7 @@ Hai quyết định trên sẽ là contract đầu vào cho task triển khai sa
 
 **Đề xuất:** Sau khi xác thực, nếu tài khoản có nhiều cơ sở/khoa được gán, yêu cầu chọn một cặp cơ sở–khoa đang làm việc cho phiên đó. Nếu chỉ có một cặp thì tự chọn. Danh sách lựa chọn lấy từ assignment trong CSDL; UI không thể tự thêm scope. Mỗi Command/Query nhạy cảm phải được Application kiểm tra lại actor, role, cơ sở/khoa và tài nguyên đích.
 
-**Cần duyệt:** Có yêu cầu chọn cơ sở/khoa mỗi phiên không, hay phiên có thể dùng toàn bộ assignment của tài khoản? Phòng khám là một phần của scope bắt buộc hay chỉ là lựa chọn vận hành?
+**Cần duyệt:** Khi một tài khoản có nhiều assignment hợp lệ, phiên cần chọn một cơ sở/khoa đang làm việc hay được thao tác trên mọi assignment đã cấp? Phòng khám là một phần của scope bắt buộc hay chỉ là lựa chọn vận hành?
 
 ### 2. Timeout, khóa phiên và đăng xuất
 
@@ -67,4 +67,4 @@ Hai quyết định trên sẽ là contract đầu vào cho task triển khai sa
 
 ## Chốt trạng thái
 
-Phase 2 vẫn chưa đạt gate. Chỉ hai lựa chọn ở phần “Đã được chủ dự án xác nhận” được xem là quyết định hiện hành. Các giá trị/thao tác ở phần đề xuất phải được duyệt hoặc chỉnh sửa trước khi đưa vào implementation contract.
+Phase 2 vẫn chưa đạt gate. Chỉ hai quyết định ở phần “Đã được chủ dự án xác nhận” được xem là hiện hành. Các giá trị và quy tắc chi tiết còn mở phải được duyệt hoặc chỉnh sửa trước khi đưa vào implementation contract.
