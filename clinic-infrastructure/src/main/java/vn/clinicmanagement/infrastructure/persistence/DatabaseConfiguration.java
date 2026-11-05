@@ -91,6 +91,15 @@ final class DatabaseConfiguration {
             String password,
             String driver,
             String connectionString) {
+        @Override
+        public String toString() {
+            return "ResolvedConfiguration[hasUrl=" + (url != null && !url.isEmpty())
+                    + ", hasUsername=" + (username != null && !username.isEmpty())
+                    + ", hasPassword=" + (password != null && !password.isEmpty())
+                    + ", hasDriver=" + (driver != null && !driver.isEmpty())
+                    + ", hasConnectionString=" + (connectionString != null && !connectionString.isEmpty()) + "]";
+        }
+
         ConnectionTarget connectionTarget() {
             if (connectionString != null && !connectionString.isEmpty()) {
                 return new ConnectionTarget(ConnectionMode.FULL_CONNECTION_STRING, connectionString, null, null);
@@ -105,7 +114,15 @@ final class DatabaseConfiguration {
         }
     }
 
-    record ConnectionTarget(ConnectionMode mode, String value, String username, String password) {}
+    record ConnectionTarget(ConnectionMode mode, String value, String username, String password) {
+        @Override
+        public String toString() {
+            return "ConnectionTarget[mode=" + mode
+                    + ", hasValue=" + (value != null && !value.isEmpty())
+                    + ", hasUsername=" + (username != null && !username.isEmpty())
+                    + ", hasPassword=" + (password != null && !password.isEmpty()) + "]";
+        }
+    }
 
     enum ConnectionMode {
         FULL_CONNECTION_STRING,

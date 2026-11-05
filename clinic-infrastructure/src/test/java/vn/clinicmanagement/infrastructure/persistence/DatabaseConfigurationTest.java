@@ -84,6 +84,23 @@ class DatabaseConfigurationTest {
     }
 
     @Test
+    void configurationAndConnectionTargetStringRepresentationsRedactAllValues() {
+        DatabaseConfiguration.ResolvedConfiguration resolved = DatabaseConfiguration.resolve(
+                properties("jdbc:synthetic:url-marker", "synthetic-user-marker",
+                        "synthetic-password-marker", "synthetic-driver-marker"),
+                Map.of("DB_CONNECTION_STRING", "jdbc:synthetic:connection-marker;password=synthetic-secret-marker"));
+
+        String configurationText = resolved.toString();
+        String targetText = resolved.connectionTarget().toString();
+        for (String marker : new String[]{
+                "url-marker", "user-marker", "password-marker", "driver-marker",
+                "connection-marker", "secret-marker"}) {
+            org.junit.jupiter.api.Assertions.assertFalse(configurationText.contains(marker));
+            org.junit.jupiter.api.Assertions.assertFalse(targetText.contains(marker));
+        }
+    }
+
+    @Test
     void programmaticStringSetBeforeConfigureSurvivesLoadingAndConfigure() {
         DatabaseConfiguration configuration = configuration(
                 properties("property-url", "property-user", "property-password", "driver"),
