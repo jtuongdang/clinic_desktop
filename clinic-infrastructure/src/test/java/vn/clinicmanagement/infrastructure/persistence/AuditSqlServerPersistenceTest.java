@@ -30,6 +30,7 @@ import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.infrastructure.persistence.facility.PhongKhamRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.patient.BaoHiemRepositoryImpl;
+import vn.clinicmanagement.infrastructure.persistence.patient.BenhNhanCoSoRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.patient.BenhNhanRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.reception.ReceptionQueueRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.system.JdbcAuditRepositoryImpl;
@@ -695,6 +696,7 @@ class AuditSqlServerPersistenceTest {
             JdbcTransactionManager transactions = new JdbcTransactionManager(unitOfWork);
             JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
             BenhNhanRepositoryImpl patients = new BenhNhanRepositoryImpl(connections, unitOfWork);
+            BenhNhanCoSoRepositoryImpl patientFacilities = new BenhNhanCoSoRepositoryImpl(connections, unitOfWork);
             BaoHiemRepositoryImpl insurance = new BaoHiemRepositoryImpl(connections, unitOfWork);
             PhongKhamRepositoryImpl rooms = new PhongKhamRepositoryImpl(connections);
             ReceptionQueueRepositoryImpl queue = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
@@ -715,7 +717,8 @@ class AuditSqlServerPersistenceTest {
                     new SystemRepositoryImpl(connections, unitOfWork));
             return new ReceptionServices(
                     rooms,
-                    new RegisterPatientHandler(patients, insurance, rooms, queue, transactions, auditPort, authorization),
+                    new RegisterPatientHandler(patients, patientFacilities, insurance, rooms, queue, transactions,
+                            auditPort, authorization),
                     new SearchPatientsHandler(patients, insurance, authorization, auditPort),
                     new GetReceptionQueueHandler(queue, authorization, auditPort),
                     authorizationContext,

@@ -22,6 +22,7 @@ import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.domain.patient.PatientIdentityConflictException;
 import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
 import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
+import vn.clinicmanagement.domain.repositories.IBenhNhanCoSoRepository;
 import vn.clinicmanagement.domain.repositories.IPhongKhamRepository;
 
 import java.time.Instant;
@@ -29,6 +30,7 @@ import java.time.LocalDate;
 
 public final class RegisterPatientHandler implements CommandHandler<RegisterPatientCommand, RegistrationReceipt> {
     private final IBenhNhanRepository patients;
+    private final IBenhNhanCoSoRepository patientFacilities;
     private final IBaoHiemRepository insuranceCards;
     private final IPhongKhamRepository rooms;
     private final ReceptionQueuePort receptionQueue;
@@ -36,11 +38,13 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
     private final AuditWritePort audit;
     private final AuthorizationService authorization;
 
-    public RegisterPatientHandler(IBenhNhanRepository patients, IBaoHiemRepository insuranceCards,
+    public RegisterPatientHandler(IBenhNhanRepository patients, IBenhNhanCoSoRepository patientFacilities,
+                                  IBaoHiemRepository insuranceCards,
                                   IPhongKhamRepository rooms, ReceptionQueuePort receptionQueue,
                                   TransactionBoundary transactions, AuditWritePort audit,
                                   AuthorizationService authorization) {
         this.patients = patients;
+        this.patientFacilities = patientFacilities;
         this.insuranceCards = insuranceCards;
         this.rooms = rooms;
         this.receptionQueue = receptionQueue;
@@ -122,6 +126,8 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                         command.priority(), command.createdBy());
                 appendAudit(command.auditActorContext(), context, AuditActionCode.VISIT_REGISTERED,
                         AuditResourceType.VISIT, visit.getId());
+
+                patientFacilities.ensureActiveLink(patient.getId(), context.facilityId(), context.employeeId());
 
                 return Result.success(new RegistrationReceipt(patient.getId(), patient.getMaBenhNhanFormat(),
                         visit.getId(), visit.getSoThuTu() == null ? 0 : visit.getSoThuTu(), visit.getSoThuTuDisplay()));

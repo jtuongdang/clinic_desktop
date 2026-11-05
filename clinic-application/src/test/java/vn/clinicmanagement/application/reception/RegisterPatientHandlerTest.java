@@ -28,6 +28,7 @@ import vn.clinicmanagement.domain.identity.NhanVien;
 import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
 import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
+import vn.clinicmanagement.domain.repositories.IBenhNhanCoSoRepository;
 import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.domain.repositories.IPhongKhamRepository;
@@ -116,6 +117,9 @@ class RegisterPatientHandlerTest {
         assertEquals(1, fixture.visitCalls.get());
         assertEquals(List.of(41, FACILITY_ID, DEPARTMENT_ID, ROOM_ID, "Khám bệnh",
                 "Synthetic reason", DoiTuongKham.BHYT, true, 5), fixture.visitArguments);
+        assertEquals(1, fixture.patientFacilityCalls.get());
+        assertEquals(List.of(41, FACILITY_ID, ACTOR.employeeId()), fixture.patientFacilityArguments);
+        assertTrue(fixture.transactions.committedWrites.contains("patient-facility"));
         assertEquals(1, fixture.transactions.calls);
         assertEquals(0, fixture.transactions.failures);
         assertAuditEvents(fixture.auditEntries,
@@ -182,6 +186,8 @@ class RegisterPatientHandlerTest {
         assertEquals(3, insurance.getCreatedBy());
         assertEquals(ACTOR.employeeId(), insurance.getUpdatedBy());
         assertEquals(1, fixture.visitCalls.get());
+        assertEquals(1, fixture.patientFacilityCalls.get());
+        assertEquals(List.of(52, FACILITY_ID, ACTOR.employeeId()), fixture.patientFacilityArguments);
         assertEquals(1, fixture.transactions.calls);
         assertEquals(0, fixture.transactions.failures);
         assertAuditEvents(fixture.auditEntries,
@@ -438,6 +444,42 @@ class RegisterPatientHandlerTest {
     }
 
     @Test
+    void existingActivePatientFacilityLinkDoesNotStageAnotherInsert() {
+        Fixture fixture = new Fixture();
+        fixture.patientFacilityAlreadyActive = true;
+        BenhNhan patient = validPatient();
+        patient.setId(52);
+        fixture.duplicatePatient = validPatient();
+        fixture.duplicatePatient.setId(52);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, fixture.patientFacilityCalls.get());
+        assertEquals(List.of(52, FACILITY_ID, ACTOR.employeeId()), fixture.patientFacilityArguments);
+        assertFalse(fixture.transactions.committedWrites.contains("patient-facility"));
+    }
+
+    @Test
+    void patientFacilityFailureRollsBackFullRegistrationAndReturnsSafeFailure() {
+        Fixture fixture = new Fixture();
+        fixture.patientFacilityFailure =
+                new IllegalStateException("synthetic facility-link failure containing " + SYNTHETIC_CCCD);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+
+        assertSafePersistenceFailure(result);
+        assertEquals(1, fixture.patientAdds.get());
+        assertEquals(1, fixture.insuranceAdds.get());
+        assertEquals(1, fixture.visitCalls.get());
+        assertEquals(1, fixture.patientFacilityCalls.get());
+        assertEquals(List.of(41, FACILITY_ID, ACTOR.employeeId()), fixture.patientFacilityArguments);
+        assertEquals(List.of(), fixture.transactions.committedWrites);
+        assertEquals(List.of(), fixture.transactions.stagedWrites);
+        assertEquals(1, fixture.transactions.failures);
+    }
+
+    @Test
     void auditFailureAfterBusinessWritesReturnsSafeFailureAndTransactionRollsBackAllWrites() {
         Fixture fixture = new Fixture();
         fixture.auditFailureAction = AuditActionCode.VISIT_REGISTERED;
@@ -584,7 +626,9 @@ class RegisterPatientHandlerTest {
         private final AtomicInteger insuranceAdds = new AtomicInteger();
         private final AtomicInteger insuranceUpdates = new AtomicInteger();
         private final AtomicInteger visitCalls = new AtomicInteger();
+        private final AtomicInteger patientFacilityCalls = new AtomicInteger();
         private final List<Object> visitArguments = new ArrayList<>();
+        private final List<Object> patientFacilityArguments = new ArrayList<>();
         private final List<SystemAuditEntry> auditEntries = new ArrayList<>();
         private final List<SystemAuditEntry> independentAuditEntries = new ArrayList<>();
         private final TransactionProbe transactions = new TransactionProbe();
@@ -604,10 +648,12 @@ class RegisterPatientHandlerTest {
         private boolean identityConflictOnInsert;
         private RuntimeException insuranceFailure;
         private RuntimeException queueFailure;
+        private RuntimeException patientFacilityFailure;
         private RuntimeException auditFailure;
         private RuntimeException independentAuditFailure;
         private AuditActionCode auditFailureAction;
         private int insuranceInsertId = 71;
+        private boolean patientFacilityAlreadyActive;
         private LuotKham visit = visit(93, 9, "Q-009");
 
         private Fixture() {
@@ -632,6 +678,16 @@ class RegisterPatientHandlerTest {
                     }
                     default -> defaultValue(method);
                 };
+            });
+            IBenhNhanCoSoRepository patientFacilities = proxy(IBenhNhanCoSoRepository.class, (method, args) -> {
+                if (!method.equals("ensureActiveLink")) return defaultValue(method);
+                patientFacilityCalls.incrementAndGet();
+                patientFacilityArguments.clear();
+                patientFacilityArguments.addAll(List.of(args));
+                if (patientFacilityFailure != null) throw patientFacilityFailure;
+                if (patientFacilityAlreadyActive) return false;
+                transactions.stage("patient-facility");
+                return true;
             });
             IBaoHiemRepository insuranceCards = proxy(IBaoHiemRepository.class, (method, args) -> {
                 return switch (method) {
@@ -679,8 +735,8 @@ class RegisterPatientHandlerTest {
                 transactions.stage("audit");
                 return null;
             });
-            handler = new RegisterPatientHandler(patients, insuranceCards, rooms, queue, transactions, audit,
-                    authorizationService());
+            handler = new RegisterPatientHandler(patients, patientFacilities, insuranceCards, rooms, queue,
+                    transactions, audit, authorizationService());
         }
 
         private AuthorizationService authorizationService() {

@@ -21,6 +21,7 @@ import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.domain.patient.PatientIdentityConflictException;
 import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
+import vn.clinicmanagement.domain.repositories.IBenhNhanCoSoRepository;
 import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.domain.repositories.IPhongKhamRepository;
@@ -79,8 +80,10 @@ class RegisterPatientDuplicateCccdTest {
                 return result;
             }
         };
-        RegisterPatientHandler handler = new RegisterPatientHandler(patients, insurance, rooms, queue, transactions,
-                noOpAudit(), authorizationService());
+        IBenhNhanCoSoRepository patientFacilities = proxy(IBenhNhanCoSoRepository.class,
+                (method, args) -> method.equals("ensureActiveLink") ? true : defaultValue(method));
+        RegisterPatientHandler handler = new RegisterPatientHandler(patients, patientFacilities, insurance, rooms,
+                queue, transactions, noOpAudit(), authorizationService());
 
         BenhNhan patient = new BenhNhan();
         patient.setHo("Nguyen");

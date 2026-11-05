@@ -114,6 +114,8 @@ class ReceptionSqlServerPersistenceTest {
             assertTrue(registeredPatientId > 0, "Registration did not return a patient identifier");
             assertTrue(receipt.visitId() > 0, "Registration did not return a visit identifier");
             assertTrue(generatedCardId > 0, "Registration did not return a BHYT card identifier");
+            assertActiveFacilityLink(registeredPatientId, authorizationContext.facilityId(),
+                    authorizationContext.employeeId());
 
             PatientSearchItem initialMatch = findByCccd(
                     services.searchPatients().handle(new SearchPatientsQuery(syntheticCccd, authorizationContext,
@@ -157,6 +159,8 @@ class ReceptionSqlServerPersistenceTest {
                     "Updating an existing patient created a different patient");
             assertTrue(updateReceipt.visitId() > 0, "Update registration did not return a visit identifier");
             generatedVisitIds.add(updateReceipt.visitId());
+            assertActiveFacilityLink(registeredPatientId, authorizationContext.facilityId(),
+                    authorizationContext.employeeId());
 
             ReceptionCompositionRoot.Services freshServices = ReceptionCompositionRoot.create(lifecycle);
             List<PatientSearchItem> reloadedMatches = freshServices.searchPatients()
@@ -258,6 +262,23 @@ class ReceptionSqlServerPersistenceTest {
                 "Registered visit was not present in the reception queue");
     }
 
+    private static void assertActiveFacilityLink(int patientId, int facilityId, int actorId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT COUNT(*), MIN(createdBy) FROM BenhNhanCoSo "
+                             + "WHERE maBenhNhan=? AND maCoSo=? AND isDeleted=0")) {
+            statement.setInt(1, patientId);
+            statement.setInt(2, facilityId);
+            try (var result = statement.executeQuery()) {
+                assertTrue(result.next());
+                assertEquals(1, result.getInt(1),
+                        "Registration must leave exactly one active link to the selected facility");
+                assertEquals(actorId, result.getInt(2),
+                        "The active patient-facility link must record the authenticated actor");
+            }
+        }
+    }
+
     private static void softDeleteGeneratedRecords(int patientId, int cardId, List<Integer> visitIds)
             throws SQLException {
         if (patientId <= 0) return;
@@ -269,6 +290,12 @@ class ReceptionSqlServerPersistenceTest {
                     softDeleteGeneratedRecord(connection, "LuotKham", visitId, patientId);
                 }
                 softDeleteGeneratedRecord(connection, "BaoHiem", cardId, patientId);
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE BenhNhanCoSo SET isDeleted=1, deletedAt=SYSDATETIME(), deletedBy=NULL, "
+                                + "version=version+1 WHERE maBenhNhan=? AND isDeleted=0")) {
+                    statement.setInt(1, patientId);
+                    statement.executeUpdate();
+                }
                 try (PreparedStatement statement = connection.prepareStatement(
                         "UPDATE BenhNhan SET isDeleted=1, deletedAt=SYSDATETIME(), deletedBy=NULL, version=version+1 "
                                 + "WHERE id=? AND isDeleted=0")) {
