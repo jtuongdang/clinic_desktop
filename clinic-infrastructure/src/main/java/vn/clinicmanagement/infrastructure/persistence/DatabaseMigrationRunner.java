@@ -26,6 +26,7 @@ import java.util.List;
  *    - V2__Seed_Initial_Data.sql (Nạp dữ liệu danh mục ban đầu)
  *    - V3__Repair_Demo_Account_Passwords.sql (Sửa hash tài khoản demo)
  *    - V4__Enforce_Active_Patient_CCCD_Uniqueness.sql (Định danh CCCD duy nhất cho hồ sơ hoạt động)
+ *    - V5__Seed_Session_Timeout_Parameters.sql (Nạp tham số thời hạn phiên mặc định nếu chưa tồn tại)
  * 3. Đảm bảo tính Idempotent: Chỉ chạy những script chưa được áp dụng.
  */
 public class DatabaseMigrationRunner {
@@ -36,7 +37,8 @@ public class DatabaseMigrationRunner {
             "migrations/V1__Initial_Clinic_Schema.sql",
             "migrations/V2__Seed_Initial_Data.sql",
             "migrations/V3__Repair_Demo_Account_Passwords.sql",
-            "migrations/V4__Enforce_Active_Patient_CCCD_Uniqueness.sql"
+            "migrations/V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
+            "migrations/V5__Seed_Session_Timeout_Parameters.sql"
     };
 
     /**

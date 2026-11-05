@@ -78,10 +78,11 @@ class FreshDatabaseMigrationSqlServerTest {
                             "V1__Initial_Clinic_Schema.sql",
                             "V2__Seed_Initial_Data.sql",
                             "V3__Repair_Demo_Account_Passwords.sql",
-                            "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql"
+                            "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
+                            "V5__Seed_Session_Timeout_Parameters.sql"
                     ),
                     queryMigrationRecords(connection),
-                    "All V1-V4 migrations must be recorded as successful"
+                    "All V1-V5 migrations must be recorded as successful"
             );
 
             assertEquals(1, queryInt(
@@ -110,7 +111,43 @@ class FreshDatabaseMigrationSqlServerTest {
             assertSeedCount(connection, "Kho", 3);
             assertSeedCount(connection, "Item", 3);
             assertSeedCount(connection, "TonKho", 3);
-            assertSeedCount(connection, "ThamSoHeThong", 4);
+            assertEquals(
+                    1,
+                    queryInt(
+                            connection,
+                            "SELECT COUNT(*) FROM ThamSoHeThong "
+                                    + "WHERE maThamSo = 'SESSION_IDLE_TIMEOUT_MINUTES'"
+                    ),
+                    "The idle timeout parameter must exist exactly once"
+            );
+            assertEquals(
+                    "15",
+                    queryString(
+                            connection,
+                            "SELECT giaTri FROM ThamSoHeThong "
+                                    + "WHERE maThamSo = 'SESSION_IDLE_TIMEOUT_MINUTES'"
+                    ),
+                    "The idle timeout parameter must retain its approved default"
+            );
+            assertEquals(
+                    1,
+                    queryInt(
+                            connection,
+                            "SELECT COUNT(*) FROM ThamSoHeThong "
+                                    + "WHERE maThamSo = 'SESSION_ABSOLUTE_TIMEOUT_HOURS'"
+                    ),
+                    "The absolute timeout parameter must exist exactly once"
+            );
+            assertEquals(
+                    "12",
+                    queryString(
+                            connection,
+                            "SELECT giaTri FROM ThamSoHeThong "
+                                    + "WHERE maThamSo = 'SESSION_ABSOLUTE_TIMEOUT_HOURS'"
+                    ),
+                    "The absolute timeout parameter must retain its approved default"
+            );
+            assertSeedCount(connection, "ThamSoHeThong", 6);
         } catch (SQLException exception) {
             throw new AssertionError(
                     "Could not verify the SQL Server migration results; connection details were suppressed"
