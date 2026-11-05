@@ -1,10 +1,12 @@
-# Phase 0: business error mapping review
+# Phase 0: business error mapping review (historical snapshot)
+
+> **Historical review:** this report records the source state inspected by task `PLAT-ERROR-REVIEW-01` (task commit `d11adf7`, integrated locally at `91cf68f`). It is not a description of the current checkout. Follow-up tasks changed the reception UI mapping and added restricted diagnostics; see `PLAT-ERROR-UI-01`, `PLAT-ERROR-01A`, `PLAT-ERROR-AUTH-01`, `PLAT-ERROR-DOCX-01`, `PLAT-ERROR-STARTUP-01`, and `PLAT-ERROR-SWING-01` in [`03-model-task-board.md`](03-model-task-board.md). The recommendations below remain useful as a checklist for error boundaries outside those completed slices.
 
 ## Scope and conclusion
 
-This is an analysis of the current patient reception vertical slice and shared error types. No code or existing file was changed. The application already has a stable `Result<T>` with `success`, `failure(code, message)`, and `ApplicationError(code, message)`; recommendations below keep that contract unchanged (`clinic-application/src/main/java/vn/clinicmanagement/application/common/Result.java:6-39`).
+At the review snapshot, this was an analysis of the patient reception vertical slice and shared error types. No code or existing file was changed by that review task. The application already had a stable `Result<T>` with `success`, `failure(code, message)`, and `ApplicationError(code, message)`; its recommendations kept that contract unchanged (`clinic-application/src/main/java/vn/clinicmanagement/application/common/Result.java:6-39`).
 
-The duplicate active CCCD path is deliberately translated into a generic business error before it reaches Swing. Validation and general registration failures also have user-oriented messages. The main gaps are inconsistent direct-message display, no diagnostic logging before broad catches discard exception details, and no explicit mapping for the declared not-found/domain exception family. The reviewed reception handlers currently do not log exceptions.
+At that snapshot, the duplicate active CCCD path was deliberately translated into a generic business error before it reached Swing. Validation and general registration failures also had user-oriented messages. The review identified inconsistent direct-message display and missing diagnostics at the reviewed boundaries. Later follow-ups added fixed-code registration presentation, redacted diagnostics for reception/authentication, and bounded UI error handling in the slices listed above. The remaining work is broader application-wide mapping and acceptance; those follow-ups do not complete `PLAT-ERROR-01`.
 
 ## Error mapping matrix
 
