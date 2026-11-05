@@ -7,7 +7,8 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Trạng thái:** `[~]` Nền tảng và wiring cơ bản có trong source; validation/release chưa hoàn tất.
 **Phụ thuộc:** Không.
 **Phạm vi:** Maven modules, application shell, schema/migrations, JDBC, transaction/unit of work và cấu hình môi trường.
-**Còn lại:** Build/CI và migrations trên DB thử nghiệm sạch; test rollback; cấu hình secret. Identity/access baseline nằm ở Phase 2.
+**Bằng chứng mới:** `JdbcTransactionManagerTest` kiểm tra commit/rollback/cleanup; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra tách batch `GO`; DateRange/Money regression tests được thêm ở `3f6ba31`. 11 test source hiện có tương ứng 55 test cases theo kết quả gần nhất (domain 16, application 17, infrastructure 17, desktop 5). `mvn clean verify` gần nhất trước DateRange/Money additions đã pass; lần chạy sau additions bị Maven shared-cache lock chặn trước khi compile.
+**Còn lại:** Lặp lại build/verify thành công và migrations trên SQL Server thử nghiệm sạch; cấu hình secret. Các kiểm thử transaction/splitter hiện có không chứng minh migration hay reception E2E trên SQL Server. Identity/access baseline nằm ở Phase 2.
 **Gate:** build/migrations/repository transaction có thể tái lập trong môi trường thử nghiệm.
 
 ## Phase 1 — Bệnh nhân và tiếp đón
@@ -15,8 +16,8 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Trạng thái:** `[~]` Một phần workflow đã nối; regression tests có trong branch; chưa nghiệm thu E2E.
 **Phụ thuộc:** Phase 0.
 **Phạm vi:** `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `TienSuBenh`, lựa chọn `CoSo`/`Khoa`/`PhongKham`, đăng ký/tìm kiếm/queue `LuotKham`.
-**Bằng chứng hiện tại:** task checkout tại `58ac034` có 5 test source: 1 domain, 3 application, 1 infrastructure; `clinic-desktop` có 0 test. Local ref `feature/patient-reception-workflow` đã tiến tới `ff2045a` và thêm `JdbcTransactionManagerTest` (một infrastructure test nữa), ngoài task checkout snapshot. UI/application/JDBC wiring hiện diện.
-**Còn lại:** SQL Server save/search/queue và reload sau restart; cập nhật hồ sơ/BHYT; rollback đa bảng; concurrency queue/CCCD; kiểm thử UI và publish/review. Phase 1 chưa qua gate.
+**Bằng chứng hiện tại tại feature HEAD `3f6ba31`:** Có 11 test source/55 test cases theo kết quả gần nhất: domain 3/16, application 3/17, infrastructure 4/17, desktop 1/5. Commits liên quan gồm `ff2045a` transaction tests, `264bbae` migration runner/GO splitter tests, `ea397f9` headless reception form tests (đã sửa giả định chọn phòng deterministic) và `3f6ba31` DateRange/Money tests. Application/JDBC/UI wiring hiện diện. Đây là test/review evidence, chưa phải Phase 1 acceptance.
+**Còn lại:** SQL Server save/search/queue và reload sau restart; cập nhật hồ sơ/BHYT; rollback đa bảng của luồng reception; queue/CCCD concurrency; UI integration/E2E và review. Không có bằng chứng SQL Server E2E, restart hoặc concurrency; Phase 1 exit criteria vẫn unmet.
 
 ## Phase 2 — Baseline identity, access checks và audit
 
@@ -80,3 +81,4 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 - Chỉ chuyển sang trạng thái hoàn tất khi workflow có bằng chứng theo tiêu chí phase, gồm quyền/audit khi dữ liệu nhạy cảm.
 - Phase 2 là gate trước mọi thao tác EMR, prescription/pharmacy và billing; Phase 8 chỉ chứa quản trị nhân sự và mở rộng.
 - Task-level status và bằng chứng theo từng model được theo dõi tại [03 — Model task board](03-model-task-board.md).
+- Test task có thể hoàn tất khi đúng phạm vi test đã có kết quả xác nhận; việc đó không tự hoàn tất phase hoặc workflow.
