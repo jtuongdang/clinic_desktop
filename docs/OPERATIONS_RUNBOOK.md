@@ -105,8 +105,10 @@ For a **controlled synthetic test rehearsal only**, before migration or another 
 ```sql
 BACKUP DATABASE [clinic_test_<unique_suffix>]
 TO DISK = N'<approved_backup_path>/<unique_backup_name>.bak'
-WITH CHECKSUM, INIT;
+WITH CHECKSUM;
 ```
+
+Choose a new, unique backup artifact path for each rehearsal; do not enable overwrite options for an existing backup artifact.
 
 ```sql
 RESTORE VERIFYONLY

@@ -3,7 +3,7 @@
 **Cập nhật:** 06/11/2026
 **Phạm vi:** Clinic Management Desktop — Java, Maven, JDBC, SQL Server, Java Swing.
 
-> Trạng thái phản ánh source, task board và lịch sử Git quan sát được tại commit `ac4f09b054f9be665479ce4917111ea8fe048bae`. Nhánh dự án `feature/patient-reception-workflow` hiện có cục bộ tại commit này; worktree của task tài liệu đang đứng trên nhánh `orchestrator/doc-state-refresh-02-reconcile-current-completion-ev` cùng commit. Code đã commit trên máy vẫn chưa đồng nghĩa với đã được đẩy lên remote, phát hành, hoặc nghiệm thu end-to-end.
+> Trạng thái phản ánh source, task board và lịch sử Git được đối chiếu trên checkout local của nhánh `feature/patient-reception-workflow` ngày 06/11/2026. Task worktree đã được tích hợp cục bộ vào nhánh feature; code đã commit trên máy vẫn chưa đồng nghĩa với đã được đẩy lên remote, phát hành, hoặc nghiệm thu end-to-end.
 
 ## Hiện trạng theo lớp
 
@@ -24,7 +24,7 @@
 ## Tiếp đón và trạng thái Git
 
 - `ReceptionCompositionRoot` nối các handler Tiếp đón với JDBC; task board ghi nhận các kiểm tra SQL Server tổng hợp riêng trên `clinic_test_v9_20261106` và `clinic_test_audit_20261105`. Test source giới hạn database và dùng fixture tổng hợp; lần cập nhật này không kết nối database. Không đưa credentials hay dữ liệu cá nhân vào tài liệu.
-- Nhánh dự án `feature/patient-reception-workflow` và nhánh task hiện tại đều trỏ tới commit `ac4f09b` cục bộ; không có bằng chứng push, release hoặc GitHub-hosted CI run. Kết quả build/test không đồng nghĩa Phase 0, Phase 1 hoặc Phase 2 hoàn tất.
+- Nhánh dự án `feature/patient-reception-workflow` chứa các commit task được tích hợp cục bộ; không có bằng chứng push, release hoặc GitHub-hosted CI run. Kết quả build/test không đồng nghĩa Phase 0, Phase 1 hoặc Phase 2 hoàn tất.
 - **UI chưa được xác minh trực tiếp:** cửa sổ Swing chưa được quan sát; headless form-to-persistence evidence không chứng minh hiển thị/layout, tương tác đầy đủ `ReceptionPanel`, hay toàn bộ UI-to-database acceptance.
 - Task board vẫn để `PAT-01`, `PAT-02`, `REC-01` và `SEC-01` ở trạng thái `[~]`. Các gate còn mở gồm visual/interaction acceptance, queue lifecycle/transfer, workflow tiền sử có guard/audit và các quyết định/policy security chưa triển khai; vì vậy Phase 0, Phase 1, Phase 2 và project tổng thể chưa được xác nhận hoàn tất. Phase 3–9 vẫn theo roadmap, không được đóng chỉ vì build hoặc migration pass.
 - Các giới hạn khác vẫn gồm nghiệm thu nghiệp vụ toàn diện và xác minh authorization/privacy/audit theo từng luồng; không suy ra hoàn tất phase từ source, test hoặc một lượt tích hợp có phạm vi giới hạn.

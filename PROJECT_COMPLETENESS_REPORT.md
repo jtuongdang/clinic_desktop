@@ -74,7 +74,7 @@ Roadmap hiện có 10 phase, đánh số 0–9. Phase 0 nền tảng và Phase 1
 
 ## 6. Giới hạn của đánh giá
 
-- Báo cáo đối chiếu source và các tài liệu/bằng chứng được dẫn trong kế hoạch tính đến 06/11/2026. Nhánh dự án `feature/patient-reception-workflow` hiện có local tại commit `ac4f09b054f9be665479ce4917111ea8fe048bae`; worktree của task tài liệu đang đứng trên nhánh `orchestrator/doc-state-refresh-02-reconcile-current-completion-ev` cùng commit. Không có bằng chứng push, phát hành hoặc GitHub-hosted CI run.
+- Báo cáo đối chiếu source và các tài liệu/bằng chứng được dẫn trong kế hoạch tính đến 06/11/2026 trên checkout local của nhánh `feature/patient-reception-workflow`; task worktrees đã được tích hợp cục bộ. Không có bằng chứng push, phát hành hoặc GitHub-hosted CI run.
 - Maven verify được phân biệt với các lượt SQL Server opt-in được task board ghi nhận; không kết nối database trong lần cập nhật báo cáo này.
 - Không quan sát cửa sổ Swing trực tiếp; không đánh giá trực quan layout hay thao tác toàn desktop.
 - Không đánh giá tuân thủ pháp lý/nghiệp vụ y tế, BHYT, hóa đơn, an toàn thuốc, tích hợp ngoài hoặc khả năng vận hành production. Không có kết luận “production ready”.

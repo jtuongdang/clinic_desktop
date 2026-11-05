@@ -2,11 +2,13 @@
 
 **Phạm vi:** Đọc mã migration V9, đăng ký runner, test, schema và contract đã duyệt. Không sửa source/test, không kết nối database và không chạy migration.
 
+**Lưu ý về thời điểm:** Phần review gốc dưới đây là snapshot report-only trước khi có kiểm thử runtime V9 và nối repository. Đến 06/11/2026, DEC-PAT-01 đã được Owner tái xác nhận; `BenhNhanCoSoRepositoryImpl`/đăng ký tiếp đón đã được nối; SQL Server opt-in `FreshDatabaseMigrationSqlServerTest` đã chạy trên database synthetic `clinic_test_v9_20261106`. Addendum cuối báo cáo ghi trạng thái mới nhất để không nhầm snapshot cũ với kết quả hiện hành.
+
 ## Kết luận
 
 Không phát hiện lỗi cú pháp hay sai khác contract trong mã V9 khi đọc tĩnh. Migration dùng preflight để từ chối dữ liệu legacy có cặp active trùng, sau đó tạo filtered unique index cho `isDeleted = 0`. Runner đăng ký V9 sau V8 và tách `GO` thành hai batch.
 
-**Tình trạng nghiệm thu:** Chưa có bằng chứng trong lượt review này về thực thi trên SQL Server. Test hiện tại không chứng minh SQL Server thật từ chối insert trùng active hoặc cho phép tái liên kết sau soft delete. Không xem sự hiện diện của index trong code/test nguồn là SQL Server runtime acceptance.
+**Tình trạng tại thời điểm review gốc:** Chưa có bằng chứng thực thi SQL Server trong lượt review đó. Đây không còn là trạng thái hiện tại; xem addendum.
 
 ## Findings (xếp theo mức độ)
 
@@ -49,3 +51,13 @@ Không phát hiện lỗi cú pháp hay sai khác contract trong mã V9 khi đ�
 - `docs/ke-hoach-trien-khai/README.md`, `00-hien-trang.md`, `02-cac-dot-trien-khai.md`, `03-model-task-board.md`, `phase2-implementation-contract.md`, `phase2-role-permission-matrix-proposal.md`.
 
 Các tài liệu roadmap xác định Phase 1/PAT-02 còn đang triển khai và yêu cầu đánh giá dựa trên bằng chứng; UI coding standards không đặt quy tắc riêng ảnh hưởng đến migration này.
+
+## Addendum — trạng thái sau nghiệm thu runtime (06/11/2026)
+
+- Owner tái xác nhận DEC-PAT-01: mỗi cặp (`maBenhNhan`, `maCoSo`) có tối đa một dòng active; bệnh nhân vẫn có thể liên kết tới các cơ sở khác nhau. Migration không tự sửa dữ liệu legacy trùng.
+- `FreshDatabaseMigrationSqlServerTest` chạy opt-in trên SQL Server database synthetic `clinic_test_v9_20261106`, áp dụng V1–V9 và xác nhận index filtered được tạo, insert active duplicate bị SQL Server từ chối (2601), soft-delete rồi tạo lại liên kết active thành công, và cả hai bản ghi lịch sử được giữ lại. Đây là bằng chứng runtime cho uniqueness/soft-delete semantics, không phải bằng chứng cho preflight trên dữ liệu duplicate legacy đã có trước V9.
+- Migration V9 kiểm tra duplicate legacy trước khi tạo index và dừng với lỗi 51090; đường preflight legacy này hiện đã được kiểm tra tĩnh nhưng chưa có SQL Server runtime fixture chuyên biệt chứng minh rollback/tracking/index khi lỗi xảy ra.
+- Repository `BenhNhanCoSoRepositoryImpl` và registration wiring đã được triển khai; acceptance `PAT-FACILITY-WIRE-01`/`REC-UI-DB-01` xác nhận ensure trong transaction, actor/facility từ session và readback tổng hợp. Đường đọc quyền vẫn theo exact facility+department/visit, liên kết không cấp quyền truy cập.
+- Root JDK 17 `mvn -Djava.awt.headless=true clean verify` gần nhất pass **243 tests, 0 failures, 0 errors, 4 skipped**; SQL Server opt-in được báo cáo riêng, không tính trong con số mặc định.
+
+**Trạng thái hiện tại:** V9 và liên kết runtime đã có bằng chứng acceptance. Phần còn mở riêng là SQL Server runtime test cho preflight duplicate legacy; không có căn cứ để gọi đó là lỗi đã xác nhận trong migration.
