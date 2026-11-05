@@ -2,6 +2,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
 import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -91,7 +93,7 @@ class ReceptionSqlServerPersistenceTest {
 
             var registrationResult = services.registerPatient().handle(new RegisterPatientCommand(
                     patient, insurance, room.getId(), "WALK_IN", "Synthetic persistence test",
-                    DoiTuongKham.BHYT, false, 0));
+                    DoiTuongKham.BHYT, false, 0, syntheticActorContext()));
             assertTrue(registrationResult.isSuccess(), "Synthetic reception registration failed");
             var receipt = registrationResult.valueOrThrow();
             registeredPatientId = receipt.patientId();
@@ -133,7 +135,7 @@ class ReceptionSqlServerPersistenceTest {
 
             var updateResult = services.registerPatient().handle(new RegisterPatientCommand(
                     updatedPatient, updatedInsurance, room.getId(), "WALK_IN", "Synthetic update persistence test",
-                    DoiTuongKham.BHYT, false, 0));
+                    DoiTuongKham.BHYT, false, 0, syntheticActorContext()));
             assertTrue(updateResult.isSuccess(), "Synthetic existing-patient update failed");
             var updateReceipt = updateResult.valueOrThrow();
             assertEquals(registeredPatientId, updateReceipt.patientId(),
@@ -185,6 +187,10 @@ class ReceptionSqlServerPersistenceTest {
                 : url + ";databaseName=" + databaseName;
         DatabaseConnection.setConnectionString("");
         DatabaseConnection.configure(targetUrl, username, credentialValue);
+    }
+
+    private static AuditActorContext syntheticActorContext() {
+        return new AuditActorContext(701, 31, "RECEPTION", 11, 21, "synthetic-workstation", UUID.randomUUID());
     }
 
     private static boolean runMigrationsWithoutLogging() {

@@ -1,11 +1,13 @@
 package vn.clinicmanagement.desktop.modules.reception.components;
 
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.desktop.core.session.UserSession;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -17,6 +19,7 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -386,9 +389,18 @@ public class PatientRegistrationFormPanel extends JPanel {
         };
         PhongKham room = roomsByName.get(selectedClinicRoomName());
         if (room == null) throw new IllegalArgumentException("Chọn phòng khám từ danh sách đã tải.");
+        UserSession session = UserSession.getInstance();
+        if (!session.isLoggedOn()) throw new IllegalArgumentException("An authenticated session is required.");
+        String sessionId = session.getSessionId();
+        if (sessionId == null) throw new IllegalArgumentException("A session correlation identifier is required.");
+        String workstationId = session.getWorkstationId();
+        if (workstationId != null && workstationId.isBlank()) workstationId = null;
+        AuditActorContext actorContext = new AuditActorContext(session.getUserId(), session.getRoleId(),
+                session.getRoleCode(), session.getFacilityId(), session.getDepartmentId(), workstationId,
+                UUID.fromString(sessionId));
         return new RegisterPatientCommand(patient, insurance, room.getId(),
                 String.valueOf(cbRegistrationType.getSelectedItem()), txtReason.getText().trim(), payer,
-                chkPriority.isSelected(), userId);
+                chkPriority.isSelected(), userId, actorContext);
     }
 
     private BaoHiem toInsurance(int userId) {

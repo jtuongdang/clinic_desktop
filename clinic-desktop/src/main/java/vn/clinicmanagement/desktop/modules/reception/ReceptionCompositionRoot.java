@@ -6,6 +6,7 @@ import vn.clinicmanagement.infrastructure.persistence.facility.PhongKhamReposito
 import vn.clinicmanagement.infrastructure.persistence.patient.BaoHiemRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.patient.BenhNhanRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.reception.ReceptionQueueRepositoryImpl;
+import vn.clinicmanagement.infrastructure.persistence.system.JdbcAuditRepositoryImpl;
 
 /** Shared JDBC adapters for reception use cases; repositories participate in one UoW. */
 final class ReceptionCompositionRoot {
@@ -19,7 +20,8 @@ final class ReceptionCompositionRoot {
         var insurance = new BaoHiemRepositoryImpl(connections, unitOfWork);
         var rooms = new PhongKhamRepositoryImpl(connections);
         var queue = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
-        return new Services(rooms, new RegisterPatientHandler(patients, insurance, rooms, queue, transactions),
+        var audit = new JdbcAuditRepositoryImpl(connections, unitOfWork, DatabaseConnection::getConnection);
+        return new Services(rooms, new RegisterPatientHandler(patients, insurance, rooms, queue, transactions, audit),
                 new SearchPatientsHandler(patients, insurance), new GetReceptionQueueHandler(queue));
     }
 

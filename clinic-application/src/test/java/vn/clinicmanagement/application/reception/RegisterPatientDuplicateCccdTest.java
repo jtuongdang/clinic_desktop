@@ -1,6 +1,8 @@
 package vn.clinicmanagement.application.reception;
 
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.audit.AuditActorContext;
+import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
@@ -18,6 +20,7 @@ import java.lang.reflect.Proxy;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,7 +63,15 @@ class RegisterPatientDuplicateCccdTest {
                 return result;
             }
         };
-        RegisterPatientHandler handler = new RegisterPatientHandler(patients, insurance, rooms, queue, transactions);
+        RegisterPatientHandler handler = new RegisterPatientHandler(patients, insurance, rooms, queue, transactions,
+                new AuditWritePort() {
+                    @Override public void appendInCurrentTransaction(vn.clinicmanagement.application.audit.SystemAuditEntry entry) {}
+                    @Override public void appendIndependently(vn.clinicmanagement.application.audit.SystemAuditEntry entry) {}
+                    @Override public void appendMedicalRecordInCurrentTransaction(
+                            vn.clinicmanagement.application.audit.MedicalRecordAuditEntry entry) {}
+                    @Override public void appendMedicalRecordIndependently(
+                            vn.clinicmanagement.application.audit.MedicalRecordAuditEntry entry) {}
+                });
 
         BenhNhan patient = new BenhNhan();
         patient.setHo("Nguyen");
@@ -71,7 +82,9 @@ class RegisterPatientDuplicateCccdTest {
         card.setSoBaoHiem("synthetic-insurance");
         card.setNgayHetHan(LocalDate.of(2030, 1, 1));
         RegisterPatientCommand command = new RegisterPatientCommand(patient, card, 3,
-                "Khám bệnh", "Synthetic test", DoiTuongKham.BHYT, false, 1);
+                "Khám bệnh", "Synthetic test", DoiTuongKham.BHYT, false, 1,
+                new AuditActorContext(1, 31, "RECEPTION", 1, 2, null,
+                        UUID.fromString("123e4567-e89b-12d3-a456-426614174000")));
 
         Result<RegistrationReceipt> result = handler.handle(command);
 

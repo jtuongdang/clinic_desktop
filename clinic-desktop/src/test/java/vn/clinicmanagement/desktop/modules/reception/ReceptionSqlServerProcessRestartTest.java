@@ -2,6 +2,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
 import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
@@ -99,7 +101,8 @@ class ReceptionSqlServerProcessRestartTest {
             insurance.setMucHuong(80);
 
             var result = services.registerPatient().handle(new RegisterPatientCommand(patient, insurance,
-                    room.getId(), "WALK_IN", "Synthetic process restart test", DoiTuongKham.BHYT, false, 0));
+                    room.getId(), "WALK_IN", "Synthetic process restart test", DoiTuongKham.BHYT, false, 0,
+                    syntheticActorContext()));
             assertTrue(result.isSuccess(), "Synthetic reception registration failed");
             var receipt = result.valueOrThrow();
             patientId = receipt.patientId();
@@ -155,6 +158,10 @@ class ReceptionSqlServerProcessRestartTest {
                 ? matcher.replaceAll("$1" + Matcher.quoteReplacement(databaseName))
                 : url + ";databaseName=" + databaseName;
         return new DatabaseCredentials(targetUrl, username, credentialValue);
+    }
+
+    private static AuditActorContext syntheticActorContext() {
+        return new AuditActorContext(701, 31, "RECEPTION", 11, 21, "synthetic-workstation", UUID.randomUUID());
     }
 
     private static boolean runMigrationsWithoutLogging() {

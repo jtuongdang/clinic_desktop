@@ -1,12 +1,18 @@
 package vn.clinicmanagement.desktop.modules.reception.components;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
+import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.UserSession;
 
 import javax.swing.JButton;
 import javax.swing.JTextField;
@@ -14,10 +20,13 @@ import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,6 +41,11 @@ class PatientRegistrationFormPanelTest {
 
     static {
         System.setProperty("java.awt.headless", "true");
+    }
+
+    @AfterEach
+    void clearSession() {
+        UserSession.getInstance().clearSession();
     }
 
     @BeforeAll
@@ -105,6 +119,7 @@ class PatientRegistrationFormPanelTest {
             assertTrue(panel.hasUnsavedInput());
             assertEquals(101, panel.selectedClinicRoomId());
 
+            startSyntheticSession(9);
             RegisterPatientCommand command = panel.toRegisterCommand(9);
             assertEquals("Synthetic Nguyen Van", command.patient().getHo());
             assertEquals("Mau", command.patient().getTen());
@@ -116,6 +131,14 @@ class PatientRegistrationFormPanelTest {
             assertEquals("SYNTH-BHYT-0001", command.insurance().getSoBaoHiem());
             assertEquals(101, command.roomId());
             assertEquals("Synthetic checkup reason", command.reason());
+            assertEquals(9, command.actorContext().employeeId());
+            assertEquals(31, command.actorContext().roleId());
+            assertEquals("RECEPTION", command.actorContext().roleCode());
+            assertEquals(11, command.actorContext().facilityId());
+            assertEquals(21, command.actorContext().departmentId());
+            assertEquals("synthetic-workstation", command.actorContext().workstationId());
+            assertEquals(UUID.fromString(UserSession.getInstance().getSessionId()),
+                    command.actorContext().correlationId());
         });
     }
 
@@ -242,6 +265,7 @@ class PatientRegistrationFormPanelTest {
 
             findByName(panel, "fullName", JTextField.class).setText("Synthetic New Entry");
             findByName(panel, "dateOfBirth", JTextField.class).setText("01/02/2000");
+            startSyntheticSession(12);
             RegisterPatientCommand newCommand = panel.toRegisterCommand(12);
             assertNull(newCommand.patient().getId());
             assertNull(newCommand.patient().getUpdatedBy());
@@ -336,6 +360,7 @@ class PatientRegistrationFormPanelTest {
             reasonField.setText("Synthetic periodic follow-up");
             insuranceNumberField.setText("SYNTH-BHYT-0504-NEW");
 
+            startSyntheticSession(syntheticUpdaterUserId);
             RegisterPatientCommand command = panel.toRegisterCommand(syntheticUpdaterUserId);
 
             assertEquals(401, command.roomId());
@@ -436,11 +461,22 @@ class PatientRegistrationFormPanelTest {
         return null;
     }
 
+    private static void startSyntheticSession(int employeeId) {
+        UserSession session = UserSession.getInstance();
+        SessionLifecycleService lifecycle = new SessionLifecycleService(session,
+                new SessionTimeoutPolicy(Duration.ofMinutes(15), Duration.ofHours(12)), Clock.systemUTC());
+        lifecycle.startSession(employeeId, "synthetic-user", "Synthetic User",
+                new RoleChoice(31, "RECEPTION", "Synthetic Reception"),
+                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"));
+        session.setWorkstationId("synthetic-workstation");
+    }
+
     private static void onEdt(EdtAction action) throws Exception {
         if (SwingUtilities.isEventDispatchThread()) {
             action.run();
             return;
         }
+
         AtomicReference<Throwable> failure = new AtomicReference<>();
         SwingUtilities.invokeAndWait(() -> {
             assertTrue(SwingUtilities.isEventDispatchThread(), "Must execute on Swing EDT");

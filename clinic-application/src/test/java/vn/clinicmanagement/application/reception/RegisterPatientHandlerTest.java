@@ -1,6 +1,13 @@
 package vn.clinicmanagement.application.reception;
 
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.audit.AuditActionCode;
+import vn.clinicmanagement.application.audit.AuditActorContext;
+import vn.clinicmanagement.application.audit.AuditOutcome;
+import vn.clinicmanagement.application.audit.AuditResourceType;
+import vn.clinicmanagement.application.audit.AuditReasonCode;
+import vn.clinicmanagement.application.audit.AuditWritePort;
+import vn.clinicmanagement.application.audit.SystemAuditEntry;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
@@ -20,11 +27,13 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterPatientHandlerTest {
@@ -32,6 +41,10 @@ class RegisterPatientHandlerTest {
     private static final int FACILITY_ID = 11;
     private static final int DEPARTMENT_ID = 21;
     private static final String SYNTHETIC_CCCD = "synthetic-cccd-001";
+    private static final UUID CORRELATION_ID =
+            UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final AuditActorContext ACTOR =
+            new AuditActorContext(5, 31, "RECEPTION", FACILITY_ID, DEPARTMENT_ID, "station-01", CORRELATION_ID);
 
     @Test
     void invalidCommandIsRejectedBeforeTransactionOrPersistence() {
@@ -71,6 +84,10 @@ class RegisterPatientHandlerTest {
                 "Synthetic reason", DoiTuongKham.BHYT, true, 5), fixture.visitArguments);
         assertEquals(1, fixture.transactions.calls);
         assertEquals(0, fixture.transactions.failures);
+        assertAuditEvents(fixture.auditEntries,
+                AuditActionCode.PATIENT_CREATED, AuditResourceType.PATIENT, 41,
+                AuditActionCode.INSURANCE_CREATED, AuditResourceType.INSURANCE, 71,
+                AuditActionCode.VISIT_REGISTERED, AuditResourceType.VISIT, 91);
     }
 
     @Test
@@ -101,6 +118,26 @@ class RegisterPatientHandlerTest {
         assertEquals(1, fixture.visitCalls.get());
         assertEquals(1, fixture.transactions.calls);
         assertEquals(0, fixture.transactions.failures);
+        assertAuditEvents(fixture.auditEntries,
+                AuditActionCode.PATIENT_UPDATED, AuditResourceType.PATIENT, 52,
+                AuditActionCode.INSURANCE_UPDATED, AuditResourceType.INSURANCE, 8,
+                AuditActionCode.VISIT_REGISTERED, AuditResourceType.VISIT, 92);
+    }
+
+    @Test
+    void registrationWithoutPersistedInsuranceWritesNoInsuranceAuditEvent() {
+        Fixture fixture = new Fixture();
+        fixture.visit = visit(94, 10, "Q-010");
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), null,
+                DoiTuongKham.THU_PHI));
+
+        assertTrue(result.isSuccess());
+        assertEquals(0, fixture.insuranceAdds.get());
+        assertEquals(0, fixture.insuranceUpdates.get());
+        assertAuditEvents(fixture.auditEntries,
+                AuditActionCode.PATIENT_CREATED, AuditResourceType.PATIENT, 41,
+                AuditActionCode.VISIT_REGISTERED, AuditResourceType.VISIT, 94);
     }
 
     @Test
@@ -126,6 +163,26 @@ class RegisterPatientHandlerTest {
             assertNoWritesOrVisit(fixture);
             assertEquals(1, fixture.transactions.failures);
         }
+    }
+
+    @Test
+    void roomOutsideSelectedSessionScopeIsDeniedAndAuditedWithoutBusinessWrites() {
+        Fixture fixture = new Fixture();
+        fixture.room = activeRoom(FACILITY_ID, DEPARTMENT_ID + 1);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+
+        assertFailure(result, "AUTH_SCOPE_MISMATCH");
+        assertNoWritesOrVisit(fixture);
+        assertEquals(1, fixture.independentAuditEntries.size());
+        SystemAuditEntry denial = fixture.independentAuditEntries.get(0);
+        assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, denial.actionCode());
+        assertEquals(AuditOutcome.DENIED, denial.outcome());
+        assertEquals(AuditReasonCode.SCOPE_MISMATCH, denial.reasonCode());
+        assertEquals(ACTOR.employeeId(), denial.actorEmployeeId());
+        assertEquals(ACTOR.facilityId(), denial.facilityId());
+        assertEquals(ACTOR.departmentId(), denial.departmentId());
+        assertEquals(1, fixture.transactions.failures);
     }
 
     @Test
@@ -187,6 +244,23 @@ class RegisterPatientHandlerTest {
         assertEquals(1, fixture.transactions.failures);
     }
 
+    @Test
+    void auditFailureAfterBusinessWritesReturnsSafeFailureAndTransactionRollsBackAllWrites() {
+        Fixture fixture = new Fixture();
+        fixture.auditFailureAction = AuditActionCode.VISIT_REGISTERED;
+        fixture.auditFailure = new IllegalStateException("synthetic audit storage failure");
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+
+        assertSafePersistenceFailure(result);
+        assertEquals(1, fixture.patientAdds.get());
+        assertEquals(1, fixture.insuranceAdds.get());
+        assertEquals(1, fixture.visitCalls.get());
+        assertEquals(List.of(), fixture.transactions.committedWrites);
+        assertEquals(List.of(), fixture.transactions.stagedWrites);
+        assertEquals(1, fixture.transactions.failures);
+    }
+
     private static void assertSafePersistenceFailure(Result<RegistrationReceipt> result) {
         assertFailure(result, "PATIENT_REGISTRATION_FAILED");
         String message = result.getError().orElseThrow().message();
@@ -208,8 +282,36 @@ class RegisterPatientHandlerTest {
     }
 
     private static RegisterPatientCommand command(BenhNhan patient, BaoHiem insurance) {
+        return command(patient, insurance, DoiTuongKham.BHYT);
+    }
+
+    private static RegisterPatientCommand command(BenhNhan patient, BaoHiem insurance, DoiTuongKham payerType) {
         return new RegisterPatientCommand(patient, insurance, ROOM_ID, "Khám bệnh", "Synthetic reason",
-                DoiTuongKham.BHYT, true, 5);
+                payerType, true, 5, ACTOR);
+    }
+
+    private static void assertAuditEvents(List<SystemAuditEntry> events, Object... expected) {
+        assertEquals(expected.length / 3, events.size());
+        for (int i = 0; i < events.size(); i++) {
+            SystemAuditEntry event = events.get(i);
+            assertEquals(expected[i * 3], event.actionCode());
+            assertEquals(expected[i * 3 + 1], event.resourceType());
+            assertEquals(expected[i * 3 + 2], event.resourceId());
+            assertEquals(ACTOR.employeeId(), event.actorEmployeeId());
+            assertEquals(ACTOR.roleId(), event.roleId());
+            assertEquals(ACTOR.roleCode(), event.roleCode());
+            assertEquals(ACTOR.facilityId(), event.facilityId());
+            assertEquals(ACTOR.departmentId(), event.departmentId());
+            assertEquals(ACTOR.workstationId(), event.workstationId());
+            assertEquals(CORRELATION_ID, event.correlationId());
+            assertEquals(AuditOutcome.SUCCESS, event.outcome());
+            assertNull(event.reasonCode());
+            assertNotNull(event.occurredAtUtc());
+            assertFalse(event.toString().contains(SYNTHETIC_CCCD));
+            assertFalse(event.toString().contains("Synthetic Patient"));
+            assertFalse(event.toString().contains("Synthetic reason"));
+            assertFalse(event.toString().contains("synthetic-insurance-001"));
+        }
     }
 
     private static BenhNhan validPatient() {
@@ -230,14 +332,18 @@ class RegisterPatientHandlerTest {
     }
 
     private static PhongKham activeRoom() {
+        return activeRoom(FACILITY_ID, DEPARTMENT_ID);
+    }
+
+    private static PhongKham activeRoom(int facilityId, int departmentId) {
         CoSo facility = new CoSo();
-        facility.setId(FACILITY_ID);
+        facility.setId(facilityId);
         Khoa department = new Khoa();
-        department.setId(DEPARTMENT_ID);
+        department.setId(departmentId);
         department.setCoSo(facility);
         PhongKham room = new PhongKham();
         room.setId(ROOM_ID);
-        room.setMaKhoa(DEPARTMENT_ID);
+        room.setMaKhoa(departmentId);
         room.setKhoa(department);
         return room;
     }
@@ -285,6 +391,8 @@ class RegisterPatientHandlerTest {
         private final AtomicInteger insuranceUpdates = new AtomicInteger();
         private final AtomicInteger visitCalls = new AtomicInteger();
         private final List<Object> visitArguments = new ArrayList<>();
+        private final List<SystemAuditEntry> auditEntries = new ArrayList<>();
+        private final List<SystemAuditEntry> independentAuditEntries = new ArrayList<>();
         private final TransactionProbe transactions = new TransactionProbe();
         private final RegisterPatientHandler handler;
         private PhongKham room = activeRoom();
@@ -294,6 +402,9 @@ class RegisterPatientHandlerTest {
         private boolean identityConflictOnInsert;
         private RuntimeException insuranceFailure;
         private RuntimeException queueFailure;
+        private RuntimeException auditFailure;
+        private AuditActionCode auditFailureAction;
+        private int insuranceInsertId = 71;
         private LuotKham visit = visit(93, 9, "Q-009");
 
         private Fixture() {
@@ -306,10 +417,12 @@ class RegisterPatientHandlerTest {
                         BenhNhan patient = (BenhNhan) args[0];
                         patient.setId(patientInsertId);
                         patient.setMaBenhNhanFormat("SYNTH-PATIENT-" + patientInsertId);
+                        transactions.stage("patient");
                         yield null;
                     }
                     case "update" -> {
                         patientUpdates.incrementAndGet();
+                        transactions.stage("patient");
                         yield null;
                     }
                     default -> defaultValue(method);
@@ -321,11 +434,14 @@ class RegisterPatientHandlerTest {
                     case "add" -> {
                         insuranceAdds.incrementAndGet();
                         if (insuranceFailure != null) throw insuranceFailure;
+                        ((BaoHiem) args[0]).setId(insuranceInsertId);
+                        transactions.stage("insurance");
                         yield null;
                     }
                     case "update" -> {
                         insuranceUpdates.incrementAndGet();
                         if (insuranceFailure != null) throw insuranceFailure;
+                        transactions.stage("insurance");
                         yield null;
                     }
                     default -> defaultValue(method);
@@ -339,22 +455,48 @@ class RegisterPatientHandlerTest {
                 visitArguments.clear();
                 visitArguments.addAll(List.of(args));
                 if (queueFailure != null) throw queueFailure;
+                transactions.stage("visit");
                 return visit;
             });
-            handler = new RegisterPatientHandler(patients, insuranceCards, rooms, queue, transactions);
+            AuditWritePort audit = proxy(AuditWritePort.class, (method, args) -> {
+                if (method.equals("appendIndependently")) {
+                    independentAuditEntries.add((SystemAuditEntry) args[0]);
+                    return null;
+                }
+                if (!method.equals("appendInCurrentTransaction")) return null;
+                SystemAuditEntry entry = (SystemAuditEntry) args[0];
+                if (entry.actionCode() == auditFailureAction && auditFailure != null) throw auditFailure;
+                auditEntries.add(entry);
+                transactions.stage("audit");
+                return null;
+            });
+            handler = new RegisterPatientHandler(patients, insuranceCards, rooms, queue, transactions, audit);
         }
     }
 
     private static final class TransactionProbe implements TransactionBoundary {
         private int calls;
         private int failures;
+        private final List<String> stagedWrites = new ArrayList<>();
+        private final List<String> committedWrites = new ArrayList<>();
 
         @Override
         public <T> Result<T> inTransaction(java.util.function.Supplier<Result<T>> operation) {
             calls++;
+            int writeCheckpoint = stagedWrites.size();
             Result<T> result = operation.get();
-            if (result.isFailure()) failures++;
+            if (result.isFailure()) {
+                failures++;
+                stagedWrites.subList(writeCheckpoint, stagedWrites.size()).clear();
+            } else {
+                committedWrites.addAll(stagedWrites.subList(writeCheckpoint, stagedWrites.size()));
+                stagedWrites.subList(writeCheckpoint, stagedWrites.size()).clear();
+            }
             return result;
+        }
+
+        private void stage(String write) {
+            stagedWrites.add(write);
         }
     }
 }
