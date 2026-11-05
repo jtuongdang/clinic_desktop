@@ -30,6 +30,7 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [Phase 0 — Review domain events](phase0-domain-events-review.md) | Vòng đời sự kiện miền, transaction timing, persistence, UI và test gaps. |
 | [Phase 0 — Review repository contracts](phase0-repository-contract-review.md) | Map model repository từ domain port tới adapter, use case, transaction và test. |
 | [Phase 0 — Review error mapping](phase0-error-mapping-review.md) | Map lỗi từ domain/Application/JDBC tới thông báo Swing và rủi ro dữ liệu. |
+| [Phase 2 — Security implementation contract](phase2-implementation-contract.md) | Ranh giới tin cậy, role/scope/session/audit policy đã duyệt và thứ tự task implementation. |
 | [03 — Tiếp đón, bệnh nhân, nhân sự](phan-he/03-tiep-don-benh-nhan-nhan-su.md) | Patient, insurance, identity, staff, shift/attendance. |
 | [04 — Lịch hẹn và khám/EMR](phan-he/04-lich-hen-kham-emr.md) | Appointment, visit, diagnosis, vitals, prescriptions, care plan. |
 | [05 — Dịch vụ và cận lâm sàng](phan-he/05-dich-vu-can-lam-sang.md) | Catalog services, orders, lab/imaging result workflow. |
