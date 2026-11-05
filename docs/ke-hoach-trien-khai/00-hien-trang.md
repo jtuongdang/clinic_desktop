@@ -17,17 +17,17 @@
 ## Migration và kiểm thử trong checkout
 
 - Migration runner đăng ký tuần tự bốn file: `V1__Initial_Clinic_Schema.sql`, `V2__Seed_Initial_Data.sql`, `V3__Repair_Demo_Account_Passwords.sql`, `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql`.
-- `DatabaseMigrationRunner` dùng `SqlServerBatchSplitter` để tách `GO` đứng riêng trên dòng; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra runner/splitter bằng test tự chứa. Chưa có bằng chứng chạy migration trên SQL Server thử nghiệm.
-- Tại code snapshot `9ff7ddd` có **13 test source / 64 test cases**: domain 3 source/16 tests (`DateRangeTest`, `MoneyTest`, `PhoneNumberTest`); application 5/26 (`AuthenticateUserHandlerTest`, `Pbkdf2PasswordHasherTest`, `RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest`); infrastructure 4/17 (`BenhNhanRepositoryImplTest`, `DatabaseMigrationRunnerTest`, `JdbcTransactionManagerTest`, `SqlServerBatchSplitterTest`); desktop 1/5 (`PatientRegistrationFormPanelTest`).
-- `mvn clean verify` trên code snapshot `9ff7ddd` đã pass: 64 tests, 0 failures/errors/skips; cả năm Maven module thành công. Auth tests kiểm tra handler và PBKDF2 verifier bằng fixture tổng hợp, không xác nhận persistence, access scope hay audit.
-- Các test unit/headless không chứng minh SQL Server save/search/queue, migration trên SQL Server, đọc lại sau restart, rollback đa bảng trong quy trình tiếp đón, hoặc queue/CCCD concurrency.
+- `DatabaseMigrationRunner` dùng `SqlServerBatchSplitter` để tách `GO` đứng riêng trên dòng; unit tests kiểm tra runner/splitter. Test opt-in reception đã gọi migration runner trên SQL Server synthetic hiện hữu, nhưng chưa xác nhận bootstrap database trống hoặc behavior khi migration thất bại.
+- Tại HEAD `99d709b` có **14 test source / 66 test cases**: domain 3/16, application 5/26, infrastructure 4/17, desktop 2/7. `ReceptionSqlServerPersistenceTest` là test opt-in và được skip khi chạy mặc định.
+- `mvn clean verify` trên HEAD `99d709b` đã pass: 66 tests được phát hiện, 0 failures/errors, 1 skip (test SQL Server opt-in); cả năm Maven module thành công. Auth tests kiểm tra handler/verifier bằng fixture tổng hợp, không xác nhận access scope hay audit.
+- SQL Server synthetic `clinic_orchestrator_review_20261105`: test opt-in đăng ký và cập nhật patient+BHYT+visit+queue, đọc lại bằng composition mới pass 1/1; dữ liệu test được soft-delete. Kiểm thử thủ công riêng cũng xác nhận rollback đa bảng, 8 queue registrations đồng thời có số riêng, và hai đăng ký cùng CCCD cho đúng một thành công. Đây không phải process restart hoặc UI end-to-end.
 
 ## Tiếp đón và trạng thái Git
 
-- `ReceptionCompositionRoot` nối `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler` với JDBC repositories. Handler đăng ký ghi bệnh nhân, bảo hiểm tùy chọn và lượt khám trong transaction boundary.
-- Search query tra cứu hồ sơ và BHYT gần nhất; queue repository ghi lượt khám, cấp số theo phòng/ngày bằng khóa giao dịch SQL, và đọc hàng đợi/tóm tắt phòng. Các hành vi này có trong source nhưng chưa có E2E SQL Server/restart acceptance.
-- Feature code HEAD tại thời điểm cập nhật là `9ff7ddd` (authentication handler/PBKDF2 tests); các commit liên quan trước đó gồm `3f6ba31` (DateRange/Money), `ea397f9` (headless reception form tests), `264bbae` (SQL Server GO splitter/migration runner tests) và `ff2045a` (JDBC transaction tests). Đây là bằng chứng commit/test local; không phải phát hành hay phase acceptance.
-- Số liệu inventory được đối chiếu với `src/test` ở cả bốn module; `mvn clean verify` xác nhận 64 tests pass tại source snapshot `9ff7ddd`.
+- `ReceptionCompositionRoot` nối các handler với JDBC. Test opt-in đã ghi patient+BHYT+visit+queue, tìm theo CCCD và đọc lại dữ liệu bằng composition/repository instances mới trên SQL Server synthetic. Nó không khởi động process thứ hai.
+- SQL Server verification bổ sung: rollback đa bảng khi insert visit lỗi để lại 0 active rows cho patient/BHYT/visit; 8 đăng ký đồng thời nhận queue number duy nhất; hai đăng ký cùng CCCD cho đúng 1 commit và lỗi còn lại được ánh xạ `PATIENT_DUPLICATE_CCCD`. Các bản ghi test đã soft-delete.
+- Feature code HEAD là `99d709b` (`task: Verify SQL Server updates for existing patients and BHYT`); trước đó có `75a218d` (headless existing-patient form update test), `fcfc62b` (opt-in SQL Server persistence test), cùng các commit `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`. Đây là bằng chứng commit/test local; không phải phát hành hay nghiệm thu Phase 0/1.
+- Còn thiếu: restart process thực tế, UI-to-database E2E/review, fresh database migration acceptance và authorization/privacy/audit.
 
 ## Nguyên tắc đánh giá hoàn thiện
 

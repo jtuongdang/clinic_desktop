@@ -7,17 +7,17 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Trạng thái:** `[~]` Nền tảng và wiring cơ bản có trong source; validation/release chưa hoàn tất.
 **Phụ thuộc:** Không.
 **Phạm vi:** Maven modules, application shell, schema/migrations, JDBC, transaction/unit of work và cấu hình môi trường.
-**Bằng chứng mới:** `JdbcTransactionManagerTest` kiểm tra commit/rollback/cleanup; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra tách batch `GO`; DateRange/Money regression tests có ở `3f6ba31`. Tại code snapshot `9ff7ddd`, inventory là 13 test source/64 tests (domain 3/16, application 5/26, infrastructure 4/17, desktop 1/5). `mvn clean verify` pass: 64 tests, 0 failures/errors/skips, năm Maven module thành công.
-**Còn lại:** Xác nhận migrations trên SQL Server thử nghiệm sạch; cấu hình secret. Các kiểm thử transaction/splitter hiện có không chứng minh migration hay reception E2E trên SQL Server. Identity/access baseline nằm ở Phase 2.
+**Bằng chứng mới:** `mvn clean verify` tại `99d709b` pass 66 tests được phát hiện (0 failures/errors, 1 opt-in SQL Server test skipped), cả năm module. `ReceptionSqlServerPersistenceTest` chạy opt-in trên synthetic SQL Server thành công; xác nhận migration V1–V4 có hiệu lực trên DB thử nghiệm hiện hữu cùng luồng lưu/đọc reception. Migration trên database trống vẫn cần kiểm thử riêng.
+**Còn lại:** Kiểm thử database trống, failure safety và cấu hình secret trong môi trường triển khai. Transaction boundary test và E2E reception test không đồng nghĩa đã chấp nhận toàn Phase 0. Identity/access baseline nằm ở Phase 2.
 **Gate:** build/migrations/repository transaction có thể tái lập trong môi trường thử nghiệm.
 
 ## Phase 1 — Bệnh nhân và tiếp đón
 
-**Trạng thái:** `[~]` Một phần workflow đã nối; regression tests có trong branch; chưa nghiệm thu E2E.
+**Trạng thái:** `[~]` Persistence E2E và các kiểm tra transaction/concurrency đã có bằng chứng trên SQL Server synthetic; chưa đạt nghiệm thu UI/restart/nghiệp vụ đầy đủ.
 **Phụ thuộc:** Phase 0.
 **Phạm vi:** `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `TienSuBenh`, lựa chọn `CoSo`/`Khoa`/`PhongKham`, đăng ký/tìm kiếm/queue `LuotKham`.
-**Bằng chứng hiện tại tại code snapshot `9ff7ddd`:** Có 13 test source/64 test cases: domain 3/16, application 5/26, infrastructure 4/17, desktop 1/5. Commits liên quan gồm `ff2045a` transaction tests, `264bbae` migration runner/GO splitter tests, `ea397f9` headless reception form tests, `3f6ba31` DateRange/Money tests và `9ff7ddd` authentication tests. Application/JDBC/UI wiring hiện diện. Đây là test/review evidence, chưa phải Phase 1 acceptance.
-**Còn lại:** SQL Server save/search/queue và reload sau restart; cập nhật hồ sơ/BHYT; rollback đa bảng của luồng reception; queue/CCCD concurrency; UI integration/E2E và review. Không có bằng chứng SQL Server E2E, restart hoặc concurrency; Phase 1 exit criteria vẫn unmet.
+**Bằng chứng hiện tại tại `99d709b`:** 14 test source/66 test cases được phát hiện (domain 3/16, application 5/26, infrastructure 4/17, desktop 2/7); default verify có 1 SQL Server opt-in test skip. Test opt-in pass trên SQL Server synthetic cho đăng ký+search+update patient/BHYT+queue và đọc lại bằng composition mới. Manual SQL checks xác nhận multi-table rollback, queue numbering dưới 8 đăng ký đồng thời và ánh xạ duplicate CCCD trong tranh chấp. Tất cả test data được soft-delete. Đây là evidence task, chưa phải Phase 1 acceptance.
+**Còn lại:** process restart thật; UI-to-DB E2E và review thao tác trên desktop; quy tắc/privacy/audit. Phase 1 exit criteria vẫn unmet.
 
 ## Phase 2 — Baseline identity, access checks và audit
 
