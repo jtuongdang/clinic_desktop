@@ -15,6 +15,7 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -243,8 +244,156 @@ class PatientRegistrationFormPanelTest {
             findByName(panel, "dateOfBirth", JTextField.class).setText("01/02/2000");
             RegisterPatientCommand newCommand = panel.toRegisterCommand(12);
             assertNull(newCommand.patient().getId());
+            assertNull(newCommand.patient().getUpdatedBy());
+            assertEquals(12, newCommand.patient().getCreatedBy());
             assertNull(newCommand.insurance());
             assertEquals(302, newCommand.roomId());
+        });
+    }
+
+    @Test
+    void selectPatientMapsExistingSyntheticPatientAndPreservesIdentityAndVersionAfterEdits() throws Exception {
+        onEdt(() -> {
+            PatientRegistrationFormPanel panel = new PatientRegistrationFormPanel();
+            panel.setClinicRooms(List.of(room(401, "PK Nội 01")));
+
+            LocalDateTime initialCreatedAt = LocalDateTime.of(2026, 3, 10, 8, 30);
+            int originalCreatorId = 11;
+            int syntheticUpdaterUserId = 29;
+
+            BenhNhan existingPatient = new BenhNhan();
+            existingPatient.setId(504);
+            existingPatient.setMaBenhNhanFormat("SYNTH-BN-0504");
+            existingPatient.setVersion(7L);
+            existingPatient.setCreatedAt(initialCreatedAt);
+            existingPatient.setCreatedBy(originalCreatorId);
+            existingPatient.setHo("Synthetic Le Thi");
+            existingPatient.setTen("Minh");
+            existingPatient.setGioiTinh(GioiTinh.F);
+            existingPatient.setNgaySinh(LocalDate.of(1990, 12, 25));
+            existingPatient.setNoiSinh("Synthetic Province");
+            existingPatient.setSoNhaThonPho("12 Synthetic Alley");
+            existingPatient.setMaTinh("01");
+            existingPatient.setMaHuyen("002");
+            existingPatient.setMaXa("00003");
+            existingPatient.setDiaChi("12 Synthetic Alley, Synthetic District");
+            existingPatient.setNgheNghiep("Synthetic Engineer");
+            existingPatient.setDienThoai(SYNTHETIC_PHONE);
+            existingPatient.setEmail("synthetic.patient@example.invalid");
+            existingPatient.setDanToc("Tày");
+            existingPatient.setQuocTich("Việt Nam");
+            existingPatient.setSoCCCD(SYNTHETIC_CCCD);
+            existingPatient.setNgayCapCCCD(LocalDate.of(2021, 5, 20));
+            existingPatient.setNoiCapCCCD("Synthetic Registry Office");
+            existingPatient.setNoiLamViec("Synthetic Co");
+            existingPatient.setNguoiLienHeTen("Synthetic Contact");
+            existingPatient.setNguoiLienHeDienThoai("0900000777");
+
+            BaoHiem existingInsurance = new BaoHiem();
+            existingInsurance.setId(88);
+            existingInsurance.setVersion(3L);
+            existingInsurance.setCreatedAt(initialCreatedAt);
+            existingInsurance.setCreatedBy(originalCreatorId);
+            existingInsurance.setSoBaoHiem("SYNTH-BHYT-0504");
+            existingInsurance.setNgayBatDau(LocalDate.of(2026, 1, 1));
+            existingInsurance.setNgayHetHan(LocalDate.of(2026, 12, 31));
+            existingInsurance.setMucHuong(80);
+            existingInsurance.setMaNoiSong("K1");
+            existingInsurance.setMaNoiDangKyKCB("01-999");
+            existingInsurance.setNoiDangKyKCB("Synthetic Clinic Facility");
+            existingInsurance.setDiaChiThe("12 Synthetic Alley");
+            existingInsurance.setDungTuyen(false);
+            existingInsurance.setCoGiayKhaiSinh(true);
+            existingInsurance.setKhongGiuThe(true);
+            existingInsurance.setMienCungChiTra(true);
+            existingInsurance.setNgayMienCungChiTra(LocalDate.of(2026, 6, 1));
+            existingInsurance.setNgayDu5NamLienTuc(LocalDate.of(2025, 1, 1));
+
+            panel.selectPatient(existingPatient, existingInsurance);
+
+            JTextField patientCodeField = findByName(panel, "patientCode", JTextField.class);
+            JTextField fullNameField = findByName(panel, "fullName", JTextField.class);
+            JTextField dateOfBirthField = findByName(panel, "dateOfBirth", JTextField.class);
+            JTextField phoneField = findByName(panel, "phone", JTextField.class);
+            JTextField cccdField = findByName(panel, "cccd", JTextField.class);
+            JTextField addressField = findByName(panel, "address", JTextField.class);
+            JTextField reasonField = findByName(panel, "reason", JTextField.class);
+            JTextField insuranceNumberField = findByName(panel, "insuranceNumber", JTextField.class);
+
+            assertFalse(patientCodeField.isEditable());
+            assertEquals("SYNTH-BN-0504", patientCodeField.getText());
+            assertEquals("Synthetic Le Thi Minh", fullNameField.getText());
+            assertEquals("25/12/1990", dateOfBirthField.getText());
+            assertEquals(SYNTHETIC_PHONE, phoneField.getText());
+            assertEquals(SYNTHETIC_CCCD, cccdField.getText());
+            assertEquals("12 Synthetic Alley, Synthetic District", addressField.getText());
+            assertEquals("SYNTH-BHYT-0504", insuranceNumberField.getText());
+            assertTrue(panel.hasUnsavedInput());
+
+            fullNameField.setText("Synthetic Le Thi Minh Updated");
+            phoneField.setText("0900000321");
+            addressField.setText("99 Updated Synthetic Street");
+            reasonField.setText("Synthetic periodic follow-up");
+            insuranceNumberField.setText("SYNTH-BHYT-0504-NEW");
+
+            RegisterPatientCommand command = panel.toRegisterCommand(syntheticUpdaterUserId);
+
+            assertEquals(401, command.roomId());
+            assertEquals("Synthetic periodic follow-up", command.reason());
+            assertEquals(syntheticUpdaterUserId, command.createdBy());
+
+            BenhNhan updatedPatient = command.patient();
+            assertNotNull(updatedPatient);
+            assertEquals(504, updatedPatient.getId());
+            assertEquals("SYNTH-BN-0504", updatedPatient.getMaBenhNhanFormat());
+            assertEquals(7L, updatedPatient.getVersion());
+            assertEquals(initialCreatedAt, updatedPatient.getCreatedAt());
+            assertEquals(originalCreatorId, updatedPatient.getCreatedBy());
+            assertEquals(syntheticUpdaterUserId, updatedPatient.getUpdatedBy());
+
+            assertEquals("Synthetic Le Thi Minh", updatedPatient.getHo());
+            assertEquals("Updated", updatedPatient.getTen());
+            assertEquals(GioiTinh.F, updatedPatient.getGioiTinh());
+            assertEquals(LocalDate.of(1990, 12, 25), updatedPatient.getNgaySinh());
+            assertEquals("0900000321", updatedPatient.getDienThoai());
+            assertEquals(SYNTHETIC_CCCD, updatedPatient.getSoCCCD());
+            assertEquals("99 Updated Synthetic Street", updatedPatient.getDiaChi());
+            assertEquals("Synthetic Province", updatedPatient.getNoiSinh());
+            assertEquals("12 Synthetic Alley", updatedPatient.getSoNhaThonPho());
+            assertEquals("01", updatedPatient.getMaTinh());
+            assertEquals("002", updatedPatient.getMaHuyen());
+            assertEquals("00003", updatedPatient.getMaXa());
+            assertEquals("Synthetic Engineer", updatedPatient.getNgheNghiep());
+            assertEquals("synthetic.patient@example.invalid", updatedPatient.getEmail());
+            assertEquals("Tày", updatedPatient.getDanToc());
+            assertEquals("Việt Nam", updatedPatient.getQuocTich());
+            assertEquals(LocalDate.of(2021, 5, 20), updatedPatient.getNgayCapCCCD());
+            assertEquals("Synthetic Registry Office", updatedPatient.getNoiCapCCCD());
+            assertEquals("Synthetic Co", updatedPatient.getNoiLamViec());
+            assertEquals("Synthetic Contact", updatedPatient.getNguoiLienHeTen());
+            assertEquals("0900000777", updatedPatient.getNguoiLienHeDienThoai());
+
+            BaoHiem updatedInsurance = command.insurance();
+            assertNotNull(updatedInsurance);
+            assertEquals(88, updatedInsurance.getId());
+            assertEquals(3L, updatedInsurance.getVersion());
+            assertEquals(initialCreatedAt, updatedInsurance.getCreatedAt());
+            assertEquals(originalCreatorId, updatedInsurance.getCreatedBy());
+            assertEquals(syntheticUpdaterUserId, updatedInsurance.getUpdatedBy());
+            assertEquals("SYNTH-BHYT-0504-NEW", updatedInsurance.getSoBaoHiem());
+            assertEquals(LocalDate.of(2026, 1, 1), updatedInsurance.getNgayBatDau());
+            assertEquals(LocalDate.of(2026, 12, 31), updatedInsurance.getNgayHetHan());
+            assertEquals(80, updatedInsurance.getMucHuong());
+            assertEquals("K1", updatedInsurance.getMaNoiSong());
+            assertEquals("01-999", updatedInsurance.getMaNoiDangKyKCB());
+            assertEquals("Synthetic Clinic Facility", updatedInsurance.getNoiDangKyKCB());
+            assertEquals("12 Synthetic Alley", updatedInsurance.getDiaChiThe());
+            assertFalse(updatedInsurance.isDungTuyen());
+            assertTrue(updatedInsurance.isCoGiayKhaiSinh());
+            assertTrue(updatedInsurance.isKhongGiuThe());
+            assertTrue(updatedInsurance.isMienCungChiTra());
+            assertEquals(LocalDate.of(2026, 6, 1), updatedInsurance.getNgayMienCungChiTra());
+            assertEquals(LocalDate.of(2025, 1, 1), updatedInsurance.getNgayDu5NamLienTuc());
         });
     }
 
