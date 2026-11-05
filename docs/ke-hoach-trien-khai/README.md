@@ -7,7 +7,8 @@
 1. Bắt đầu từ [Hiện trạng và nguyên tắc phân tích](00-hien-trang.md).
 2. Dùng [Ma trận Domain–màn hình và phần cần bổ sung](01-ma-tran-model-man-hinh.md) để chọn phạm vi.
 3. Quản lý thứ tự, phụ thuộc và điều kiện nghiệm thu trong [Các đợt triển khai](02-cac-dot-trien-khai.md).
-4. Mỗi phân hệ có một trang backlog riêng trong `phan-he/`; cập nhật trạng thái và người phụ trách tại đó khi bắt đầu làm.
+4. Theo dõi model/task, bằng chứng và gate trong [03 — Model task board](03-model-task-board.md); các review Phase 0 được liên kết ở đây.
+5. Mỗi phân hệ có một trang backlog riêng trong `phan-he/`; cập nhật trạng thái và người phụ trách tại đó khi bắt đầu làm.
 
 ## Quy ước trạng thái
 
@@ -25,6 +26,10 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [00 — Hiện trạng](00-hien-trang.md) | Kiến trúc thực tế, mức hoàn thiện, nguyên tắc phân tích và giới hạn. |
 | [01 — Ma trận model–màn hình](01-ma-tran-model-man-hinh.md) | Domain models, UI hiện có, màn hình cần bổ sung, mức ưu tiên. |
 | [02 — Các đợt triển khai](02-cac-dot-trien-khai.md) | Lộ trình theo dependency, deliverable và điều kiện qua đợt. |
+| [03 — Model task board](03-model-task-board.md) | Trạng thái task theo model family, dependency, bằng chứng và blocker. |
+| [Phase 0 — Review domain events](phase0-domain-events-review.md) | Vòng đời sự kiện miền, transaction timing, persistence, UI và test gaps. |
+| [Phase 0 — Review repository contracts](phase0-repository-contract-review.md) | Map model repository từ domain port tới adapter, use case, transaction và test. |
+| [Phase 0 — Review error mapping](phase0-error-mapping-review.md) | Map lỗi từ domain/Application/JDBC tới thông báo Swing và rủi ro dữ liệu. |
 | [03 — Tiếp đón, bệnh nhân, nhân sự](phan-he/03-tiep-don-benh-nhan-nhan-su.md) | Patient, insurance, identity, staff, shift/attendance. |
 | [04 — Lịch hẹn và khám/EMR](phan-he/04-lich-hen-kham-emr.md) | Appointment, visit, diagnosis, vitals, prescriptions, care plan. |
 | [05 — Dịch vụ và cận lâm sàng](phan-he/05-dich-vu-can-lam-sang.md) | Catalog services, orders, lab/imaging result workflow. |
