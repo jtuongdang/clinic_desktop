@@ -71,11 +71,8 @@ public class DatabaseMigrationRunner {
                     return false;
                 }
 
-                executeSqlScript(conn, sqlContent);
-
                 long duration = System.currentTimeMillis() - startTime;
-                recordMigration(conn, scriptName, duration);
-                conn.commit();
+                executeMigration(conn, scriptName, sqlContent, duration);
                 System.out.println("  HOÀN THÀNH: " + scriptName + " (" + duration + " ms)");
             }
 
@@ -170,6 +167,22 @@ public class DatabaseMigrationRunner {
             for (String batch : batches) {
                 stmt.execute(batch);
             }
+        }
+    }
+
+    static void executeMigration(Connection conn, String scriptName, String sqlContent, long duration)
+            throws SQLException {
+        try {
+            executeSqlScript(conn, sqlContent);
+            recordMigration(conn, scriptName, duration);
+            conn.commit();
+        } catch (SQLException migrationFailure) {
+            try {
+                conn.rollback();
+            } catch (SQLException rollbackFailure) {
+                migrationFailure.addSuppressed(rollbackFailure);
+            }
+            throw migrationFailure;
         }
     }
 

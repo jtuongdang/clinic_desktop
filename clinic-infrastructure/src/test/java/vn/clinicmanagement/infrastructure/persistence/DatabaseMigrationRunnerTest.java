@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -11,9 +12,58 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatabaseMigrationRunnerTest {
+
+    @Test
+    void failedBatchAfterEarlierBatchRollsBackWithoutTrackingOrCommit() {
+        SQLException migrationFailure = new SQLException("synthetic batch failure");
+        MigrationJdbcFake jdbc = new MigrationJdbcFake(migrationFailure, null, null);
+
+        SQLException thrown = assertThrows(SQLException.class, () -> DatabaseMigrationRunner.executeMigration(
+                jdbc.connection(), "V-test__synthetic.sql",
+                "CREATE TABLE SyntheticRoom (id INT);\nGO\nINSERT INTO SyntheticRoom VALUES (1);", 12L));
+
+        assertSame(migrationFailure, thrown);
+        assertEquals(List.of("CREATE TABLE SyntheticRoom (id INT);"), jdbc.executedBatches);
+        assertEquals(0, jdbc.trackingWrites);
+        assertEquals(0, jdbc.commits);
+        assertEquals(1, jdbc.rollbacks);
+    }
+
+    @Test
+    void trackingWriteFailureRollsBackAndDoesNotCommit() {
+        SQLException trackingFailure = new SQLException("synthetic tracking write failure");
+        MigrationJdbcFake jdbc = new MigrationJdbcFake(null, trackingFailure, null);
+
+        SQLException thrown = assertThrows(SQLException.class, () -> DatabaseMigrationRunner.executeMigration(
+                jdbc.connection(), "V-test__synthetic.sql", "CREATE TABLE SyntheticRoom (id INT);", 12L));
+
+        assertSame(trackingFailure, thrown);
+        assertEquals(1, jdbc.trackingWrites);
+        assertEquals(0, jdbc.commits);
+        assertEquals(1, jdbc.rollbacks);
+    }
+
+    @Test
+    void rollbackFailureIsSuppressedOnOriginalMigrationFailure() {
+        SQLException migrationFailure = new SQLException("synthetic batch failure");
+        SQLException rollbackFailure = new SQLException("synthetic rollback failure");
+        MigrationJdbcFake jdbc = new MigrationJdbcFake(migrationFailure, null, rollbackFailure);
+
+        SQLException thrown = assertThrows(SQLException.class, () -> DatabaseMigrationRunner.executeMigration(
+                jdbc.connection(), "V-test__synthetic.sql",
+                "CREATE TABLE SyntheticRoom (id INT);\nGO\nINSERT INTO SyntheticRoom VALUES (1);", 12L));
+
+        assertSame(migrationFailure, thrown);
+        assertEquals(1, thrown.getSuppressed().length);
+        assertSame(rollbackFailure, thrown.getSuppressed()[0]);
+        assertEquals(0, jdbc.commits);
+        assertEquals(1, jdbc.rollbacks);
+    }
 
     @Test
     void executeSqlScriptExecutesSplitNonEmptyBatchesInOrderWithoutDatabaseConnection() throws SQLException {
@@ -71,5 +121,65 @@ class DatabaseMigrationRunnerTest {
                 executedBatches
         );
         assertTrue(statementClosed.get());
+    }
+
+    private static final class MigrationJdbcFake {
+        private final SQLException batchFailure;
+        private final SQLException trackingFailure;
+        private final SQLException rollbackFailure;
+        private final List<String> executedBatches = new ArrayList<>();
+        private int trackingWrites;
+        private int commits;
+        private int rollbacks;
+
+        private MigrationJdbcFake(SQLException batchFailure, SQLException trackingFailure,
+                                  SQLException rollbackFailure) {
+            this.batchFailure = batchFailure;
+            this.trackingFailure = trackingFailure;
+            this.rollbackFailure = rollbackFailure;
+        }
+
+        private Connection connection() {
+            Statement statement = (Statement) Proxy.newProxyInstance(
+                    Statement.class.getClassLoader(), new Class<?>[]{Statement.class}, (proxy, method, args) -> {
+                        if ("execute".equals(method.getName())) {
+                            String sql = (String) args[0];
+                            if (batchFailure != null && executedBatches.size() == 1) {
+                                throw batchFailure;
+                            }
+                            executedBatches.add(sql);
+                            return false;
+                        }
+                        if ("close".equals(method.getName())) return null;
+                        throw new UnsupportedOperationException("Unexpected Statement method: " + method.getName());
+                    });
+            PreparedStatement trackingStatement = (PreparedStatement) Proxy.newProxyInstance(
+                    PreparedStatement.class.getClassLoader(), new Class<?>[]{PreparedStatement.class},
+                    (proxy, method, args) -> {
+                        if ("executeUpdate".equals(method.getName())) {
+                            trackingWrites++;
+                            if (trackingFailure != null) throw trackingFailure;
+                            return 1;
+                        }
+                        if ("setString".equals(method.getName()) || "setLong".equals(method.getName())
+                                || "close".equals(method.getName())) return null;
+                        throw new UnsupportedOperationException(
+                                "Unexpected PreparedStatement method: " + method.getName());
+                    });
+            return (Connection) Proxy.newProxyInstance(
+                    Connection.class.getClassLoader(), new Class<?>[]{Connection.class}, (proxy, method, args) -> {
+                        switch (method.getName()) {
+                            case "createStatement": return statement;
+                            case "prepareStatement": return trackingStatement;
+                            case "commit": commits++; return null;
+                            case "rollback":
+                                rollbacks++;
+                                if (rollbackFailure != null) throw rollbackFailure;
+                                return null;
+                            default: throw new UnsupportedOperationException(
+                                    "Unexpected Connection method: " + method.getName());
+                        }
+                    });
+        }
     }
 }
