@@ -58,7 +58,7 @@ class RegisterPatientHandlerTest {
     private static final UUID CORRELATION_ID =
             UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final AuthorizationContext ACTOR =
-            new AuthorizationContext(5, 31, "RECEPTION", FACILITY_ID, DEPARTMENT_ID, CORRELATION_ID);
+            new AuthorizationContext(5, 31, "RECEPTIONIST", FACILITY_ID, DEPARTMENT_ID, CORRELATION_ID);
     private static final UUID AUDIT_CORRELATION_ID = UUID.fromString("f48e1b30-1ca3-4f24-9a01-5ddc001ac123");
 
     @Test
@@ -522,7 +522,7 @@ class RegisterPatientHandlerTest {
 
     private static RegisterPatientCommand command(BenhNhan patient, BaoHiem insurance, DoiTuongKham payerType) {
         return new RegisterPatientCommand(patient, insurance, ROOM_ID, "Khám bệnh", "Synthetic reason",
-                payerType, true, 5, ACTOR, new AuditActorContext(5, 31, "RECEPTION", FACILITY_ID,
+                payerType, true, 5, ACTOR, new AuditActorContext(5, 31, "RECEPTIONIST", FACILITY_ID,
                 DEPARTMENT_ID, "synthetic-station", AUDIT_CORRELATION_ID));
     }
 

@@ -41,6 +41,7 @@ class NavigationPermissionsHandlerTest {
         assertTrue(handler.handle(ROLE_ID, null).isFailure());
         assertTrue(handler.handle(ROLE_ID, "Quản trị viên toàn hệ thống").isFailure());
         assertTrue(handler.handle(ROLE_ID, "UNKNOWN").isFailure());
+        assertTrue(handler.handle(ROLE_ID, "RECEPTION").isFailure());
     }
 
     @Test

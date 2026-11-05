@@ -43,7 +43,7 @@ class RegisterPatientDuplicateCccdTest {
     private static final UUID SESSION_ID =
             UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final AuthorizationContext CONTEXT =
-            new AuthorizationContext(1, 31, "RECEPTION", 1, 2, SESSION_ID);
+            new AuthorizationContext(1, 31, "RECEPTIONIST", 1, 2, SESSION_ID);
 
     @Test
     void duplicateDuringPatientInsertReturnsGuidanceAndRollsBackBeforeInsuranceOrVisit() {
@@ -95,7 +95,7 @@ class RegisterPatientDuplicateCccdTest {
         card.setNgayHetHan(LocalDate.of(2030, 1, 1));
         RegisterPatientCommand command = new RegisterPatientCommand(patient, card, 3,
                 "Khám bệnh", "Synthetic test", DoiTuongKham.BHYT, false, 1, CONTEXT,
-                new AuditActorContext(1, 31, "RECEPTION", 1, 2, "test-station", SESSION_ID));
+                new AuditActorContext(1, 31, "RECEPTIONIST", 1, 2, "test-station", SESSION_ID));
 
         Result<RegistrationReceipt> result = handler.handle(command);
 
