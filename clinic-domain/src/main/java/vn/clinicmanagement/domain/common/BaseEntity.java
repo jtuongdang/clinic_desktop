@@ -88,13 +88,23 @@ public abstract class BaseEntity<TId> {
     }
 
     public void registerDomainEvent(IDomainEvent event) {
+        Objects.requireNonNull(event, "event must not be null");
         if (this.domainEvents == null) this.domainEvents = new ArrayList<>();
         this.domainEvents.add(event);
     }
 
     public List<IDomainEvent> getDomainEvents() {
         if (this.domainEvents == null) return Collections.emptyList();
-        return Collections.unmodifiableList(this.domainEvents);
+        return Collections.unmodifiableList(new ArrayList<>(this.domainEvents));
+    }
+
+    public List<IDomainEvent> pullDomainEvents() {
+        if (this.domainEvents == null || this.domainEvents.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<IDomainEvent> events = new ArrayList<>(this.domainEvents);
+        this.domainEvents.clear();
+        return Collections.unmodifiableList(events);
     }
 
     public void clearDomainEvents() {
