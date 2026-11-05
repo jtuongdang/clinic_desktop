@@ -26,6 +26,11 @@ import java.util.Map;
  */
 public class ReceptionPanel extends BaseViewPanel {
 
+    private static final String PATIENT_VALIDATION_MESSAGE =
+            "Thông tin người bệnh chưa hợp lệ. Vui lòng kiểm tra lại các trường bắt buộc.";
+    private static final String REGISTRATION_ERROR_FALLBACK =
+            "Đã xảy ra lỗi khi đăng ký người bệnh. Vui lòng thử lại sau.";
+
     private final ReceptionTopToolbar topToolbar;
     private final PatientRegistrationFormPanel formPanel;
     private final ClinicRoomStatusPanel statusPanel;
@@ -141,7 +146,7 @@ public class ReceptionPanel extends BaseViewPanel {
     private void saveRegistration() {
         final RegisterPatientCommand command;
         try { command = formPanel.toRegisterCommand(UserSession.getInstance().getUserId()); }
-        catch (IllegalArgumentException ex) { showError(ex.getMessage()); return; }
+        catch (IllegalArgumentException ex) { showError(registrationFailureMessage("PATIENT_VALIDATION")); return; }
         footerBar.setSaving(true);
         new SwingWorker<Result<RegistrationReceipt>, Void>() {
             @Override protected Result<RegistrationReceipt> doInBackground() { return services.registerPatient().handle(command); }
@@ -169,7 +174,17 @@ public class ReceptionPanel extends BaseViewPanel {
             handleDuplicateCccd();
             return;
         }
-        showError(sanitizeUserMessage(error.message(), "Không thể lưu đăng ký. Vui lòng kiểm tra lại thông tin."));
+        showError(registrationFailureMessage(error.code()));
+    }
+
+    static String registrationFailureMessage(String code) {
+        if (code == null) return REGISTRATION_ERROR_FALLBACK;
+        return switch (code) {
+            case "PATIENT_VALIDATION" -> PATIENT_VALIDATION_MESSAGE;
+            case "ROOM_UNAVAILABLE" -> "Phòng khám đã chọn không còn khả dụng. Vui lòng chọn phòng khám khác.";
+            case "PATIENT_REGISTRATION_FAILED" -> "Không thể hoàn tất đăng ký người bệnh. Vui lòng thử lại.";
+            default -> REGISTRATION_ERROR_FALLBACK;
+        };
     }
 
     private void handleDuplicateCccd() {
