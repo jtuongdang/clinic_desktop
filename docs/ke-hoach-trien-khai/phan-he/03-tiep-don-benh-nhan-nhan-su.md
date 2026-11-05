@@ -4,7 +4,7 @@
 **Phase:** 1; quản trị nhân sự mở rộng ở Phase 8.
 **Domain:** `patient`, `identity`, `facility`, `appointment`.
 
-> Code snapshot: `99d709b`. Test inventory: 14 source files / 66 discovered cases (domain 3/16, application 5/26, infrastructure 4/17, desktop 2/7); one SQL Server test is opt-in and skipped by default. `mvn clean verify` passed with 0 failures/errors. SQL Server synthetic E2E save/search/queue/reload passed separately; manual checks also passed multi-row rollback and queue/CCCD concurrency. Phase 1 remains in progress because real process restart, UI E2E, privacy/audit and full business acceptance remain open.
+> Code snapshot: `df5a8da`. Test inventory: 15 source files / 67 discovered cases (domain 3/16, application 5/26, infrastructure 4/17, desktop 3/8); two SQL Server tests are opt-in and skipped by default. `mvn clean verify` passed with 0 failures/errors. SQL Server synthetic E2E save/search/queue/reload passed separately; manual checks also passed multi-row rollback and queue/CCCD concurrency. Phase 1 remains in progress because full Swing app/UI E2E, privacy/audit and full business acceptance remain open. JDK 17 smoke started the Swing AWT event loop, but the window itself was not observed.
 
 ## Hiện có trong source
 
@@ -12,15 +12,15 @@
 - **Infrastructure:** `BenhNhanRepositoryImpl`, `BaoHiemRepositoryImpl`, `PhongKhamRepositoryImpl`, `ReceptionQueueRepositoryImpl`; `DatabaseMigrationRunner` đăng ký V1–V4.
 - **Desktop:** `ReceptionCompositionRoot`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel`; các thao tác tải, tìm kiếm và lưu reception dùng `SwingWorker`.
 - **Luồng lưu:** handler validate dữ liệu bắt buộc/phòng/BHYT và dùng `TransactionBoundary`; ghi bệnh nhân, thẻ BHYT nếu có, rồi tạo lượt khám/queue. Test opt-in đã xác nhận persist/search/queue/reload bằng composition mới trên SQL Server synthetic. Manual failure injection xác nhận rollback không còn active patient/BHYT/visit rows.
-- **Tìm kiếm:** query repository theo keyword (mã bệnh nhân, CCCD, số điện thoại, họ tên theo logic repository), giới hạn 50 kết quả và ghép BHYT gần nhất. Save/search/reload qua composition mới đã pass; chưa phải process restart.
+- **Tìm kiếm:** query repository theo keyword (mã bệnh nhân, CCCD, số điện thoại, họ tên theo logic repository), giới hạn 50 kết quả và ghép BHYT gần nhất. Save/search/reload qua composition mới và JVM process con độc lập đã pass; chưa phải restart toàn bộ ứng dụng Swing.
 
 ## Bằng chứng đã có
 
-- Tại `99d709b` có **14 test sources và 66 test cases được phát hiện**: domain 3/16, application 5/26, infrastructure 4/17, desktop 2/7; một SQL Server opt-in test bị skip trong default verify. `mvn clean verify` pass với 0 failures/errors. `ReceptionSqlServerPersistenceTest` opt-in pass riêng 1/1 trên DB synthetic, xác nhận đăng ký+search+queue+reload và update patient+BHYT. Test suite không chứng minh Phase 2 access/audit.
+- Tại `df5a8da` có **15 test sources và 67 test cases được phát hiện**: domain 3/16, application 5/26, infrastructure 4/17, desktop 3/8; hai SQL Server opt-in tests bị skip trong default verify. `mvn clean verify` pass với 0 failures/errors. `ReceptionSqlServerPersistenceTest` opt-in pass riêng 1/1 trên DB synthetic, xác nhận đăng ký+search+queue+reload, update patient+BHYT; process-restart probe cross-process pass riêng 1/1. Test suite không chứng minh Phase 2 access/audit.
 - `PhoneNumberTest` kiểm tra định dạng số di động Việt Nam, prefix `0`/`+84`, dấu phân cách và đầu vào sai; đây chỉ là validation domain.
 - `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql` dừng nếu tồn tại CCCD trùng trên hồ sơ active trước khi tạo unique index. Test application kiểm tra nhánh duplicate không ghi BHYT/lượt khám; test infrastructure dùng lỗi tổng hợp xác nhận chỉ ánh xạ đúng index CCCD và không lộ giá trị trùng.
 - UI source nhận lỗi duplicate CCCD, hướng dẫn tìm hồ sơ hiện hữu, chạy tìm kiếm với CCCD và giữ form để tiếp tục. `PatientRegistrationFormPanelTest` bổ sung headless component coverage; commit `ea397f9` sửa giả định chọn phòng để kết quả test deterministic. Đây không phải end-to-end UI/JDBC test.
-- Evidence commits trong local history: `99d709b` (SQL Server update E2E), `75a218d` (headless existing patient update test), `fcfc62b` (SQL Server registration E2E), `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`. Migration runner đã được gọi trên SQL Server synthetic hiện hữu bởi test opt-in; database trống và migration failure safety cần acceptance riêng. Manual checks xác nhận rollback multi-table; 8 queue allocations đồng thời nhận số khác nhau; hai CCCD giống nhau có một success và một lỗi nghiệp vụ. Test records đã soft-delete.
+- Evidence commits trong local history: `df5a8da` (distinct JVM persistence probe), `99d709b` (SQL Server update E2E), `75a218d` (headless existing patient update test), `fcfc62b` (SQL Server registration E2E), `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`. Migration runner đã được gọi trên SQL Server synthetic hiện hữu bởi test opt-in; database trống và migration failure safety cần acceptance riêng. Manual checks xác nhận rollback multi-table; 8 queue allocations đồng thời nhận số khác nhau; hai CCCD giống nhau có một success và một lỗi nghiệp vụ. Test records đã soft-delete.
 
 ## Quy tắc nghiệp vụ cần bảo vệ
 
@@ -47,7 +47,7 @@
 
 ## Nghiệm thu Phase 1
 
-- [ ] Đăng ký bệnh nhân tổng hợp trên DB thử nghiệm, restart ứng dụng và tìm lại chính xác.
+- [x] Đăng ký patient synthetic trên SQL Server, đọc lại search/BHYT/queue từ JVM process thứ hai qua opt-in test `ReceptionSqlServerProcessRestartTest` (`df5a8da`). Đây xác nhận cross-process persistence, chưa kiểm restart cửa sổ Swing.
 - [ ] Chọn hồ sơ cũ và cập nhật; không nhân đôi hồ sơ.
 - [ ] Tạo lượt khám, cấp queue number không trùng trong cùng phạm vi phòng/ngày.
 - [ ] Mô phỏng lỗi ghi và xác nhận patient/insurance/visit cùng rollback.

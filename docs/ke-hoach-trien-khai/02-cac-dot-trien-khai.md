@@ -7,17 +7,17 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Trạng thái:** `[~]` Nền tảng và wiring cơ bản có trong source; validation/release chưa hoàn tất.
 **Phụ thuộc:** Không.
 **Phạm vi:** Maven modules, application shell, schema/migrations, JDBC, transaction/unit of work và cấu hình môi trường.
-**Bằng chứng mới:** `mvn clean verify` tại `99d709b` pass 66 tests được phát hiện (0 failures/errors, 1 opt-in SQL Server test skipped), cả năm module. `ReceptionSqlServerPersistenceTest` chạy opt-in trên synthetic SQL Server thành công; xác nhận migration V1–V4 có hiệu lực trên DB thử nghiệm hiện hữu cùng luồng lưu/đọc reception. Migration trên database trống vẫn cần kiểm thử riêng.
-**Còn lại:** Kiểm thử database trống, failure safety và cấu hình secret trong môi trường triển khai. Transaction boundary test và E2E reception test không đồng nghĩa đã chấp nhận toàn Phase 0. Identity/access baseline nằm ở Phase 2.
+**Bằng chứng mới:** `mvn clean verify` tại `df5a8da` bằng JDK 17 pass 67 tests được phát hiện (0 failures/errors, 2 opt-in SQL Server tests skipped), cả năm module. Shaded JAR loại metadata chữ ký của dependency và cấu hình `db.properties` local; artifact được kiểm tra không chứa hai loại nội dung này. `ReceptionSqlServerPersistenceTest` chạy opt-in trên synthetic SQL Server thành công; xác nhận migration V1–V4 có hiệu lực trên DB thử nghiệm hiện hữu cùng luồng lưu/đọc reception. Migration trên database trống vẫn cần kiểm thử riêng.
+**Còn lại:** Kiểm thử database trống, failure safety và cấu hình secret trong môi trường triển khai. Smoke test đã xác nhận tiến trình Swing mở được AWT event loop trên JDK 17, nhưng chưa quan sát được cửa sổ UI. Transaction boundary test và E2E reception test không đồng nghĩa đã chấp nhận toàn Phase 0. Identity/access baseline nằm ở Phase 2.
 **Gate:** build/migrations/repository transaction có thể tái lập trong môi trường thử nghiệm.
 
 ## Phase 1 — Bệnh nhân và tiếp đón
 
-**Trạng thái:** `[~]` Persistence E2E và các kiểm tra transaction/concurrency đã có bằng chứng trên SQL Server synthetic; chưa đạt nghiệm thu UI/restart/nghiệp vụ đầy đủ.
+**Trạng thái:** `[~]` Persistence E2E, cross-process reload và transaction/concurrency đã có bằng chứng trên SQL Server synthetic; full Swing UI, security/privacy/audit và nghiệp vụ chưa nghiệm thu.
 **Phụ thuộc:** Phase 0.
 **Phạm vi:** `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `TienSuBenh`, lựa chọn `CoSo`/`Khoa`/`PhongKham`, đăng ký/tìm kiếm/queue `LuotKham`.
-**Bằng chứng hiện tại tại `99d709b`:** 14 test source/66 test cases được phát hiện (domain 3/16, application 5/26, infrastructure 4/17, desktop 2/7); default verify có 1 SQL Server opt-in test skip. Test opt-in pass trên SQL Server synthetic cho đăng ký+search+update patient/BHYT+queue và đọc lại bằng composition mới. Manual SQL checks xác nhận multi-table rollback, queue numbering dưới 8 đăng ký đồng thời và ánh xạ duplicate CCCD trong tranh chấp. Tất cả test data được soft-delete. Đây là evidence task, chưa phải Phase 1 acceptance.
-**Còn lại:** process restart thật; UI-to-DB E2E và review thao tác trên desktop; quy tắc/privacy/audit. Phase 1 exit criteria vẫn unmet.
+**Bằng chứng hiện tại tại `df5a8da`:** 15 test source/67 test cases được phát hiện (domain 3/16, application 5/26, infrastructure 4/17, desktop 3/8); default verify có 2 SQL Server opt-in tests skipped. Registration/update SQL Server E2E và second-JVM readback probe pass trên SQL Server synthetic. Manual SQL checks xác nhận multi-table rollback, queue numbering dưới 8 đăng ký đồng thời và ánh xạ duplicate CCCD trong tranh chấp. Tất cả test data được soft-delete. Đây là evidence task, chưa phải Phase 1 acceptance.
+**Còn lại:** full Swing app restart/interaction; UI-to-DB E2E và review thao tác trên desktop; quy tắc/privacy/audit. Phase 1 exit criteria vẫn unmet.
 
 ## Phase 2 — Baseline identity, access checks và audit
 
