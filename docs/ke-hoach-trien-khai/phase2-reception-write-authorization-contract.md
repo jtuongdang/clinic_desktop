@@ -17,7 +17,7 @@ Nối evaluator default-deny vào vertical slice ghi tiếp đón: tạo/cập n
 
 ## Ngoài phạm vi
 
-Không triển khai patient search, queue/room reads, EMR, audit read, quyền admin, permission UI, role grant seed hoặc sửa schema scope của `BaoHiem`. Successful read audit có technical decision riêng đang chờ Owner.
+Không triển khai patient search, queue/room reads, EMR, audit read, quyền admin, permission UI, role grant seed hoặc sửa schema scope của `BaoHiem`. Successful-read audit nằm ngoài contract này; Owner đã duyệt thứ tự query/audit và fail-closed behavior sau đó trong [read-audit decision](phase2-read-audit-decision.md). `AUDIT_READ` vẫn bị deny cho mọi role theo DEC-AUTHZ-10.
 
 ## Acceptance
 

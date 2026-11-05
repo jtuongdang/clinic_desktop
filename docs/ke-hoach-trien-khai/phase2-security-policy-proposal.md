@@ -10,7 +10,7 @@
 | Nhiều vai trò | Mỗi phiên chọn đúng một vai trò đã được gán cho tài khoản. Role chưa được cấp quyền phải bị từ chối mặc định. |
 | Phạm vi dữ liệu | Mỗi phiên chọn đúng một cặp cơ sở/khoa từ assignment hợp lệ của tài khoản; mọi truy vấn/command phải khớp cả cơ sở lẫn khoa. Không cấp quyền xem liên khoa hoặc toàn hệ thống. |
 | Phiên làm việc | Tự khóa sau 15 phút không thao tác; hết phiên sau tối đa 12 giờ. Auto-lock che workspace, giữ bản nháp và yêu cầu xác thực lại cùng tài khoản/vai trò. |
-| Audit | Ghi nhận event set được liệt kê dưới đây; audit thay đổi nghiệp vụ trong cùng transaction, lỗi audit làm rollback; chỉ append; không purge tự động khi chưa chốt retention. Tra cứu audit phải có quyền riêng. |
+| Audit | Ghi nhận event set được liệt kê dưới đây; audit thay đổi nghiệp vụ trong cùng transaction, lỗi audit làm rollback; chỉ append; không purge tự động khi chưa chốt retention. Theo DEC-AUTHZ-10, `AUDIT_READ` bị deny cho mọi role và không có audit viewer/query được cấp quyền. |
 
 Các quyết định này là contract đầu vào cho Phase 2. Trong phiên, mọi Command/Query nhạy cảm vẫn phải được Application xác thực lại theo actor, role và cặp cơ sở/khoa đã chọn; UI không phải ranh giới phân quyền.
 
