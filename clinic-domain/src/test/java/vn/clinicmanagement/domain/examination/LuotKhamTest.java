@@ -3,7 +3,10 @@ package vn.clinicmanagement.domain.examination;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import vn.clinicmanagement.domain.common.enums.TrangThaiLuotKham;
+import vn.clinicmanagement.domain.common.events.EmrLockedEvent;
 import vn.clinicmanagement.domain.common.events.LuotKhamCompletedEvent;
 import vn.clinicmanagement.domain.common.events.LuotKhamStartedEvent;
 import vn.clinicmanagement.domain.common.exceptions.EmrLockedException;
@@ -12,9 +15,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LuotKhamTest {
 
@@ -94,6 +100,70 @@ class LuotKhamTest {
 
         assertEquals(TrangThaiLuotKham.DANG_KHAM, visit.getTrangThai());
         assertEquals(completionTime, visit.getThoiGianKetThucKham());
+        assertEquals(eventsBefore, visit.getDomainEvents());
+    }
+
+    @Test
+    void lockEmrAcceptsValidSignatureAndDoctorAndRegistersOneEvent() {
+        LuotKham visit = visitInState(TrangThaiLuotKham.DANG_KHAM);
+        String signature = "  synthetic-signature  ";
+
+        visit.lockEmr(signature, 11);
+
+        assertTrue(visit.isEmrLocked());
+        assertEquals(signature, visit.getEmrSignature());
+        assertNotNull(visit.getEmrLockedAt());
+        assertEquals(11, visit.getEmrLockedBy());
+        assertEquals(1, visit.getDomainEvents().size());
+        EmrLockedEvent event = assertInstanceOf(EmrLockedEvent.class, visit.getDomainEvents().get(0));
+        assertEquals(42, event.getVisitId());
+        assertEquals(11, event.getDoctorId());
+        assertEquals(signature, event.getSignature());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " ", "\t\n"})
+    void lockEmrRejectsNullOrBlankSignatureWithoutChangingLockFieldsOrEvents(String signature) {
+        assertInvalidLockArgumentsLeaveVisitUnchanged(signature, 11);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void lockEmrRejectsNonpositiveDoctorIdWithoutChangingLockFieldsOrEvents(int doctorId) {
+        assertInvalidLockArgumentsLeaveVisitUnchanged("synthetic-signature", doctorId);
+    }
+
+    @Test
+    void lockEmrRejectsRepeatedLockWithoutChangingFieldsOrEvents() {
+        LuotKham visit = visitInState(TrangThaiLuotKham.DANG_KHAM);
+        visit.lockEmr("synthetic-signature", 11);
+        boolean lockedBefore = visit.isEmrLocked();
+        String signatureBefore = visit.getEmrSignature();
+        LocalDateTime lockedAtBefore = visit.getEmrLockedAt();
+        Integer lockedByBefore = visit.getEmrLockedBy();
+        List<?> eventsBefore = List.copyOf(visit.getDomainEvents());
+
+        assertThrows(EmrLockedException.class, () -> visit.lockEmr("replacement-signature", 12));
+
+        assertEquals(lockedBefore, visit.isEmrLocked());
+        assertEquals(signatureBefore, visit.getEmrSignature());
+        assertEquals(lockedAtBefore, visit.getEmrLockedAt());
+        assertEquals(lockedByBefore, visit.getEmrLockedBy());
+        assertEquals(eventsBefore, visit.getDomainEvents());
+    }
+
+    private static void assertInvalidLockArgumentsLeaveVisitUnchanged(String signature, int doctorId) {
+        LuotKham visit = visitInState(TrangThaiLuotKham.DANG_KHAM);
+        visit.registerDomainEvent(new LuotKhamStartedEvent(42, 7, 11));
+        List<?> eventsBefore = List.copyOf(visit.getDomainEvents());
+
+        assertThrows(IllegalArgumentException.class, () -> visit.lockEmr(signature, doctorId));
+
+        assertFalse(visit.isEmrLocked());
+        assertNull(visit.getEmrSignature());
+        assertNull(visit.getEmrLockedAt());
+        assertNull(visit.getEmrLockedBy());
         assertEquals(eventsBefore, visit.getDomainEvents());
     }
 

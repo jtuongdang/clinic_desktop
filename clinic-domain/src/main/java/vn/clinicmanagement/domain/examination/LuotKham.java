@@ -110,6 +110,12 @@ public class LuotKham extends BaseEntity<Integer> implements IAggregateRoot {
         if (emrLocked) {
             throw new EmrLockedException(getId() != null ? getId() : 0);
         }
+        if (signature == null || signature.isBlank()) {
+            throw new IllegalArgumentException("Chữ ký EMR không được để trống.");
+        }
+        if (doctorId <= 0) {
+            throw new IllegalArgumentException("Mã bác sĩ phải là số dương.");
+        }
         this.emrLocked = true;
         this.emrSignature = signature;
         this.emrLockedAt = LocalDateTime.now();
