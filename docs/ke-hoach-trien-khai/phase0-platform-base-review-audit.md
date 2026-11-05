@@ -22,3 +22,8 @@
 | §8 — validation và tự xác nhận | **Stale / unverifiable** | Lịch sử sandbox và kiểm tra tại checkout tích hợp trong report không thể tái xác minh chỉ từ source hiện tại; task board ghi nhận `git diff --check` pass (`03-model-task-board.md:17`). Các khẳng định §8.2 rằng toàn bộ citation/line numbers còn chính xác trên checkout hiện tại là **overstated**: UoW, `recordSuccessfulLogin` và một số line references đã đổi. Với audit này, Maven verify pass (176 tests, 4 expected opt-in skips), không bật SQL Server test; `git diff --check` được chạy riêng sau khi tạo note. |
 
 **Kết luận:** Các phát hiện cốt lõi về CAS, actor metadata, soft delete, hydration, thiếu adapter và domain-event dispatch phần lớn còn chính xác. Những hiệu chỉnh quan trọng là cập nhật mô tả `JdbcUnitOfWork`/`recordSuccessfulLogin`, không khẳng định chắc chắn độ lệch timezone 7 giờ, phân biệt test snapshot với inventory hiện tại và không coi các line reference cũ là đã được xác minh lại.
+
+
+## Root review addendum (05/11/2026)
+
+Root review found one additional baseline defect not listed above: `BaseEntity.equals` used `Objects.equals(id, that.id)` after its same-class check, so distinct same-class entities with null IDs compared equal. PLAT-BASE-02 fixed this and made `hashCode` stable across ID assignment; `BaseEntityLifecycleTest` now covers transient identity, persisted same-ID equality, cross-class inequality and stable hash. The original source audit therefore did not identify every identity-semantic defect, and its claim-level table should be treated as independent but not exhaustive.
