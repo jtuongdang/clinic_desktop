@@ -13,11 +13,13 @@ import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.auth.CompleteLoginSessionCommand;
 import vn.clinicmanagement.application.auth.CompleteLoginSessionHandler;
 import vn.clinicmanagement.application.auth.CompletedLoginSession;
+import vn.clinicmanagement.application.authorization.NavigationPermissionsHandler;
 import vn.clinicmanagement.application.common.Result;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.Set;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
@@ -180,11 +182,19 @@ public class LoginForm extends JFrame {
             protected FinalizedLoginAttempt doInBackground() {
                 Result<CompletedLoginSession> result = completeLoginSessionHandler.handle(finalizeCommand);
                 if (result.isFailure()) {
-                    return new FinalizedLoginAttempt(result, null);
+                    return new FinalizedLoginAttempt(result, null, null);
+                }
+                CompletedLoginSession completed = result.valueOrThrow();
+                NavigationPermissionsHandler navigationPermissionsHandler =
+                        AuthenticationCompositionRoot.createNavigationPermissionsHandler();
+                Result<Set<String>> navigationResult = navigationPermissionsHandler.handle(
+                        completed.role().id(), completed.role().code());
+                if (navigationResult.isFailure()) {
+                    return new FinalizedLoginAttempt(result, navigationResult, null);
                 }
                 SessionLifecycleService lifecycle = AuthenticationCompositionRoot
                         .createSessionLifecycleService(UserSession.getInstance());
-                return new FinalizedLoginAttempt(result, lifecycle);
+                return new FinalizedLoginAttempt(result, navigationResult, lifecycle);
             }
 
             @Override
@@ -201,13 +211,24 @@ public class LoginForm extends JFrame {
                         return;
                     }
 
+                    Result<Set<String>> navigationResult = attempt.navigationResult();
+                    if (navigationResult == null || navigationResult.isFailure()) {
+                        UserSession.getInstance().clearSession();
+                        JOptionPane.showMessageDialog(
+                                LoginForm.this,
+                                "Không thể tải quyền điều hướng. Đăng nhập bị từ chối.",
+                                "Không thể mở phân hệ",
+                                JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+
                     CompletedLoginSession completed = result.valueOrThrow();
                     SessionLifecycleService lifecycle = attempt.lifecycle();
                     lifecycle.startSession(completed);
 
                     dispose();
                     MainDashboardFrame dashboard = new MainDashboardFrame(
-                            completed.username(), completed.role().name(), lifecycle);
+                            completed, navigationResult.valueOrThrow(), lifecycle);
                     dashboard.setVisible(true);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
@@ -236,6 +257,7 @@ public class LoginForm extends JFrame {
 
     private record FinalizedLoginAttempt(
             Result<CompletedLoginSession> result,
+            Result<Set<String>> navigationResult,
             SessionLifecycleService lifecycle) {}
 
     private RoleChoice chooseRole(java.util.List<RoleChoice> roles) {

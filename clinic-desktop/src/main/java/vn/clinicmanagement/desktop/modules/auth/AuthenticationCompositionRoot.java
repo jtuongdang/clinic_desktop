@@ -1,6 +1,7 @@
 package vn.clinicmanagement.desktop.modules.auth;
 
 import vn.clinicmanagement.application.audit.AuditWritePort;
+import vn.clinicmanagement.application.authorization.NavigationPermissionsHandler;
 import vn.clinicmanagement.application.auth.AuthenticateUserHandler;
 import vn.clinicmanagement.application.auth.CompleteLoginSessionHandler;
 import vn.clinicmanagement.application.auth.Pbkdf2PasswordHasher;
@@ -40,6 +41,13 @@ public final class AuthenticationCompositionRoot {
         JdbcAuditRepositoryImpl auditWritePort = new JdbcAuditRepositoryImpl(
                 connections, unitOfWork, DatabaseConnection::getConnection);
         return new CompleteLoginSessionHandler(employees, transactions, auditWritePort, Clock.systemUTC());
+    }
+
+    public static NavigationPermissionsHandler createNavigationPermissionsHandler() {
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcTransactionManager transactions = new JdbcTransactionManager(unitOfWork);
+        JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+        return new NavigationPermissionsHandler(new SystemRepositoryImpl(connections, unitOfWork));
     }
 
     public static AuditWritePort createAuditWritePort() {
