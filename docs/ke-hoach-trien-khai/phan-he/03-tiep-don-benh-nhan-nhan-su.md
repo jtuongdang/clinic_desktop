@@ -1,10 +1,10 @@
 # Phân hệ 03 — Hồ sơ bệnh nhân, BHYT và Tiếp đón
 
-**Trạng thái:** `[~] Code đã commit local; còn kiểm thử tích hợp và nghiệm thu end-to-end`
+**Trạng thái:** `[~] Code và 5 test source đã commit local; còn kiểm thử tích hợp và nghiệm thu end-to-end`
 **Phase:** 1; quản trị nhân sự mở rộng ở Phase 8.
 **Domain:** `patient`, `identity`, `facility`, `appointment`.
 
-> Feature branch local `feature/patient-reception-workflow` hiện ở `37adb7e`; remote không có ref tương ứng. Code đã commit local không đồng nghĩa đã publish hoặc nghiệm thu. Không đánh dấu Phase 1 hoàn tất vì save/search/queue SQL Server, rollback/restart và E2E chưa được chứng minh.
+> Task checkout ở `58ac034`; local ref `feature/patient-reception-workflow` đã tiến thêm tới `ff2045a` trong lúc cập nhật tài liệu. Checkout snapshot có 5 test source (1 domain, 3 application, 1 infrastructure; 0 desktop); ref mới thêm `JdbcTransactionManagerTest` ở infrastructure. Các commit gần nhất trên ref gồm `ff2045a`, `58ac034`, `e6bbc2e`, `11c800c`. Remote không có ref tương ứng. Code đã commit local không đồng nghĩa đã publish hoặc nghiệm thu. Không đánh dấu Phase 1 hoàn tất vì save/search/queue SQL Server, rollback/restart và E2E chưa được chứng minh.
 
 ## Hiện có trong source
 
@@ -16,10 +16,11 @@
 
 ## Bằng chứng đã có
 
+- Trong task checkout có đúng 5 test source: **1 domain** (`PhoneNumberTest`), **3 application** (`RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest`), **1 infrastructure** (`BenhNhanRepositoryImplTest`); `clinic-desktop` có **0 test**. Local feature ref mới hơn bổ sung `JdbcTransactionManagerTest`, nên có thêm 1 infrastructure test ngoài checkout này. Các test kiểm tra validation/handler/transaction/repository mapping; không chứng minh E2E SQL Server reception.
 - `PhoneNumberTest` kiểm tra định dạng số di động Việt Nam, prefix `0`/`+84`, dấu phân cách và đầu vào sai; đây chỉ là validation domain.
 - `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql` dừng nếu tồn tại CCCD trùng trên hồ sơ active trước khi tạo unique index. Test application kiểm tra nhánh duplicate không ghi BHYT/lượt khám; test infrastructure dùng lỗi tổng hợp xác nhận chỉ ánh xạ đúng index CCCD và không lộ giá trị trùng.
 - UI source nhận lỗi duplicate CCCD, hướng dẫn tìm hồ sơ hiện hữu, chạy tìm kiếm với CCCD và giữ form để tiếp tục. Hiện chưa có desktop test cho tương tác này.
-- Có ba test source trên feature branch: một domain, một application, một infrastructure; không có desktop test. Commit `74490b3` với `SqlServerBatchSplitter` và test nằm trên ref task địa phương riêng, không thuộc ancestry feature branch hiện tại.
+- Commit gần nhất phản ánh test sources mới là `e6bbc2e` (search/queue handlers) và `11c800c` (registration regression); commit `37adb7e` xử lý ánh xạ lỗi duplicate. Commit `74490b3` với `SqlServerBatchSplitter` và test nằm trên ref task địa phương riêng, không thuộc ancestry feature branch hiện tại.
 
 ## Quy tắc nghiệp vụ cần bảo vệ
 

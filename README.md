@@ -15,4 +15,5 @@ Migration seed tạo tài khoản demo `admin` và `tiennv`, mật khẩu ban đ
 
 - `PROJECT_COMPLETENESS_REPORT.md`: đánh giá mức độ hoàn thiện.
 - `docs/ke-hoach-trien-khai/README.md`: kế hoạch theo đợt và bản đồ phân hệ/model/màn hình.
+- `docs/ke-hoach-trien-khai/03-model-task-board.md`: task board theo model, dependency, trạng thái và bằng chứng.
 - `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `UI_CODING_STANDARDS.md`: phân tích Domain, schema và quy chuẩn UI.

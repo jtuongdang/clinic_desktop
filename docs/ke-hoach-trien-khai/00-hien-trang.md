@@ -18,18 +18,18 @@
 
 - Migration runner đăng ký tuần tự bốn file: `V1__Initial_Clinic_Schema.sql`, `V2__Seed_Initial_Data.sql`, `V3__Repair_Demo_Account_Passwords.sql`, `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql`.
 - Runner hiện có tách batch tại `GO` đứng riêng trên một dòng (regex hỗ trợ LF/CRLF). Không có migration-runner test trong feature branch hiện tại và chưa có bằng chứng chạy migration trên SQL Server thử nghiệm. Một commit task địa phương `74490b3` thêm `SqlServerBatchSplitter` cùng test, nhưng ref đó không nằm trong ancestry của `feature/patient-reception-workflow`; không tính test ấy vào trạng thái branch này.
-- Có đúng ba test source trong các module hiện rà soát:
+- Có đúng năm test source trong các module hiện rà soát:
   - Domain: `PhoneNumberTest` — định dạng/prefix số di động Việt Nam và đầu vào không hợp lệ.
-  - Application: `RegisterPatientDuplicateCccdTest` — lỗi trùng CCCD lúc insert trả hướng dẫn, gọi transaction failure path, và không ghi BHYT/lượt khám.
+  - Application: `RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest` — nhánh duplicate; đăng ký; tìm kiếm và queue handlers.
   - Infrastructure: `BenhNhanRepositoryImplTest` — ánh xạ lỗi unique index CCCD, không nhầm unique key mã bệnh nhân, không để lộ giá trị trùng.
-- Chưa có test desktop. Ba test trên không chứng minh SQL Server save/search/queue, đọc lại sau restart, rollback nhiều bảng khi lỗi ghi tổng quát, hoặc queue concurrency.
+- Chưa có test desktop. Năm test trên không chứng minh SQL Server save/search/queue, đọc lại sau restart, rollback nhiều bảng khi lỗi ghi tổng quát, hoặc queue concurrency.
 
 ## Tiếp đón và trạng thái Git
 
 - `ReceptionCompositionRoot` nối `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler` với JDBC repositories. Handler đăng ký ghi bệnh nhân, bảo hiểm tùy chọn và lượt khám trong transaction boundary.
 - Search query tra cứu hồ sơ và BHYT gần nhất; queue repository ghi lượt khám, cấp số theo phòng/ngày bằng khóa giao dịch SQL, và đọc hàng đợi/tóm tắt phòng. Các hành vi này có trong source nhưng chưa có E2E SQL Server/restart acceptance.
-- Checkout đang ở `orchestrator/sync-approved-10-phase-roadmap-with-verified-reposit`; feature branch local `feature/patient-reception-workflow` ở `37adb7e` (commit `fix(patient): scope duplicate error to CCCD index`). Lịch sử feature gồm phone validation (`fa4acff`), duplicate-patient UI (`9cf4005`), CCCD uniqueness/V4 (`9987000`) và xử lý lỗi unique index (`37adb7e`). Commit GO-splitting kèm test (`74490b3`) có trên ref local `orchestrator/task-311f480b`, tách khỏi ancestry feature branch.
-- Remote refs hiện có `origin/main` và `origin/feature/jdbc-transaction-tests-maven-ci`; không có remote ref cho `feature/patient-reception-workflow`. Các thay đổi nói trên là commit/ref local, chưa có bằng chứng được publish lên remote hoặc phát hành. Trong lúc đồng bộ tài liệu, worktree có thay đổi ở bốn file roadmap được giao; không dùng trạng thái đó để mô tả source commit.
+- Task checkout đang ở `orchestrator/add-model-level-task-board-and-secure-phase-dependen` commit `58ac034`; tại snapshot này có đúng năm test source: 1 domain, 3 application, 1 infrastructure, 0 desktop. Trong lúc cập nhật, ref local `feature/patient-reception-workflow` đã tiến thêm tới `ff2045a` (JDBC transaction manager test), ngoài snapshot task checkout; ref mới có thêm một infrastructure test. Gần nhất trên feature ref là `ff2045a`, `58ac034`, `e6bbc2e`, `11c800c`, `37adb7e`. Vì scope cho phép chỉ sửa tài liệu, source test mới không được copy vào task checkout. Commit GO-splitting/test `74490b3` vẫn ở ref local riêng, không thuộc ancestry feature.
+- Remote refs hiện có `origin/main` và `origin/feature/jdbc-transaction-tests-maven-ci`; không có remote ref cho `feature/patient-reception-workflow`. Các commit nêu trên là local, chưa có bằng chứng được publish hoặc phát hành.
 
 ## Nguyên tắc đánh giá hoàn thiện
 
