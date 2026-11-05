@@ -3,6 +3,9 @@ package vn.clinicmanagement.infrastructure.persistence;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -17,6 +20,39 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatabaseMigrationRunnerTest {
+
+    @Test
+    void executesV7BatchesThroughFakeJdbcWithoutOpeningDatabaseConnection() throws IOException, SQLException {
+        String scriptPath = "migrations/V7__Harden_Permission_Matrix_Defaults.sql";
+        String sql;
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream(scriptPath)) {
+            if (input == null) throw new AssertionError("Missing migration script: " + scriptPath);
+            sql = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        List<String> executedBatches = new ArrayList<>();
+        Statement fakeStatement = (Statement) Proxy.newProxyInstance(
+                Statement.class.getClassLoader(), new Class<?>[]{Statement.class}, (proxy, method, args) -> {
+                    if ("execute".equals(method.getName())) {
+                        executedBatches.add((String) args[0]);
+                        return false;
+                    }
+                    if ("close".equals(method.getName())) return null;
+                    throw new UnsupportedOperationException("Unexpected Statement method: " + method.getName());
+                });
+        Connection fakeConnection = (Connection) Proxy.newProxyInstance(
+                Connection.class.getClassLoader(), new Class<?>[]{Connection.class}, (proxy, method, args) -> {
+                    if ("createStatement".equals(method.getName())) return fakeStatement;
+                    throw new UnsupportedOperationException("Unexpected Connection method: " + method.getName());
+                });
+
+        DatabaseMigrationRunner.executeSqlScript(fakeConnection, sql);
+
+        assertEquals(2, executedBatches.size());
+        assertTrue(executedBatches.get(0).contains("THROW 51070"));
+        assertTrue(executedBatches.get(0).contains("THROW 51071"));
+        assertTrue(executedBatches.get(1).contains("CREATE UNIQUE INDEX"));
+    }
 
     @Test
     void failedBatchAfterEarlierBatchRollsBackWithoutTrackingOrCommit() {

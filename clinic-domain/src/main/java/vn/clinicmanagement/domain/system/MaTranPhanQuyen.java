@@ -7,8 +7,8 @@ public class MaTranPhanQuyen extends BaseEntity<Integer> {
     private int maVaiTro;
     private String phanHe = "";
     private HanhDongQuyen hanhDong = HanhDongQuyen.XEM;
-    private PhamViDuLieu phamViDuLieu = PhamViDuLieu.CO_SO;
-    private boolean duocPhep;
+    private PhamViDuLieu phamViDuLieu = PhamViDuLieu.KHOA_PHONG;
+    private boolean duocPhep = false;
     public MaTranPhanQuyen() {}
     public int getMaVaiTro() { return maVaiTro; }
     public void setMaVaiTro(int maVaiTro) { this.maVaiTro = maVaiTro; }

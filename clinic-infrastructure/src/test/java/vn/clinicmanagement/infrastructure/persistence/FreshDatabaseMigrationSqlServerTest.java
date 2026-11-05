@@ -81,10 +81,11 @@ class FreshDatabaseMigrationSqlServerTest {
                             "V3__Repair_Demo_Account_Passwords.sql",
                             "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
                             "V5__Seed_Session_Timeout_Parameters.sql",
-                            "V6__Enhance_Audit_Tables_Append_Only.sql"
+                            "V6__Enhance_Audit_Tables_Append_Only.sql",
+                            "V7__Harden_Permission_Matrix_Defaults.sql"
                     ),
                     queryMigrationRecords(connection),
-                    "All V1-V6 migrations must be recorded as successful"
+                    "All V1-V7 migrations must be recorded as successful"
             );
 
             assertEquals(1, queryInt(
@@ -113,6 +114,37 @@ class FreshDatabaseMigrationSqlServerTest {
             assertSeedCount(connection, "Kho", 3);
             assertSeedCount(connection, "Item", 3);
             assertSeedCount(connection, "TonKho", 3);
+            assertSeedCount(connection, "MaTranPhanQuyen", 0);
+            assertEquals(
+                    2,
+                    queryInt(connection,
+                            "SELECT COUNT(*) FROM sys.default_constraints dc "
+                                    + "JOIN sys.columns c ON c.object_id = dc.parent_object_id "
+                                    + "AND c.column_id = dc.parent_column_id "
+                                    + "WHERE dc.parent_object_id = OBJECT_ID('dbo.MaTranPhanQuyen') "
+                                    + "AND ((c.name = 'phamViDuLieu' AND dc.definition LIKE '%KHOA_PHONG%') "
+                                    + "OR (c.name = 'duocPhep' AND dc.definition LIKE '%0%'))"),
+                    "V7 must persist KHOA_PHONG and false defaults"
+            );
+            assertEquals(
+                    1,
+                    queryInt(connection,
+                            "SELECT COUNT(*) FROM sys.check_constraints "
+                                    + "WHERE parent_object_id = OBJECT_ID('dbo.MaTranPhanQuyen') "
+                                    + "AND name = 'CK_MaTranPhanQuyen_ActiveAllowScope' "
+                                    + "AND is_disabled = 0 AND is_not_trusted = 0"),
+                    "V7 must enable and trust the active ALLOW scope constraint"
+            );
+            assertEquals(
+                    1,
+                    queryInt(connection,
+                            "SELECT COUNT(*) FROM sys.indexes "
+                                    + "WHERE object_id = OBJECT_ID('dbo.MaTranPhanQuyen') "
+                                    + "AND name = 'UX_MaTranPhanQuyen_Active_Role_Module_Action' "
+                                    + "AND is_unique = 1 AND has_filter = 1 "
+                                    + "AND filter_definition LIKE '%isDeleted%0%'"),
+                    "V7 must create the filtered unique active assignment index"
+            );
             assertEquals(
                     1,
                     queryInt(
