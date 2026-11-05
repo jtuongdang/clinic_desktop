@@ -16,10 +16,61 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatabaseConnectionTest {
     private static final String SYNTHETIC_URL = "jdbc:synthetic:diagnostics-test";
+
+    @Test
+    void fullConnectionStringUsesSingleArgumentConnectionOverload() throws SQLException {
+        FakeConnectionFactory factory = new FakeConnectionFactory();
+        DatabaseConfiguration.ConnectionTarget target = new DatabaseConfiguration.ConnectionTarget(
+                DatabaseConfiguration.ConnectionMode.FULL_CONNECTION_STRING,
+                "jdbc:synthetic:full",
+                null,
+                null);
+
+        DatabaseConnection.openConnection(target, factory);
+
+        assertEquals("jdbc:synthetic:full", factory.singleArgument);
+        assertEquals(1, factory.singleArgumentCalls);
+        assertEquals(0, factory.credentialCalls);
+    }
+
+    @Test
+    void splitConfigurationWithUsernameUsesCredentialOverload() throws SQLException {
+        FakeConnectionFactory factory = new FakeConnectionFactory();
+        DatabaseConfiguration.ConnectionTarget target = new DatabaseConfiguration.ConnectionTarget(
+                DatabaseConfiguration.ConnectionMode.URL_WITH_CREDENTIALS,
+                "jdbc:synthetic:split",
+                "synthetic-user",
+                null);
+
+        DatabaseConnection.openConnection(target, factory);
+
+        assertEquals("jdbc:synthetic:split", factory.url);
+        assertEquals("synthetic-user", factory.username);
+        assertNull(factory.password);
+        assertEquals(0, factory.singleArgumentCalls);
+        assertEquals(1, factory.credentialCalls);
+    }
+
+    @Test
+    void splitConfigurationWithoutUsernameUsesSingleArgumentOverload() throws SQLException {
+        FakeConnectionFactory factory = new FakeConnectionFactory();
+        DatabaseConfiguration.ConnectionTarget target = new DatabaseConfiguration.ConnectionTarget(
+                DatabaseConfiguration.ConnectionMode.URL_ONLY,
+                "jdbc:synthetic:url-only",
+                null,
+                null);
+
+        DatabaseConnection.openConnection(target, factory);
+
+        assertEquals("jdbc:synthetic:url-only", factory.singleArgument);
+        assertEquals(1, factory.singleArgumentCalls);
+        assertEquals(0, factory.credentialCalls);
+    }
 
     @Test
     void testConnectionPrintsOnlyGenericSuccessDiagnostics() throws SQLException {
@@ -86,6 +137,31 @@ class DatabaseConnectionTest {
     }
 
     private record CapturedOutput(boolean result, String stdout, String stderr) {}
+
+    private static final class FakeConnectionFactory implements DatabaseConnection.ConnectionFactory {
+        private String singleArgument;
+        private int singleArgumentCalls;
+        private String url;
+        private String username;
+        private String password;
+        private int credentialCalls;
+
+        @Override
+        public Connection getConnection(String connectionString) {
+            singleArgument = connectionString;
+            singleArgumentCalls++;
+            return null;
+        }
+
+        @Override
+        public Connection getConnection(String url, String username, String password) {
+            this.url = url;
+            this.username = username;
+            this.password = password;
+            credentialCalls++;
+            return null;
+        }
+    }
 
     private static final class SyntheticDriver implements Driver {
         private final String url;
