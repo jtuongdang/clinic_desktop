@@ -32,6 +32,7 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [Phase 0 — Review repository contracts](phase0-repository-contract-review.md) | Map model repository từ domain port tới adapter, use case, transaction và test. |
 | [Phase 0 — Review error mapping](phase0-error-mapping-review.md) | Map lỗi từ domain/Application/JDBC tới thông báo Swing và rủi ro dữ liệu. |
 | [Phase 2 — Security implementation contract](phase2-implementation-contract.md) | Ranh giới tin cậy, role/scope/session/audit policy đã duyệt và thứ tự task implementation. |
+| [Phase 2 — Security gate closure review](phase2-security-exit-gate-review.md) | Report-only đối chiếu SEC-01, bằng chứng hiện có, dependency vòng giữa baseline và workflow về sau; đề xuất hai định nghĩa gate và sequence nghiệm thu không cấp quyền. |
 | [Phase 2 — Login lockout policy](phase2-login-lockout-policy-proposal.md) | Hiện trạng và các phương án giới hạn đăng nhập sai cần Owner duyệt trước khi migration/use case. |
 | [Phase 1 — Review migration V9](phase1-pat02-v9-review.md) | Review độc lập về unique active patient/facility link, migration safety và runtime test gaps. |
 | [Phase 1 — Patient–facility link contract](phase1-patient-facility-link-contract.md) | Hợp đồng triển khai idempotent link trong transaction tiếp nhận, không mở rộng quyền truy cập. |
