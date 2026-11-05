@@ -17,6 +17,8 @@ public class UserSession {
     private String facilityName;
     private int departmentId;
     private String departmentName;
+    private String stationId;
+    private String workstationId;
 
     private UserSession() { clearSession(); }
 
@@ -37,6 +39,8 @@ public class UserSession {
         this.facilityName = scope.facilityName();
         this.departmentId = scope.departmentId();
         this.departmentName = scope.departmentName();
+        this.stationId = "";
+        this.workstationId = "";
         this.loggedOn = true;
     }
 
@@ -52,6 +56,8 @@ public class UserSession {
         facilityName = "";
         departmentId = 0;
         departmentName = "";
+        stationId = "";
+        workstationId = "";
     }
 
     public boolean isLoggedOn() { return loggedOn; }
@@ -67,6 +73,8 @@ public class UserSession {
     public String getFacilityName() { return facilityName; }
     public int getDepartmentId() { return departmentId; }
     public String getDepartmentName() { return departmentName; }
-    /** Compatibility view for existing dashboard labels; the selected department is the current station context. */
-    public String getStationId() { return departmentId == 0 ? "" : Integer.toString(departmentId); }
+    public String getStationId() { return stationId; }
+    public void setStationId(String stationId) { this.stationId = stationId; }
+    public String getWorkstationId() { return workstationId; }
+    public void setWorkstationId(String workstationId) { this.workstationId = workstationId; }
 }

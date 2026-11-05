@@ -21,7 +21,7 @@ public record AuthenticatedUser(int userId, String username, String fullName,
             Objects.requireNonNull(name, "name");
         }
 
-        @Override public String toString() { return name + " (" + code + ", ID " + id + ")"; }
+        @Override public String toString() { return name + " (" + code + ")"; }
     }
 
     public record WorkScopeChoice(int facilityId, String facilityName, int departmentId, String departmentName) {
@@ -32,7 +32,7 @@ public record AuthenticatedUser(int userId, String username, String fullName,
         }
 
         @Override public String toString() {
-            return facilityName + " [" + facilityId + "] — " + departmentName + " [" + departmentId + "]";
+            return facilityName + " — " + departmentName;
         }
     }
 }

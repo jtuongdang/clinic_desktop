@@ -31,14 +31,31 @@ class UserSessionContextTest {
         assertEquals("Cơ sở mẫu", session.getFacilityName());
         assertEquals(21, session.getDepartmentId());
         assertEquals("Khoa mẫu", session.getDepartmentName());
-        assertEquals("21", session.getStationId());
+        assertEquals("", session.getStationId());
+        assertEquals("", session.getWorkstationId());
     }
 
     @Test
-    void logoutClearsIdentityRoleAndScopeContext() {
+    void stationAndWorkstationRemainIndependentFromSelectedScope() {
         session.setSession(701, "synth.user.701", "Nhân viên mẫu",
                 new RoleChoice(42, "DOCTOR", "Bác sĩ"),
                 new WorkScopeChoice(11, "Cơ sở mẫu", 21, "Khoa mẫu"));
+        session.setStationId("station-A");
+        session.setWorkstationId("workstation-7");
+
+        assertEquals("station-A", session.getStationId());
+        assertEquals("workstation-7", session.getWorkstationId());
+        assertEquals(11, session.getFacilityId());
+        assertEquals(21, session.getDepartmentId());
+    }
+
+    @Test
+    void logoutClearsIdentityRoleScopeStationAndWorkstationContext() {
+        session.setSession(701, "synth.user.701", "Nhân viên mẫu",
+                new RoleChoice(42, "DOCTOR", "Bác sĩ"),
+                new WorkScopeChoice(11, "Cơ sở mẫu", 21, "Khoa mẫu"));
+        session.setStationId("station-A");
+        session.setWorkstationId("workstation-7");
 
         session.clearSession();
 
@@ -54,6 +71,39 @@ class UserSessionContextTest {
         assertEquals(0, session.getDepartmentId());
         assertEquals("", session.getDepartmentName());
         assertEquals("", session.getStationId());
+        assertEquals("", session.getWorkstationId());
+    }
+
+    @Test
+    void startingANewSessionClearsStationAndWorkstationFromPreviousSession() {
+        session.setSession(701, "synth.user.701", "Nhân viên mẫu",
+                new RoleChoice(42, "DOCTOR", "Bác sĩ"),
+                new WorkScopeChoice(11, "Cơ sở mẫu", 21, "Khoa mẫu"));
+        session.setStationId("station-A");
+        session.setWorkstationId("workstation-7");
+
+        session.setSession(702, "synth.user.702", "Nhân viên khác",
+                new RoleChoice(43, "RECEPTION", "Tiếp đón"),
+                new WorkScopeChoice(12, "Cơ sở khác", 22, "Khoa khác"));
+
+        assertTrue(session.isLoggedOn());
+        assertEquals(702, session.getUserId());
+        assertEquals(12, session.getFacilityId());
+        assertEquals(22, session.getDepartmentId());
+        assertEquals("", session.getStationId());
+        assertEquals("", session.getWorkstationId());
+    }
+
+    @Test
+    void choiceLabelsShowNamesAndRoleCodeWithoutInternalIds() {
+        RoleChoice role = new RoleChoice(42, "DOCTOR", "Bác sĩ điều trị");
+        WorkScopeChoice scope = new WorkScopeChoice(11, "Cơ sở mẫu", 21, "Khoa mẫu");
+
+        assertEquals("Bác sĩ điều trị (DOCTOR)", role.toString());
+        assertEquals("Cơ sở mẫu — Khoa mẫu", scope.toString());
+        assertFalse(role.toString().contains("42"));
+        assertFalse(scope.toString().contains("11"));
+        assertFalse(scope.toString().contains("21"));
     }
 
     @Test
