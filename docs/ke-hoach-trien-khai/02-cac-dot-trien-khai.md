@@ -7,7 +7,7 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Trạng thái:** `[~]` Nền tảng và wiring cơ bản có trong source; validation/release chưa hoàn tất.
 **Phụ thuộc:** Không.
 **Phạm vi:** Maven modules, application shell, schema/migrations, JDBC, transaction/unit of work và cấu hình môi trường.
-**Bằng chứng mới:** `JdbcTransactionManagerTest` kiểm tra commit/rollback/cleanup; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra tách batch `GO`; DateRange/Money regression tests có ở `3f6ba31`. `mvn clean verify` sau các additions pass trên code snapshot `3f6ba31`: 55 tests, 0 failures/errors/skips, năm Maven module thành công.
+**Bằng chứng mới:** `JdbcTransactionManagerTest` kiểm tra commit/rollback/cleanup; `DatabaseMigrationRunnerTest` và `SqlServerBatchSplitterTest` kiểm tra tách batch `GO`; DateRange/Money regression tests có ở `3f6ba31`. Tại code snapshot `9ff7ddd`, inventory là 13 test source/64 tests (domain 3/16, application 5/26, infrastructure 4/17, desktop 1/5). `mvn clean verify` pass: 64 tests, 0 failures/errors/skips, năm Maven module thành công.
 **Còn lại:** Xác nhận migrations trên SQL Server thử nghiệm sạch; cấu hình secret. Các kiểm thử transaction/splitter hiện có không chứng minh migration hay reception E2E trên SQL Server. Identity/access baseline nằm ở Phase 2.
 **Gate:** build/migrations/repository transaction có thể tái lập trong môi trường thử nghiệm.
 
@@ -16,7 +16,7 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Trạng thái:** `[~]` Một phần workflow đã nối; regression tests có trong branch; chưa nghiệm thu E2E.
 **Phụ thuộc:** Phase 0.
 **Phạm vi:** `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `TienSuBenh`, lựa chọn `CoSo`/`Khoa`/`PhongKham`, đăng ký/tìm kiếm/queue `LuotKham`.
-**Bằng chứng hiện tại tại feature HEAD `3f6ba31`:** Có 11 test source/55 test cases theo kết quả gần nhất: domain 3/16, application 3/17, infrastructure 4/17, desktop 1/5. Commits liên quan gồm `ff2045a` transaction tests, `264bbae` migration runner/GO splitter tests, `ea397f9` headless reception form tests (đã sửa giả định chọn phòng deterministic) và `3f6ba31` DateRange/Money tests. Application/JDBC/UI wiring hiện diện. Đây là test/review evidence, chưa phải Phase 1 acceptance.
+**Bằng chứng hiện tại tại code snapshot `9ff7ddd`:** Có 13 test source/64 test cases: domain 3/16, application 5/26, infrastructure 4/17, desktop 1/5. Commits liên quan gồm `ff2045a` transaction tests, `264bbae` migration runner/GO splitter tests, `ea397f9` headless reception form tests, `3f6ba31` DateRange/Money tests và `9ff7ddd` authentication tests. Application/JDBC/UI wiring hiện diện. Đây là test/review evidence, chưa phải Phase 1 acceptance.
 **Còn lại:** SQL Server save/search/queue và reload sau restart; cập nhật hồ sơ/BHYT; rollback đa bảng của luồng reception; queue/CCCD concurrency; UI integration/E2E và review. Không có bằng chứng SQL Server E2E, restart hoặc concurrency; Phase 1 exit criteria vẫn unmet.
 
 ## Phase 2 — Baseline identity, access checks và audit
@@ -26,6 +26,8 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Phạm vi tối thiểu bắt buộc:** định danh actor/session tin cậy; role và data scope lấy từ tài khoản; kiểm tra quyền tại application/use case và persistence boundary phù hợp; audit truy cập/thay đổi nhạy cảm; kiểm thử allow/deny và truy vết.
 **Gate bắt buộc:** Phase 2 là prerequisite trực tiếp của Phase 4 (EMR), Phase 6 (prescription/inventory/pharmacy) và Phase 7 (billing). UI ẩn/disable không thay thế authorization ở backend. Không bật các luồng nhạy cảm với dữ liệu thật khi gate chưa đạt.
 **Còn lại:** xác minh password/session policy, role/scope, kiểm tra quyền tập trung, audit đăng nhập/xem/sửa EMR/cấp phát/thu tiền và test quyền/audit.
+
+**Bằng chứng auth unit:** `AuthenticateUserHandlerTest` và `Pbkdf2PasswordHasherTest` được thêm tại commit `9ff7ddd`; các test này kiểm tra handler/verifier và không chứng minh persistence, access scope hoặc audit. SEC-01 vẫn chưa được chấp nhận.
 
 ## Phase 3 — Lịch hẹn và vòng đời lượt khám
 

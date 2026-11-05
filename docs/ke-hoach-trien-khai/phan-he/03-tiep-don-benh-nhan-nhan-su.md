@@ -4,7 +4,7 @@
 **Phase:** 1; quản trị nhân sự mở rộng ở Phase 8.
 **Domain:** `patient`, `identity`, `facility`, `appointment`.
 
-> Code snapshot at task creation was `3f6ba31`; current feature then received documentation-only commit `dbad2fd`. Test inventory: 11 source files / 55 test cases (domain 3/16, application 3/17, infrastructure 4/17, desktop 1/5). Recent commits include `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`, `dba0da9`. `mvn clean verify` after DateRange/Money additions passed with 55 tests and zero failures/errors/skips. Code/test commits do not equal phase acceptance. Phase 1 remains in progress because SQL Server save/search/queue, restart/recovery, multi-row reception rollback and E2E remain unproven.
+> Code snapshot: `9ff7ddd`. Test inventory: 13 source files / 64 test cases (domain 3/16, application 5/26, infrastructure 4/17, desktop 1/5). Recent commits include `9ff7ddd` (authentication handler/PBKDF2 tests), `3f6ba31`, `ea397f9`, `264bbae` and `ff2045a`. `mvn clean verify` on this snapshot passed with 64 tests and zero failures/errors/skips. Code/test commits do not equal phase acceptance. Phase 1 remains in progress because SQL Server save/search/queue, restart/recovery, multi-row reception rollback and E2E remain unproven.
 
 ## Hiện có trong source
 
@@ -16,11 +16,11 @@
 
 ## Bằng chứng đã có
 
-- Tại feature HEAD có **11 test source và 55 test cases** theo kết quả gần nhất được cung cấp: **3 domain / 16** (`DateRangeTest`, `MoneyTest`, `PhoneNumberTest`), **3 application / 17** (`RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest`), **4 infrastructure / 17** (`BenhNhanRepositoryImplTest`, `DatabaseMigrationRunnerTest`, `JdbcTransactionManagerTest`, `SqlServerBatchSplitterTest`), **1 desktop / 5** (`PatientRegistrationFormPanelTest`). Targeted tests passed. Những test này bao phủ validation, handler, transaction boundary, batch splitter/runner, repository mapping và headless form; không chứng minh SQL Server reception E2E.
+- Tại code snapshot `9ff7ddd` có **13 test source và 64 test cases**: **3 domain / 16** (`DateRangeTest`, `MoneyTest`, `PhoneNumberTest`), **5 application / 26** (`AuthenticateUserHandlerTest`, `Pbkdf2PasswordHasherTest`, `RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest`), **4 infrastructure / 17** (`BenhNhanRepositoryImplTest`, `DatabaseMigrationRunnerTest`, `JdbcTransactionManagerTest`, `SqlServerBatchSplitterTest`), **1 desktop / 5** (`PatientRegistrationFormPanelTest`). `mvn clean verify` passed at this snapshot. Coverage includes validation, authentication handler/verifier unit behavior, transaction boundary, batch splitter/runner, repository mapping and headless form; it does not prove SQL Server reception E2E or Phase 2 access/audit requirements.
 - `PhoneNumberTest` kiểm tra định dạng số di động Việt Nam, prefix `0`/`+84`, dấu phân cách và đầu vào sai; đây chỉ là validation domain.
 - `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql` dừng nếu tồn tại CCCD trùng trên hồ sơ active trước khi tạo unique index. Test application kiểm tra nhánh duplicate không ghi BHYT/lượt khám; test infrastructure dùng lỗi tổng hợp xác nhận chỉ ánh xạ đúng index CCCD và không lộ giá trị trùng.
 - UI source nhận lỗi duplicate CCCD, hướng dẫn tìm hồ sơ hiện hữu, chạy tìm kiếm với CCCD và giữ form để tiếp tục. `PatientRegistrationFormPanelTest` bổ sung headless component coverage; commit `ea397f9` sửa giả định chọn phòng để kết quả test deterministic. Đây không phải end-to-end UI/JDBC test.
-- Evidence commits trong current history: `3f6ba31` (DateRange/Money), `ea397f9` (headless reception form), `264bbae` (GO splitter/migration runner), `ff2045a` (JDBC transaction), `dba0da9` (model task board); cùng các commit trước đó về handler/search/duplicate mapping. GO splitter test hiện thuộc feature HEAD; vẫn chưa có migration run trên SQL Server.
+- Evidence commits trong current history: `9ff7ddd` (authentication handler/PBKDF2 tests), `3f6ba31` (DateRange/Money), `ea397f9` (headless reception form), `264bbae` (GO splitter/migration runner), `ff2045a` (JDBC transaction). GO splitter test hiện thuộc feature HEAD; vẫn chưa có migration run trên SQL Server.
 
 ## Quy tắc nghiệp vụ cần bảo vệ
 
