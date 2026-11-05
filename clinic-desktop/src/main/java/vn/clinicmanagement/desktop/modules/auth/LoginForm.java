@@ -7,6 +7,8 @@ import vn.clinicmanagement.desktop.modules.dashboard.MainDashboardFrame;
 import vn.clinicmanagement.application.auth.AuthenticateUserCommand;
 import vn.clinicmanagement.application.auth.AuthenticateUserHandler;
 import vn.clinicmanagement.application.auth.AuthenticatedUser;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.common.Result;
 
 import javax.swing.*;
@@ -98,6 +100,7 @@ public class LoginForm extends JFrame {
     }
 
     private void onLogin() {
+        UserSession.getInstance().clearSession();
         String username = txtUsername.getText().trim();
         char[] password = txtPassword.getPassword();
 
@@ -132,12 +135,16 @@ public class LoginForm extends JFrame {
                     }
 
                     AuthenticatedUser user = result.valueOrThrow();
+                    RoleChoice role = chooseRole(user.roles());
+                    if (role == null) return;
+                    WorkScopeChoice scope = chooseScope(user.workScopes());
+                    if (scope == null) return;
+
                     UserSession session = UserSession.getInstance();
-                    session.setSession(user.userId(), user.username(), user.fullName(), user.roleName());
-                    session.setDepartmentName("Chưa phân công");
+                    session.setSession(user.userId(), user.username(), user.fullName(), role, scope);
 
                     dispose();
-                    MainDashboardFrame dashboard = new MainDashboardFrame(user.username(), user.roleName());
+                    MainDashboardFrame dashboard = new MainDashboardFrame(user.username(), role.name());
                     dashboard.setVisible(true);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
@@ -152,5 +159,19 @@ public class LoginForm extends JFrame {
                 }
             }
         }.execute();
+    }
+
+    private RoleChoice chooseRole(java.util.List<RoleChoice> roles) {
+        if (roles.size() == 1) return roles.get(0);
+        Object selected = JOptionPane.showInputDialog(this, "Chọn vai trò làm việc:", "Chọn vai trò",
+                JOptionPane.QUESTION_MESSAGE, null, roles.toArray(), null);
+        return selected instanceof RoleChoice role ? role : null;
+    }
+
+    private WorkScopeChoice chooseScope(java.util.List<WorkScopeChoice> scopes) {
+        if (scopes.size() == 1) return scopes.get(0);
+        Object selected = JOptionPane.showInputDialog(this, "Chọn cơ sở và khoa làm việc:", "Chọn phạm vi làm việc",
+                JOptionPane.QUESTION_MESSAGE, null, scopes.toArray(), null);
+        return selected instanceof WorkScopeChoice scope ? scope : null;
     }
 }
