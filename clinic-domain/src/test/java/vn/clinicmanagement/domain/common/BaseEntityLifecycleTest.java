@@ -56,17 +56,21 @@ class BaseEntityLifecycleTest {
         TestEntity second = new TestEntity();
         OtherTestEntity otherClass = new OtherTestEntity();
 
-        assertEquals(first, second);
+        assertEquals(first, first);
+        assertNotEquals(first, second);
         assertNotEquals(first, otherClass);
+        int transientHashCode = first.hashCode();
 
         first.setId(42);
         second.setId(42);
         otherClass.setId(42);
         assertEquals(first, second);
         assertNotEquals(first, otherClass);
+        assertEquals(transientHashCode, first.hashCode());
 
         second.setId(43);
         assertNotEquals(first, second);
+        assertEquals(transientHashCode, second.hashCode());
     }
 
     private static class TestEntity extends BaseEntity<Integer> {
