@@ -24,6 +24,17 @@ class BenhNhanRepositoryImplTest {
     }
 
     @Test
+    void scopedIdLookupRequiresBothFacilityAndDepartmentOnLinkedVisit() {
+        String sql = BenhNhanRepositoryImpl.scopedIdSql();
+
+        assertTrue(sql.contains("WHERE id=? AND isDeleted=0 AND EXISTS"));
+        assertTrue(sql.contains("lk.maBenhNhan=BenhNhan.id"));
+        assertTrue(sql.contains("lk.maCoSo=?"));
+        assertTrue(sql.contains("lk.maKhoa=?"));
+        assertTrue(sql.contains("lk.isDeleted=0"));
+    }
+
+    @Test
     void mapsOnlyTheActiveCccdIndexViolationWithoutLeakingTheDuplicateValue() {
         for (int errorCode : new int[]{2601, 2627}) {
             SQLException sqlException = new SQLException(

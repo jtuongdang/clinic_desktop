@@ -3,6 +3,7 @@ package vn.clinicmanagement.desktop.core.session;
 import vn.clinicmanagement.application.authorization.ActiveSessionPort;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.audit.AuditActionCode;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.audit.AuditOutcome;
 import vn.clinicmanagement.application.audit.AuditReasonCode;
 import vn.clinicmanagement.application.audit.AuditResourceType;
@@ -311,6 +312,19 @@ public final class SessionLifecycleService implements ActiveSessionPort {
                 session.getUserId(), session.getRoleId(), session.getRoleCode(),
                 session.getFacilityId(), session.getDepartmentId(), currentSessionId);
         return context.isValid() ? Optional.of(context) : Optional.empty();
+    }
+
+    /** Creates per-operation audit metadata without reusing the session correlation ID. */
+    public synchronized Optional<AuditActorContext> currentAuditActorContext() {
+        if (evaluate() != State.ACTIVE) return Optional.empty();
+        UUID sessionId = parseSessionId(session.getSessionId());
+        if (sessionId == null || session.getUserId() <= 0 || session.getRoleId() <= 0
+                || session.getFacilityId() <= 0 || session.getDepartmentId() <= 0) return Optional.empty();
+        String roleCode = normalizeRoleCode(session.getRoleCode());
+        if (roleCode == null) return Optional.empty();
+        return Optional.of(new AuditActorContext(session.getUserId(), session.getRoleId(), roleCode,
+                session.getFacilityId(), session.getDepartmentId(),
+                normalizeWorkstationId(session.getWorkstationId(), session.getStationId()), UUID.randomUUID()));
     }
 
     public String lastAuditDiagnostic() {

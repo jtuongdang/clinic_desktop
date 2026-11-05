@@ -2,6 +2,7 @@ package vn.clinicmanagement.application.reception;
 
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.audit.AuditWritePort;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.authorization.ActiveSessionPort;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
@@ -90,13 +91,14 @@ class RegisterPatientDuplicateCccdTest {
         card.setSoBaoHiem("synthetic-insurance");
         card.setNgayHetHan(LocalDate.of(2030, 1, 1));
         RegisterPatientCommand command = new RegisterPatientCommand(patient, card, 3,
-                "Khám bệnh", "Synthetic test", DoiTuongKham.BHYT, false, 1, CONTEXT);
+                "Khám bệnh", "Synthetic test", DoiTuongKham.BHYT, false, 1, CONTEXT,
+                new AuditActorContext(1, 31, "RECEPTION", 1, 2, "test-station", SESSION_ID));
 
         Result<RegistrationReceipt> result = handler.handle(command);
 
         assertTrue(result.isFailure());
-        assertEquals("PATIENT_DUPLICATE_CCCD", result.getError().orElseThrow().code());
-        assertTrue(result.getError().orElseThrow().message().contains("tìm người bệnh"));
+        assertEquals("PATIENT_REGISTRATION_FAILED", result.getError().orElseThrow().code());
+        assertFalse(result.getError().orElseThrow().message().toLowerCase().contains("cccd"));
         assertEquals(1, patientInsertCalls.get());
         assertEquals(1, rollbackCalls.get());
         assertEquals(0, insuranceCalls.get());

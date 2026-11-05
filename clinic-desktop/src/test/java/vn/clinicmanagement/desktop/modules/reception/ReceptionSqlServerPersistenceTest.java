@@ -102,7 +102,8 @@ class ReceptionSqlServerPersistenceTest {
 
             var registrationResult = services.registerPatient().handle(new RegisterPatientCommand(
                     patient, insurance, room.getId(), "WALK_IN", "Synthetic persistence test",
-                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext));
+                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext,
+                    lifecycle.currentAuditActorContext().orElseThrow()));
             assertTrue(registrationResult.isSuccess(), "Synthetic reception registration failed");
             var receipt = registrationResult.valueOrThrow();
             registeredPatientId = receipt.patientId();
@@ -144,7 +145,8 @@ class ReceptionSqlServerPersistenceTest {
 
             var updateResult = services.registerPatient().handle(new RegisterPatientCommand(
                     updatedPatient, updatedInsurance, room.getId(), "WALK_IN", "Synthetic update persistence test",
-                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext));
+                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext,
+                    lifecycle.currentAuditActorContext().orElseThrow()));
             assertTrue(updateResult.isSuccess(), "Synthetic existing-patient update failed");
             var updateReceipt = updateResult.valueOrThrow();
             assertEquals(registeredPatientId, updateReceipt.patientId(),

@@ -6,6 +6,7 @@ import vn.clinicmanagement.application.audit.AuditOutcome;
 import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.AuditReasonCode;
 import vn.clinicmanagement.application.audit.AuditWritePort;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
 import vn.clinicmanagement.application.authorization.ActiveSessionPort;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
@@ -55,6 +56,7 @@ class RegisterPatientHandlerTest {
             UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final AuthorizationContext ACTOR =
             new AuthorizationContext(5, 31, "RECEPTION", FACILITY_ID, DEPARTMENT_ID, CORRELATION_ID);
+    private static final UUID AUDIT_CORRELATION_ID = UUID.fromString("f48e1b30-1ca3-4f24-9a01-5ddc001ac123");
 
     @Test
     void invalidCommandIsRejectedBeforeTransactionOrPersistence() {
@@ -288,25 +290,9 @@ class RegisterPatientHandlerTest {
 
         Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
 
-        assertFailure(result, "PATIENT_DUPLICATE_CCCD");
+        assertFailure(result, "AUTH_SCOPE_MISMATCH");
         assertEquals(0, fixture.patientUpdates.get());
         assertEquals(0, fixture.insuranceAdds.get());
-        assertEquals(0, fixture.visitCalls.get());
-        assertEquals(1, fixture.transactions.failures);
-    }
-
-    @Test
-    void duplicateCccdPrecheckReturnsStableErrorWithoutInsuranceOrVisit() {
-        Fixture fixture = new Fixture();
-        fixture.duplicatePatient = validPatient();
-
-        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
-
-        assertFailure(result, "PATIENT_DUPLICATE_CCCD");
-        assertEquals(0, fixture.patientAdds.get());
-        assertEquals(0, fixture.patientUpdates.get());
-        assertEquals(0, fixture.insuranceAdds.get());
-        assertEquals(0, fixture.insuranceUpdates.get());
         assertEquals(0, fixture.visitCalls.get());
         assertEquals(1, fixture.transactions.failures);
     }
@@ -318,7 +304,7 @@ class RegisterPatientHandlerTest {
 
         Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
 
-        assertFailure(result, "PATIENT_DUPLICATE_CCCD");
+        assertFailure(result, "PATIENT_REGISTRATION_FAILED");
         assertEquals(1, fixture.patientAdds.get());
         assertEquals(0, fixture.insuranceAdds.get());
         assertEquals(0, fixture.insuranceUpdates.get());
@@ -397,7 +383,8 @@ class RegisterPatientHandlerTest {
 
     private static RegisterPatientCommand command(BenhNhan patient, BaoHiem insurance, DoiTuongKham payerType) {
         return new RegisterPatientCommand(patient, insurance, ROOM_ID, "Khám bệnh", "Synthetic reason",
-                payerType, true, 5, ACTOR);
+                payerType, true, 5, ACTOR, new AuditActorContext(5, 31, "RECEPTION", FACILITY_ID,
+                DEPARTMENT_ID, "synthetic-station", AUDIT_CORRELATION_ID));
     }
 
     private static void assertAuditEvents(List<SystemAuditEntry> events, Object... expected) {
@@ -412,8 +399,8 @@ class RegisterPatientHandlerTest {
             assertEquals(ACTOR.roleCode(), event.roleCode());
             assertEquals(ACTOR.facilityId(), event.facilityId());
             assertEquals(ACTOR.departmentId(), event.departmentId());
-            assertNull(event.workstationId());
-            assertEquals(CORRELATION_ID, event.correlationId());
+            assertEquals("synthetic-station", event.workstationId());
+            assertEquals(AUDIT_CORRELATION_ID, event.correlationId());
             assertEquals(AuditOutcome.SUCCESS, event.outcome());
             assertNull(event.reasonCode());
             assertNotNull(event.occurredAtUtc());
@@ -483,7 +470,7 @@ class RegisterPatientHandlerTest {
 
     private static Object defaultValue(String method) {
         return switch (method) {
-            case "getById", "getLatestByPatientId", "getByCCCD", "getByCCCDInScope", "getByPhone" -> Optional.empty();
+            case "getById", "getByIdInScope", "getLatestByPatientId", "getByCCCD", "getByCCCDInScope", "getByPhone" -> Optional.empty();
             case "getAll", "search", "getByPatientId", "getActiveRooms" -> List.of();
             default -> null;
         };
@@ -525,7 +512,7 @@ class RegisterPatientHandlerTest {
         private Fixture() {
             IBenhNhanRepository patients = proxy(IBenhNhanRepository.class, (method, args) -> {
                 return switch (method) {
-                    case "getByCCCDInScope" -> Optional.ofNullable(duplicatePatient);
+                    case "getByIdInScope" -> Optional.ofNullable(duplicatePatient);
                     case "add" -> {
                         patientAdds.incrementAndGet();
                         if (identityConflictOnInsert) throw new PatientIdentityConflictException();

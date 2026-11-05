@@ -147,12 +147,13 @@ public class ReceptionPanel extends BaseViewPanel {
 
     private void saveRegistration() {
         var context = sessionLifecycle.currentAuthorizationContext();
-        if (context.isEmpty()) {
+        var auditActor = sessionLifecycle.currentAuditActorContext();
+        if (context.isEmpty() || auditActor.isEmpty()) {
             showError("Phiên làm việc không còn hoạt động. Đăng nhập lại trước khi đăng ký.");
             return;
         }
         final RegisterPatientCommand command;
-        try { command = formPanel.toRegisterCommand(context.get()); }
+        try { command = formPanel.toRegisterCommand(context.get(), auditActor.get()); }
         catch (IllegalArgumentException ex) { showError(registrationFailureMessage("PATIENT_VALIDATION")); return; }
         footerBar.setSaving(true);
         new SwingWorker<Result<RegistrationReceipt>, Void>() {
@@ -177,10 +178,6 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     private void handleRegistrationFailure(Result.ApplicationError error) {
-        if ("PATIENT_DUPLICATE_CCCD".equals(error.code())) {
-            handleDuplicateCccd();
-            return;
-        }
         showError(registrationFailureMessage(error.code()));
     }
 
@@ -192,28 +189,6 @@ public class ReceptionPanel extends BaseViewPanel {
             case "PATIENT_REGISTRATION_FAILED" -> "Không thể hoàn tất đăng ký người bệnh. Vui lòng thử lại.";
             default -> REGISTRATION_ERROR_FALLBACK;
         };
-    }
-
-    private void handleDuplicateCccd() {
-        formPanel.prepareDuplicateCccdSearch();
-        String maskedCccd = formPanel.maskedEnteredCccd();
-        String cccdHint = maskedCccd.isEmpty() ? "vừa nhập" : "(" + maskedCccd + ")";
-        String message = "Số CCCD " + cccdHint + " đã có hồ sơ người bệnh trong hệ thống.\n"
-                + "Thông tin đang nhập vẫn được giữ lại và chưa phát sinh lượt khám mới.\n"
-                + "Bạn có muốn tìm và chọn hồ sơ hiện có để tiếp tục tiếp đón không?";
-        Object[] options = {"Tìm hồ sơ đã có", "Giữ thông tin đang nhập"};
-        int choice = JOptionPane.showOptionDialog(
-                this,
-                message,
-                "Hồ sơ CCCD đã tồn tại",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE,
-                null,
-                options,
-                options[0]);
-        if (choice == JOptionPane.YES_OPTION) {
-            formPanel.searchByEnteredCccd();
-        }
     }
 
     private static String sanitizeUserMessage(String message, String fallback) {

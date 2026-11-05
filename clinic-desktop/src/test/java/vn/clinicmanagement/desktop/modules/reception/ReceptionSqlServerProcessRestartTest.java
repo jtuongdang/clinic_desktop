@@ -112,7 +112,7 @@ class ReceptionSqlServerProcessRestartTest {
             var result = services.registerPatient().handle(new RegisterPatientCommand(patient, insurance,
                     room.getId(), "WALK_IN", "Synthetic process restart test", DoiTuongKham.BHYT, false,
                     authorizationContext.employeeId(),
-                    authorizationContext));
+                    authorizationContext, lifecycle.currentAuditActorContext().orElseThrow()));
             assertTrue(result.isSuccess(), "Synthetic reception registration failed");
             var receipt = result.valueOrThrow();
             patientId = receipt.patientId();

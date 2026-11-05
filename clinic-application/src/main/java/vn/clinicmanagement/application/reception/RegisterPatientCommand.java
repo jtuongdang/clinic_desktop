@@ -1,6 +1,7 @@
 package vn.clinicmanagement.application.reception;
 
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.common.Command;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
@@ -12,14 +13,23 @@ import java.util.Objects;
 public record RegisterPatientCommand(BenhNhan patient, BaoHiem insurance, int roomId,
                                     String registrationType, String reason,
                                     DoiTuongKham payerType, boolean priority, int createdBy,
-                                    AuthorizationContext authorizationContext) implements Command<RegistrationReceipt> {
+                                    AuthorizationContext authorizationContext,
+                                    AuditActorContext auditActorContext) implements Command<RegistrationReceipt> {
     public RegisterPatientCommand {
         Objects.requireNonNull(authorizationContext, "authorizationContext");
+        Objects.requireNonNull(auditActorContext, "auditActorContext");
         if (!authorizationContext.isValid()) {
             throw new IllegalArgumentException("A valid authorization context is required.");
         }
         if (createdBy != authorizationContext.employeeId()) {
             throw new IllegalArgumentException("createdBy must match the authenticated actor.");
+        }
+        if (auditActorContext.employeeId() != authorizationContext.employeeId()
+                || auditActorContext.roleId() != authorizationContext.roleId()
+                || !auditActorContext.roleCode().equals(authorizationContext.roleCode())
+                || auditActorContext.facilityId() != authorizationContext.facilityId()
+                || auditActorContext.departmentId() != authorizationContext.departmentId()) {
+            throw new IllegalArgumentException("Audit actor must match the authorization context.");
         }
     }
 }

@@ -158,7 +158,8 @@ class AuditSqlServerPersistenceTest {
                             DoiTuongKham.BHYT,
                             false,
                             actorContext.employeeId(),
-                            authorizationContext
+                            authorizationContext,
+                            actorContext
                     )
             );
 

@@ -5,6 +5,9 @@ import java.util.Optional;
 
 public interface IBenhNhanRepository extends IRepository<BenhNhan> {
     Optional<BenhNhan> getByCCCD(String cccd);
+    default Optional<BenhNhan> getByIdInScope(int patientId, int facilityId, int departmentId) {
+        return Optional.empty();
+    }
     default Optional<BenhNhan> getByCCCDInScope(String cccd, int facilityId, int departmentId) {
         return Optional.empty();
     }

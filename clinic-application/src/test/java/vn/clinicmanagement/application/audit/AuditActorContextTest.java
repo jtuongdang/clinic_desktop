@@ -58,6 +58,7 @@ class AuditActorContextTest {
         AuthorizationContext context = new AuthorizationContext(7, 31, "RECEPTION", 11, 21, CORRELATION_ID);
 
         assertThrows(IllegalArgumentException.class, () -> new RegisterPatientCommand(
-                null, null, 3, "synthetic", "synthetic", DoiTuongKham.THU_PHI, false, 9, context));
+                null, null, 3, "synthetic", "synthetic", DoiTuongKham.THU_PHI, false, 9, context,
+                new AuditActorContext(7, 31, "RECEPTION", 11, 21, null, CORRELATION_ID)));
     }
 }

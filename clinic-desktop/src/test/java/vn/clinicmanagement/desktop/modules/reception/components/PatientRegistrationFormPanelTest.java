@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
@@ -121,7 +122,7 @@ class PatientRegistrationFormPanelTest {
             assertEquals(101, panel.selectedClinicRoomId());
 
             startSyntheticSession(9);
-            RegisterPatientCommand command = panel.toRegisterCommand(authorizationContext());
+            RegisterPatientCommand command = panel.toRegisterCommand(authorizationContext(), auditActorContext());
             assertEquals("Synthetic Nguyen Van", command.patient().getHo());
             assertEquals("Mau", command.patient().getTen());
             assertEquals(LocalDate.of(1992, 4, 15), command.patient().getNgaySinh());
@@ -266,7 +267,7 @@ class PatientRegistrationFormPanelTest {
             findByName(panel, "fullName", JTextField.class).setText("Synthetic New Entry");
             findByName(panel, "dateOfBirth", JTextField.class).setText("01/02/2000");
             startSyntheticSession(12);
-            RegisterPatientCommand newCommand = panel.toRegisterCommand(authorizationContext());
+            RegisterPatientCommand newCommand = panel.toRegisterCommand(authorizationContext(), auditActorContext());
             assertNull(newCommand.patient().getId());
             assertNull(newCommand.patient().getUpdatedBy());
             assertEquals(12, newCommand.patient().getCreatedBy());
@@ -361,7 +362,7 @@ class PatientRegistrationFormPanelTest {
             insuranceNumberField.setText("SYNTH-BHYT-0504-NEW");
 
             startSyntheticSession(syntheticUpdaterUserId);
-            RegisterPatientCommand command = panel.toRegisterCommand(authorizationContext());
+            RegisterPatientCommand command = panel.toRegisterCommand(authorizationContext(), auditActorContext());
 
             assertEquals(401, command.roomId());
             assertEquals("Synthetic periodic follow-up", command.reason());
@@ -475,6 +476,12 @@ class PatientRegistrationFormPanelTest {
         UserSession session = UserSession.getInstance();
         return new AuthorizationContext(session.getUserId(), session.getRoleId(), session.getRoleCode(),
                 session.getFacilityId(), session.getDepartmentId(), UUID.fromString(session.getSessionId()));
+    }
+
+    private static AuditActorContext auditActorContext() {
+        UserSession session = UserSession.getInstance();
+        return new AuditActorContext(session.getUserId(), session.getRoleId(), session.getRoleCode(),
+                session.getFacilityId(), session.getDepartmentId(), session.getWorkstationId(), UUID.randomUUID());
     }
 
     private static void onEdt(EdtAction action) throws Exception {

@@ -1,6 +1,7 @@
 package vn.clinicmanagement.desktop.modules.reception.components;
 
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
@@ -342,7 +343,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         clearInsuranceFields();
     }
 
-    public RegisterPatientCommand toRegisterCommand(AuthorizationContext authorizationContext) {
+    public RegisterPatientCommand toRegisterCommand(AuthorizationContext authorizationContext,
+                                                   AuditActorContext auditActorContext) {
         if (authorizationContext == null || !authorizationContext.isValid()) {
             throw new IllegalArgumentException("An active authenticated session is required.");
         }
@@ -393,7 +395,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         if (room == null) throw new IllegalArgumentException("Chọn phòng khám từ danh sách đã tải.");
         return new RegisterPatientCommand(patient, insurance, room.getId(),
                 String.valueOf(cbRegistrationType.getSelectedItem()), txtReason.getText().trim(), payer,
-                chkPriority.isSelected(), userId, authorizationContext);
+                chkPriority.isSelected(), userId, authorizationContext, auditActorContext);
     }
 
     private BaoHiem toInsurance(int userId) {

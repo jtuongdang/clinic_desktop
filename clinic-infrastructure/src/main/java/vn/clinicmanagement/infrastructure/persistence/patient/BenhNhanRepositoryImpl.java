@@ -64,6 +64,22 @@ public final class BenhNhanRepositoryImpl implements IBenhNhanRepository {
         });
     }
 
+    @Override
+    public Optional<BenhNhan> getByIdInScope(int patientId, int facilityId, int departmentId) {
+        if (patientId <= 0 || facilityId <= 0 || departmentId <= 0) return Optional.empty();
+        return queryOne(scopedIdSql(), ps -> {
+            ps.setInt(1, patientId);
+            ps.setInt(2, facilityId);
+            ps.setInt(3, departmentId);
+        });
+    }
+
+    static String scopedIdSql() {
+        return SELECT_COLUMNS + " WHERE id=? AND isDeleted=0 AND EXISTS "
+                + "(SELECT 1 FROM LuotKham lk WHERE lk.maBenhNhan=BenhNhan.id "
+                + "AND lk.maCoSo=? AND lk.maKhoa=? AND lk.isDeleted=0)";
+    }
+
     static String scopedCccdSql() {
         return SELECT_COLUMNS + " WHERE soCCCD=? AND isDeleted=0 AND EXISTS "
                 + "(SELECT 1 FROM LuotKham lk WHERE lk.maBenhNhan=BenhNhan.id "
