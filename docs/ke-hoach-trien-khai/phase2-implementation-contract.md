@@ -30,9 +30,10 @@
 5. **SEC-SESSION-01 — lifecycle complete (`51a2ae2`):** idle 15 phút, absolute 12 giờ, overlay giữ workspace/draft, re-auth cùng user/role/scope, logout và xóa context; fake-clock/headless tests pass. Full JDK 17 `mvn -Djava.awt.headless=true clean verify` pass (101 cases, 3 SQL Server opt-in skips). Desktop visual smoke check còn mở.
 6. **SEC-AUDIT-DESIGN-01 — complete:** schema/API/task decomposition được ghi tại `phase2-audit-implementation-proposal.md`; implementation và SQL rollback acceptance được theo dõi riêng ở SEC-AUDIT-01A–01D. `AUDIT_READ` giữ deny/no-purge.
 7. **SEC-AUTHZ-01A — foundation complete (`415f85d`, `a66acc7`):** action codes ổn định, domain/SQL defaults fail-closed, V7 constraint/index và giữ nguyên legacy rows; chưa seed grants, chưa bật guard. Root verify 134 tests pass, SQL Server V7 migration/persistence opt-in pass trên `clinic_test_audit_20261105`.
-8. **SEC-AUTHZ-01B/01C — evaluator and application guards (planned; scope inventory `6c9240b`):** đọc ma trận, xác nhận active role và cặp facility+department trên mọi command/query; kiểm thử allow/deny, cross-scope, revoked assignment. Chỉ grant ALLOW trong ma trận đã duyệt với scope `KHOA_PHONG`; unresolved DEC actions và `AUDIT_READ` luôn deny.
-9. **SEC-AUDIT-01A–01D — write path/integration (01A–01C complete; 01D complete):** V6 append-only writer, audit auth/session/reception trong transaction và SQL Server rollback test trên DB synthetic. Audit read vẫn bị từ chối.
-10. **SEC-UI-01 — screens and acceptance:** nối scope selector, lock overlay, logout confirmation và permission-aware navigation; headless Swing tests rồi desktop smoke check.
+8. **SEC-AUTHZ-02A — evaluator (in progress):** dùng immutable Application context và default-deny decision service; xác minh session active, employee, role assignment, exact pair, resource pair và permission ở mỗi request. Contract: `phase2-authorization-evaluator-contract.md`.
+9. **SEC-AUTHZ-02B/02C — use-case guards and repository filters (planned; scope inventory `6c9240b`):** gọi evaluator trên mọi command/query và lọc dữ liệu theo exact facility+department; kiểm thử allow/deny, cross-scope, revoked assignment. Chỉ grant ALLOW trong ma trận đã duyệt với scope `KHOA_PHONG`; unresolved DEC actions và `AUDIT_READ` luôn deny.
+10. **SEC-AUDIT-01A–01D — write path/integration (01A–01C complete; 01D complete):** V6 append-only writer, audit auth/session/reception trong transaction và SQL Server rollback test trên DB synthetic. Audit read vẫn bị từ chối.
+11. **SEC-UI-01 — screens and acceptance:** nối scope selector, lock overlay, logout confirmation và permission-aware navigation; headless Swing tests rồi desktop smoke check.
 
 ## 4. Gates và chính sách chưa duyệt
 
