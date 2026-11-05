@@ -3,6 +3,9 @@ package vn.clinicmanagement.desktop.modules.reception;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.authorization.AuthorizationDecision;
+import vn.clinicmanagement.application.authorization.AuthorizationRequest;
+import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsQuery;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
 import vn.clinicmanagement.application.reception.PatientSearchItem;
@@ -11,6 +14,7 @@ import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.application.reception.SearchPatientsQuery;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
+import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
@@ -21,6 +25,11 @@ import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseConnection;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseMigrationRunner;
+import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
+import vn.clinicmanagement.infrastructure.persistence.JdbcTransactionManager;
+import vn.clinicmanagement.infrastructure.persistence.JdbcUnitOfWork;
+import vn.clinicmanagement.infrastructure.persistence.identity.NhanVienRepositoryImpl;
+import vn.clinicmanagement.infrastructure.persistence.system.SystemRepositoryImpl;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -85,6 +94,26 @@ class ReceptionSqlServerPersistenceTest {
             generatedEmployeeId = actor.employeeId();
             SessionLifecycleService lifecycle = syntheticLifecycle(actor);
             AuthorizationContext authorizationContext = lifecycle.currentAuthorizationContext().orElseThrow();
+            AuthorizationPorts authorizationPorts = authorizationPortsFor(lifecycle);
+            assertTrue(authorizationPorts.employees().getById(actor.employeeId()).isPresent(),
+                    "Synthetic employee is not visible to authorization repository");
+            assertTrue(authorizationPorts.employees().getAssignedRoles(actor.employeeId()).stream()
+                            .anyMatch(role -> role.getId() == actor.roleId()
+                                    && "RECEPTIONIST".equals(role.getTenVaiTro())),
+                    "Synthetic receptionist role assignment is not visible");
+            assertTrue(authorizationPorts.employees().getAssignedWorkScopes(actor.employeeId()).stream()
+                            .anyMatch(scope -> scope.maCoSo() == actor.facilityId()
+                                    && scope.maKhoa() == actor.departmentId()),
+                    "Synthetic clinic scope assignment is not visible");
+            assertTrue(authorizationPorts.system().getMatrixByRoleId(actor.roleId()).stream()
+                            .anyMatch(grant -> "CATALOG".equals(grant.getPhanHe())
+                                    && grant.getHanhDong() == HanhDongQuyen.XEM && grant.isDuocPhep()),
+                    "Seeded receptionist catalog grant is not visible");
+            AuthorizationDecision catalogDecision = authorizationPorts.authorization().evaluate(new AuthorizationRequest(
+                    authorizationContext, "CATALOG", HanhDongQuyen.XEM,
+                    authorizationContext.facilityId(), authorizationContext.departmentId()));
+            assertTrue(catalogDecision.allowed(), "Synthetic receptionist authorization failed: "
+                    + catalogDecision.reasonCode());
             ReceptionCompositionRoot.Services services = ReceptionCompositionRoot.create(lifecycle);
             var room = services.getActiveRooms().handle(new GetActiveReceptionRoomsQuery(
                     authorizationContext, lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().stream().findFirst()
@@ -229,6 +258,15 @@ class ReceptionSqlServerPersistenceTest {
         return lifecycle;
     }
 
+    private static AuthorizationPorts authorizationPortsFor(SessionLifecycleService lifecycle) {
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcTransactionManager transactions = new JdbcTransactionManager(unitOfWork);
+        JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+        NhanVienRepositoryImpl employees = new NhanVienRepositoryImpl(connections, unitOfWork);
+        SystemRepositoryImpl system = new SystemRepositoryImpl(connections, unitOfWork);
+        return new AuthorizationPorts(new AuthorizationService(lifecycle, employees, system), employees, system);
+    }
+
     private static SyntheticActor createSyntheticActor(String suffix) throws SQLException {
         try (Connection connection = DatabaseConnection.getConnection()) {
             connection.setAutoCommit(false);
@@ -258,9 +296,9 @@ class ReceptionSqlServerPersistenceTest {
                 String username = "synthetic-reception-" + suffix;
                 int employeeId;
                 try (PreparedStatement statement = connection.prepareStatement(
-                        "INSERT INTO NhanVien (maNhanVien, ho, ten, username, passwordHash, hoatDong, "
+                        "INSERT INTO NhanVien (maNhanVien, ho, ten, username, hoatDong, "
                                 + "ngayVaoLam, createdBy) OUTPUT INSERTED.id VALUES (?, N'Synthetic', "
-                                + "N'Reception', ?, 'synthetic-only', 1, CAST(GETDATE() AS DATE), NULL)")) {
+                                + "N'Reception', ?, 1, CAST(GETDATE() AS DATE), NULL)")) {
                     statement.setString(1, code);
                     statement.setString(2, username);
                     try (ResultSet result = statement.executeQuery()) {
@@ -329,6 +367,9 @@ class ReceptionSqlServerPersistenceTest {
     private record SyntheticActor(int employeeId, String username, int roleId,
                                   int facilityId, String facilityName,
                                   int departmentId, String departmentName) {}
+
+    private record AuthorizationPorts(AuthorizationService authorization, NhanVienRepositoryImpl employees,
+                                      SystemRepositoryImpl system) {}
 
     private static boolean runMigrationsWithoutLogging() {
         PrintStream originalOut = System.out;

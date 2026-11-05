@@ -227,7 +227,7 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
                 + "WHERE nv.id=? AND nv.hoatDong=1 AND nv.isDeleted=0 "
                 + "AND pq.isDeleted=0 AND cs.hoatDong=1 AND cs.isDeleted=0 "
                 + "AND nk.isDeleted=0 AND k.hoatDong=1 AND k.isDeleted=0 "
-                + "ORDER BY pq.maCoSo, nk.maKhoa";
+                + "ORDER BY maCoSo, maKhoa";
         try (JdbcConnectionProvider.Lease lease = connections.acquire();
              PreparedStatement ps = lease.connection().prepareStatement(sql)) {
             ps.setInt(1, employeeId);
