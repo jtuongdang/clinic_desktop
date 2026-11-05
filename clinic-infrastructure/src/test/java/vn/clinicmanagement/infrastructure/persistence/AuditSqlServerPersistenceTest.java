@@ -232,13 +232,14 @@ class AuditSqlServerPersistenceTest {
             }
 
             ReceptionServices freshServices = ReceptionServices.create();
+            freshServices.authorizationContext().set(authorizationContext);
             List<PatientSearchItem> matches = freshServices.searchPatients()
-                    .handle(new SearchPatientsQuery(syntheticCccd))
+                    .handle(new SearchPatientsQuery(syntheticCccd, authorizationContext, actorContext))
                     .valueOrThrow();
             assertTrue(matches.isEmpty(), "Rolled-back synthetic patient must not appear in reception search");
 
             List<ReceptionQueueItem> queue = freshServices.getQueue()
-                    .handle(new GetReceptionQueueQuery(today))
+                    .handle(new GetReceptionQueueQuery(today, authorizationContext, actorContext))
                     .valueOrThrow()
                     .queue();
             assertFalse(
@@ -650,7 +651,7 @@ class AuditSqlServerPersistenceTest {
             BaoHiemRepositoryImpl insurance = new BaoHiemRepositoryImpl(connections, unitOfWork);
             PhongKhamRepositoryImpl rooms = new PhongKhamRepositoryImpl(connections);
             ReceptionQueueRepositoryImpl queue = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
-            JdbcAuditRepositoryImpl audit = new JdbcAuditRepositoryImpl(
+            JdbcAuditRepositoryImpl auditPort = new JdbcAuditRepositoryImpl(
                     connections, unitOfWork, DatabaseConnection::getConnection);
             AtomicReference<AuthorizationContext> authorizationContext = new AtomicReference<>();
             ActiveSessionPort activeSessions = sessionId -> {
@@ -665,9 +666,9 @@ class AuditSqlServerPersistenceTest {
                     new SystemRepositoryImpl(connections, unitOfWork));
             return new ReceptionServices(
                     rooms,
-                    new RegisterPatientHandler(patients, insurance, rooms, queue, transactions, audit, authorization),
-                    new SearchPatientsHandler(patients, insurance),
-                    new GetReceptionQueueHandler(queue),
+                    new RegisterPatientHandler(patients, insurance, rooms, queue, transactions, auditPort, authorization),
+                    new SearchPatientsHandler(patients, insurance, authorization, auditPort),
+                    new GetReceptionQueueHandler(queue, authorization, auditPort),
                     authorizationContext
             );
         }

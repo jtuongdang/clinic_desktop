@@ -3,6 +3,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsQuery;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
 import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
@@ -292,7 +293,8 @@ class ReceptionSqlServerProcessRestartTest {
             int cardId = Integer.parseInt(requiredEnvironment(ENV_CARD_ID));
             int visitId = Integer.parseInt(requiredEnvironment(ENV_VISIT_ID));
 
-            var services = ReceptionCompositionRoot.create(syntheticLifecycle());
+            SessionLifecycleService lifecycle = syntheticLifecycle();
+            var services = ReceptionCompositionRoot.create(lifecycle);
             List<PatientSearchItem> matches = services.searchPatients()
                     .handle(new vn.clinicmanagement.application.reception.SearchPatientsQuery(cccd,
                             lifecycle.currentAuthorizationContext().orElseThrow(),

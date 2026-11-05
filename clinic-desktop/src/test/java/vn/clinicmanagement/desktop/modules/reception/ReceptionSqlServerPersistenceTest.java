@@ -3,6 +3,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsQuery;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
 import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
