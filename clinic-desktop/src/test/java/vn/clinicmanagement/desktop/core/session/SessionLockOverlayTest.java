@@ -8,6 +8,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SessionLockOverlayTest {
+    static {
+        System.setProperty("java.awt.headless", "true");
+    }
+
     @Test void visibleGlassPaneBlocksWorkspaceInputAndOffersOnlyReauthenticationOrLogout() throws Exception {
         AtomicBoolean authenticated = new AtomicBoolean();
         AtomicBoolean loggedOut = new AtomicBoolean();

@@ -235,6 +235,11 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
 
     @Override
     public void recordSuccessfulLogin(int employeeId, LocalDateTime loginAt) {
+        if (employeeId <= 0) throw new IllegalArgumentException("Mã nhân viên không hợp lệ.");
+        if (loginAt == null) throw new IllegalArgumentException("Thời điểm đăng nhập không được để trống.");
+        if (!connections.isTransactionActive()) {
+            throw new IllegalStateException("Cập nhật thời điểm đăng nhập yêu cầu giao dịch đang hoạt động.");
+        }
         withConnection(connection -> {
             try (PreparedStatement ps = connection.prepareStatement(
                     "UPDATE NhanVien SET dangNhapCuoi=? WHERE id=? AND hoatDong=1 AND isDeleted=0")) {

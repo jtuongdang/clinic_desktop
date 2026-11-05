@@ -1,6 +1,13 @@
 package vn.clinicmanagement.application.auth;
 
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.audit.AuditActionCode;
+import vn.clinicmanagement.application.audit.AuditOutcome;
+import vn.clinicmanagement.application.audit.AuditReasonCode;
+import vn.clinicmanagement.application.audit.AuditResourceType;
+import vn.clinicmanagement.application.audit.AuditWritePort;
+import vn.clinicmanagement.application.audit.MedicalRecordAuditEntry;
+import vn.clinicmanagement.application.audit.SystemAuditEntry;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.identity.NhanVien;
@@ -9,11 +16,15 @@ import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 
 import java.lang.reflect.Proxy;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,7 +46,7 @@ class AuthenticateUserHandlerTest {
     private static final String EXPECTED_INVALID_MESSAGE = "Tên đăng nhập hoặc mật khẩu không đúng.";
 
     @Test
-    void returnsEveryAssignedRoleAndScopeAndRecordsLoginInsideTransaction() {
+    void returnsEveryAssignedRoleAndScopeWithoutRecordingLoginOrSuccessAuditBeforeScopeSelection() {
         Fixture fixture = new Fixture();
         fixture.roles = List.of(role(31, "admin"), role(42, "doctor"));
         fixture.scopes = List.of(scope(11, "Cơ sở mẫu A", 21, "Khoa mẫu A"),
@@ -55,18 +67,19 @@ class AuthenticateUserHandlerTest {
         assertEquals(1, fixture.usernameLookupCalls.get());
         assertEquals(1, fixture.roleLookupCalls.get());
         assertEquals(1, fixture.scopeLookupCalls.get());
-        assertEquals(1, fixture.transactions.calls.get());
-        assertEquals(1, fixture.recordLoginCalls.get());
-        assertTrue(fixture.recordedInsideTransaction.get());
-        assertEquals(SYNTHETIC_EMPLOYEE_ID, fixture.recordedEmployeeId.get());
-        assertNotNull(fixture.recordedLoginAt.get());
+        assertEquals(0, fixture.transactions.calls.get());
+        assertEquals(0, fixture.recordLoginCalls.get());
+        assertNull(fixture.recordedEmployeeId.get());
+        assertNull(fixture.recordedLoginAt.get());
+        assertTrue(fixture.audit.independentEntries.isEmpty());
+        assertTrue(fixture.audit.transactionalEntries.isEmpty());
         assertThrows(UnsupportedOperationException.class, () -> user.roles().clear());
         assertThrows(UnsupportedOperationException.class, () -> user.workScopes().clear());
         assertPasswordBuffersCleared(command, fixture.lastPasswordPassedToVerifier.get());
     }
 
     @Test
-    void returnsIdenticalGenericErrorForMissingInactiveDeletedAndWrongCredentialAccounts() {
+    void returnsIdenticalGenericErrorAndAppendsSafeIndependentAuditForMissingInactiveDeletedAndWrongCredentialAccounts() {
         Fixture missing = new Fixture();
         missing.employee = null;
         AuthenticateUserCommand missingCommand = commandWithSyntheticSecret("missing.synth.user");
@@ -101,7 +114,25 @@ class AuthenticateUserHandlerTest {
             assertEquals(0, fixture.recordLoginCalls.get());
             assertEquals(0, fixture.roleLookupCalls.get());
             assertEquals(0, fixture.scopeLookupCalls.get());
+            assertEquals(1, fixture.audit.independentEntries.size());
+            assertTrue(fixture.audit.transactionalEntries.isEmpty());
+            SystemAuditEntry entry = fixture.audit.independentEntries.get(0);
+            assertEquals(AuditActionCode.AUTH_LOGIN_FAILED, entry.actionCode());
+            assertEquals(fixture == missing ? null : AuditResourceType.EMPLOYEE, entry.resourceType());
+            assertEquals(AuditOutcome.FAILURE, entry.outcome());
+            assertEquals(AuditReasonCode.AUTH_INVALID, entry.reasonCode());
+            assertNull(entry.roleCode());
+            assertNull(entry.facilityId());
+            assertNull(entry.departmentId());
+            assertEquals(fixture == missing ? null : SYNTHETIC_EMPLOYEE_ID, entry.resourceId());
+            assertNotNull(entry.correlationId());
+            assertNoSecretOrUsernameLeaked(entry, "missing.synth.user", SYNTHETIC_USERNAME);
         }
+        assertNull(missing.audit.independentEntries.get(0).actorEmployeeId());
+        assertEquals(SYNTHETIC_EMPLOYEE_ID, inactive.audit.independentEntries.get(0).actorEmployeeId());
+        assertEquals(SYNTHETIC_EMPLOYEE_ID, deleted.audit.independentEntries.get(0).actorEmployeeId());
+        assertEquals(SYNTHETIC_EMPLOYEE_ID, wrongPassword.audit.independentEntries.get(0).actorEmployeeId());
+
         assertEquals(0, missing.verifierCalls.get());
         assertEquals(0, inactive.verifierCalls.get());
         assertEquals(0, deleted.verifierCalls.get());
@@ -113,7 +144,7 @@ class AuthenticateUserHandlerTest {
     }
 
     @Test
-    void rejectsNullOrBlankUsernameBeforeRepositoryCalls() {
+    void rejectsNullOrBlankUsernameBeforeRepositoryCallsAndAuditsSafeAnonymousFailure() {
         Fixture fixture = new Fixture();
 
         Result<AuthenticatedUser> nullCommandResult = fixture.handler.handle(null);
@@ -131,12 +162,19 @@ class AuthenticateUserHandlerTest {
         assertEquals(0, fixture.scopeLookupCalls.get());
         assertEquals(0, fixture.transactions.calls.get());
         assertEquals(0, fixture.recordLoginCalls.get());
+        assertEquals(3, fixture.audit.independentEntries.size());
+        for (SystemAuditEntry entry : fixture.audit.independentEntries) {
+            assertEquals(AuditActionCode.AUTH_LOGIN_FAILED, entry.actionCode());
+            assertEquals(AuditOutcome.FAILURE, entry.outcome());
+            assertEquals(AuditReasonCode.AUTH_INVALID, entry.reasonCode());
+            assertNull(entry.actorEmployeeId());
+        }
         assertCommandBufferZeroized(nullUsernameCommand);
         assertCommandBufferZeroized(blankCommand);
     }
 
     @Test
-    void rejectsAccountsWithoutActiveRoleOrValidScopeWithoutRecordingLogin() {
+    void rejectsAccountsWithoutActiveRoleOrValidScopeWithoutRecordingLoginAndAuditsDeniedReason() {
         for (List<VaiTro> roles : List.of(List.<VaiTro>of(), Arrays.asList(null, role(0, "ADMIN"), role(32, "  ")))) {
             Fixture noRoles = new Fixture();
             noRoles.roles = roles;
@@ -151,6 +189,13 @@ class AuthenticateUserHandlerTest {
             assertEquals(0, noRoles.scopeLookupCalls.get());
             assertEquals(0, noRoles.transactions.calls.get());
             assertEquals(0, noRoles.recordLoginCalls.get());
+            assertEquals(1, noRoles.audit.independentEntries.size());
+            SystemAuditEntry roleEntry = noRoles.audit.independentEntries.get(0);
+            assertEquals(AuditActionCode.AUTH_LOGIN_DENIED_NO_ROLE, roleEntry.actionCode());
+            assertEquals(AuditOutcome.DENIED, roleEntry.outcome());
+            assertEquals(AuditReasonCode.AUTH_NO_ROLE, roleEntry.reasonCode());
+            assertEquals(SYNTHETIC_EMPLOYEE_ID, roleEntry.actorEmployeeId());
+            assertNoSecretOrUsernameLeaked(roleEntry, SYNTHETIC_USERNAME);
             assertPasswordBuffersCleared(command, noRoles.lastPasswordPassedToVerifier.get());
         }
 
@@ -164,6 +209,13 @@ class AuthenticateUserHandlerTest {
         assertEquals(1, noScopes.scopeLookupCalls.get());
         assertEquals(0, noScopes.transactions.calls.get());
         assertEquals(0, noScopes.recordLoginCalls.get());
+        assertEquals(1, noScopes.audit.independentEntries.size());
+        SystemAuditEntry scopeEntry = noScopes.audit.independentEntries.get(0);
+        assertEquals(AuditActionCode.AUTH_LOGIN_DENIED_NO_SCOPE, scopeEntry.actionCode());
+        assertEquals(AuditOutcome.DENIED, scopeEntry.outcome());
+        assertEquals(AuditReasonCode.AUTH_NO_SCOPE, scopeEntry.reasonCode());
+        assertEquals(SYNTHETIC_EMPLOYEE_ID, scopeEntry.actorEmployeeId());
+        assertNoSecretOrUsernameLeaked(scopeEntry, SYNTHETIC_USERNAME);
         assertPasswordBuffersCleared(noScopeCommand, noScopes.lastPasswordPassedToVerifier.get());
     }
 
@@ -180,11 +232,12 @@ class AuthenticateUserHandlerTest {
         assertEquals(0, fixture.roleLookupCalls.get());
         assertEquals(0, fixture.scopeLookupCalls.get());
         assertEquals(0, fixture.recordLoginCalls.get());
+        assertEquals(1, fixture.audit.independentEntries.size());
         assertPasswordBuffersCleared(command, fixture.lastPasswordPassedToVerifier.get());
     }
 
     @Test
-    void returnsSafeGenericUnavailableErrorForRepositoryAndTransactionFailures() {
+    void returnsSafeGenericUnavailableErrorForRepositoryAndAuditFailures() {
         String syntheticDiagnostic = "synthetic repository diagnostic for " + SYNTHETIC_USERNAME;
 
         Fixture lookupFailure = new Fixture();
@@ -193,10 +246,11 @@ class AuthenticateUserHandlerTest {
         roleFailure.roleFailure = new IllegalStateException(syntheticDiagnostic);
         Fixture scopeFailure = new Fixture();
         scopeFailure.scopeFailure = new IllegalStateException(syntheticDiagnostic);
-        Fixture loginFailure = new Fixture();
-        loginFailure.loginFailure = new IllegalStateException(syntheticDiagnostic);
+        Fixture auditFailureOnInvalid = new Fixture();
+        auditFailureOnInvalid.passwordVerified = false;
+        auditFailureOnInvalid.audit.failure = new IllegalStateException(syntheticDiagnostic);
 
-        List<Fixture> fixtures = List.of(lookupFailure, roleFailure, scopeFailure, loginFailure);
+        List<Fixture> fixtures = List.of(lookupFailure, roleFailure, scopeFailure, auditFailureOnInvalid);
         List<AuthenticateUserCommand> commands = new ArrayList<>();
         List<Result<AuthenticatedUser>> results = new ArrayList<>();
         for (Fixture fixture : fixtures) {
@@ -217,8 +271,8 @@ class AuthenticateUserHandlerTest {
         assertEquals(0, lookupFailure.recordLoginCalls.get());
         assertEquals(0, roleFailure.transactions.calls.get());
         assertEquals(0, scopeFailure.transactions.calls.get());
-        assertEquals(1, loginFailure.transactions.calls.get());
-        assertEquals(1, loginFailure.recordLoginCalls.get());
+        assertEquals(0, auditFailureOnInvalid.transactions.calls.get());
+        assertEquals(0, auditFailureOnInvalid.recordLoginCalls.get());
         for (int index = 0; index < fixtures.size(); index++) {
             assertCommandBufferZeroized(commands.get(index));
             char[] verifierBuffer = fixtures.get(index).lastPasswordPassedToVerifier.get();
@@ -247,6 +301,15 @@ class AuthenticateUserHandlerTest {
         assertEquals(0, nullSafeCommand.passwordCopy().length);
         nullSafeCommand.close();
         assertEquals(0, nullSafeCommand.passwordCopy().length);
+    }
+
+    private static void assertNoSecretOrUsernameLeaked(SystemAuditEntry entry, String... forbiddenSubstrings) {
+        String combined = entry.toString();
+        assertFalse(combined.contains("synthetic-secret"), "Audit entry must not contain secret values");
+        assertFalse(combined.contains(SYNTHETIC_HASH), "Audit entry must not contain password hashes");
+        for (String forbidden : forbiddenSubstrings) {
+            assertFalse(combined.contains(forbidden), "Audit entry must not contain username: " + forbidden);
+        }
     }
 
     private static VaiTro role(int id, String code) {
@@ -323,6 +386,7 @@ class AuthenticateUserHandlerTest {
         private final AtomicReference<LocalDateTime> recordedLoginAt = new AtomicReference<>();
         private final AtomicReference<char[]> lastPasswordPassedToVerifier = new AtomicReference<>();
         private final TransactionProbe transactions = new TransactionProbe();
+        private final AuditProbe audit = new AuditProbe();
         private final AuthenticateUserHandler handler;
 
         private NhanVien employee = activeSyntheticEmployee();
@@ -372,7 +436,40 @@ class AuthenticateUserHandlerTest {
                 lastPasswordPassedToVerifier.set(password);
                 return passwordVerified && SYNTHETIC_HASH.equals(encodedHash);
             };
-            handler = new AuthenticateUserHandler(employees, passwordHasher, transactions);
+            handler = new AuthenticateUserHandler(
+                    employees,
+                    passwordHasher,
+                    transactions,
+                    audit,
+                    Clock.fixed(Instant.parse("2026-01-15T08:00:00Z"), ZoneOffset.UTC));
+        }
+    }
+
+    private static final class AuditProbe implements AuditWritePort {
+        private final List<SystemAuditEntry> transactionalEntries = new ArrayList<>();
+        private final List<SystemAuditEntry> independentEntries = new ArrayList<>();
+        private RuntimeException failure;
+
+        @Override
+        public void appendInCurrentTransaction(SystemAuditEntry entry) {
+            if (failure != null) throw failure;
+            transactionalEntries.add(entry);
+        }
+
+        @Override
+        public void appendIndependently(SystemAuditEntry entry) {
+            if (failure != null) throw failure;
+            independentEntries.add(entry);
+        }
+
+        @Override
+        public void appendMedicalRecordInCurrentTransaction(MedicalRecordAuditEntry entry) {
+            throw new UnsupportedOperationException("Medical record audit is not used by authentication tests.");
+        }
+
+        @Override
+        public void appendMedicalRecordIndependently(MedicalRecordAuditEntry entry) {
+            throw new UnsupportedOperationException("Medical record audit is not used by authentication tests.");
         }
     }
 

@@ -383,15 +383,16 @@ public class MainDashboardFrame extends JFrame {
         AuthenticateUserCommand command = new AuthenticateUserCommand(credentials.username(), secret);
         java.util.Arrays.fill(secret, '\0');
         credentials.clear();
-        new SwingWorker<Result<AuthenticatedUser>, Void>() {
-            @Override protected Result<AuthenticatedUser> doInBackground() {
-                return AuthenticationCompositionRoot.createHandler().handle(command);
+        new SwingWorker<Boolean, Void>() {
+            @Override protected Boolean doInBackground() {
+                Result<AuthenticatedUser> result = AuthenticationCompositionRoot.createHandler().handle(command);
+                AuthenticatedUser authenticated = result.isSuccess() ? result.valueOrThrow() : null;
+                return sessionLifecycle.reauthenticate(authenticated);
             }
             @Override protected void done() {
                 try {
-                    Result<AuthenticatedUser> result = get();
-                    if (result.isFailure() || !sessionLifecycle.reauthenticate(result.valueOrThrow())) {
-                        lockOverlay.setMessage("Không thể tiếp tục: thông tin xác thực hoặc phạm vi hiện tại không còn hợp lệ.");
+                    if (!get()) {
+                        lockOverlay.setMessage("Không thể tiếp tục: thông tin xác thực, phạm vi hoặc nhật ký phiên chưa hợp lệ.");
                         return;
                     }
                     lockOverlay.setMessage("");

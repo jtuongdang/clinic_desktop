@@ -1,15 +1,21 @@
 package vn.clinicmanagement.desktop.modules.auth;
 
+import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.auth.AuthenticateUserHandler;
+import vn.clinicmanagement.application.auth.CompleteLoginSessionHandler;
 import vn.clinicmanagement.application.auth.Pbkdf2PasswordHasher;
+import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.UserSession;
+import vn.clinicmanagement.infrastructure.persistence.DatabaseConnection;
 import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
 import vn.clinicmanagement.infrastructure.persistence.JdbcTransactionManager;
 import vn.clinicmanagement.infrastructure.persistence.JdbcUnitOfWork;
 import vn.clinicmanagement.infrastructure.persistence.identity.NhanVienRepositoryImpl;
-import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
-import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
-import vn.clinicmanagement.desktop.core.session.UserSession;
+import vn.clinicmanagement.infrastructure.persistence.system.JdbcAuditRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.system.SystemRepositoryImpl;
+
+import java.time.Clock;
 
 /** Builds the authentication use case and its JDBC adapters for the desktop application. */
 public final class AuthenticationCompositionRoot {
@@ -20,7 +26,27 @@ public final class AuthenticationCompositionRoot {
         JdbcTransactionManager transactions = new JdbcTransactionManager(unitOfWork);
         JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
         NhanVienRepositoryImpl employees = new NhanVienRepositoryImpl(connections, unitOfWork);
-        return new AuthenticateUserHandler(employees, new Pbkdf2PasswordHasher(), transactions);
+        JdbcAuditRepositoryImpl auditWritePort = new JdbcAuditRepositoryImpl(
+                connections, unitOfWork, DatabaseConnection::getConnection);
+        return new AuthenticateUserHandler(
+                employees, new Pbkdf2PasswordHasher(), transactions, auditWritePort, Clock.systemUTC());
+    }
+
+    public static CompleteLoginSessionHandler createCompleteLoginSessionHandler() {
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcTransactionManager transactions = new JdbcTransactionManager(unitOfWork);
+        JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+        NhanVienRepositoryImpl employees = new NhanVienRepositoryImpl(connections, unitOfWork);
+        JdbcAuditRepositoryImpl auditWritePort = new JdbcAuditRepositoryImpl(
+                connections, unitOfWork, DatabaseConnection::getConnection);
+        return new CompleteLoginSessionHandler(employees, transactions, auditWritePort, Clock.systemUTC());
+    }
+
+    public static AuditWritePort createAuditWritePort() {
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcTransactionManager transactions = new JdbcTransactionManager(unitOfWork);
+        JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+        return new JdbcAuditRepositoryImpl(connections, unitOfWork, DatabaseConnection::getConnection);
     }
 
     public static SessionTimeoutPolicy createSessionTimeoutPolicy() {
@@ -31,6 +57,12 @@ public final class AuthenticationCompositionRoot {
     }
 
     public static SessionLifecycleService createSessionLifecycleService(UserSession session) {
-        return new SessionLifecycleService(session, createSessionTimeoutPolicy(), java.time.Clock.systemUTC());
+        return createSessionLifecycleService(session, createSessionTimeoutPolicy());
+    }
+
+    public static SessionLifecycleService createSessionLifecycleService(
+            UserSession session,
+            SessionTimeoutPolicy policy) {
+        return new SessionLifecycleService(session, policy, Clock.systemUTC(), createAuditWritePort());
     }
 }

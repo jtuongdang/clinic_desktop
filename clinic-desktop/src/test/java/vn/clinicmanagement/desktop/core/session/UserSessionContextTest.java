@@ -8,6 +8,10 @@ import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UserSessionContextTest {
+    static {
+        System.setProperty("java.awt.headless", "true");
+    }
+
     private final UserSession session = UserSession.getInstance();
 
     @AfterEach
