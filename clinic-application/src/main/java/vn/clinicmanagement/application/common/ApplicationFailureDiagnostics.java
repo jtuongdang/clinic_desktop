@@ -34,7 +34,7 @@ public final class ApplicationFailureDiagnostics {
                                      String correlationId, Throwable failure, Consumer<String> logger) {
         try {
             logger.accept(format(operationCode, resultCode, correlationId, failure));
-        } catch (Throwable ignored) {
+        } catch (RuntimeException ignored) {
             // Diagnostics must never alter the application result.
         }
     }
