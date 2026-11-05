@@ -13,6 +13,8 @@
 
 ## Backlog bảo mật P0
 
+Đã có hai báo cáo source review cho Phase 2: [`phase2-auth-persistence-review.md`](../phase2-auth-persistence-review.md) và [`phase2-desktop-session-review.md`](../phase2-desktop-session-review.md). Chúng ghi nhận các gap về role/scope enforcement, session lifecycle, audit, repository integration tests và các quyết định cần chủ dự án xác nhận. Các báo cáo không phải bằng chứng gate đã đạt.
+
 - [x] Có luồng xác thực application và repository nhân viên nối với `LoginForm` trong source hiện tại.
 - [ ] Kiểm tra chính sách hash/verify, phản hồi lỗi, khóa tài khoản và lưu session; không kết luận đạt bảo mật chỉ vì đăng nhập SQL Server hoạt động.
 - [ ] Không cho người dùng tự chọn role để cấp quyền; role lấy từ tài khoản và giới hạn theo cơ sở/khoa.
