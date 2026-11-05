@@ -24,7 +24,7 @@
 ## 3. Thứ tự thực hiện
 
 1. **SEC-DATA-01 — assignment reads (complete, `2d062f8` + `0d91903`):** repository đọc assigned role IDs/codes và cặp cơ sở/khoa hợp lệ, kèm tên cơ sở/khoa làm nhãn lựa chọn; fake-JDBC tests pass. Chưa thay UI/login.
-2. **SEC-LOGIN-01 — role/scope selection:** authentication trả choices từ persistence, yêu cầu chọn một role và một cặp scope; tạo authenticated context sau khi lựa chọn. Tài khoản không có assignment hợp lệ bị từ chối.
+2. **SEC-LOGIN-01 — role/scope selection:** chỉ sau khi password hợp lệ, Authentication trả choices từ persistence (không mở query assignment trước auth). Nếu có nhiều role/scope thì yêu cầu chọn; nếu mỗi loại chỉ có một choice thì có thể chọn sẵn. Tạo context phiên chỉ sau khi đủ đúng một role và một cặp scope. Hủy chọn thì không mở dashboard/phiên. Tài khoản thiếu role hoặc scope hợp lệ bị từ chối.
 3. **SEC-AUTHZ-01 — default-deny authorization:** map role/action từ `MaTranPhanQuyen`, validate context và scope tại Application boundary; test allow/deny, cross-scope, revoked assignment. Không cấp mặc định `AUDIT_READ`.
 4. **SEC-SESSION-01 — lifecycle:** idle 15 phút, absolute 12 giờ, overlay giữ draft, re-auth cùng user/role, logout và thu hồi context; dùng `Clock`/timer giả cho test.
 5. **SEC-AUDIT-01 — persistence and transaction:** migration bổ sung fields cần thiết, append-only write/read repositories, audit cùng transaction với thay đổi nhạy cảm, fail-closed, redaction và quyền `AUDIT_READ` default-deny. SQL Server integration chỉ trên DB synthetic riêng.
