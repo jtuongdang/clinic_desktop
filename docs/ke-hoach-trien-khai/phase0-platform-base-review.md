@@ -1,9 +1,9 @@
 # Rà Soát Bằng Chứng Hợp Đồng Nền Tảng Miền & Cưỡng Chế Lưu Trữ (`PLAT-BASE-01`)
 
-> **Mã công việc:** `PLAT-BASE-01` — Domain Base Contract Evidence Review  
-> **Hợp đồng phê duyệt:** `c94b970a-4363-4c5c-a3a2-7e2e943dfca8` (`PLAT-BASE-01 — review domain base invariants and persistence enforcement`)  
-> **Nhánh cơ sở / Nhánh làm việc:** `feature/patient-reception-workflow` / `orchestrator/plat-base-01-domain-base-contract-evidence-review`  
-> **Phạm vi thay đổi:** Chỉ tạo duy nhất báo cáo này (`docs/ke-hoach-trien-khai/phase0-platform-base-review.md`). Tuyệt đối không chỉnh sửa mã nguồn Java, SQL, cấu hình build, kiểm thử, schema, migration hay dữ liệu runtime; không kết nối hoặc truy vấn `clinicDb`.  
+> **Mã công việc:** `PLAT-BASE-01` — Domain Base Contract Evidence Review
+> **Hợp đồng phê duyệt:** `c94b970a-4363-4c5c-a3a2-7e2e943dfca8` (`PLAT-BASE-01 — review domain base invariants and persistence enforcement`)
+> **Nhánh cơ sở / Nhánh làm việc:** `feature/patient-reception-workflow` / `orchestrator/plat-base-01-domain-base-contract-evidence-review`
+> **Phạm vi thay đổi:** Chỉ tạo duy nhất báo cáo này (`docs/ke-hoach-trien-khai/phase0-platform-base-review.md`). Tuyệt đối không chỉnh sửa mã nguồn Java, SQL, cấu hình build, kiểm thử, schema, migration hay dữ liệu runtime; không kết nối hoặc truy vấn `clinicDb`.
 > **Quy ước phân định trong báo cáo:**
 > - **`[Hợp đồng đã khai báo / Declared Contract]`**: Quy tắc được tuyên bố trong tài liệu kiến trúc (`DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, kế hoạch triển khai) hoặc chữ ký kiểu (`BaseEntity`, `IAggregateRoot`, `IRepository`, `IUnitOfWork`, `TransactionBoundary`).
 > - **`[Hành vi được cưỡng chế / Enforced Behavior]`**: Hành vi thực sự được thực thi và kiểm chứng bởi code Java, câu lệnh JDBC SQL, ràng buộc/trigger SQL Server (`V1`–`V8`) và các bài test hiện hữu (kèm đường dẫn file + số dòng).
@@ -285,7 +285,9 @@ Trong `clinic-domain`, có **15 lớp** cài đặt marker interface [`IAggregat
 
 ## 6. Kiểm Kê Bằng Chứng Kiểm Thử Hiện Có & Các Kiểm Thử Tổng Hợp Còn Thiếu
 
-### 6.1. Kiểm kê Toàn bộ 28 File Kiểm thử Hiện có (`146` Test Methods)
+### 6.1. Kiểm kê 28 File Kiểm thử tại thời điểm rà soát (`146` Test Methods)
+
+> **Mốc kiểm kê:** Số lượng này thuộc checkout nền của task review (trước khi các test bổ sung ở những task SEC-UI sau đó được tích hợp). Khi review tiếp trên nhánh đích đã có 40 file `*Test.java`; các số trong bảng bên dưới là snapshot của PLAT-BASE-01, không phải tổng hiện hành.
 
 | Module | File Test (`src/test/java/vn/clinicmanagement/...`) | Số test | Hành vi được chứng minh (`Enforced Test Evidence`) |
 | :--- | :--- | :---: | :--- |
@@ -374,15 +376,9 @@ Không tự đoán hoặc tự áp đặt các thay đổi sau đây nếu chưa
 ## 8. Nhật Ký Kiểm Định (`Validation Record`)
 
 ### 8.1. Kiểm định `git diff --check` và Trạng thái Sandbox
-- **Yêu cầu kiểm định:** `git diff --check passes; no build/test or database access required.`
-- **Thực thi trong Standard Sandbox (`BypassSandbox: false`):**
-  - Khi gọi lệnh qua công cụ thực thi lệnh trong worktree `/Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/a7a4dd8f-8b7b-4443-a8f4-81217f24bac4`, môi trường sandbox trả về lỗi cấu hình:
-    ```text
-    Command failed to run: sandbox configuration error: deny .git/: non-absolute file path.
-    ```
-  - Tuân thủ hướng dẫn của gói task (*"Run relevant checks when the sandbox permits them; report exact results and blockers. The Orchestrator runs its own validation after the agent."*), không tự ý vượt rào sandbox và không đụng tới `clinicDb`.
-- **Kiểm tra thủ công định dạng file đã tạo:**
-  - File duy nhất được tạo mới là `docs/ke-hoach-trien-khai/phase0-platform-base-review.md`, kết thúc bằng ký tự xuống dòng chuẩn (`LF`), không có khoảng trắng thừa cuối dòng (`trailing whitespace`) và không có conflict marker.
+- **Yêu cầu kiểm định:** `git diff --check`; không yêu cầu build/test hoặc truy cập cơ sở dữ liệu.
+- **Kiểm tra ban đầu:** sandbox của task trả lỗi cấu hình (`deny .git/: non-absolute file path`), nên Agent không chạy được lệnh Git trong worktree và không tuyên bố đã chạy diff check.
+- **Hậu kiểm review tại checkout tích hợp:** đã loại bỏ trailing whitespace phát hiện khi review; `git diff --check` chạy thành công trên thay đổi của báo cáo sau khi đưa vào checkout tích hợp. Không chạy build/test và không truy cập `clinicDb`, đúng phạm vi task chỉ tạo tài liệu.
 
 ### 8.2. Đối chiếu Tiêu chí Nghiệm thu (`Acceptance Criteria Verification`)
 
