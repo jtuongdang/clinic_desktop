@@ -119,24 +119,13 @@ Hiện tại gói `vn.clinicmanagement.domain.common.events` khai báo **10 lớ
 
 ## 5. Khoảng Trống Kiểm Thử Hiện Tại (`Test Gaps`)
 
-Đã rà soát toàn bộ 16 file test hiện có trong repository:
-- `clinic-domain/src/test/java`:
-  1. `BenhNhanTest.java` (`L1-L78`) — chỉ kiểm thử constructor rỗng + setter và các hàm validate CCCD/SĐT/BHYT/ngày sinh; **không** gọi constructor 9 tham số (`BenhNhan.java:53-64`) và **không** kiểm tra `getDomainEvents()`.
-  2. `LuotKhamTest.java` (`L1-L55`) — chỉ kiểm thử `setChiSoSinhTon` và validate sinh hiệu; **không** kiểm thử `startExam()`, `completeExam()`, `lockEmr(...)` hay các sự kiện `LuotKhamStartedEvent`, `LuotKhamCompletedEvent`, `EmrLockedEvent`.
-  3. `DonThuocTest.java` (`L1-L40`) — chỉ kiểm thử `addDetail` và `InvalidPrescriptionItemException`; **không** kiểm thử `approve()`, `completeDispense(...)` hay `DonThuocApprovedEvent`, `DonThuocDispensedEvent`.
-  4. `HoaDonTest.java` (`L1-L55`) — có gọi `invoice.recordPayment(...)` (`L22`, `L34`, `L49`), nhưng chỉ assert `daThanhToan` và `trangThai`; **không** assert `invoice.getDomainEvents()` chứa `PaymentRecordedEvent` và không kiểm thử `HoaDonCreatedEvent`.
-  5. `FefoAllocationServiceTest.java` (`L1-L75`) — chỉ kiểm thử phân bổ lô FEFO; không kiểm thử `LowStockWarningEvent`.
-  6. `AuditEntitiesTest.java`, `CatalogEntitiesTest.java`, `ClinicalEntitiesTest.java`, `FacilityScheduleEntitiesTest.java`, `HrPayrollEntitiesTest.java`, `InventoryExtendedEntitiesTest.java`, `StaffAccountEntitiesTest.java` — kiểm thử các thực thể mở rộng Phase 1; không có test nào cho `LichHenBookedEvent` hay `BaseEntity` domain events.
-- `clinic-application/src/test/java`:
-  13. `RegisterPatientHandlerTest.java` (`L1-L162`) — kiểm thử luồng tiếp đón với in-memory fake; không kiểm thử phát hành sự kiện miền.
-  14. `GetReceptionQueueHandlerTest.java` (`L1-L76`).
-- `clinic-infrastructure/src/test/java`:
-  15. `ReceptionPersistenceIntegrationTest.java` (`L1-L157`).
-- `clinic-desktop/src/test/java`:
-  16. `ReceptionViewModelAndFormTest.java` (`L1-L120`).
+Đã rà soát toàn bộ **16 file test hiện có** trong checkout (đối chiếu `rg --files clinic-domain/src/test/java clinic-application/src/test/java clinic-infrastructure/src/test/java clinic-desktop/src/test/java`):
+- `clinic-domain`: `DateRangeTest`, `MoneyTest`, `PhoneNumberTest` (3 file, 16 test case) — kiểm thử value object; không có test về domain event hoặc aggregate được nêu ở trên.
+- `clinic-application`: `AuthenticateUserHandlerTest`, `Pbkdf2PasswordHasherTest`, `RegisterPatientDuplicateCccdTest`, `RegisterPatientHandlerTest`, `SearchAndReceptionQueueHandlerTest` (5 file, 26 test case) — không có test về phát hành/điều phối domain event.
+- `clinic-infrastructure`: `DatabaseMigrationRunnerTest`, `FreshDatabaseMigrationSqlServerTest`, `JdbcTransactionManagerTest`, `SqlServerBatchSplitterTest`, `BenhNhanRepositoryImplTest` (5 file, 21 test case; migration SQL Server opt-in được skip trong lệnh mặc định) — không có test về phát hành domain event.
+- `clinic-desktop`: `ReceptionSqlServerPersistenceTest`, `ReceptionSqlServerProcessRestartTest`, `PatientRegistrationFormPanelTest` (3 file, 8 test case; hai SQL Server E2E opt-in được skip trong lệnh mặc định) — không có test về UI lắng nghe domain event.
 
-**Kết luận về độ phủ test sự kiện miền:** **0 / 16 file test** kiểm thử `BaseEntity.registerDomainEvent`, `getDomainEvents`, `clearDomainEvents`, `AbstractDomainEvent`, `IDomainEventPublisher`, `IDomainEventHandler`, hoặc bất kỳ lớp nào trong 10 lớp sự kiện miền.
-
+**Kết luận về độ phủ test sự kiện miền:** **0 / 16 file test** kiểm thử `BaseEntity.registerDomainEvent`, `getDomainEvents`, `clearDomainEvents`, `AbstractDomainEvent`, `IDomainEventPublisher`, `IDomainEventHandler`, hoặc bất kỳ lớp nào trong 10 lớp sự kiện miền. Đây là source inventory của checkout và khớp số liệu Maven `mvn clean verify`: 71 test được phát hiện, 68 pass, 0 failure/error, 3 SQL Server opt-in skip.
 ---
 
 ## 6. Khế Ước Triển Khai Tối Thiểu Tiếp Theo Cho `PLAT-EVENT-01` (`[Khuyến nghị / Recommendation]`)
