@@ -41,7 +41,18 @@ public final class JdbcTransactionManager implements TransactionBoundary {
             currentConnection.set(connection);
             rollbackOnly.set(false);
             unitOfWork.beginTransaction();
-            Result<T> result = operation.get();
+            Result<T> result;
+            try {
+                result = operation.get();
+            } catch (RuntimeException ex) {
+                rollbackOnly.set(true);
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    // Keep the operation failure generic even when rollback also fails.
+                }
+                return Result.failure("TRANSACTION_FAILED", "Không thể hoàn tất giao dịch cơ sở dữ liệu.");
+            }
             if (result == null || result.isFailure() || rollbackOnly.get()) {
                 connection.rollback();
                 if (result == null) return Result.failure("TRANSACTION_FAILED", "Giao dịch không trả về kết quả.");

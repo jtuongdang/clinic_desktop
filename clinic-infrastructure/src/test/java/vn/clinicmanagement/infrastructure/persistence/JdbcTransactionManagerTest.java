@@ -58,6 +58,54 @@ class JdbcTransactionManagerTest {
     }
 
     @Test
+    void rollsBackOuterRuntimeFailureAndReturnsSafeFailure() {
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        SyntheticConnection synthetic = new SyntheticConnection();
+        JdbcTransactionManager transactions = transactionManager(unitOfWork, synthetic);
+        JdbcConnectionProvider provider = new JdbcConnectionProvider(transactions);
+
+        Result<String> result = transactions.inTransaction(() -> {
+            assertTrue(provider.isTransactionActive());
+            unitOfWork.recordChanges(1);
+            throw new IllegalStateException("Synthetic runtime detail");
+        });
+
+        assertTrue(result.isFailure());
+        assertEquals("TRANSACTION_FAILED", result.getError().orElseThrow().code());
+        assertFalse(result.getError().orElseThrow().message().contains("Synthetic runtime detail"));
+        assertEquals(1, synthetic.rollbacks);
+        assertEquals(0, synthetic.commits);
+        assertEquals(1, synthetic.closes);
+        assertNull(transactions.currentConnection());
+        assertFalse(provider.isTransactionActive());
+        assertEquals(0, unitOfWork.saveChanges());
+    }
+
+    @Test
+    void returnsSafeFailureAndCleansUpWhenRollbackThrowsSqlException() {
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        SyntheticConnection synthetic = new SyntheticConnection(false, true);
+        JdbcTransactionManager transactions = transactionManager(unitOfWork, synthetic);
+        JdbcConnectionProvider provider = new JdbcConnectionProvider(transactions);
+
+        Result<String> result = transactions.inTransaction(() -> {
+            unitOfWork.recordChanges(1);
+            throw new IllegalStateException("Synthetic runtime detail");
+        });
+
+        assertTrue(result.isFailure());
+        assertEquals("TRANSACTION_FAILED", result.getError().orElseThrow().code());
+        assertFalse(result.getError().orElseThrow().message().contains("Synthetic runtime detail"));
+        assertFalse(result.getError().orElseThrow().message().contains("Synthetic rollback detail"));
+        assertEquals(1, synthetic.rollbacks);
+        assertEquals(0, synthetic.commits);
+        assertEquals(1, synthetic.closes);
+        assertNull(transactions.currentConnection());
+        assertFalse(provider.isTransactionActive());
+        assertEquals(0, unitOfWork.saveChanges());
+    }
+
+    @Test
     void rollsBackWhenNestedFailureIsIgnoredBySuccessfulOuterOperation() {
         SyntheticConnection synthetic = new SyntheticConnection();
         JdbcTransactionManager transactions = transactionManager(new JdbcUnitOfWork(), synthetic);
@@ -162,16 +210,22 @@ class JdbcTransactionManagerTest {
     private static final class SyntheticConnection {
         private final Connection connection;
         private final boolean failOnAutoCommit;
+        private final boolean failOnRollback;
         private int commits;
         private int rollbacks;
         private int closes;
 
         private SyntheticConnection() {
-            this(false);
+            this(false, false);
         }
 
         private SyntheticConnection(boolean failOnAutoCommit) {
+            this(failOnAutoCommit, false);
+        }
+
+        private SyntheticConnection(boolean failOnAutoCommit, boolean failOnRollback) {
             this.failOnAutoCommit = failOnAutoCommit;
+            this.failOnRollback = failOnRollback;
             connection = (Connection) Proxy.newProxyInstance(
                     Connection.class.getClassLoader(),
                     new Class<?>[]{Connection.class},
@@ -188,6 +242,9 @@ class JdbcTransactionManagerTest {
                         }
                         case "rollback" -> {
                             rollbacks++;
+                            if (this.failOnRollback) {
+                                throw new SQLException("Synthetic rollback detail");
+                            }
                             yield null;
                         }
                         case "close" -> {
