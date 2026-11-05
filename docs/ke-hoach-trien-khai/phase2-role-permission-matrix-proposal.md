@@ -1,16 +1,18 @@
-# Đề xuất Ma trận Phân quyền Vai trò cho `SEC-AUTHZ-01` (Business-Review Proposal)
+# Ma trận Phân quyền Vai trò cho `SEC-AUTHZ-01` (Owner Approved Baseline)
 
-> **Trạng thái tài liệu:** **`[ĐỀ XUẤT CHỜ CHỦ DỰ ÁN PHÊ DUYỆT — CHƯA PHẢI CHÍNH SÁCH ĐÃ DUYỆT / PROPOSAL ONLY — NOT APPROVED POLICY]`**  
+> **Trạng thái tài liệu:** Ma trận role/action được Chủ dự án duyệt ngày **05/11/2026**. Xem [phê duyệt ma trận](phase2-role-permission-matrix-approval.md) để biết ranh giới scope và các action vẫn `DENY`. Những nhãn `[Suy luận đề xuất]` bên dưới mô tả nguồn gốc dòng ma trận trước khi phê duyệt, không làm mất hiệu lực quyết định duyệt này.
 > **Ngày lập:** 05/11/2026  
 > **Phạm vi thay đổi:** Chỉ tạo duy nhất tài liệu đề xuất `docs/ke-hoach-trien-khai/phase2-role-permission-matrix-proposal.md`. Không chỉnh sửa mã nguồn Java, schema SQL, script migration hay dữ liệu seed.  
 > **Nguyên tắc nền tảng bắt buộc (theo Policy & Implementation Contract đã duyệt):**
 > 1. **Một vai trò và một phạm vi mỗi phiên (`One-Role & One-Assigned-Facility-Department-Scope Per Session`):** Mỗi phiên đăng nhập chỉ kích hoạt đúng **1 vai trò (`VaiTro`)** và **1 cặp Cơ sở – Khoa (`CoSo` – `Khoa`)** đã được gán hợp lệ cho tài khoản (`docs/ke-hoach-trien-khai/phase2-security-policy-proposal.md:8-11`, `docs/ke-hoach-trien-khai/phase2-implementation-contract.md:8-9`).
 > 2. **Từ chối mặc định (`Default-Deny`):** Mọi hành động hoặc phạm vi không được khai báo tường minh với `duocPhep = true` cho vai trò đang kích hoạt đều bị từ chối mặc định tại ranh giới `clinic-application` (`docs/ke-hoach-trien-khai/phase2-implementation-contract.md:8,20-21,28`). Việc ẩn/hiện nút trên giao diện Swing chỉ hỗ trợ trải nghiệm người dùng, tuyệt đối không phải ranh giới bảo mật.
-> 3. **Quyền tra cứu Audit (`AUDIT_READ`) luôn là `DENY` mặc định cho mọi vai trò:** Không vai trò nào (kể cả `ADMIN`) được tự động cấp hoặc seed quyền đọc nhật ký kiểm toán (`AUDIT_READ` / `AUDIT:XEM`). Mọi đề xuất liên quan đến `AUDIT_READ` đều giữ trạng thái **`DENY (duocPhep = false)`** và chỉ đánh dấu là câu hỏi chờ Chủ dự án (Owner) quyết định riêng (`docs/ke-hoach-trien-khai/phase2-implementation-contract.md:13,28,37`).
+> 3. **Quyền tra cứu Audit (`AUDIT_READ`) bị từ chối cho mọi vai trò:** Owner đã duyệt giữ `DENY (duocPhep = false)` kể cả cho `ADMIN`; không seed quyền đọc nhật ký kiểm toán (`AUDIT_READ` / `AUDIT:XEM`).
 > 4. **Phân biệt Bằng chứng và Suy luận:** Mọi dòng ánh xạ trong tài liệu này đều tách bạch rõ:
 >    - **`[Bằng chứng / Evidence]`**: Dẫn chiếu trực tiếp tới file và dòng lệnh trong mã nguồn/migration/tài liệu hiện hữu.
->    - **`[Suy luận đề xuất / Proposed Inference]`**: Đề xuất ánh xạ tối thiểu từ bằng chứng giao diện/miền để phục vụ rà soát nghiệp vụ, **chưa được phê duyệt**.
+>    - **`[Suy luận đề xuất / Proposed Inference]`**: Nhãn này mô tả nguồn gốc suy luận trước Owner review; các mapping 5.2 đã được duyệt theo decision record. Các dòng có unresolved `DEC-AUTHZ-*` vẫn deny.
 >    - **`[Cần Owner quyết định / Owner Decision Required]`**: Điểm khuyết hoặc nhập nhằng không thể tự suy diễn kỹ thuật; chặn việc thực thi hoặc seed quyền tự động.
+>
+> **Kết quả Owner review:** Ma trận 5.2 được duyệt theo đúng action ALLOW/DENY đã ghi. Mọi scope rộng `CO_SO` trong bảng bị policy phiên hiện hành giới hạn xuống đúng cặp `KHOA_PHONG`; `DEC-AUTHZ-03` chọn cô lập theo khoa. Các action ở DEC-AUTHZ-01/02/04/05/06/07/08 vẫn deny cho tới khi có quyết định riêng. `AUDIT_READ` luôn deny.
 
 ---
 
@@ -150,13 +152,13 @@ Trước khi thực thi `SEC-AUTHZ-01`, cần ghi nhận rõ 7 điểm lệch c�
 1. **Vai trò (`VaiTro.tenVaiTro`):** Sử dụng đúng 6 mã vai trò đang có trong `V2__Seed_Initial_Data.sql:51-58` và `AuthenticateUserHandler.java:79-86`:
    - `ADMIN` (`id=1`), `DOCTOR` (`id=2`), `RECEPTIONIST` (`id=3`), `PHARMACIST` (`id=4`), `CASHIER` (`id=5`), `LAB_TECH` (`id=6`).
 2. **Hành động (`HanhDongQuyen`):**
-   - Trong cột **Hành động chuẩn hiện có (`HanhDongQuyen.java:4-8`)**, chỉ sử dụng 5 giá trị đã khai báo trong code: `XEM`, `TAO`, `SUA`, `XOA`, `DUYET`.
-   - Các hành động nhạy cảm mà tài liệu `DOMAIN_ANALYSIS.md:153` hoặc `phase2-security-policy-proposal.md:36-39` nhắc tới nhưng **chưa có trong `HanhDongQuyen.java`** (như `IN`, `XUAT_FILE`, `KY_KHOA_EMR`, `MO_KHOA_EMR`, `HOAN_HUY_THU_TIEN`, `AUDIT_READ`) được ghi rõ trong cột hành động/ghi chú kèm nhãn **`[Cần Owner quyết định / Owner Decision Required]`**.
+   - Hiện code có `XEM`, `TAO`, `SUA`, `XOA`, `DUYET`; decision record đã duyệt bổ sung `IN`, `XUAT_FILE`, `MO_KHOA_EMR`, `AUDIT_READ`. `AUDIT_READ` tồn tại như action code nhưng bị từ chối tuyệt đối.
+   - Những workflow/action còn gắn `DEC-AUTHZ-01/02/04/05/06/07/08` vẫn deny; không biến nhãn đề xuất ở các dòng đó thành grant.
 3. **Phạm vi dữ liệu hiệu lực (`PhamViDuLieu` kết hợp Session Scope):**
-   - Theo quyết định của Chủ dự án (`phase2-security-policy-proposal.md:11` và `phase2-implementation-contract.md:9`), **không cấp quyền `TOAN_HE_THONG`** cho dữ liệu tác nghiệp.
-   - Quyết định đã duyệt bảo đảm phiên chỉ chứa một cặp assignment `(facilityId, departmentId)`. Tuy nhiên, phạm vi ma trận `CO_SO` sẽ cho phép truy cập liên khoa trong cùng cơ sở và vì vậy rộng hơn khoa đang chọn. Các hàng `CO_SO` dưới đây chỉ là **đề xuất chưa được chấp thuận**, phụ thuộc `DEC-AUTHZ-03`; cho tới khi Owner quyết định, không triển khai hoặc seed chúng. Phạm vi `KHOA_PHONG` khớp cả cơ sở và khoa của assignment phiên.
+   - Owner đã duyệt phạm vi duy nhất có hiệu lực cho thao tác nghiệp vụ là `KHOA_PHONG`, khớp đồng thời cả facility và department trong assignment của phiên.
+   - Các ô bảng cũ ghi `CO_SO` không phải ngoại lệ liên khoa được duyệt; phải giới hạn ở đúng cặp `KHOA_PHONG`. `DEC-AUTHZ-03` đã chốt cô lập theo khoa, không có thao tác mở xem liên khoa trong scope hiện hành.
      - **`KHOA_PHONG` (`PhamViDuLieu.KHOA_PHONG`, `PhamViDuLieu.java:6`)**: Giới hạn chặt trong cả `maCoSo == session.facilityId` **và** `maKhoa == session.departmentId`.
-     - **`CO_SO` (`PhamViDuLieu.CO_SO`, `PhamViDuLieu.java:5`)**: Nếu Owner duyệt ngoại lệ liên khoa, giới hạn trong `maCoSo == session.facilityId`; không suy ra quyền này chỉ từ việc người dùng có một assignment khoa trong cơ sở. Các use case cần scope liên khoa phải có quyết định nghiệp vụ và audit phù hợp trước khi cấp.
+     - **`CO_SO` (`PhamViDuLieu.CO_SO`, `PhamViDuLieu.java:5`)**: Giữ để nhận diện/đọc legacy data, nhưng không tạo allow trong policy hiện hành; mọi thao tác liên khoa bị từ chối cho đến khi có quyết định Owner mới.
 
 ### 5.2. Bảng Ma trận Chi tiết (`Role × Module × Action × Scope`)
 
@@ -260,5 +262,5 @@ Các quyết định dưới đây bắt buộc phải được Chủ dự án (
 |---|---|---|---|
 | 1 | **Only `docs/ke-hoach-trien-khai/phase2-role-permission-matrix-proposal.md` changes.** | **PASS (Đạt)** | Chỉ tạo mới duy nhất file `docs/ke-hoach-trien-khai/phase2-role-permission-matrix-proposal.md`; không chỉnh sửa code, migration hay file khác. |
 | 2 | **Every proposed role/action mapping cites repository evidence and labels inference explicitly.** | **PASS (Đạt)** | Mục 2, Mục 3 và từng dòng trong Bảng Ma trận 5.2 đều trích dẫn chính xác đường dẫn file + số dòng (`V1`, `V2`, `AuthenticateUserHandler.java`, `MainDashboardFrame.java`, các Panel và Entity) và gắn nhãn tường minh **`[Bằng chứng]`**, **`[Suy luận đề xuất]`**, **`[Cần Owner quyết định]`**. |
-| 3 | **No permission grants are described as approved; `AUDIT_READ` remains default-deny.** | **PASS (Đạt)** | Toàn bộ tài liệu và Bảng 5.2 gắn nhãn **`[ĐỀ XUẤT CHỜ CHỦ DỰ ÁN PHÊ DUYỆT — CHƯA PHẢI CHÍNH SÁCH ĐÃ DUYỆT]`**; dòng `AUDIT` / `AUDIT_READ` tại Bảng 5.2 và Mục 7 đặt **`DENY` (`duocPhep = false`)** cho cả 6 vai trò, không đề xuất seed quyền đọc audit. |
-| 4 | **Report missing decisions that block safe authorization enforcement.** | **PASS (Đạt)** | Mục 4 báo cáo 7 điểm lệch Code/Schema/UI và Mục 6 báo cáo chi tiết 10 quyết định chặn (`DEC-AUTHZ-01` đến `DEC-AUTHZ-10`) cần Owner chốt trước khi thực thi/seed quyền. |
+| 3 | **Permission grants are explicitly reviewed; `AUDIT_READ` remains default-deny.** | **PASS (Đạt)** | Owner duyệt ma trận 5.2 ngày 05/11/2026; approval supplement ghi rõ chỉ action đã duyệt được seed, scope rộng bị giới hạn về `KHOA_PHONG`, và `AUDIT_READ` vẫn deny cho cả 6 role. |
+| 4 | **Report missing decisions that block safe authorization enforcement.** | **PASS (Đạt)** | `DEC-AUTHZ-03`, `DEC-AUTHZ-09`, `DEC-AUTHZ-10` được giải quyết trong approval supplement. `DEC-AUTHZ-01/02/04/05/06/07/08` vẫn chờ Owner và tương ứng tiếp tục deny. |

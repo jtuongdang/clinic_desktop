@@ -8,11 +8,13 @@
 | Chủ đề | Quyết định |
 |---|---|
 | Nhiều vai trò | Mỗi phiên chọn đúng một vai trò đã được gán cho tài khoản. Role chưa được cấp quyền phải bị từ chối mặc định. |
-| Phạm vi dữ liệu | Mỗi phiên chọn đúng một cặp cơ sở/khoa từ assignment hợp lệ của tài khoản; không cấp quyền xem toàn hệ thống. |
+| Phạm vi dữ liệu | Mỗi phiên chọn đúng một cặp cơ sở/khoa từ assignment hợp lệ của tài khoản; mọi truy vấn/command phải khớp cả cơ sở lẫn khoa. Không cấp quyền xem liên khoa hoặc toàn hệ thống. |
 | Phiên làm việc | Tự khóa sau 15 phút không thao tác; hết phiên sau tối đa 12 giờ. Auto-lock che workspace, giữ bản nháp và yêu cầu xác thực lại cùng tài khoản/vai trò. |
 | Audit | Ghi nhận event set được liệt kê dưới đây; audit thay đổi nghiệp vụ trong cùng transaction, lỗi audit làm rollback; chỉ append; không purge tự động khi chưa chốt retention. Tra cứu audit phải có quyền riêng. |
 
 Các quyết định này là contract đầu vào cho Phase 2. Trong phiên, mọi Command/Query nhạy cảm vẫn phải được Application xác thực lại theo actor, role và cặp cơ sở/khoa đã chọn; UI không phải ranh giới phân quyền.
+
+Ngày 05/11/2026, Chủ dự án duyệt ma trận role/action tại [phase2-role-permission-matrix-approval.md](phase2-role-permission-matrix-approval.md). Scope đã được chốt nghiêm ngặt theo `KHOA_PHONG`; không áp dụng các dòng `CO_SO` như một ngoại lệ liên khoa. Những thao tác chưa được quyết định riêng vẫn `DENY`.
 
 ## Quy tắc đã duyệt để triển khai
 
@@ -40,7 +42,7 @@ Ghi nhận các nhóm sự kiện đã duyệt:
 
 Mỗi bản ghi audit lưu actor ID, role hiệu lực, cơ sở/khoa hiệu lực, mã hành động, loại và ID bản ghi đích, UTC time, kết quả, mã lý do khi cần, workstation/correlation ID. Không ghi password/hash/token/connection string, CCCD/BHYT đầy đủ hoặc nội dung lâm sàng tự do. Audit hồ sơ chỉ giữ định danh lượt khám cần thiết và mã hành động/lý do truy cập.
 
-Tra cứu audit chỉ cho phép qua quyền riêng, mặc định từ chối. Implementation không tự gán quyền này cho role nào; cấp role cụ thể cần qua ma trận quyền đã được quản trị phê duyệt.
+Tra cứu audit chỉ cho phép qua quyền riêng, mặc định từ chối. Ma trận được duyệt vẫn giữ `AUDIT_READ` là `DENY` cho mọi role; chưa triển khai reader hoặc cấp quyền này.
 
 ### 4. Tính nguyên tử, bất biến và thời hạn lưu Audit
 
