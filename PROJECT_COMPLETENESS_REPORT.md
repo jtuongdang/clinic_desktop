@@ -17,13 +17,13 @@ Project đã vượt qua trạng thái “chỉ có UI tĩnh”: có kiểm th�
 | Tiếp đón và bệnh nhân | Có handlers, JDBC repositories, giao diện nối qua composition root, tìm kiếm có scope, ghi/đọc bệnh nhân, BHYT và lượt khám/hàng đợi. | Chỉ là vertical slice đang tiến hành; UI-to-database E2E đầy đủ và nghiệm thu Phase 1 còn thiếu. |
 | Tiền sử và EMR | Có model/schema và một số màn hình/placeholder. | Chưa có workflow tiền sử lâm sàng được persist; EMR chưa có luồng end-to-end được chấp nhận. |
 | Các phân hệ khác | Có nhiều model, migration, panel, dialog hoặc bản xem trước. | Khám, CLS, kê đơn/kho, viện phí, danh mục, báo cáo, HR/quản trị chủ yếu chưa có application-to-database workflow được nghiệm thu; một số UI dùng dữ liệu tĩnh. |
-| Kiểm thử | JDK 17 mặc định: **226 tests, 0 failures, 0 errors, 4 skipped**. | Bốn test SQL Server opt-in được skip có chủ đích trong lượt mặc định; UI chưa được quan sát trực tiếp. |
+| Kiểm thử | JDK 17 mặc định: **230 tests, 0 failures, 0 errors, 4 skipped**. | Bốn test SQL Server opt-in được skip có chủ đích trong lượt mặc định; UI chưa được quan sát trực tiếp. |
 
 ## 2. Bằng chứng và cách diễn giải
 
 ### Kiểm định mặc định
 
-Lượt root JDK 17 gần nhất ghi trong kế hoạch là `mvn -Djava.awt.headless=true clean verify`: **226 tests, 0 failures, 0 errors, 4 skipped**, trên cả năm module. Bốn lượt skip là các test SQL Server opt-in; chúng **không chạy** trong Maven verify mặc định. Kết quả này xác nhận build/test suite mặc định tại snapshot tương ứng, không xác nhận SQL Server hay giao diện desktop đang hiển thị đúng.
+Lượt root JDK 17 mới nhất là `mvn -Djava.awt.headless=true clean verify`: **230 tests, 0 failures, 0 errors, 4 skipped**, trên cả năm module. Bốn lượt skip là các test SQL Server opt-in; chúng **không chạy** trong Maven verify mặc định. Kết quả này xác nhận build/test suite mặc định tại snapshot hiện tại, không xác nhận SQL Server hay giao diện desktop đang hiển thị đúng.
 
 ### SQL Server opt-in riêng trên dữ liệu tổng hợp
 
