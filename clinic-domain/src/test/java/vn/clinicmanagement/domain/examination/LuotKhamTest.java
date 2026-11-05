@@ -35,7 +35,7 @@ class LuotKhamTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = TrangThaiLuotKham.class, names = {"CHO_KHAM", "DA_HUY", "HOAN_THANH"})
+    @EnumSource(value = TrangThaiLuotKham.class, mode = EnumSource.Mode.EXCLUDE, names = "DANG_KHAM")
     void completeExamRejectsNonActiveStateWithoutChangingVisit(TrangThaiLuotKham initialState) {
         LuotKham visit = visitInState(initialState);
         LocalDateTime completionTime = LocalDateTime.of(2026, 10, 20, 9, 15);
