@@ -132,8 +132,10 @@ class AuditSqlServerPersistenceTest {
         insurance.setCreatedBy(actorContext.employeeId());
 
         Integer generatedPatientIdBeforeRollback;
+        boolean triggerInstalled = false;
         try {
             installTemporaryPatientCreatedRejectTrigger(correlationId);
+            triggerInstalled = true;
 
             Result<RegistrationReceipt> registrationResult = services.registerPatient().handle(
                     new RegisterPatientCommand(
@@ -232,7 +234,9 @@ class AuditSqlServerPersistenceTest {
                     "Rolled-back synthetic registration must not appear in the reception queue"
             );
         } finally {
-            dropTemporaryPatientCreatedRejectTrigger();
+            if (triggerInstalled) {
+                dropTemporaryPatientCreatedRejectTrigger();
+            }
         }
 
         try (Connection connection = DatabaseConnection.getConnection()) {
@@ -473,7 +477,16 @@ class AuditSqlServerPersistenceTest {
 
     private static void installTemporaryPatientCreatedRejectTrigger(UUID correlationId) throws SQLException {
         String correlationLiteral = correlationId.toString();
-        String triggerSql = "CREATE OR ALTER TRIGGER dbo." + TEMPORARY_REJECT_TRIGGER + "\n"
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            if (queryCountByString(
+                    connection,
+                    "SELECT COUNT(*) FROM sys.triggers WHERE name = ?",
+                    TEMPORARY_REJECT_TRIGGER
+            ) != 0) {
+                throw new SQLException("Refusing to replace an existing test trigger");
+            }
+        }
+        String triggerSql = "CREATE TRIGGER dbo." + TEMPORARY_REJECT_TRIGGER + "\n"
                 + "ON dbo.NhatKyHeThong\n"
                 + "AFTER INSERT\n"
                 + "AS\n"
