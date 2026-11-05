@@ -10,11 +10,17 @@ import java.util.function.Supplier;
 /** JDBC transaction boundary shared by repository calls on the current thread. */
 public final class JdbcTransactionManager implements TransactionBoundary {
     private final JdbcUnitOfWork unitOfWork;
+    private final ConnectionSupplier connectionSupplier;
     private final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
     private final ThreadLocal<Boolean> rollbackOnly = ThreadLocal.withInitial(() -> false);
 
     public JdbcTransactionManager(JdbcUnitOfWork unitOfWork) {
+        this(unitOfWork, DatabaseConnection::getConnection);
+    }
+
+    JdbcTransactionManager(JdbcUnitOfWork unitOfWork, ConnectionSupplier connectionSupplier) {
         this.unitOfWork = unitOfWork;
+        this.connectionSupplier = connectionSupplier;
     }
 
     @Override
@@ -30,7 +36,7 @@ public final class JdbcTransactionManager implements TransactionBoundary {
             }
         }
 
-        try (Connection connection = DatabaseConnection.getConnection()) {
+        try (Connection connection = connectionSupplier.get()) {
             connection.setAutoCommit(false);
             currentConnection.set(connection);
             rollbackOnly.set(false);
@@ -57,4 +63,9 @@ public final class JdbcTransactionManager implements TransactionBoundary {
     }
 
     Connection currentConnection() { return currentConnection.get(); }
+
+    @FunctionalInterface
+    interface ConnectionSupplier {
+        Connection get() throws SQLException;
+    }
 }
