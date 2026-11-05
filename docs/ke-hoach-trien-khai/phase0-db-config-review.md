@@ -61,7 +61,7 @@ Then add focused tests using synthetic values and a fake JDBC driver:
 3. For the packaged JAR, build under JDK 17, inspect archive entry names to confirm no `db.properties` is present, and launch the shaded artifact with the documented external configuration source. Use the fake driver/configuration seam for a no-network smoke test of resolution and driver handoff; do not connect to SQL Server for this configuration test.
 4. Add a distinct TLS configuration test asserting the chosen URL options and certificate-validation behavior at the configuration boundary. A real certificate/handshake test belongs in a separately authorized environment test.
 
-These steps validate behavior without selecting a production policy or claiming production readiness.
+The precedence resolver and synthetic unit tests recommended here were later implemented under `PLAT-DB-CONFIG-RESOLVER-01` (see [`phase0-db-config-resolution-contract.md`](phase0-db-config-resolution-contract.md)). That implementation preserves the observed source order and does not decide TLS, external-JAR configuration, authentication modes, or release readiness.
 
 ## Guidance read
 

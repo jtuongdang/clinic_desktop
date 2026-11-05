@@ -76,6 +76,10 @@ Then route the resolved immutable configuration to a fake JDBC boundary that cap
 
 This sequence establishes configuration behavior only. It does not establish deployment readiness.
 
+## Implementation result
+
+The contract was implemented locally in `PLAT-DB-CONFIG-RESOLVER-01` (Copilot task `12fb66a0-2aab-41e4-abf4-ca9e82bdc83f`, task commit `3696188`, integrated commit `9b8dcaa`). Root review identified that Java record-generated `toString()` would expose URL/password fields; commit `f508eac` overrides both configuration record representations with presence-only fields and adds synthetic-marker assertions. `DatabaseConfigurationTest` covers the in-memory source precedence and setter/configure lifecycle, and `DatabaseConnectionTest` verifies connection overload selection through an injected fake. Root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed 224 tests, 0 failures/errors, and 4 expected SQL Server opt-in skips. No local config/credentials were read and no database was contacted. Unresolved deployment decisions in this report remain open.
+
 ## Guidance read
 
 - `docs/PROJECT_CONVENTIONS.md` — supplied in the task guidance; no repository copy was found.
