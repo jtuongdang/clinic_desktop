@@ -19,6 +19,7 @@ import java.util.Properties;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class FreshDatabaseMigrationSqlServerTest {
 
@@ -79,10 +80,11 @@ class FreshDatabaseMigrationSqlServerTest {
                             "V2__Seed_Initial_Data.sql",
                             "V3__Repair_Demo_Account_Passwords.sql",
                             "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
-                            "V5__Seed_Session_Timeout_Parameters.sql"
+                            "V5__Seed_Session_Timeout_Parameters.sql",
+                            "V6__Enhance_Audit_Tables_Append_Only.sql"
                     ),
                     queryMigrationRecords(connection),
-                    "All V1-V5 migrations must be recorded as successful"
+                    "All V1-V6 migrations must be recorded as successful"
             );
 
             assertEquals(1, queryInt(
@@ -148,11 +150,75 @@ class FreshDatabaseMigrationSqlServerTest {
                     "The absolute timeout parameter must retain its approved default"
             );
             assertSeedCount(connection, "ThamSoHeThong", 6);
+            assertEquals(
+                    22,
+                    queryInt(
+                            connection,
+                            "SELECT COUNT(*) FROM sys.columns c "
+                                    + "JOIN sys.tables t ON t.object_id = c.object_id "
+                                    + "WHERE t.name IN ('NhatKyHeThong', 'NhatKyHoSoBenhAn') "
+                                    + "AND c.name IN ('maVaiTro', 'maVaiTroCode', 'maCoSo', 'maKhoa', "
+                                    + "'loaiDoiTuong', 'maDoiTuong', 'ketQua', 'maLyDo', 'workstationId', "
+                                    + "'correlationId', 'occurredAtUtc')"
+                    ),
+                    "V6 must add nullable metadata columns to both audit tables"
+            );
+            assertEquals(
+                    2,
+                    queryInt(
+                            connection,
+                            "SELECT COUNT(*) FROM sys.triggers tr "
+                                    + "JOIN sys.tables t ON t.object_id = tr.parent_id "
+                                    + "WHERE t.name IN ('NhatKyHeThong', 'NhatKyHoSoBenhAn') "
+                                    + "AND tr.name IN ('TR_NhatKyHeThong_AppendOnly', "
+                                    + "'TR_NhatKyHoSoBenhAn_AppendOnly') AND tr.is_disabled = 0"
+                    ),
+                    "V6 must enable append-only triggers on both audit tables"
+            );
+            assertEquals(
+                    4,
+                    queryInt(
+                            connection,
+                            "SELECT COUNT(*) FROM sys.trigger_events e "
+                                    + "JOIN sys.triggers tr ON tr.object_id = e.object_id "
+                                    + "WHERE tr.name IN ('TR_NhatKyHeThong_AppendOnly', "
+                                    + "'TR_NhatKyHoSoBenhAn_AppendOnly') "
+                                    + "AND e.type_desc IN ('UPDATE', 'DELETE')"
+                    ),
+                    "Each append-only trigger must reject both UPDATE and DELETE"
+            );
+
+            assertAppendOnlyTriggersRejectPayloadChangesAndDeletion(connection);
         } catch (SQLException exception) {
             throw new AssertionError(
                     "Could not verify the SQL Server migration results; connection details were suppressed"
             );
         }
+    }
+
+    private static void assertAppendOnlyTriggersRejectPayloadChangesAndDeletion(Connection connection)
+            throws SQLException {
+        int auditId;
+        try (Statement statement = connection.createStatement()) {
+            try (ResultSet resultSet = statement.executeQuery(
+                    "INSERT INTO NhatKyHeThong (maNhanVien, hanhDong, chiTiet) "
+                            + "OUTPUT INSERTED.id VALUES (NULL, 'SYNTHETIC_APPEND_ONLY_TEST', 'synthetic payload')")) {
+                if (!resultSet.next()) throw new SQLException("Synthetic audit insert returned no identity.");
+                auditId = resultSet.getInt(1);
+            }
+        }
+
+        try (Statement statement = connection.createStatement()) {
+            assertThrows(SQLException.class, () -> statement.executeUpdate(
+                    "UPDATE NhatKyHeThong SET chiTiet = 'tampered synthetic payload' WHERE id = " + auditId));
+            assertThrows(SQLException.class, () -> statement.executeUpdate(
+                    "DELETE FROM NhatKyHeThong WHERE id = " + auditId));
+        }
+
+        assertEquals(1, queryInt(connection,
+                "SELECT COUNT(*) FROM NhatKyHeThong WHERE id = " + auditId
+                        + " AND chiTiet = 'synthetic payload'"),
+                "Append-only trigger must preserve synthetic payload and row after rejected mutations");
     }
 
     private static Properties loadLocalProperties() {
