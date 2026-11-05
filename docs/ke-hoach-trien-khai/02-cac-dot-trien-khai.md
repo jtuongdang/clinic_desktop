@@ -84,7 +84,7 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Phụ thuộc:** các phase cung cấp dữ liệu; Phase 2 cho mọi truy vấn/tài liệu nhạy cảm; Phase 8 cho cấu hình quản trị.
 **Phạm vi:** báo cáo, DOCX/print/export, notification/payment/external integrations, hardening, CI/release/operations.
 **Còn lại:** định nghĩa chỉ số và đối soát; kiểm tra mẫu tài liệu; quản lý secrets; contract/integration tests; build/release và hướng dẫn vận hành.
-**CI:** `REL-CI-01` đang thêm GitHub Actions workflow JDK 17 `clean verify` cho push/PR, không sử dụng secrets hoặc chạy SQL Server opt-in.
+**CI:** `REL-CI-01` đã thêm `.github/workflows/maven-verify.yml`: push/PR sẽ chạy headless Maven verify trên JDK 17 bằng action major hiện hành; quyền `contents: read`, không secrets/SQL Server opt-in. YAML và Maven đã kiểm tra local. GitHub-hosted run chưa có vì branch chưa push; task được đánh dấu complete-local, không phải CI run đã nghiệm thu.
 
 ## Quy tắc chuyển phase
 
