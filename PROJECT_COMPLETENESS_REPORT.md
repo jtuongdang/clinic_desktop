@@ -17,23 +17,23 @@ Project đã vượt qua trạng thái “chỉ có UI tĩnh”: có kiểm th�
 | Tiếp đón và bệnh nhân | Có handlers, JDBC repositories, giao diện nối qua composition root, tìm kiếm có scope, ghi/đọc bệnh nhân, BHYT và lượt khám/hàng đợi. | Chỉ là vertical slice đang tiến hành; UI-to-database E2E đầy đủ và nghiệm thu Phase 1 còn thiếu. |
 | Tiền sử và EMR | Có model/schema và một số màn hình/placeholder. | Chưa có workflow tiền sử lâm sàng được persist; EMR chưa có luồng end-to-end được chấp nhận. |
 | Các phân hệ khác | Có nhiều model, migration, panel, dialog hoặc bản xem trước. | Khám, CLS, kê đơn/kho, viện phí, danh mục, báo cáo, HR/quản trị chủ yếu chưa có application-to-database workflow được nghiệm thu; một số UI dùng dữ liệu tĩnh. |
-| Kiểm thử | JDK 17 mặc định: **237 tests, 0 failures, 0 errors, 4 skipped**. | Bốn test SQL Server opt-in được skip có chủ đích trong lượt mặc định; UI chưa được quan sát trực tiếp. |
+| Kiểm thử | JDK 17 mặc định: **243 tests, 0 failures, 0 errors, 4 skipped**. | Bốn test SQL Server opt-in được skip có chủ đích trong lượt mặc định; UI chưa được quan sát trực tiếp. |
 
 ## 2. Bằng chứng và cách diễn giải
 
 ### Kiểm định mặc định
 
-Lượt root JDK 17 mới nhất là `mvn -Djava.awt.headless=true clean verify`: **237 tests, 0 failures, 0 errors, 4 skipped**, trên cả năm module. Bốn lượt skip là các test SQL Server opt-in; chúng **không chạy** trong Maven verify mặc định. Kết quả này xác nhận build/test suite mặc định tại snapshot hiện tại, không xác nhận SQL Server hay giao diện desktop đang hiển thị đúng.
+Lượt root JDK 17 mới nhất là `mvn -Djava.awt.headless=true clean verify`: **243 tests, 0 failures, 0 errors, 4 skipped**, trên cả năm module. Bốn lượt skip là các test SQL Server opt-in; chúng **không chạy** trong Maven verify mặc định. Kết quả này xác nhận build/test suite mặc định tại snapshot hiện tại, không xác nhận toàn bộ SQL Server hay giao diện desktop đang hiển thị đúng.
 
 ### SQL Server opt-in riêng trên dữ liệu tổng hợp
 
 - `FreshDatabaseMigrationSqlServerTest` pass **1/1** trên database tổng hợp mới `clinic_test_v9_20261106`, áp dụng migration V1–V9 và kiểm tra ràng buộc liên kết bệnh nhân–cơ sở của V9.
-- `ReceptionSqlServerPersistenceTest` pass **1/1** riêng trên database tổng hợp nói trên, qua composition root tiếp đón. Bằng chứng bao gồm đăng ký/tìm kiếm/cập nhật bệnh nhân, thông tin BHYT, metadata liên kết cơ sở, hàng đợi và đọc lại; dữ liệu test được dọn bằng soft delete theo ghi nhận của task.
-- Hai lượt trên là kiểm tra opt-in độc lập, không thuộc 226 test mặc định, không phải xác minh toàn bộ UI hoặc mọi trường hợp nghiệp vụ. Báo cáo nguồn ghi rõ chúng dùng dữ liệu tổng hợp và không nhắm tới `clinicDb`.
+- `ReceptionSqlServerPersistenceTest` pass **1/1** riêng trên database tổng hợp nói trên. Bài test mới điền `PatientRegistrationFormPanel` trên Swing EDT, tạo lệnh qua converter thật, gọi composition/handler thật, rồi tìm và đọc lại toàn bộ trường bệnh nhân/BHYT được form hỗ trợ, liên kết cơ sở và lượt trong queue. Fixture dọn các dòng do nó tạo bằng soft delete.
+- Hai lượt trên là kiểm tra opt-in độc lập, không thuộc 243 test mặc định, không phải xác minh toàn bộ `ReceptionPanel` hoặc mọi trường hợp nghiệp vụ. Báo cáo nguồn ghi rõ chúng dùng dữ liệu tổng hợp và không nhắm tới `clinicDb`.
 
 ### UI và nghiệm thu
 
-Các test Swing/headless xác minh hành vi component được kiểm thử, không chứng minh cửa sổ thực tế đã được nhìn thấy, layout hiển thị đúng, hay thao tác end-to-end toàn ứng dụng. Kế hoạch hiện trạng ghi cửa sổ Swing chưa được quan sát trực tiếp do máy chủ bị khóa; full UI-to-database E2E còn mở. Không có kết luận thị giác về UI trong báo cáo này.
+Các test Swing/headless hiện nối form đăng ký với handler/persistence trên SQL Server tổng hợp, nhưng không chứng minh cửa sổ thực tế đã được nhìn thấy, layout hiển thị đúng, hay `ReceptionPanel` button/worker/dialog chạy trọn vẹn. Kế hoạch hiện trạng ghi cửa sổ Swing chưa được quan sát trực tiếp do máy chủ bị khóa; full UI visual/interaction E2E còn mở. Không có kết luận thị giác về UI trong báo cáo này.
 
 ## 3. Hiện trạng theo lớp và luồng
 
@@ -48,7 +48,7 @@ Các test Swing/headless xác minh hành vi component được kiểm thử, kh�
 
 - `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler` và `ReceptionCompositionRoot` nối UI, application, transaction, audit và JDBC adapters.
 - Có lưu/cập nhật và đọc lại hồ sơ bệnh nhân, BHYT, liên kết bệnh nhân–cơ sở, lượt khám/hàng đợi; truy vấn tiếp đón được giới hạn theo cặp cơ sở/khoa trong các luồng đã nối. Có tests unit/headless và bằng chứng SQL Server opt-in nêu ở trên.
-- Đây là slice có persistence thực, khác với các panel chỉ hiển thị mẫu. Tuy nhiên, Phase 1 vẫn `[~]`: full Swing UI workflow, queue lifecycle/chuyển phòng, privacy/audit đầy đủ và nghiệm thu nghiệp vụ còn mở. Bằng chứng opt-in không đóng phase.
+- Đây là slice có persistence thực, khác với các panel chỉ hiển thị mẫu. Phase 1 vẫn `[~]`: headless form-to-SQL acceptance và các audit/scope cụ thể đã có; full `ReceptionPanel` visual/interaction workflow, queue lifecycle/chuyển phòng, tiền sử có guard/audit và nghiệm thu nghiệp vụ còn mở. Bằng chứng opt-in không đóng phase.
 
 ### Tiền sử bệnh và khám/EMR
 
