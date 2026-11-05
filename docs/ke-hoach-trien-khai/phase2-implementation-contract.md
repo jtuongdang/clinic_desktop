@@ -23,7 +23,7 @@
 
 ## 3. Thứ tự thực hiện
 
-1. **SEC-DATA-01 — assignment reads:** repository đọc assigned role IDs/codes và cặp cơ sở/khoa hợp lệ; test SQL mapping bằng JDBC fake. Chưa thay UI/login.
+1. **SEC-DATA-01 — assignment reads:** repository đọc assigned role IDs/codes và cặp cơ sở/khoa hợp lệ, kèm tên cơ sở/khoa làm nhãn lựa chọn; test SQL mapping bằng JDBC fake. Chưa thay UI/login.
 2. **SEC-LOGIN-01 — role/scope selection:** authentication trả choices từ persistence, yêu cầu chọn một role và một cặp scope; tạo authenticated context sau khi lựa chọn. Tài khoản không có assignment hợp lệ bị từ chối.
 3. **SEC-AUTHZ-01 — default-deny authorization:** map role/action từ `MaTranPhanQuyen`, validate context và scope tại Application boundary; test allow/deny, cross-scope, revoked assignment. Không cấp mặc định `AUDIT_READ`.
 4. **SEC-SESSION-01 — lifecycle:** idle 15 phút, absolute 12 giờ, overlay giữ draft, re-auth cùng user/role, logout và thu hồi context; dùng `Clock`/timer giả cho test.

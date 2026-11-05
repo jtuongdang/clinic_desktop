@@ -43,16 +43,20 @@ class StaffAccessAssignmentRepositoryTest {
     @Test
     void mapsOnlyAssignedFacilityDepartmentPairsAndEnforcesOwnershipAndActiveRows() {
         SyntheticJdbc jdbc = new SyntheticJdbc(List.of(
-                Map.of("maCoSo", 2, "maKhoa", 12),
-                Map.of("maCoSo", 5, "maKhoa", 31)));
+                Map.of("maCoSo", 2, "tenCoSo", "Co so Dong", "maKhoa", 12, "tenKhoa", "Khoa Noi"),
+                Map.of("maCoSo", 5, "tenCoSo", "Co so Tay", "maKhoa", 31, "tenKhoa", "Khoa Nhi")));
         Harness harness = new Harness(jdbc);
         List<NhanVienWorkScope> scopes = harness.read(repo -> repo.getAssignedWorkScopes(42));
 
-        assertEquals(List.of(new NhanVienWorkScope(2, 12), new NhanVienWorkScope(5, 31)), scopes);
+        assertEquals(List.of(
+                new NhanVienWorkScope(2, "Co so Dong", 12, "Khoa Noi"),
+                new NhanVienWorkScope(5, "Co so Tay", 31, "Khoa Nhi")), scopes);
         assertEquals(42, jdbc.boundParameters.get(1));
         assertTrue(jdbc.sql.contains("INNER JOIN PhanQuyenCoSo pq ON pq.maNhanVien=nv.id"));
         assertTrue(jdbc.sql.contains("INNER JOIN NhanVienKhoa nk ON nk.maNhanVien=nv.id"));
         assertTrue(jdbc.sql.contains("INNER JOIN CoSo cs ON cs.id=pq.maCoSo"));
+        assertTrue(jdbc.sql.contains("cs.tenCoSo AS tenCoSo"));
+        assertTrue(jdbc.sql.contains("k.tenKhoa AS tenKhoa"));
         assertTrue(jdbc.sql.contains("k.maCoSo=cs.id AND k.maCoSo=pq.maCoSo"));
         assertTrue(jdbc.sql.contains("nv.hoatDong=1"));
         assertTrue(jdbc.sql.contains("nv.isDeleted=0"));

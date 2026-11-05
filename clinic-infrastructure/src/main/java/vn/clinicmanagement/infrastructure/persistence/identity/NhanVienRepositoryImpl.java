@@ -206,7 +206,8 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
 
     @Override
     public List<NhanVienWorkScope> getAssignedWorkScopes(int employeeId) {
-        String sql = "SELECT DISTINCT pq.maCoSo AS maCoSo, nk.maKhoa AS maKhoa "
+        String sql = "SELECT DISTINCT cs.id AS maCoSo, cs.tenCoSo AS tenCoSo, "
+                + "k.id AS maKhoa, k.tenKhoa AS tenKhoa "
                 + "FROM NhanVien nv "
                 + "INNER JOIN PhanQuyenCoSo pq ON pq.maNhanVien=nv.id "
                 + "INNER JOIN CoSo cs ON cs.id=pq.maCoSo "
@@ -222,7 +223,8 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
             try (ResultSet rs = ps.executeQuery()) {
                 List<NhanVienWorkScope> scopes = new ArrayList<>();
                 while (rs.next()) {
-                    scopes.add(new NhanVienWorkScope(rs.getInt("maCoSo"), rs.getInt("maKhoa")));
+                    scopes.add(new NhanVienWorkScope(rs.getInt("maCoSo"), rs.getString("tenCoSo"),
+                            rs.getInt("maKhoa"), rs.getString("tenKhoa")));
                 }
                 return scopes;
             }
