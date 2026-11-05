@@ -2,6 +2,8 @@ package vn.clinicmanagement.infrastructure.persistence.identity;
 
 import vn.clinicmanagement.domain.common.IUnitOfWork;
 import vn.clinicmanagement.domain.identity.NhanVien;
+import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
+import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.domain.repositories.ISpecification;
@@ -171,6 +173,58 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
                 List<String> roles = new ArrayList<>();
                 while (rs.next()) roles.add(rs.getString(1));
                 return roles;
+            }
+        } catch (SQLException ex) {
+            throw persistenceFailure(ex);
+        }
+    }
+
+    @Override
+    public List<VaiTro> getAssignedRoles(int employeeId) {
+        String sql = "SELECT vt.id, vt.tenVaiTro FROM NhanVien nv "
+                + "INNER JOIN NhanVienVaiTro nvt ON nvt.maNhanVien=nv.id "
+                + "INNER JOIN VaiTro vt ON vt.id=nvt.maVaiTro "
+                + "WHERE nv.id=? AND nv.hoatDong=1 AND nv.isDeleted=0 "
+                + "AND nvt.isDeleted=0 AND vt.isDeleted=0 ORDER BY vt.id";
+        try (JdbcConnectionProvider.Lease lease = connections.acquire();
+             PreparedStatement ps = lease.connection().prepareStatement(sql)) {
+            ps.setInt(1, employeeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<VaiTro> roles = new ArrayList<>();
+                while (rs.next()) {
+                    VaiTro role = new VaiTro();
+                    role.setId(rs.getInt("id"));
+                    role.setTenVaiTro(rs.getString("tenVaiTro"));
+                    roles.add(role);
+                }
+                return roles;
+            }
+        } catch (SQLException ex) {
+            throw persistenceFailure(ex);
+        }
+    }
+
+    @Override
+    public List<NhanVienWorkScope> getAssignedWorkScopes(int employeeId) {
+        String sql = "SELECT DISTINCT pq.maCoSo AS maCoSo, nk.maKhoa AS maKhoa "
+                + "FROM NhanVien nv "
+                + "INNER JOIN PhanQuyenCoSo pq ON pq.maNhanVien=nv.id "
+                + "INNER JOIN CoSo cs ON cs.id=pq.maCoSo "
+                + "INNER JOIN NhanVienKhoa nk ON nk.maNhanVien=nv.id "
+                + "INNER JOIN Khoa k ON k.id=nk.maKhoa AND k.maCoSo=cs.id AND k.maCoSo=pq.maCoSo "
+                + "WHERE nv.id=? AND nv.hoatDong=1 AND nv.isDeleted=0 "
+                + "AND pq.isDeleted=0 AND cs.hoatDong=1 AND cs.isDeleted=0 "
+                + "AND nk.isDeleted=0 AND k.hoatDong=1 AND k.isDeleted=0 "
+                + "ORDER BY pq.maCoSo, nk.maKhoa";
+        try (JdbcConnectionProvider.Lease lease = connections.acquire();
+             PreparedStatement ps = lease.connection().prepareStatement(sql)) {
+            ps.setInt(1, employeeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<NhanVienWorkScope> scopes = new ArrayList<>();
+                while (rs.next()) {
+                    scopes.add(new NhanVienWorkScope(rs.getInt("maCoSo"), rs.getInt("maKhoa")));
+                }
+                return scopes;
             }
         } catch (SQLException ex) {
             throw persistenceFailure(ex);
