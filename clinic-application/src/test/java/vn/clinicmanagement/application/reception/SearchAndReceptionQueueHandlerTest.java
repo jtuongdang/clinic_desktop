@@ -1,486 +1,376 @@
 package vn.clinicmanagement.application.reception;
 
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.audit.*;
+import vn.clinicmanagement.application.authorization.*;
 import vn.clinicmanagement.application.common.Result;
-import vn.clinicmanagement.domain.common.IUnitOfWork;
-import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
-import vn.clinicmanagement.domain.common.enums.GioiTinh;
-import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
-import vn.clinicmanagement.domain.examination.LuotKham;
+import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
+import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
+import vn.clinicmanagement.domain.facility.PhongKham;
+import vn.clinicmanagement.domain.identity.*;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
-import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
-import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
-import vn.clinicmanagement.domain.repositories.ISpecification;
-import vn.clinicmanagement.domain.repositories.PagedResult;
+import vn.clinicmanagement.domain.repositories.*;
+import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 
+import java.lang.reflect.Proxy;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class SearchAndReceptionQueueHandlerTest {
-
-    private static final String REPOSITORY_FAILURE_MESSAGE = "synthetic repository failure";
+    private static final int EMPLOYEE = 17, ROLE = 4, FACILITY = 3, DEPARTMENT = 8;
+    private static final String ROLE_CODE = "RECEPTIONIST";
+    private static final UUID SESSION = UUID.fromString("a43eeb1d-7e98-4ceb-8b84-903a1fdab203");
 
     @Test
-    void searchRejectsNullAndBlankQueriesBeforeCallingRepositories() {
-        FakePatientRepository patientRepo = new FakePatientRepository();
-        FakeInsuranceRepository insuranceRepo = new FakeInsuranceRepository();
-        SearchPatientsHandler handler = new SearchPatientsHandler(patientRepo, insuranceRepo);
+    void deniedAndStaleScopeReadsAuditDenialWithoutRunningProtectedQueries() {
+        Fixture f = new Fixture();
+        f.permissions = List.of();
+        assertTrue(f.search("synthetic-term").isFailure());
+        assertEquals(0, f.patientQueries);
+        assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, f.audit.entries.get(0).actionCode());
+        assertNull(f.audit.entries.get(0).resourceId());
+        assertNull(f.audit.entries.get(0).resourceType());
 
-        List<SearchPatientsQuery> invalidQueries = new ArrayList<>();
-        invalidQueries.add(null);
-        invalidQueries.add(new SearchPatientsQuery(null));
-        invalidQueries.add(new SearchPatientsQuery(""));
-        invalidQueries.add(new SearchPatientsQuery("   \t\n  "));
-
-        for (SearchPatientsQuery query : invalidQueries) {
-            Result<List<PatientSearchItem>> result = handler.handle(query);
-
-            assertTrue(result.isFailure());
-            Result.ApplicationError error = result.getError().orElseThrow();
-            assertEquals("SEARCH_KEYWORD_REQUIRED", error.code());
-            assertFalse(error.message().isBlank());
-        }
-
-        assertEquals(0, patientRepo.searchCallCount);
-        assertEquals(0, insuranceRepo.lookupCallCount);
+        f = new Fixture();
+        AuthorizationContext stale = new AuthorizationContext(EMPLOYEE, ROLE, ROLE_CODE,
+                FACILITY, DEPARTMENT + 1, SESSION);
+        assertTrue(f.search("private-search-term", stale).isFailure());
+        assertEquals(0, f.patientQueries);
+        assertEquals(1, f.audit.entries.size());
+        assertNull(f.audit.entries.get(0).resourceId());
     }
 
     @Test
-    void searchTrimsNonBlankKeywordAndProjectsLatestInsurancePerPatient() {
-        FakePatientRepository patientRepo = new FakePatientRepository();
-        FakeInsuranceRepository insuranceRepo = new FakeInsuranceRepository();
+    void inactiveSessionAndRevokedAssignmentSkipRepositoryReads() {
+        Fixture f = new Fixture();
+        f.sessionActive = false;
+        assertTrue(f.search("synthetic").isFailure());
+        assertEquals(0, f.patientQueries);
+        assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, f.audit.entries.get(0).actionCode());
 
-        BenhNhan firstPatient = syntheticPatient(101, "BN-SYN-0101", "Họ Mẫu", "Một");
-        BenhNhan secondPatient = syntheticPatient(102, "BN-SYN-0102", "Họ Mẫu", "Hai");
-        patientRepo.patientsToReturn = List.of(firstPatient, secondPatient);
+        f = new Fixture();
+        f.assignmentValid = false;
+        assertTrue(f.search("synthetic").isFailure());
+        assertEquals(0, f.patientQueries);
+        assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, f.audit.entries.get(0).actionCode());
+    }
 
-        BaoHiem olderCard = syntheticInsurance(1, 101, "BH-SYN-OLD-0101", LocalDate.of(2025, 12, 31));
-        BaoHiem latestCard = syntheticInsurance(2, 101, "BH-SYN-NEW-0101", LocalDate.of(2026, 12, 31));
-        insuranceRepo.add(olderCard);
-        insuranceRepo.add(latestCard);
-
-        SearchPatientsHandler handler = new SearchPatientsHandler(patientRepo, insuranceRepo);
-
-        Result<List<PatientSearchItem>> result = handler.handle(new SearchPatientsQuery("  BN-SYN  "));
+    @Test
+    void patientQueryPrecedesIndependentAuditAndOnlyThenReturnsResults() {
+        Fixture f = new Fixture();
+        f.patientResults = List.of(patient(21));
+        Result<List<PatientSearchItem>> result = f.search("  BN-SYN-21  ");
 
         assertTrue(result.isSuccess());
-        assertEquals("BN-SYN", patientRepo.lastSearchKeyword);
-        assertEquals(1, patientRepo.searchCallCount);
-
-        List<PatientSearchItem> items = result.valueOrThrow();
-        assertEquals(2, items.size());
-        assertSame(firstPatient, items.get(0).patient());
-        assertSame(latestCard, items.get(0).latestInsurance());
-        assertSame(secondPatient, items.get(1).patient());
-        assertNull(items.get(1).latestInsurance());
-        assertEquals(List.of(101, 102), insuranceRepo.queriedPatientIds);
+        assertEquals(List.of("query", "audit"), f.order);
+        assertEquals(1, result.valueOrThrow().size());
+        assertEquals(1, f.insuranceLookups);
+        assertEquals(AuditActionCode.PATIENT_SEARCH, f.audit.entries.get(0).actionCode());
+        assertNull(f.audit.entries.get(0).resourceId());
     }
 
     @Test
-    void searchCapsResultsAtFiftyAndAttachesLatestInsuranceForEachIncludedPatient() {
-        FakePatientRepository patientRepo = new FakePatientRepository();
-        FakeInsuranceRepository insuranceRepo = new FakeInsuranceRepository();
+    void searchCapsScopedResultsAtFiftyAndProjectsLatestInsurance() {
+        Fixture f = new Fixture();
+        List<BenhNhan> patients = new ArrayList<>();
+        for (int id = 1; id <= 60; id++) patients.add(patient(id));
+        f.patientResults = patients;
+        BaoHiem card = new BaoHiem();
+        card.setId(71);
+        card.setMaBenhNhan(1);
+        card.setSoBaoHiem("SYNTHETIC-CARD");
+        f.cardsByPatient.put(1, card);
 
-        List<BenhNhan> sixtyPatients = new ArrayList<>();
-        Map<Integer, BaoHiem> expectedLatestByPatient = new HashMap<>();
-        for (int i = 1; i <= 60; i++) {
-            BenhNhan patient = syntheticPatient(
-                    i,
-                    String.format("BN-SYN-%04d", i),
-                    "Họ Tổng Hợp",
-                    "Bệnh Nhân " + i
-            );
-            sixtyPatients.add(patient);
-
-            if (i % 3 != 0) {
-                BaoHiem older = syntheticInsurance(
-                        i * 10,
-                        i,
-                        String.format("BH-SYN-OLD-%04d", i),
-                        LocalDate.of(2025, 6, 30)
-                );
-                BaoHiem latest = syntheticInsurance(
-                        i * 10 + 1,
-                        i,
-                        String.format("BH-SYN-LATEST-%04d", i),
-                        LocalDate.of(2026, 12, 31)
-                );
-                insuranceRepo.add(older);
-                insuranceRepo.add(latest);
-                expectedLatestByPatient.put(i, latest);
-            }
-        }
-        patientRepo.patientsToReturn = sixtyPatients;
-
-        SearchPatientsHandler handler = new SearchPatientsHandler(patientRepo, insuranceRepo);
-
-        Result<List<PatientSearchItem>> result = handler.handle(new SearchPatientsQuery("Họ Tổng Hợp"));
+        Result<List<PatientSearchItem>> result = f.search("synthetic");
 
         assertTrue(result.isSuccess());
-        List<PatientSearchItem> items = result.valueOrThrow();
-        assertEquals(50, items.size());
-        assertEquals(50, insuranceRepo.lookupCallCount);
-
-        for (int index = 0; index < 50; index++) {
-            int expectedPatientId = index + 1;
-            PatientSearchItem item = items.get(index);
-            assertEquals(expectedPatientId, item.patient().getId());
-            assertSame(expectedLatestByPatient.get(expectedPatientId), item.latestInsurance());
-        }
-        assertFalse(insuranceRepo.queriedPatientIds.contains(51));
+        assertEquals(50, result.valueOrThrow().size());
+        assertSame(card, result.valueOrThrow().get(0).latestInsurance());
+        assertEquals(50, f.insuranceLookups);
+        assertEquals(50, f.requestedLimit);
     }
 
     @Test
-    void searchMapsPatientRepositoryFailureToGenericErrorWithoutLeakingExceptionMessage() {
-        FakePatientRepository patientRepo = new FakePatientRepository();
-        patientRepo.failure = new RuntimeException(REPOSITORY_FAILURE_MESSAGE);
-        FakeInsuranceRepository insuranceRepo = new FakeInsuranceRepository();
-        SearchPatientsHandler handler = new SearchPatientsHandler(patientRepo, insuranceRepo);
+    void insuranceReadFailureReturnsNoPartialPatientResultsOrSuccessAudit() {
+        Fixture f = new Fixture();
+        f.patientResults = List.of(patient(23));
+        f.insuranceFailure = new IllegalStateException("synthetic insurance read failure");
 
-        Result<List<PatientSearchItem>> result = handler.handle(new SearchPatientsQuery("BN-SYN-0001"));
+        Result<List<PatientSearchItem>> result = f.search("synthetic");
 
         assertTrue(result.isFailure());
-        Result.ApplicationError error = result.getError().orElseThrow();
-        assertEquals("PATIENT_SEARCH_FAILED", error.code());
-        assertEquals("Không thể tìm hồ sơ lúc này. Hãy kiểm tra kết nối cơ sở dữ liệu.", error.message());
-        assertFalse(error.message().contains(REPOSITORY_FAILURE_MESSAGE));
-        assertEquals(0, insuranceRepo.lookupCallCount);
+        assertTrue(result.getValue().isEmpty());
+        assertTrue(f.audit.entries.isEmpty());
     }
 
     @Test
-    void searchMapsInsuranceRepositoryFailureToGenericErrorWithoutLeakingExceptionMessage() {
-        FakePatientRepository patientRepo = new FakePatientRepository();
-        patientRepo.patientsToReturn = List.of(syntheticPatient(201, "BN-SYN-0201", "Họ Mẫu", "Ba"));
-        FakeInsuranceRepository insuranceRepo = new FakeInsuranceRepository();
-        insuranceRepo.failure = new RuntimeException(REPOSITORY_FAILURE_MESSAGE);
-        SearchPatientsHandler handler = new SearchPatientsHandler(patientRepo, insuranceRepo);
+    void auditFailureReturnsNoProtectedData() {
+        Fixture f = new Fixture();
+        f.patientResults = List.of(patient(22));
+        f.audit.failure = new IllegalStateException("synthetic audit storage failure");
 
-        Result<List<PatientSearchItem>> result = handler.handle(new SearchPatientsQuery("BN-SYN-0201"));
+        Result<List<PatientSearchItem>> result = f.search("synthetic");
 
         assertTrue(result.isFailure());
-        Result.ApplicationError error = result.getError().orElseThrow();
-        assertEquals("PATIENT_SEARCH_FAILED", error.code());
-        assertEquals("Không thể tìm hồ sơ lúc này. Hãy kiểm tra kết nối cơ sở dữ liệu.", error.message());
-        assertFalse(error.message().contains(REPOSITORY_FAILURE_MESSAGE));
-        assertEquals(1, insuranceRepo.lookupCallCount);
+        assertTrue(result.getValue().isEmpty());
+        assertEquals(List.of("query", "audit"), f.order);
     }
 
     @Test
-    void queueUsesExplicitDateAndReturnsBothQueueEntriesAndRoomSummaries() {
-        FakeReceptionQueuePort queuePort = new FakeReceptionQueuePort();
-        LocalDate explicitDate = LocalDate.of(2026, 11, 5);
-        ReceptionQueueItem queueItem = new ReceptionQueueItem(
-                501,
-                301,
-                "BN-SYN-0301",
-                "Họ Mẫu Bốn",
-                11,
-                "Phòng Khám Nội 1",
-                1,
-                "001",
-                "CHO_KHAM",
-                LocalDateTime.of(2026, 11, 5, 8, 30)
-        );
-        ClinicRoomQueueSummary roomSummary = new ClinicRoomQueueSummary(
-                11,
-                "Phòng Khám Nội 1",
-                "Khoa Nội Tổng Hợp",
-                5,
-                3,
-                1
-        );
-        queuePort.queueItems = List.of(queueItem);
-        queuePort.roomSummaries = List.of(roomSummary);
+    void queueAndRoomAuditFailuresReturnNoProtectedData() {
+        Fixture f = new Fixture();
+        f.permissions = List.of(grant("RECEPTION"));
+        f.audit.failure = new IllegalStateException("synthetic audit storage failure");
+        Result<ReceptionQueueSnapshot> queue = f.queueHandler().handle(f.queueQuery());
+        assertTrue(queue.isFailure());
+        assertTrue(queue.getValue().isEmpty());
 
-        GetReceptionQueueHandler handler = new GetReceptionQueueHandler(queuePort);
+        f = new Fixture();
+        f.permissions = List.of(grant("CATALOG"));
+        f.audit.failure = new IllegalStateException("synthetic audit storage failure");
+        Result<List<PhongKham>> rooms = f.roomHandler().handle(f.roomQuery());
+        assertTrue(rooms.isFailure());
+        assertTrue(rooms.getValue().isEmpty());
+    }
 
-        Result<ReceptionQueueSnapshot> result = handler.handle(new GetReceptionQueueQuery(explicitDate));
+    @Test
+    void queryFailureDoesNotCreateSuccessfulReadAudit() {
+        Fixture f = new Fixture();
+        f.queryFailure = new IllegalStateException("synthetic query failure");
+
+        assertTrue(f.search("synthetic").isFailure());
+        assertTrue(f.audit.entries.isEmpty());
+    }
+
+    @Test
+    void emptyResultForValidSearchIsAudited() {
+        Fixture f = new Fixture();
+
+        Result<List<PatientSearchItem>> result = f.search("no-such-synthetic-patient");
 
         assertTrue(result.isSuccess());
-        assertEquals(explicitDate, queuePort.lastQueueDate);
-        assertEquals(explicitDate, queuePort.lastRoomSummariesDate);
-
-        ReceptionQueueSnapshot snapshot = result.valueOrThrow();
-        assertEquals(List.of(queueItem), snapshot.queue());
-        assertEquals(List.of(roomSummary), snapshot.rooms());
+        assertTrue(result.valueOrThrow().isEmpty());
+        assertEquals("no-such-synthetic-patient", f.lastKeyword);
+        assertEquals(List.of("query", "audit"), f.order);
+        assertEquals(AuditActionCode.PATIENT_SEARCH, f.audit.entries.get(0).actionCode());
     }
 
     @Test
-    void queueDefaultsToCurrentDateWhenQueryOrDateIsNull() {
-        FakeReceptionQueuePort queuePort = new FakeReceptionQueuePort();
-        ReceptionQueueItem queueItem = new ReceptionQueueItem(
-                502,
-                302,
-                "BN-SYN-0302",
-                "Họ Mẫu Năm",
-                12,
-                "Phòng Khám Nội 2",
-                2,
-                "002",
-                "DANG_KHAM",
-                LocalDateTime.of(2026, 11, 5, 9, 0)
-        );
-        ClinicRoomQueueSummary roomSummary = new ClinicRoomQueueSummary(
-                12,
-                "Phòng Khám Nội 2",
-                "Khoa Nội Tổng Hợp",
-                4,
-                2,
-                1
-        );
-        queuePort.queueItems = List.of(queueItem);
-        queuePort.roomSummaries = List.of(roomSummary);
+    void blankSearchInputDoesNotRunQueryOrCreateSuccessfulReadAudit() {
+        Fixture f = new Fixture();
 
-        GetReceptionQueueHandler handler = new GetReceptionQueueHandler(queuePort);
+        Result<List<PatientSearchItem>> result = f.search("  \t ");
 
-        LocalDate beforeNullQuery = LocalDate.now();
-        Result<ReceptionQueueSnapshot> nullQueryResult = handler.handle(null);
-        LocalDate afterNullQuery = LocalDate.now();
-
-        assertTrue(nullQueryResult.isSuccess());
-        assertNotNull(queuePort.lastQueueDate);
-        assertEquals(queuePort.lastQueueDate, queuePort.lastRoomSummariesDate);
-        assertTrue(!queuePort.lastQueueDate.isBefore(beforeNullQuery) && !queuePort.lastQueueDate.isAfter(afterNullQuery));
-        assertEquals(List.of(queueItem), nullQueryResult.valueOrThrow().queue());
-        assertEquals(List.of(roomSummary), nullQueryResult.valueOrThrow().rooms());
-
-        LocalDate beforeNullDate = LocalDate.now();
-        Result<ReceptionQueueSnapshot> nullDateResult = handler.handle(new GetReceptionQueueQuery(null));
-        LocalDate afterNullDate = LocalDate.now();
-
-        assertTrue(nullDateResult.isSuccess());
-        assertNotNull(queuePort.lastQueueDate);
-        assertEquals(queuePort.lastQueueDate, queuePort.lastRoomSummariesDate);
-        assertTrue(!queuePort.lastQueueDate.isBefore(beforeNullDate) && !queuePort.lastQueueDate.isAfter(afterNullDate));
-        assertEquals(List.of(queueItem), nullDateResult.valueOrThrow().queue());
-        assertEquals(List.of(roomSummary), nullDateResult.valueOrThrow().rooms());
+        assertTrue(result.isFailure());
+        assertEquals("SEARCH_KEYWORD_REQUIRED", result.getError().orElseThrow().code());
+        assertEquals(0, f.patientQueries);
+        assertTrue(f.audit.entries.isEmpty());
     }
 
     @Test
-    void queueMapsPortFailuresToGenericErrorWithoutLeakingExceptionMessage() {
-        LocalDate targetDate = LocalDate.of(2026, 11, 5);
+    void queueAndRoomReadsRequireTheirOwnGrantsAndAuditAfterQuery() {
+        Fixture f = new Fixture();
+        f.permissions = List.of(grant("RECEPTION"));
+        Result<ReceptionQueueSnapshot> queueResult = f.queueHandler().handle(f.queueQuery());
+        assertTrue(queueResult.isSuccess());
+        assertEquals(List.of("queue", "summaries", "audit"), f.order);
+        assertEquals(AuditActionCode.PATIENT_VIEW, f.audit.entries.get(0).actionCode());
+        assertEquals(FACILITY, f.queueFacility);
+        assertEquals(DEPARTMENT, f.queueDepartment);
+        assertEquals(FACILITY, f.summaryFacility);
+        assertEquals(DEPARTMENT, f.summaryDepartment);
 
-        FakeReceptionQueuePort failingQueuePort = new FakeReceptionQueuePort();
-        failingQueuePort.queueFailure = new RuntimeException(REPOSITORY_FAILURE_MESSAGE);
-        GetReceptionQueueHandler queueFailureHandler = new GetReceptionQueueHandler(failingQueuePort);
+        f = new Fixture();
+        f.permissions = List.of();
+        assertTrue(f.queueHandler().handle(f.queueQuery()).isFailure());
+        assertEquals(List.of("audit"), f.order);
+        assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, f.audit.entries.get(0).actionCode());
 
-        Result<ReceptionQueueSnapshot> queueFailureResult =
-                queueFailureHandler.handle(new GetReceptionQueueQuery(targetDate));
+        f = new Fixture();
+        f.permissions = List.of();
+        assertTrue(f.roomHandler().handle(f.roomQuery()).isFailure());
+        assertEquals(List.of("audit"), f.order);
+        assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, f.audit.entries.get(0).actionCode());
 
-        assertTrue(queueFailureResult.isFailure());
-        Result.ApplicationError queueError = queueFailureResult.getError().orElseThrow();
-        assertEquals("RECEPTION_QUEUE_FAILED", queueError.code());
-        assertEquals("Không thể tải hàng đợi tiếp đón.", queueError.message());
-        assertFalse(queueError.message().contains(REPOSITORY_FAILURE_MESSAGE));
-        assertEquals(0, failingQueuePort.roomSummariesCallCount);
-
-        FakeReceptionQueuePort failingRoomsPort = new FakeReceptionQueuePort();
-        failingRoomsPort.roomSummariesFailure = new RuntimeException(REPOSITORY_FAILURE_MESSAGE);
-        GetReceptionQueueHandler roomsFailureHandler = new GetReceptionQueueHandler(failingRoomsPort);
-
-        Result<ReceptionQueueSnapshot> roomsFailureResult =
-                roomsFailureHandler.handle(new GetReceptionQueueQuery(targetDate));
-
-        assertTrue(roomsFailureResult.isFailure());
-        Result.ApplicationError roomsError = roomsFailureResult.getError().orElseThrow();
-        assertEquals("RECEPTION_QUEUE_FAILED", roomsError.code());
-        assertEquals("Không thể tải hàng đợi tiếp đón.", roomsError.message());
-        assertFalse(roomsError.message().contains(REPOSITORY_FAILURE_MESSAGE));
-        assertEquals(1, failingRoomsPort.queueCallCount);
-        assertEquals(1, failingRoomsPort.roomSummariesCallCount);
+        f = new Fixture();
+        f.permissions = List.of(grant("CATALOG"));
+        Result<List<PhongKham>> roomResult = f.roomHandler().handle(f.roomQuery());
+        assertTrue(roomResult.isSuccess());
+        assertEquals(List.of("rooms", "audit"), f.order);
+        assertEquals(AuditActionCode.CATALOG_VIEW, f.audit.entries.get(0).actionCode());
+        assertEquals(FACILITY, f.roomFacility);
+        assertEquals(DEPARTMENT, f.roomDepartment);
     }
 
-    private static BenhNhan syntheticPatient(int id, String patientCode, String lastName, String firstName) {
+    @Test
+    void queueUsesRequestedDateAndQueryFailureDoesNotWriteSuccessfulAudit() {
+        Fixture f = new Fixture();
+        f.permissions = List.of(grant("RECEPTION"));
+        LocalDate requestedDate = LocalDate.of(2026, 11, 5);
+
+        Result<ReceptionQueueSnapshot> result = f.queueHandler().handle(
+                new GetReceptionQueueQuery(requestedDate, f.context, f.actor));
+
+        assertTrue(result.isSuccess());
+        assertEquals(requestedDate, f.queueDate);
+        assertEquals(requestedDate, f.summaryDate);
+        assertEquals(List.of("queue", "summaries", "audit"), f.order);
+
+        Fixture defaultDateFixture = new Fixture();
+        defaultDateFixture.permissions = List.of(grant("RECEPTION"));
+        LocalDate before = LocalDate.now();
+        Result<ReceptionQueueSnapshot> defaultDate = defaultDateFixture.queueHandler().handle(
+                new GetReceptionQueueQuery(null, defaultDateFixture.context, defaultDateFixture.actor));
+        LocalDate after = LocalDate.now();
+        assertTrue(defaultDate.isSuccess());
+        assertTrue(!defaultDateFixture.queueDate.isBefore(before) && !defaultDateFixture.queueDate.isAfter(after));
+        assertEquals(defaultDateFixture.queueDate, defaultDateFixture.summaryDate);
+
+        f = new Fixture();
+        f.permissions = List.of(grant("RECEPTION"));
+        f.queueFailure = new IllegalStateException("synthetic queue failure");
+
+        Result<ReceptionQueueSnapshot> failed = f.queueHandler().handle(f.queueQuery());
+
+        assertTrue(failed.isFailure());
+        assertTrue(failed.getValue().isEmpty());
+        assertTrue(f.audit.entries.isEmpty());
+    }
+
+    private static BenhNhan patient(int id) {
         BenhNhan patient = new BenhNhan();
         patient.setId(id);
-        patient.setMaBenhNhanFormat(patientCode);
-        patient.setHo(lastName);
-        patient.setTen(firstName);
-        patient.setNgaySinh(LocalDate.of(1990, 1, 1));
-        patient.setGioiTinh(GioiTinh.M);
-        patient.setDienThoai("0900000100");
+        patient.setMaBenhNhanFormat("BN-SYN-" + id);
+        patient.setHo("Họ Tổng Hợp");
+        patient.setTen("Người Bệnh");
         return patient;
     }
 
-    private static BaoHiem syntheticInsurance(int id, int patientId, String cardNumber, LocalDate expiryDate) {
-        BaoHiem insurance = new BaoHiem();
-        insurance.setId(id);
-        insurance.setMaBenhNhan(patientId);
-        insurance.setLoaiBaoHiem(LoaiBaoHiem.BHYT);
-        insurance.setSoBaoHiem(cardNumber);
-        insurance.setNgayBatDau(expiryDate.minusYears(1));
-        insurance.setNgayHetHan(expiryDate);
-        insurance.setMucHuong(80);
-        return insurance;
+    private static MaTranPhanQuyen grant(String module) {
+        MaTranPhanQuyen permission = new MaTranPhanQuyen();
+        permission.setMaVaiTro(ROLE);
+        permission.setPhanHe(module);
+        permission.setHanhDong(HanhDongQuyen.XEM);
+        permission.setDuocPhep(true);
+        permission.setPhamViDuLieu(PhamViDuLieu.KHOA_PHONG);
+        return permission;
     }
 
-    private static final class FakePatientRepository implements IBenhNhanRepository {
-        private List<BenhNhan> patientsToReturn = List.of();
-        private RuntimeException failure;
-        private String lastSearchKeyword;
-        private int searchCallCount;
+    private static final class Fixture {
+        final AuthorizationContext context = new AuthorizationContext(EMPLOYEE, ROLE, ROLE_CODE, FACILITY, DEPARTMENT, SESSION);
+        final AuditActorContext actor = new AuditActorContext(EMPLOYEE, ROLE, ROLE_CODE, FACILITY, DEPARTMENT,
+                "synthetic-workstation", UUID.randomUUID());
+        final List<String> order = new ArrayList<>();
+        final TestAudit audit = new TestAudit(order);
+        List<MaTranPhanQuyen> permissions = List.of(grant("PATIENT"), grant("RECEPTION"), grant("CATALOG"));
+        List<BenhNhan> patientResults = List.of();
+        final Map<Integer, BaoHiem> cardsByPatient = new HashMap<>();
+        RuntimeException queryFailure;
+        RuntimeException insuranceFailure;
+        int patientQueries, insuranceLookups;
+        int requestedLimit;
+        String lastKeyword;
+        int queueFacility, queueDepartment, roomFacility, roomDepartment;
+        int summaryFacility, summaryDepartment;
+        LocalDate queueDate, summaryDate;
+        RuntimeException queueFailure;
+        boolean sessionActive = true, assignmentValid = true;
 
-        @Override
-        public List<BenhNhan> search(String keyword) {
-            searchCallCount++;
-            lastSearchKeyword = keyword;
-            if (failure != null) {
-                throw failure;
+        final IBenhNhanRepository patients = (IBenhNhanRepository) Proxy.newProxyInstance(
+                IBenhNhanRepository.class.getClassLoader(), new Class<?>[]{IBenhNhanRepository.class}, (p, m, a) -> {
+                    if (m.getName().equals("searchInScope")) {
+                        order.add("query"); patientQueries++; lastKeyword = (String) a[0]; requestedLimit = (int) a[3];
+                        if (queryFailure != null) throw queryFailure;
+                        return patientResults;
+                    }
+                    return defaultValue(m.getReturnType());
+                });
+        final IBaoHiemRepository insurance = (IBaoHiemRepository) Proxy.newProxyInstance(
+                IBaoHiemRepository.class.getClassLoader(), new Class<?>[]{IBaoHiemRepository.class}, (p, m, a) -> {
+                    if (m.getName().equals("getLatestByPatientId")) {
+                        insuranceLookups++;
+                        if (insuranceFailure != null) throw insuranceFailure;
+                        return Optional.ofNullable(cardsByPatient.get((int) a[0]));
+                    }
+                    return defaultValue(m.getReturnType());
+                });
+        final ReceptionQueuePort queue = new ReceptionQueuePort() {
+            @Override public vn.clinicmanagement.domain.examination.LuotKham registerVisit(int p, int f, int d, int r,
+                    String t, String reason, vn.clinicmanagement.domain.common.enums.DoiTuongKham payer, boolean priority, int by) { return null; }
+            @Override public List<ReceptionQueueItem> getQueue(LocalDate date, int facility, int department) {
+                order.add("queue"); queueFacility = facility; queueDepartment = department; queueDate = date;
+                if (queueFailure != null) throw queueFailure;
+                return List.of();
             }
-            return patientsToReturn;
+            @Override public List<ClinicRoomQueueSummary> getRoomSummaries(LocalDate date, int facility, int department) {
+                order.add("summaries"); summaryFacility = facility; summaryDepartment = department;
+                summaryDate = date; return List.of();
+            }
+        };
+        final IPhongKhamRepository rooms = (IPhongKhamRepository) Proxy.newProxyInstance(
+                IPhongKhamRepository.class.getClassLoader(), new Class<?>[]{IPhongKhamRepository.class}, (p, m, a) -> {
+                    if (m.getName().equals("getActiveRoomsInScope")) {
+                        order.add("rooms"); roomFacility = (int) a[0]; roomDepartment = (int) a[1]; return List.of();
+                    }
+                    return defaultValue(m.getReturnType());
+                });
+        final AuthorizationService authorization;
+
+        Fixture() {
+            NhanVien employee = new NhanVien(); employee.setId(EMPLOYEE);
+            VaiTro role = new VaiTro(); role.setId(ROLE); role.setTenVaiTro(ROLE_CODE);
+            INhanVienRepository employeeRepository = (INhanVienRepository) Proxy.newProxyInstance(
+                    INhanVienRepository.class.getClassLoader(), new Class<?>[]{INhanVienRepository.class}, (p, m, a) -> switch (m.getName()) {
+                        case "getById" -> Optional.of(employee);
+                        case "getAssignedRoles" -> List.of(role);
+                        case "getAssignedWorkScopes" -> assignmentValid
+                                ? List.of(new NhanVienWorkScope(FACILITY, "Synthetic facility", DEPARTMENT, "Synthetic department"))
+                                : List.of();
+                        default -> defaultValue(m.getReturnType());
+                    });
+            ISystemRepository system = new ISystemRepository() {
+                @Override public List<MaTranPhanQuyen> getMatrixByRoleId(int id) { return permissions; }
+                @Override public Optional<String> getSystemParameterValue(String key) { return Optional.empty(); }
+            };
+            authorization = new AuthorizationService(id -> Optional.of(new ActiveSessionPort.ActiveSession(
+                    SESSION, EMPLOYEE, ROLE, ROLE_CODE, FACILITY, DEPARTMENT, sessionActive, true, true)), employeeRepository, system);
         }
 
-        @Override
-        public Optional<BenhNhan> getByCCCD(String cccd) {
-            return Optional.empty();
+        Result<List<PatientSearchItem>> search(String keyword) { return search(keyword, context); }
+        Result<List<PatientSearchItem>> search(String keyword, AuthorizationContext auth) {
+            return new SearchPatientsHandler(patients, insurance, authorization, audit)
+                    .handle(new SearchPatientsQuery(keyword, auth, actor));
         }
-
-        @Override
-        public Optional<BenhNhan> getByPhone(String phone) {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<BenhNhan> getById(int id) {
-            return patientsToReturn.stream().filter(p -> p.getId() != null && p.getId() == id).findFirst();
-        }
-
-        @Override
-        public List<BenhNhan> getAll() {
-            return patientsToReturn;
-        }
-
-        @Override
-        public PagedResult<BenhNhan> getPaged(int pageIndex, int pageSize, ISpecification<BenhNhan> specification) {
-            return new PagedResult<>(List.of(), 0, pageIndex, pageSize);
-        }
-
-        @Override
-        public List<BenhNhan> find(ISpecification<BenhNhan> specification) {
-            return List.of();
-        }
-
-        @Override
-        public boolean exists(ISpecification<BenhNhan> specification) {
-            return false;
-        }
-
-        @Override
-        public int count(ISpecification<BenhNhan> specification) {
-            return 0;
-        }
-
-        @Override
-        public void add(BenhNhan entity) {
-        }
-
-        @Override
-        public void update(BenhNhan entity) {
-        }
-
-        @Override
-        public void delete(BenhNhan entity) {
-        }
-
-        @Override
-        public IUnitOfWork getUnitOfWork() {
-            return null;
-        }
+        GetReceptionQueueHandler queueHandler() { return new GetReceptionQueueHandler(queue, authorization, audit); }
+        GetReceptionQueueQuery queueQuery() { return new GetReceptionQueueQuery(LocalDate.of(2026, 11, 5), context, actor); }
+        GetActiveReceptionRoomsHandler roomHandler() { return new GetActiveReceptionRoomsHandler(rooms, authorization, audit); }
+        GetActiveReceptionRoomsQuery roomQuery() { return new GetActiveReceptionRoomsQuery(context, actor); }
     }
 
-    private static final class FakeInsuranceRepository implements IBaoHiemRepository {
-        private final Map<Integer, List<BaoHiem>> cardsByPatientId = new HashMap<>();
-        private final List<Integer> queriedPatientIds = new ArrayList<>();
-        private RuntimeException failure;
-        private int lookupCallCount;
-
-        @Override
-        public Optional<BaoHiem> getById(int id) {
-            return cardsByPatientId.values().stream()
-                    .flatMap(List::stream)
-                    .filter(card -> card.getId() != null && card.getId() == id)
-                    .findFirst();
-        }
-
-        @Override
-        public Optional<BaoHiem> getLatestByPatientId(int patientId) {
-            lookupCallCount++;
-            queriedPatientIds.add(patientId);
-            if (failure != null) {
-                throw failure;
-            }
-            List<BaoHiem> cards = cardsByPatientId.getOrDefault(patientId, List.of());
-            return cards.stream()
-                    .max(Comparator.comparing(
-                            BaoHiem::getNgayHetHan,
-                            Comparator.nullsFirst(Comparator.naturalOrder())
-                    ));
-        }
-
-        @Override
-        public List<BaoHiem> getByPatientId(int patientId) {
-            return List.copyOf(cardsByPatientId.getOrDefault(patientId, List.of()));
-        }
-
-        @Override
-        public void add(BaoHiem insurance) {
-            cardsByPatientId.computeIfAbsent(insurance.getMaBenhNhan(), ignored -> new ArrayList<>()).add(insurance);
-        }
-
-        @Override
-        public void update(BaoHiem insurance) {
-        }
+    private static Object defaultValue(Class<?> type) {
+        if (!type.isPrimitive()) return null;
+        if (type == boolean.class) return false;
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        return null;
     }
 
-    private static final class FakeReceptionQueuePort implements ReceptionQueuePort {
-        private List<ReceptionQueueItem> queueItems = List.of();
-        private List<ClinicRoomQueueSummary> roomSummaries = List.of();
-        private RuntimeException queueFailure;
-        private RuntimeException roomSummariesFailure;
-        private LocalDate lastQueueDate;
-        private LocalDate lastRoomSummariesDate;
-        private int queueCallCount;
-        private int roomSummariesCallCount;
-
-        @Override
-        public LuotKham registerVisit(int patientId, int facilityId, int departmentId, int roomId,
-                                      String registrationType, String reason, DoiTuongKham payerType,
-                                      boolean priority, int createdBy) {
-            throw new UnsupportedOperationException("Not used in queue query tests");
+    private static final class TestAudit implements AuditWritePort {
+        final List<String> order;
+        final List<SystemAuditEntry> entries = new ArrayList<>();
+        RuntimeException failure;
+        TestAudit(List<String> order) { this.order = order; }
+        @Override public void appendIndependently(SystemAuditEntry entry) {
+            order.add("audit");
+            if (failure != null) throw failure;
+            entries.add(entry);
         }
-
-        @Override
-        public List<ReceptionQueueItem> getQueue(LocalDate date) {
-            queueCallCount++;
-            lastQueueDate = date;
-            if (queueFailure != null) {
-                throw queueFailure;
-            }
-            return queueItems;
-        }
-
-        @Override
-        public List<ClinicRoomQueueSummary> getRoomSummaries(LocalDate date) {
-            roomSummariesCallCount++;
-            lastRoomSummariesDate = date;
-            if (roomSummariesFailure != null) {
-                throw roomSummariesFailure;
-            }
-            return roomSummaries;
-        }
+        @Override public void appendInCurrentTransaction(SystemAuditEntry entry) { throw new UnsupportedOperationException(); }
+        @Override public void appendMedicalRecordInCurrentTransaction(MedicalRecordAuditEntry entry) { throw new UnsupportedOperationException(); }
+        @Override public void appendMedicalRecordIndependently(MedicalRecordAuditEntry entry) { throw new UnsupportedOperationException(); }
     }
 }

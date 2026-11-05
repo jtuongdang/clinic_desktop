@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface IPhongKhamRepository {
     Optional<PhongKham> getById(int id);
     List<PhongKham> getActiveRooms();
+    List<PhongKham> getActiveRoomsInScope(int facilityId, int departmentId);
 }

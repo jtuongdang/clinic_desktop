@@ -105,6 +105,27 @@ public final class BenhNhanRepositoryImpl implements IBenhNhanRepository {
     }
 
     @Override
+    public List<BenhNhan> searchInScope(String keyword, int facilityId, int departmentId, int limit) {
+        if (facilityId <= 0 || departmentId <= 0 || limit <= 0 || keyword == null || keyword.isBlank()) return List.of();
+        String term = "%" + escapeLike(keyword.trim()) + "%";
+        return queryMany(scopedSearchSql(Math.min(limit, 50)), ps -> {
+            for (int i = 1; i <= 6; i++) ps.setString(i, term);
+            ps.setInt(7, facilityId);
+            ps.setInt(8, departmentId);
+        });
+    }
+
+    static String scopedSearchSql(int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 50));
+        return SELECT_COLUMNS.replace("SELECT ", "SELECT TOP (" + safeLimit + ") ")
+                + " WHERE isDeleted=0 AND (maBenhNhanFormat LIKE ? ESCAPE '\\' "
+                + "OR ho LIKE ? ESCAPE '\\' OR ten LIKE ? ESCAPE '\\' OR soCCCD LIKE ? ESCAPE '\\' "
+                + "OR dienThoai LIKE ? ESCAPE '\\' OR CONCAT(ho, N' ', ten) LIKE ? ESCAPE '\\') "
+                + "AND EXISTS (SELECT 1 FROM LuotKham lk WHERE lk.maBenhNhan=BenhNhan.id "
+                + "AND lk.maCoSo=? AND lk.maKhoa=? AND lk.isDeleted=0) ORDER BY ho, ten";
+    }
+
+    @Override
     public List<BenhNhan> getAll() {
         return queryMany(SELECT_COLUMNS + " WHERE isDeleted=0 ORDER BY id DESC", ps -> {});
     }

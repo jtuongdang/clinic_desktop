@@ -30,9 +30,12 @@ final class ReceptionCompositionRoot {
                 new SystemRepositoryImpl(connections, unitOfWork));
         return new Services(rooms, new RegisterPatientHandler(
                 patients, insurance, rooms, queue, transactions, audit, authorization),
-                new SearchPatientsHandler(patients, insurance), new GetReceptionQueueHandler(queue));
+                new SearchPatientsHandler(patients, insurance, authorization, audit),
+                new GetReceptionQueueHandler(queue, authorization, audit),
+                new GetActiveReceptionRoomsHandler(rooms, authorization, audit));
     }
 
     record Services(PhongKhamRepositoryImpl rooms, RegisterPatientHandler registerPatient,
-                    SearchPatientsHandler searchPatients, GetReceptionQueueHandler getQueue) {}
+                    SearchPatientsHandler searchPatients, GetReceptionQueueHandler getQueue,
+                    GetActiveReceptionRoomsHandler getActiveRooms) {}
 }

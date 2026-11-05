@@ -11,6 +11,6 @@ public interface ReceptionQueuePort {
     LuotKham registerVisit(int patientId, int facilityId, int departmentId, int roomId,
                            String registrationType, String reason, DoiTuongKham payerType,
                            boolean priority, int createdBy);
-    List<ReceptionQueueItem> getQueue(LocalDate date);
-    List<ClinicRoomQueueSummary> getRoomSummaries(LocalDate date);
+    List<ReceptionQueueItem> getQueue(LocalDate date, int facilityId, int departmentId);
+    List<ClinicRoomQueueSummary> getRoomSummaries(LocalDate date, int facilityId, int departmentId);
 }

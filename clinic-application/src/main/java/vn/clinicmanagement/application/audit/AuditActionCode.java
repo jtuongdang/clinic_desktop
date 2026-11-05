@@ -14,6 +14,7 @@ public enum AuditActionCode {
     AUTH_ACCESS_DENIED,
     PATIENT_VIEW,
     PATIENT_SEARCH,
+    CATALOG_VIEW,
     EMR_VIEW,
     EMR_PRINT,
     EMR_EXPORT_DOCX,

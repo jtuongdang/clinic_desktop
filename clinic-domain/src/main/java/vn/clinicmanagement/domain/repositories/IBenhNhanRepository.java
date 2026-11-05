@@ -13,4 +13,5 @@ public interface IBenhNhanRepository extends IRepository<BenhNhan> {
     }
     Optional<BenhNhan> getByPhone(String phone);
     List<BenhNhan> search(String keyword);
+    List<BenhNhan> searchInScope(String keyword, int facilityId, int departmentId, int limit);
 }

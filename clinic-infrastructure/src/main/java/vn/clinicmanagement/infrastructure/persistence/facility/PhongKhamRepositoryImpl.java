@@ -41,6 +41,21 @@ public final class PhongKhamRepositoryImpl implements IPhongKhamRepository {
                 + "AND c.hoatDong=1 AND c.isDeleted=0 ORDER BY c.id, k.id, p.tenPhong", ps -> {});
     }
 
+    @Override
+    public List<PhongKham> getActiveRoomsInScope(int facilityId, int departmentId) {
+        if (facilityId <= 0 || departmentId <= 0) return List.of();
+        return query(scopedActiveRoomsSql(), ps -> {
+            ps.setInt(1, facilityId);
+            ps.setInt(2, departmentId);
+        });
+    }
+
+    static String scopedActiveRoomsSql() {
+        return ROOM_SELECT + " WHERE p.hoatDong=1 AND p.isDeleted=0 AND k.hoatDong=1 AND k.isDeleted=0 "
+                + "AND c.hoatDong=1 AND c.isDeleted=0 AND k.maCoSo=? AND k.id=? "
+                + "ORDER BY p.tenPhong";
+    }
+
     private List<PhongKham> query(String sql, Binder binder) {
         try (JdbcConnectionProvider.Lease lease = connections.acquire();
              PreparedStatement ps = lease.connection().prepareStatement(sql)) {

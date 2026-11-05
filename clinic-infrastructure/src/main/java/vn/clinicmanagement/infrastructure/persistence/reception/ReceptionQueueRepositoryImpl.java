@@ -82,17 +82,14 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
     }
 
     @Override
-    public List<ReceptionQueueItem> getQueue(LocalDate date) {
-        String sql = "SELECT l.id visitId, p.id patientId, p.maBenhNhanFormat patientCode, "
-                + "CONCAT(p.ho, N' ', p.ten) patientName, r.id roomId, r.tenPhong roomName, "
-                + "ISNULL(l.soThuTu,0) queueNumber, ISNULL(l.soThuTuDisplay,'') queueDisplay, l.trangThai, l.thoiGianTiepNhan "
-                + "FROM LuotKham l INNER JOIN BenhNhan p ON p.id=l.maBenhNhan "
-                + "LEFT JOIN PhongKham r ON r.id=l.maPhongKham "
-                + "WHERE l.ngayKham=? AND l.isDeleted=0 AND l.trangThai<>'DA_HUY' AND p.isDeleted=0 "
-                + "ORDER BY l.dnVnTien DESC, l.soThuTu, l.id";
+    public List<ReceptionQueueItem> getQueue(LocalDate date, int facilityId, int departmentId) {
+        if (facilityId <= 0 || departmentId <= 0) return List.of();
+        String sql = scopedQueueSql();
         try (JdbcConnectionProvider.Lease lease = connections.acquire();
              PreparedStatement ps = lease.connection().prepareStatement(sql)) {
             ps.setObject(1, date);
+            ps.setInt(2, facilityId);
+            ps.setInt(3, departmentId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<ReceptionQueueItem> items = new ArrayList<>();
                 while (rs.next()) items.add(new ReceptionQueueItem(rs.getInt("visitId"), rs.getInt("patientId"),
@@ -105,18 +102,16 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
     }
 
     @Override
-    public List<ClinicRoomQueueSummary> getRoomSummaries(LocalDate date) {
-        String sql = "SELECT p.id roomId, p.tenPhong roomName, k.tenKhoa departmentName, "
-                + "COUNT(l.id) registeredCount, SUM(CASE WHEN l.trangThai='CHO_KHAM' THEN 1 ELSE 0 END) waitingCount, "
-                + "SUM(CASE WHEN l.trangThai='DANG_KHAM' THEN 1 ELSE 0 END) examiningCount "
-                + "FROM PhongKham p INNER JOIN Khoa k ON k.id=p.maKhoa INNER JOIN CoSo c ON c.id=k.maCoSo "
-                + "LEFT JOIN LuotKham l ON l.maPhongKham=p.id AND l.ngayKham=? AND l.isDeleted=0 "
-                + "WHERE p.hoatDong=1 AND p.isDeleted=0 AND k.hoatDong=1 AND k.isDeleted=0 "
-                + "AND c.hoatDong=1 AND c.isDeleted=0 "
-                + "GROUP BY p.id, p.tenPhong, k.tenKhoa ORDER BY k.tenKhoa, p.tenPhong";
+    public List<ClinicRoomQueueSummary> getRoomSummaries(LocalDate date, int facilityId, int departmentId) {
+        if (facilityId <= 0 || departmentId <= 0) return List.of();
+        String sql = scopedRoomSummariesSql();
         try (JdbcConnectionProvider.Lease lease = connections.acquire();
              PreparedStatement ps = lease.connection().prepareStatement(sql)) {
             ps.setObject(1, date);
+            ps.setInt(2, facilityId);
+            ps.setInt(3, departmentId);
+            ps.setInt(4, facilityId);
+            ps.setInt(5, departmentId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<ClinicRoomQueueSummary> items = new ArrayList<>();
                 while (rs.next()) items.add(new ClinicRoomQueueSummary(rs.getInt("roomId"), rs.getString("roomName"),
@@ -125,6 +120,30 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
                 return items;
             }
         } catch (SQLException ex) { throw new IllegalStateException("Không thể đọc thống kê phòng khám.", ex); }
+    }
+
+    static String scopedQueueSql() {
+        return "SELECT l.id visitId, p.id patientId, p.maBenhNhanFormat patientCode, "
+                + "CONCAT(p.ho, N' ', p.ten) patientName, r.id roomId, r.tenPhong roomName, "
+                + "ISNULL(l.soThuTu,0) queueNumber, ISNULL(l.soThuTuDisplay,'') queueDisplay, l.trangThai, l.thoiGianTiepNhan "
+                + "FROM LuotKham l INNER JOIN BenhNhan p ON p.id=l.maBenhNhan "
+                + "LEFT JOIN PhongKham r ON r.id=l.maPhongKham "
+                + "WHERE l.ngayKham=? AND l.maCoSo=? AND l.maKhoa=? AND l.isDeleted=0 "
+                + "AND l.trangThai<>'DA_HUY' AND p.isDeleted=0 "
+                + "ORDER BY l.dnVnTien DESC, l.soThuTu, l.id";
+    }
+
+    static String scopedRoomSummariesSql() {
+        return "SELECT p.id roomId, p.tenPhong roomName, k.tenKhoa departmentName, "
+                + "COUNT(b.id) registeredCount, SUM(CASE WHEN b.id IS NOT NULL AND l.trangThai='CHO_KHAM' THEN 1 ELSE 0 END) waitingCount, "
+                + "SUM(CASE WHEN b.id IS NOT NULL AND l.trangThai='DANG_KHAM' THEN 1 ELSE 0 END) examiningCount "
+                + "FROM PhongKham p INNER JOIN Khoa k ON k.id=p.maKhoa INNER JOIN CoSo c ON c.id=k.maCoSo "
+                + "LEFT JOIN LuotKham l ON l.maPhongKham=p.id AND l.ngayKham=? AND l.maCoSo=? AND l.maKhoa=? "
+                + "AND l.isDeleted=0 AND l.trangThai<>'DA_HUY' "
+                + "LEFT JOIN BenhNhan b ON b.id=l.maBenhNhan AND b.isDeleted=0 "
+                + "WHERE p.hoatDong=1 AND p.isDeleted=0 AND k.hoatDong=1 AND k.isDeleted=0 "
+                + "AND c.hoatDong=1 AND c.isDeleted=0 AND k.maCoSo=? AND k.id=? "
+                + "GROUP BY p.id, p.tenPhong, k.tenKhoa ORDER BY k.tenKhoa, p.tenPhong";
     }
 
     private int nextQueueNumber(Connection connection, int roomId, LocalDate date) throws SQLException {

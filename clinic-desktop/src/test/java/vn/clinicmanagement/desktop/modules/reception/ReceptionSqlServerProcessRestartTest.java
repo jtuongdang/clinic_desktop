@@ -88,7 +88,8 @@ class ReceptionSqlServerProcessRestartTest {
             SessionLifecycleService lifecycle = syntheticLifecycle();
             AuthorizationContext authorizationContext = lifecycle.currentAuthorizationContext().orElseThrow();
             var services = ReceptionCompositionRoot.create(lifecycle);
-            var room = services.rooms().getActiveRooms().stream().findFirst()
+            var room = services.getActiveRooms().handle(new GetActiveReceptionRoomsQuery(
+                    authorizationContext, lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().stream().findFirst()
                     .orElseThrow(() -> new AssertionError("No active seeded clinic room is available"));
 
             BenhNhan patient = new BenhNhan();
@@ -293,7 +294,9 @@ class ReceptionSqlServerProcessRestartTest {
 
             var services = ReceptionCompositionRoot.create(syntheticLifecycle());
             List<PatientSearchItem> matches = services.searchPatients()
-                    .handle(new vn.clinicmanagement.application.reception.SearchPatientsQuery(cccd)).valueOrThrow();
+                    .handle(new vn.clinicmanagement.application.reception.SearchPatientsQuery(cccd,
+                            lifecycle.currentAuthorizationContext().orElseThrow(),
+                            lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow();
             assertEquals(1, matches.size());
             PatientSearchItem match = matches.get(0);
             assertEquals(patientId, match.patient().getId());
@@ -302,7 +305,9 @@ class ReceptionSqlServerProcessRestartTest {
             assertEquals(cardId, match.latestInsurance().getId());
             assertEquals(LoaiBaoHiem.BHYT, match.latestInsurance().getLoaiBaoHiem());
             List<vn.clinicmanagement.application.reception.ReceptionQueueItem> queue = services.getQueue()
-                    .handle(new GetReceptionQueueQuery(LocalDate.now())).valueOrThrow().queue();
+                    .handle(new GetReceptionQueueQuery(LocalDate.now(),
+                            lifecycle.currentAuthorizationContext().orElseThrow(),
+                            lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().queue();
             assertTrue(queue.stream().anyMatch(item -> item.visitId() == visitId && item.patientId() == patientId));
         }
 

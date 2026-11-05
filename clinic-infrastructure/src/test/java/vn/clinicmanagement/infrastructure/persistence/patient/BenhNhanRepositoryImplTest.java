@@ -35,6 +35,17 @@ class BenhNhanRepositoryImplTest {
     }
 
     @Test
+    void scopedSearchRequiresBothFacilityAndDepartmentOnNondeletedVisitAndCapsResults() {
+        String sql = BenhNhanRepositoryImpl.scopedSearchSql(500);
+
+        assertTrue(sql.contains("TOP (50)"));
+        assertTrue(sql.contains("lk.maCoSo=?"));
+        assertTrue(sql.contains("lk.maKhoa=?"));
+        assertTrue(sql.contains("lk.isDeleted=0"));
+        assertTrue(sql.contains("EXISTS (SELECT 1 FROM LuotKham lk"));
+    }
+
+    @Test
     void mapsOnlyTheActiveCccdIndexViolationWithoutLeakingTheDuplicateValue() {
         for (int errorCode : new int[]{2601, 2627}) {
             SQLException sqlException = new SQLException(

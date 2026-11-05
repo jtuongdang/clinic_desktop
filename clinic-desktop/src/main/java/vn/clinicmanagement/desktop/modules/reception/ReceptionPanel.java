@@ -82,12 +82,22 @@ public class ReceptionPanel extends BaseViewPanel {
     @Override
     public void refreshData() {
         if (loading) return;
+        var authorizationContext = sessionLifecycle.currentAuthorizationContext();
+        var queueAuditActor = sessionLifecycle.currentAuditActorContext();
+        var catalogAuditActor = sessionLifecycle.currentAuditActorContext();
+        if (authorizationContext.isEmpty() || queueAuditActor.isEmpty() || catalogAuditActor.isEmpty()) {
+            showError("Phiên làm việc không còn hoạt động. Đăng nhập lại để tải dữ liệu tiếp đón.");
+            return;
+        }
         loading = true;
         new SwingWorker<ReceptionLoad, Void>() {
             @Override protected ReceptionLoad doInBackground() {
-                var rooms = services.rooms().getActiveRooms();
-                ReceptionQueueSnapshot snapshot = services.getQueue().handle(new GetReceptionQueueQuery(java.time.LocalDate.now())).valueOrThrow();
-                return new ReceptionLoad(rooms, snapshot);
+                var roomsResult = services.getActiveRooms().handle(new GetActiveReceptionRoomsQuery(
+                        authorizationContext.get(), catalogAuditActor.get()));
+                var queueResult = services.getQueue().handle(new GetReceptionQueueQuery(java.time.LocalDate.now(),
+                        authorizationContext.get(), queueAuditActor.get()));
+                if (roomsResult.isFailure() || queueResult.isFailure()) throw new IllegalStateException("Protected read failed.");
+                return new ReceptionLoad(roomsResult.valueOrThrow(), queueResult.valueOrThrow());
             }
             @Override protected void done() {
                 loading = false;
@@ -117,7 +127,11 @@ public class ReceptionPanel extends BaseViewPanel {
                 return new ArrayList<>(results.values());
             }
             private void addMatches(Map<Integer, PatientSearchItem> results, String keyword) {
-                Result<java.util.List<PatientSearchItem>> result = services.searchPatients().handle(new SearchPatientsQuery(keyword));
+                var context = sessionLifecycle.currentAuthorizationContext();
+                var auditActor = sessionLifecycle.currentAuditActorContext();
+                if (context.isEmpty() || auditActor.isEmpty()) throw new IllegalStateException("Session unavailable.");
+                Result<java.util.List<PatientSearchItem>> result = services.searchPatients().handle(
+                        new SearchPatientsQuery(keyword, context.get(), auditActor.get()));
                 if (result.isSuccess()) result.getValue().orElseThrow().forEach(item -> results.put(item.patient().getId(), item));
                 else throw new IllegalStateException(result.getError().orElseThrow().message());
             }

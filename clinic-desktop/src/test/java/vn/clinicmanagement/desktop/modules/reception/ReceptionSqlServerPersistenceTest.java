@@ -81,7 +81,8 @@ class ReceptionSqlServerPersistenceTest {
             SessionLifecycleService lifecycle = syntheticLifecycle();
             AuthorizationContext authorizationContext = lifecycle.currentAuthorizationContext().orElseThrow();
             ReceptionCompositionRoot.Services services = ReceptionCompositionRoot.create(lifecycle);
-            var room = services.rooms().getActiveRooms().stream().findFirst()
+            var room = services.getActiveRooms().handle(new GetActiveReceptionRoomsQuery(
+                    authorizationContext, lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().stream().findFirst()
                     .orElseThrow(() -> new AssertionError("No active seeded clinic room is available"));
 
             BenhNhan patient = new BenhNhan();
@@ -114,7 +115,8 @@ class ReceptionSqlServerPersistenceTest {
             assertTrue(generatedCardId > 0, "Registration did not return a BHYT card identifier");
 
             PatientSearchItem initialMatch = findByCccd(
-                    services.searchPatients().handle(new SearchPatientsQuery(syntheticCccd)).valueOrThrow(),
+                    services.searchPatients().handle(new SearchPatientsQuery(syntheticCccd, authorizationContext,
+                            lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow(),
                     registeredPatientId);
             assertNotNull(initialMatch.latestInsurance(), "BHYT card was not returned after registration");
             assertEquals(generatedCardId, initialMatch.latestInsurance().getId(),
@@ -123,7 +125,8 @@ class ReceptionSqlServerPersistenceTest {
                     GioiTinh.M, syntheticCccd, syntheticPhone, "Synthetic test address", syntheticCardNumber, 80,
                     initialCardStart, initialCardEnd);
             assertQueueContains(services.getQueue()
-                            .handle(new GetReceptionQueueQuery(LocalDate.now())).valueOrThrow().queue(),
+                            .handle(new GetReceptionQueueQuery(LocalDate.now(), authorizationContext,
+                                    lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().queue(),
                     receipt.visitId(), registeredPatientId);
 
             String updatedName = "Updated" + generatedSuffix;
@@ -156,7 +159,8 @@ class ReceptionSqlServerPersistenceTest {
 
             ReceptionCompositionRoot.Services freshServices = ReceptionCompositionRoot.create(lifecycle);
             List<PatientSearchItem> reloadedMatches = freshServices.searchPatients()
-                    .handle(new SearchPatientsQuery(syntheticCccd)).valueOrThrow();
+                    .handle(new SearchPatientsQuery(syntheticCccd, authorizationContext,
+                            lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow();
             assertEquals(1, reloadedMatches.size(),
                     "Updating the patient created a duplicate active patient with the same CCCD");
             PatientSearchItem reloadedMatch = findByCccd(reloadedMatches, registeredPatientId);
@@ -166,7 +170,8 @@ class ReceptionSqlServerPersistenceTest {
             assertEquals(generatedCardId, reloadedMatch.latestInsurance().getId(),
                     "Updating BHYT created a different current card instead of updating the existing card");
             List<ReceptionQueueItem> reloadedQueue = freshServices.getQueue()
-                    .handle(new GetReceptionQueueQuery(LocalDate.now())).valueOrThrow().queue();
+                    .handle(new GetReceptionQueueQuery(LocalDate.now(), authorizationContext,
+                            lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().queue();
             assertQueueContains(reloadedQueue, receipt.visitId(), registeredPatientId);
             assertQueueContains(reloadedQueue, updateReceipt.visitId(), registeredPatientId);
         } finally {
