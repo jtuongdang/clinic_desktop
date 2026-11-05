@@ -366,9 +366,9 @@ Không tự đoán hoặc tự áp đặt các thay đổi sau đây nếu chưa
 2. **`[DEC-IDENTIFIER-01 — Đã duyệt chính sách; whitelist danh mục còn mở]`:**
    - 10 cột `UNIQUE` trong `V1` (`NhanVien.maNhanVien`, `NhanVien.username`, `BenhNhan.maBenhNhanFormat`, `ICD.maICD`, `DanhMucDichVu.maDichVu`, `Item.maItem`, `PhieuNhapKho.soPhieuNhap`, `PhieuXuatKho.soPhieuXuat`, `HoaDon.soHoaDon`, `ThamSoHeThong.maThamSo`) hiện chặn tái sử dụng mã kể cả sau khi đã xóa mềm (`isDeleted = 1`).
    - *Quyết định Owner ngày 05/11/2026:* mã định danh/chứng từ không tái sử dụng sau xóa mềm; chỉ mã danh mục được phép tái sử dụng sau khi có whitelist được duyệt. Chưa có whitelist cụ thể; giữ unique hiện trạng và không tạo filtered unique index cho đến khi danh sách được chốt.
-3. **`[Cần Owner quyết định 3 — 14 Thực Thể `BaseEntity` Chưa Có Bảng SQL trong `V1`–`V8`]`:**
+3. **`[DEC-MODEL-DB-01 — Đã duyệt: tạo bảng theo phase triển khai model]`:**
    - 14 lớp miền (`DonDatHang`, `ChiTietDonDatHang`, `Stocktake`, `StocktakeCount`, `IdempotencyRecord`, `LichLamViecCoDinh`, `LichLamViecDieuChinh`, `DieuChinhChamCong`, `KyChamCong`, `NghiPhep`, `ChiTietBangLuong`, `CauHinhHoaHongLoaiDichVu`, `CauHinhTichHop`, `TokenLamMoi`) đã có class Java nhưng chưa có bảng trong `V1`–`V8`.
-   - *Câu hỏi cần chốt:* Tạo bảng bổ sung theo từng đợt phân hệ tương ứng (Đợt 5 Kho cho `Stocktake`/`DonDatHang`, Đợt 6 Nhân sự/Payroll cho `ChiTietBangLuong`/`NghiPhep`/`KyChamCong`...) hay loại bỏ các class ngoài phạm vi Desktop Monolith (như `TokenLamMoi`)?
+   - *Quyết định Owner ngày 05/11/2026:* giữ model trong roadmap và tạo schema/migration tương ứng khi phase của model được triển khai. Mỗi migration vẫn cần contract nghiệp vụ, quan hệ/constraint và acceptance riêng trước khi viết; không tạo một migration chung chỉ để đưa mọi class hiện có vào database.
 4. **`[Cần Owner quyết định 4 — Quy Tắc Chặn Xóa Mềm Khi Còn Bản Ghi Con Đang Hoạt Động]`:**
    - *Câu hỏi cần chốt:* Khi gọi xóa mềm `BenhNhan` hoặc `NhanVien`, hệ thống phải từ chối xóa nếu còn `LuotKham`/`HoaDon`/`LichHen` đang hoạt động (`isDeleted = 0`), hay tự động thu hồi/xóa mềm dây chuyền các bản ghi phụ thuộc (như `BaoHiem`, `NhanVienVaiTro`, `NhanVienKhoa`, `PhanQuyenCoSo`)?
 
