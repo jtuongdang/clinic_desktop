@@ -25,10 +25,13 @@
 
 1. **SEC-DATA-01 — assignment reads (complete, `2d062f8` + `0d91903`):** repository đọc assigned role IDs/codes và cặp cơ sở/khoa hợp lệ, kèm tên cơ sở/khoa làm nhãn lựa chọn; fake-JDBC tests pass. Chưa thay UI/login.
 2. **SEC-LOGIN-01 — role/scope selection (complete; `a5ff050`, `fcd8dda`, `367e065`):** chỉ sau khi credential hợp lệ, Application trả toàn bộ role/scope assignment; không chọn role đầu tiên và không truy vấn assignment trước auth. UI bắt buộc chọn khi có nhiều choice, chỉ auto-select khi có đúng một choice; hủy chọn không tạo session/dashboard. Thiếu role hoặc scope bị từ chối trước khi ghi nhận đăng nhập thành công. `UserSession` lưu role ID/code/name và facility/department ID/name; station/workstation là context riêng và được xóa khi logout/đăng nhập mới. Choice lists bất biến, nhãn UI không lộ database IDs. Auth regression tests cũ được giữ lại. Orchestrator và root `mvn clean verify` pass (88 tests; 3 SQL Server opt-in skips).
-3. **SEC-AUTHZ-01 — default-deny authorization:** map role/action từ `MaTranPhanQuyen`, validate context và scope tại Application boundary; test allow/deny, cross-scope, revoked assignment. Không cấp mặc định `AUDIT_READ`.
-4. **SEC-SESSION-01 — lifecycle:** idle 15 phút, absolute 12 giờ, overlay giữ draft, re-auth cùng user/role, logout và thu hồi context; dùng `Clock`/timer giả cho test.
-5. **SEC-AUDIT-01 — persistence and transaction:** migration bổ sung fields cần thiết, append-only write/read repositories, audit cùng transaction với thay đổi nhạy cảm, fail-closed, redaction và quyền `AUDIT_READ` default-deny. SQL Server integration chỉ trên DB synthetic riêng.
-6. **SEC-UI-01 — screens and acceptance:** nối login, scope selector, lock overlay, logout confirmation và permission-aware navigation; headless Swing tests rồi desktop smoke check.
+3. **SEC-AUTHZ-MATRIX-PROPOSAL-01 — proposal complete:** source-grounded ma trận đề xuất ở `phase2-role-permission-matrix-proposal.md`; mọi grant chưa được duyệt. Scope `CO_SO` chờ Owner xác nhận ngoại lệ truy cập liên khoa (`DEC-AUTHZ-03`); không seed quyền.
+4. **SEC-SESSION-CONFIG-01 — configuration complete (`0e4d8c6`):** `ISystemRepository` đọc timeout và migration V5 seed giá trị mặc định idempotent.
+5. **SEC-SESSION-01 — lifecycle complete (`51a2ae2`):** idle 15 phút, absolute 12 giờ, overlay giữ workspace/draft, re-auth cùng user/role/scope, logout và xóa context; fake-clock/headless tests pass. Full JDK 17 `mvn -Djava.awt.headless=true clean verify` pass (101 cases, 3 SQL Server opt-in skips). Desktop visual smoke check còn mở.
+6. **SEC-AUDIT-DESIGN-01 — proposal in progress:** chốt schema/API/task decomposition cho audit append-only, fail-closed transaction và event capture từ policy đã duyệt; giữ `AUDIT_READ` default-deny/no-purge.
+7. **SEC-AUTHZ-01 — default-deny authorization:** map role/action từ `MaTranPhanQuyen`, validate context và scope tại Application boundary; test allow/deny, cross-scope, revoked assignment. Không cấp mặc định `AUDIT_READ`; chờ Owner review ma trận và DEC-AUTHZ decisions trước khi seed grant.
+8. **SEC-AUDIT-01 — persistence and transaction:** migration bổ sung fields cần thiết, append-only writes, audit cùng transaction với thay đổi nhạy cảm, fail-closed, redaction và `AUDIT_READ` default-deny. SQL Server integration chỉ trên DB synthetic riêng.
+9. **SEC-UI-01 — screens and acceptance:** nối scope selector, lock overlay, logout confirmation và permission-aware navigation; headless Swing tests rồi desktop smoke check.
 
 ## 4. Gates và chính sách chưa duyệt
 
