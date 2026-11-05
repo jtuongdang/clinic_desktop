@@ -126,6 +126,8 @@ Hiện tại gói `vn.clinicmanagement.domain.common.events` khai báo **10 lớ
 - `clinic-desktop`: `ReceptionSqlServerPersistenceTest`, `ReceptionSqlServerProcessRestartTest`, `PatientRegistrationFormPanelTest` (3 file, 8 test case; hai SQL Server E2E opt-in được skip trong lệnh mặc định) — không có test về UI lắng nghe domain event.
 
 **Kết luận về độ phủ test sự kiện miền:** **0 / 16 file test** kiểm thử `BaseEntity.registerDomainEvent`, `getDomainEvents`, `clearDomainEvents`, `AbstractDomainEvent`, `IDomainEventPublisher`, `IDomainEventHandler`, hoặc bất kỳ lớp nào trong 10 lớp sự kiện miền. Đây là source inventory của checkout và khớp số liệu Maven `mvn clean verify`: 71 test được phát hiện, 68 pass, 0 failure/error, 3 SQL Server opt-in skip.
+
+**Cập nhật sau review (05/11/2026):** Codex task `8109c55f-128d-4d6d-bdda-7a7fe21d9f3f` bổ sung `BaseEntityDomainEventsTest` với 5 test cho collection semantics (`register`, null rejection, immutable snapshots, `pull-and-clear`). Hiện có **1 / 18 file test** phủ phần collection nền; vẫn chưa có test publisher/handler, phát sinh event ở aggregate, hoặc phát hành trong transaction. Sau task này, root JDK 17 `mvn clean verify` phát hiện 78 test: 75 pass, 0 failure/error, 3 SQL Server opt-in skip.
 ---
 
 ## 6. Khế Ước Triển Khai Tối Thiểu Tiếp Theo Cho `PLAT-EVENT-01` (`[Khuyến nghị / Recommendation]`)
