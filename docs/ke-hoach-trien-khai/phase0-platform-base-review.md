@@ -360,12 +360,12 @@ Hiện tại **chưa có bài test nào** kiểm증 các hành vi nền tảng s
 
 Không tự đoán hoặc tự áp đặt các thay đổi sau đây nếu chưa có quyết định của Owner:
 
-1. **`[Cần Owner quyết định 1 — Chuẩn Múi Giờ cho các cột `DATETIME2` Nghiệp Vụ & `BaseEntity`]`:**
+1. **`[DEC-TIME-01 — Đã duyệt: UTC cho metadata, giờ địa phương cho nghiệp vụ]`:**
    - Hiện tại `occurredAtUtc` (bảng Audit `V6`) và `NhanVien.dangNhapCuoi` (`CompleteLoginSessionHandler`) lưu theo **UTC**, trong khi toàn bộ 48 bảng `V1` dùng `DEFAULT GETDATE()` / `SYSDATETIME()` (giờ local của SQL Server) và `BaseEntity` dùng `LocalDateTime.now()` (giờ local của JVM).
-   - *Câu hỏi cần chốt:* Giữ các cột `createdAt`, `updatedAt`, `deletedAt` và thời gian nghiệp vụ (`ngayKe`, `ngayLap`, `thoiGianTiepNhan`...) theo giờ địa phương phòng khám (`Local Time` / `Asia/Ho_Chi_Minh`) và chỉ dùng UTC cho cột audit/session (`occurredAtUtc`), **hay** chuyển toàn bộ các cột metadata sang UTC (`SYSUTCDATETIME()` / `Clock.systemUTC()`) trong một migration mới?
-2. **`[Cần Owner quyết định 2 — Phạm vi Chuyển Đổi 10 Ràng Buộc `UNIQUE` trong `V1` sang Filtered Unique Index (`WHERE isDeleted = 0`)]`:**
+   - *Quyết định Owner ngày 05/11/2026:* metadata dùng UTC; thời gian nghiệp vụ dùng giờ địa phương `Asia/Ho_Chi_Minh`. Việc đồng bộ code/schema hiện hữu cần task migration riêng, có quy tắc chuyển đổi rõ; không diễn giải lại timestamp legacy không có timezone nguồn.
+2. **`[DEC-IDENTIFIER-01 — Đã duyệt chính sách; whitelist danh mục còn mở]`:**
    - 10 cột `UNIQUE` trong `V1` (`NhanVien.maNhanVien`, `NhanVien.username`, `BenhNhan.maBenhNhanFormat`, `ICD.maICD`, `DanhMucDichVu.maDichVu`, `Item.maItem`, `PhieuNhapKho.soPhieuNhap`, `PhieuXuatKho.soPhieuXuat`, `HoaDon.soHoaDon`, `ThamSoHeThong.maThamSo`) hiện chặn tái sử dụng mã kể cả sau khi đã xóa mềm (`isDeleted = 1`).
-   - *Câu hỏi cần chốt:* Những mã nào được phép tái sử dụng sau khi xóa mềm (cần migration tạo filtered unique index `WHERE isDeleted = 0` giống `V4`/`V7`), và những mã chứng từ/định danh lịch sử nào (`maBenhNhanFormat`, `maNhanVien`, `soHoaDon`, `soPhieuNhap`, `soPhieuXuat`) bắt buộc giữ duy nhất vĩnh viễn kể cả khi đã xóa mềm?
+   - *Quyết định Owner ngày 05/11/2026:* mã định danh/chứng từ không tái sử dụng sau xóa mềm; chỉ mã danh mục được phép tái sử dụng sau khi có whitelist được duyệt. Chưa có whitelist cụ thể; giữ unique hiện trạng và không tạo filtered unique index cho đến khi danh sách được chốt.
 3. **`[Cần Owner quyết định 3 — 14 Thực Thể `BaseEntity` Chưa Có Bảng SQL trong `V1`–`V8`]`:**
    - 14 lớp miền (`DonDatHang`, `ChiTietDonDatHang`, `Stocktake`, `StocktakeCount`, `IdempotencyRecord`, `LichLamViecCoDinh`, `LichLamViecDieuChinh`, `DieuChinhChamCong`, `KyChamCong`, `NghiPhep`, `ChiTietBangLuong`, `CauHinhHoaHongLoaiDichVu`, `CauHinhTichHop`, `TokenLamMoi`) đã có class Java nhưng chưa có bảng trong `V1`–`V8`.
    - *Câu hỏi cần chốt:* Tạo bảng bổ sung theo từng đợt phân hệ tương ứng (Đợt 5 Kho cho `Stocktake`/`DonDatHang`, Đợt 6 Nhân sự/Payroll cho `ChiTietBangLuong`/`NghiPhep`/`KyChamCong`...) hay loại bỏ các class ngoài phạm vi Desktop Monolith (như `TokenLamMoi`)?
