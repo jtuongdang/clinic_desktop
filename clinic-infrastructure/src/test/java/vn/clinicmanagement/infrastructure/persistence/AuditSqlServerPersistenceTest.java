@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.authorization.ActiveSessionPort;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.authorization.AuthorizationRequest;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.reception.GetReceptionQueueHandler;
@@ -18,12 +19,16 @@ import vn.clinicmanagement.application.reception.SearchPatientsHandler;
 import vn.clinicmanagement.application.reception.SearchPatientsQuery;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
+import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
 import vn.clinicmanagement.domain.facility.PhongKham;
+import vn.clinicmanagement.domain.identity.NhanVien;
+import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
+import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.infrastructure.persistence.facility.PhongKhamRepositoryImpl;
-import vn.clinicmanagement.infrastructure.persistence.identity.NhanVienRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.patient.BaoHiemRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.patient.BenhNhanRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.reception.ReceptionQueueRepositoryImpl;
@@ -34,6 +39,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -112,17 +118,22 @@ class AuditSqlServerPersistenceTest {
         String syntheticCccd = "0000" + generatedSuffix;
         String syntheticPhone = "09" + generatedSuffix;
         String syntheticCardNumber = "SYNTH" + generatedSuffix;
-        UUID correlationId = UUID.randomUUID();
         LocalDate today = LocalDate.now();
 
         ReceptionServices services = ReceptionServices.create();
         PhongKham room = services.rooms().getActiveRooms().stream().findFirst()
                 .orElseThrow(() -> new AssertionError("No active seeded clinic room is available"));
-        AuditActorContext actorContext = resolveSeededActorContext(room, correlationId);
-        AuthorizationContext authorizationContext = new AuthorizationContext(actorContext.employeeId(),
-                actorContext.roleId(), actorContext.roleCode(), actorContext.facilityId(),
-                actorContext.departmentId(), actorContext.correlationId());
-        services.authorizationContext().set(authorizationContext);
+        AuthorizationFixture actor = resolveSyntheticActor(room);
+        AuthorizationContext authorizationContext = actor.authorizationContext();
+        AuditActorContext actorContext = actor.auditActorContext();
+        services.authorizationContext().set(actor);
+
+        assertTrue(
+                services.authorization().evaluate(new AuthorizationRequest(
+                        authorizationContext, "PATIENT", HanhDongQuyen.TAO,
+                        actorContext.facilityId(), actorContext.departmentId())).allowed(),
+                "Synthetic reception actor must be allowed by persisted SystemRepositoryImpl grants before trigger installation"
+        );
 
         BenhNhan patient = new BenhNhan();
         patient.setHo("Synthetic");
@@ -145,7 +156,7 @@ class AuditSqlServerPersistenceTest {
         Integer generatedPatientIdBeforeRollback;
         boolean triggerInstalled = false;
         try {
-            installTemporaryPatientCreatedRejectTrigger(correlationId);
+            installTemporaryPatientCreatedRejectTrigger(actorContext.correlationId());
             triggerInstalled = true;
 
             Result<RegistrationReceipt> registrationResult = services.registerPatient().handle(
@@ -225,20 +236,18 @@ class AuditSqlServerPersistenceTest {
                         queryCountByString(
                                 connection,
                                 "SELECT COUNT(*) FROM NhatKyHeThong WHERE correlationId = ?",
-                                correlationId.toString()
+                                actorContext.correlationId().toString()
                         ),
                         "Rejected PATIENT_CREATED audit row must not persist"
                 );
             }
 
-            ReceptionServices freshServices = ReceptionServices.create();
-            freshServices.authorizationContext().set(authorizationContext);
-            List<PatientSearchItem> matches = freshServices.searchPatients()
+            List<PatientSearchItem> matches = services.searchPatients()
                     .handle(new SearchPatientsQuery(syntheticCccd, authorizationContext, actorContext))
                     .valueOrThrow();
             assertTrue(matches.isEmpty(), "Rolled-back synthetic patient must not appear in reception search");
 
-            List<ReceptionQueueItem> queue = freshServices.getQueue()
+            List<ReceptionQueueItem> queue = services.getQueue()
                     .handle(new GetReceptionQueueQuery(today, authorizationContext, actorContext))
                     .valueOrThrow()
                     .queue();
@@ -246,6 +255,12 @@ class AuditSqlServerPersistenceTest {
                     queue.stream().anyMatch(item -> item.patientId() == generatedPatientIdBeforeRollback),
                     "Rolled-back synthetic registration must not appear in the reception queue"
             );
+            try (Connection connection = DatabaseConnection.getConnection()) {
+                assertEquals(1, querySuccessfulAuditCount(connection, "PATIENT_SEARCH", actorContext.correlationId()),
+                        "Protected patient search must persist its successful read audit");
+                assertEquals(1, querySuccessfulAuditCount(connection, "PATIENT_VIEW", actorContext.correlationId()),
+                        "Protected reception queue read must persist its successful read audit");
+            }
         } finally {
             if (triggerInstalled) {
                 dropTemporaryPatientCreatedRejectTrigger();
@@ -497,7 +512,7 @@ class AuditSqlServerPersistenceTest {
         );
     }
 
-    private static AuditActorContext resolveSeededActorContext(PhongKham room, UUID correlationId)
+    private static AuthorizationFixture resolveSyntheticActor(PhongKham room)
             throws SQLException {
         int facilityId = room.getKhoa().getCoSo().getId();
         int departmentId = room.getKhoa().getId();
@@ -508,18 +523,31 @@ class AuditSqlServerPersistenceTest {
             );
             int roleId = queryInt(
                     connection,
-                    "SELECT TOP 1 id FROM VaiTro WHERE isDeleted = 0 "
-                            + "ORDER BY CASE WHEN tenVaiTro = N'RECEPTIONIST' THEN 0 ELSE 1 END, id"
+                    "SELECT id FROM VaiTro WHERE isDeleted = 0 AND tenVaiTro = N'RECEPTIONIST'"
             );
-            return new AuditActorContext(
-                    employeeId,
-                    roleId,
-                    "RECEPTIONIST",
-                    facilityId,
-                    departmentId,
-                    "synthetic-workstation",
-                    correlationId
-            );
+            UUID sessionId = UUID.randomUUID();
+            UUID correlationId = UUID.randomUUID();
+            AuthorizationContext authorizationContext = new AuthorizationContext(
+                    employeeId, roleId, "RECEPTIONIST", facilityId, departmentId, sessionId);
+            AuditActorContext auditActorContext = new AuditActorContext(
+                    employeeId, roleId, "RECEPTIONIST", facilityId, departmentId,
+                    "synthetic-workstation", correlationId);
+            return new AuthorizationFixture(authorizationContext, auditActorContext,
+                    sessionId, employeeId, roleId, facilityId, departmentId);
+        }
+    }
+
+    private static int querySuccessfulAuditCount(Connection connection, String action, UUID correlationId)
+            throws SQLException {
+        String sql = "SELECT COUNT(*) FROM NhatKyHeThong WHERE hanhDong = ? AND correlationId = ? "
+                + "AND ketQua = 'SUCCESS' AND isDeleted = 0";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, action);
+            statement.setString(2, correlationId.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) throw new SQLException("Audit count query returned no result");
+                return resultSet.getInt(1);
+            }
         }
     }
 
@@ -641,7 +669,8 @@ class AuditSqlServerPersistenceTest {
             RegisterPatientHandler registerPatient,
             SearchPatientsHandler searchPatients,
             GetReceptionQueueHandler getQueue,
-            AtomicReference<AuthorizationContext> authorizationContext) {
+            AtomicReference<AuthorizationFixture> authorizationContext,
+            AuthorizationService authorization) {
 
         private static ReceptionServices create() {
             JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
@@ -653,24 +682,75 @@ class AuditSqlServerPersistenceTest {
             ReceptionQueueRepositoryImpl queue = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
             JdbcAuditRepositoryImpl auditPort = new JdbcAuditRepositoryImpl(
                     connections, unitOfWork, DatabaseConnection::getConnection);
-            AtomicReference<AuthorizationContext> authorizationContext = new AtomicReference<>();
+            AtomicReference<AuthorizationFixture> authorizationContext = new AtomicReference<>();
             ActiveSessionPort activeSessions = sessionId -> {
-                AuthorizationContext context = authorizationContext.get();
-                if (context == null || !sessionId.equals(context.sessionId())) return Optional.empty();
+                AuthorizationFixture fixture = authorizationContext.get();
+                if (fixture == null || !sessionId.equals(fixture.sessionId())) return Optional.empty();
+                AuthorizationContext context = fixture.authorizationContext();
                 return Optional.of(new ActiveSessionPort.ActiveSession(sessionId, context.employeeId(),
                         context.roleId(), context.roleCode(), context.facilityId(), context.departmentId(),
                         true, true, true));
             };
+            INhanVienRepository syntheticEmployees = syntheticEmployeeRepository(authorizationContext);
             AuthorizationService authorization = new AuthorizationService(activeSessions,
-                    new NhanVienRepositoryImpl(connections, unitOfWork),
+                    syntheticEmployees,
                     new SystemRepositoryImpl(connections, unitOfWork));
             return new ReceptionServices(
                     rooms,
                     new RegisterPatientHandler(patients, insurance, rooms, queue, transactions, auditPort, authorization),
                     new SearchPatientsHandler(patients, insurance, authorization, auditPort),
                     new GetReceptionQueueHandler(queue, authorization, auditPort),
-                    authorizationContext
+                    authorizationContext,
+                    authorization
             );
         }
     }
+
+    private static INhanVienRepository syntheticEmployeeRepository(
+            AtomicReference<AuthorizationFixture> authorizationContext) {
+        return (INhanVienRepository) Proxy.newProxyInstance(
+                INhanVienRepository.class.getClassLoader(), new Class<?>[]{INhanVienRepository.class},
+                (proxy, method, arguments) -> {
+                    AuthorizationFixture fixture = authorizationContext.get();
+                    return switch (method.getName()) {
+                        case "getById" -> fixture != null && (int) arguments[0] == fixture.employeeId()
+                                ? Optional.of(syntheticEmployee(fixture.employeeId())) : Optional.empty();
+                        case "getAssignedRoles" -> {
+                            requireFixture(fixture, (int) arguments[0]);
+                            VaiTro role = new VaiTro();
+                            role.setId(fixture.roleId());
+                            role.setTenVaiTro("RECEPTIONIST");
+                            yield List.of(role);
+                        }
+                        case "getAssignedWorkScopes" -> {
+                            requireFixture(fixture, (int) arguments[0]);
+                            yield List.of(new NhanVienWorkScope(fixture.facilityId(), "Synthetic facility",
+                                    fixture.departmentId(), "Synthetic department"));
+                        }
+                        case "toString" -> "SyntheticAuthorizationEmployeeRepository";
+                        default -> throw new UnsupportedOperationException(
+                                "Only synthetic authorization fixture reads are supported");
+                    };
+                });
+    }
+
+    private static void requireFixture(AuthorizationFixture fixture, int employeeId) {
+        if (fixture == null || employeeId != fixture.employeeId()) {
+            throw new IllegalStateException("Synthetic employee fixture was not initialized");
+        }
+    }
+
+    private static NhanVien syntheticEmployee(int employeeId) {
+        NhanVien employee = new NhanVien();
+        employee.setId(employeeId);
+        return employee;
+    }
+
+    private record AuthorizationFixture(AuthorizationContext authorizationContext,
+                                        AuditActorContext auditActorContext,
+                                        UUID sessionId,
+                                        int employeeId,
+                                        int roleId,
+                                        int facilityId,
+                                        int departmentId) { }
 }
