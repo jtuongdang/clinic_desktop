@@ -76,9 +76,8 @@ class FreshDatabaseMigrationSqlServerTest {
             );
         }
 
-        if (!runMigrationsWithoutConsoleOutput()) {
-            throw new AssertionError("DatabaseMigrationRunner reported a migration failure");
-        }
+        runMigrationsThroughV8();
+        assertLegacyDuplicatePreflightAndRetry();
 
         try (Connection connection = DatabaseConnection.getConnection()) {
             assertEquals(
@@ -264,6 +263,160 @@ class FreshDatabaseMigrationSqlServerTest {
             throw new AssertionError(
                     "Could not verify the SQL Server migration results; connection details were suppressed"
             );
+        }
+    }
+
+    private static void runMigrationsThroughV8() {
+        List<String> migrationNames = List.of(
+                "V1__Initial_Clinic_Schema.sql",
+                "V2__Seed_Initial_Data.sql",
+                "V3__Repair_Demo_Account_Passwords.sql",
+                "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
+                "V5__Seed_Session_Timeout_Parameters.sql",
+                "V6__Enhance_Audit_Tables_Append_Only.sql",
+                "V7__Harden_Permission_Matrix_Defaults.sql",
+                "V8__Seed_Approved_Permission_Grants.sql"
+        );
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             Statement statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            statement.execute("CREATE TABLE __schema_migrations ("
+                    + "id INT IDENTITY(1,1) PRIMARY KEY, "
+                    + "script_name NVARCHAR(255) NOT NULL UNIQUE, "
+                    + "installed_on DATETIME2 NOT NULL DEFAULT GETDATE(), "
+                    + "execution_time_ms BIGINT NOT NULL, "
+                    + "success BIT NOT NULL DEFAULT 1)");
+            connection.commit();
+
+            for (String migrationName : migrationNames) {
+                DatabaseMigrationRunner.executeMigration(
+                        connection,
+                        migrationName,
+                        readMigrationScript("migrations/" + migrationName),
+                        0L
+                );
+            }
+        } catch (SQLException | IOException exception) {
+            throw new AssertionError("Could not apply V1-V8 to the selected SQL Server test database");
+        }
+    }
+
+    private static void assertLegacyDuplicatePreflightAndRetry() throws SQLException {
+        String syntheticSuffix = UUID.randomUUID().toString();
+        int facilityId = -1;
+        int patientId = -1;
+        int firstLinkId = -1;
+        int secondLinkId = -1;
+        try {
+            try (Connection connection = DatabaseConnection.getConnection()) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO CoSo (tenCoSo) OUTPUT INSERTED.id VALUES (?)")) {
+                    statement.setString(1, "Synthetic PAT-V9 preflight " + syntheticSuffix);
+                    try (ResultSet resultSet = statement.executeQuery()) {
+                        if (!resultSet.next()) {
+                            throw new SQLException("Synthetic facility insert returned no identity.");
+                        }
+                        facilityId = resultSet.getInt(1);
+                    }
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO BenhNhan (ho, ten, ngaySinh) OUTPUT INSERTED.id "
+                                + "VALUES (?, ?, '2000-01-01')")) {
+                    statement.setString(1, "Synthetic");
+                    statement.setString(2, "PATV9" + syntheticSuffix.replace("-", ""));
+                    try (ResultSet resultSet = statement.executeQuery()) {
+                        if (!resultSet.next()) {
+                            throw new SQLException("Synthetic patient insert returned no identity.");
+                        }
+                        patientId = resultSet.getInt(1);
+                    }
+                }
+
+                firstLinkId = insertPatientFacilityLink(connection, patientId, facilityId);
+                secondLinkId = insertPatientFacilityLink(connection, patientId, facilityId);
+                assertEquals(2, countSyntheticActiveLinks(connection, firstLinkId, secondLinkId),
+                        "The generated legacy fixture must contain two active duplicate links before V9");
+                assertEquals(List.of(
+                                "V1__Initial_Clinic_Schema.sql",
+                                "V2__Seed_Initial_Data.sql",
+                                "V3__Repair_Demo_Account_Passwords.sql",
+                                "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
+                                "V5__Seed_Session_Timeout_Parameters.sql",
+                                "V6__Enhance_Audit_Tables_Append_Only.sql",
+                                "V7__Harden_Permission_Matrix_Defaults.sql",
+                                "V8__Seed_Approved_Permission_Grants.sql"),
+                        queryMigrationRecords(connection), "Only V1-V8 must be successful before the V9 attempt");
+            }
+
+            assertFalse(runMigrationsWithoutConsoleOutput(),
+                    "The real migration runner must fail V9 when active legacy duplicates exist");
+            try (Connection connection = DatabaseConnection.getConnection()) {
+                assertEquals(0, queryInt(connection,
+                                "SELECT COUNT(*) FROM __schema_migrations "
+                                        + "WHERE script_name = 'V9__Enforce_Active_Patient_Facility_Uniqueness.sql' "
+                                        + "AND success = 1"),
+                        "A failed V9 attempt must not create a successful tracking record");
+                assertEquals(0, queryInt(connection,
+                                "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID('BenhNhanCoSo') "
+                                        + "AND name = 'UX_BenhNhanCoSo_Active_Patient_Facility'"),
+                        "A failed V9 attempt must leave no filtered unique index behind");
+                assertEquals(2, countSyntheticActiveLinks(connection, firstLinkId, secondLinkId),
+                        "A failed V9 preflight must preserve both generated duplicate rows");
+            }
+
+            try (Connection connection = DatabaseConnection.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(
+                         "UPDATE BenhNhanCoSo SET isDeleted = 1 WHERE id = ? AND isDeleted = 0")) {
+                statement.setInt(1, secondLinkId);
+                assertEquals(1, statement.executeUpdate(),
+                        "Only the second generated duplicate link should be soft-deleted for retry");
+            }
+            assertTrue(runMigrationsWithoutConsoleOutput(),
+                    "The real migration runner must apply V9 after the synthetic duplicate is resolved");
+        } finally {
+            cleanupSyntheticPatientFacilityFixture(patientId, facilityId, firstLinkId, secondLinkId);
+        }
+    }
+
+    private static int countSyntheticActiveLinks(Connection connection, int firstLinkId, int secondLinkId)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM BenhNhanCoSo WHERE id IN (?, ?) AND isDeleted = 0")) {
+            statement.setInt(1, firstLinkId);
+            statement.setInt(2, secondLinkId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) throw new SQLException("Synthetic duplicate count returned no result.");
+                return resultSet.getInt(1);
+            }
+        }
+    }
+
+    private static void cleanupSyntheticPatientFacilityFixture(
+            int patientId, int facilityId, int firstLinkId, int secondLinkId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DELETE FROM BenhNhanCoSo WHERE id IN (?, ?)")) {
+                if (firstLinkId > 0) statement.setInt(1, firstLinkId);
+                else statement.setNull(1, java.sql.Types.INTEGER);
+                if (secondLinkId > 0) statement.setInt(2, secondLinkId);
+                else statement.setNull(2, java.sql.Types.INTEGER);
+                statement.executeUpdate();
+            }
+            if (patientId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM BenhNhan WHERE id = ?")) {
+                    statement.setInt(1, patientId);
+                    statement.executeUpdate();
+                }
+            }
+            if (facilityId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM CoSo WHERE id = ?")) {
+                    statement.setInt(1, facilityId);
+                    statement.executeUpdate();
+                }
+            }
         }
     }
 
