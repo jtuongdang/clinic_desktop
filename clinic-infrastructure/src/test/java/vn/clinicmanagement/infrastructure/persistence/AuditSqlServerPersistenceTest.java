@@ -107,7 +107,7 @@ class AuditSqlServerPersistenceTest {
         }
 
         try (Connection connection = DatabaseConnection.getConnection()) {
-            assertV6MigrationAndAppendOnlyBehavior(connection);
+            assertMigrationAndAppendOnlyBehavior(connection);
         } catch (SQLException exception) {
             throw new AssertionError(
                     "Could not verify V6 append-only migration behavior; connection details were suppressed"
@@ -383,7 +383,7 @@ class AuditSqlServerPersistenceTest {
         }
     }
 
-    private static void assertV6MigrationAndAppendOnlyBehavior(Connection connection) throws SQLException {
+    private static void assertMigrationAndAppendOnlyBehavior(Connection connection) throws SQLException {
         assertEquals(
                 List.of(
                         "V1__Initial_Clinic_Schema.sql",
@@ -392,15 +392,32 @@ class AuditSqlServerPersistenceTest {
                         "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
                         "V5__Seed_Session_Timeout_Parameters.sql",
                         "V6__Enhance_Audit_Tables_Append_Only.sql",
-                        "V7__Harden_Permission_Matrix_Defaults.sql"
+                        "V7__Harden_Permission_Matrix_Defaults.sql",
+                        "V8__Seed_Approved_Permission_Grants.sql"
                 ),
                 queryMigrationRecords(connection),
-                "All V1-V7 migrations must be recorded as successful"
+                "All V1-V8 migrations must be recorded as successful"
+        );
+        assertEquals(
+                57,
+                queryInt(connection, "SELECT COUNT(*) FROM MaTranPhanQuyen WHERE isDeleted = 0"),
+                "V8 must seed the 57 owner-approved active grants"
         );
         assertEquals(
                 0,
-                queryInt(connection, "SELECT COUNT(*) FROM MaTranPhanQuyen"),
-                "V7 must not seed permission grants"
+                queryInt(connection,
+                        "SELECT COUNT(*) FROM MaTranPhanQuyen WHERE isDeleted = 0 AND duocPhep = 1 "
+                                + "AND (phamViDuLieu IS NULL OR phamViDuLieu <> 'KHOA_PHONG')"),
+                "V8 grants must be scoped to KHOA_PHONG"
+        );
+        assertEquals(
+                0,
+                queryInt(connection,
+                        "SELECT COUNT(*) FROM MaTranPhanQuyen WHERE isDeleted = 0 "
+                                + "AND ((phanHe = 'AUDIT' AND hanhDong = 'AUDIT_READ') "
+                                + "OR (phanHe = 'CLS' AND hanhDong = 'DUYET') "
+                                + "OR (phanHe = 'PRESCRIPTION' AND hanhDong = 'DUYET'))"),
+                "V8 must keep audit-read and unresolved approval actions default-deny"
         );
         assertEquals(
                 2,
