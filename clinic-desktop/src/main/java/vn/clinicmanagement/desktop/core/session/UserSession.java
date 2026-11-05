@@ -3,6 +3,8 @@ package vn.clinicmanagement.desktop.core.session;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 
+import java.time.Instant;
+
 public class UserSession {
     private static UserSession instance;
 
@@ -19,6 +21,12 @@ public class UserSession {
     private String departmentName;
     private String stationId;
     private String workstationId;
+    private String sessionId;
+    private Instant issuedAt;
+    private Instant lastActivityAt;
+    private Instant absoluteExpiresAt;
+    private boolean locked;
+    private boolean absoluteExpiryPending;
 
     private UserSession() { clearSession(); }
 
@@ -41,7 +49,32 @@ public class UserSession {
         this.departmentName = scope.departmentName();
         this.stationId = "";
         this.workstationId = "";
+        this.sessionId = null;
+        this.issuedAt = null;
+        this.lastActivityAt = null;
+        this.absoluteExpiresAt = null;
+        this.locked = false;
+        this.absoluteExpiryPending = false;
         this.loggedOn = true;
+    }
+
+    void setLifecycleMetadata(String sessionId, Instant issuedAt, Instant lastActivityAt, Instant absoluteExpiresAt) {
+        if (sessionId == null || issuedAt == null || lastActivityAt == null || absoluteExpiresAt == null
+                || !absoluteExpiresAt.isAfter(issuedAt)) {
+            throw new IllegalArgumentException("A bounded session lifecycle is required.");
+        }
+        this.sessionId = sessionId;
+        this.issuedAt = issuedAt;
+        this.lastActivityAt = lastActivityAt;
+        this.absoluteExpiresAt = absoluteExpiresAt;
+        this.locked = false;
+        this.absoluteExpiryPending = false;
+    }
+
+    void setLastActivityAt(Instant value) { lastActivityAt = value; }
+    void setLocked(boolean value, boolean absoluteExpiryPending) {
+        locked = value;
+        this.absoluteExpiryPending = value && absoluteExpiryPending;
     }
 
     public void clearSession() {
@@ -58,6 +91,12 @@ public class UserSession {
         departmentName = "";
         stationId = "";
         workstationId = "";
+        sessionId = null;
+        issuedAt = null;
+        lastActivityAt = null;
+        absoluteExpiresAt = null;
+        locked = false;
+        absoluteExpiryPending = false;
     }
 
     public boolean isLoggedOn() { return loggedOn; }
@@ -77,4 +116,10 @@ public class UserSession {
     public void setStationId(String stationId) { this.stationId = stationId; }
     public String getWorkstationId() { return workstationId; }
     public void setWorkstationId(String workstationId) { this.workstationId = workstationId; }
+    public String getSessionId() { return sessionId; }
+    public Instant getIssuedAt() { return issuedAt; }
+    public Instant getLastActivityAt() { return lastActivityAt; }
+    public Instant getAbsoluteExpiresAt() { return absoluteExpiresAt; }
+    public boolean isLocked() { return locked; }
+    public boolean isAbsoluteExpiryPending() { return absoluteExpiryPending; }
 }

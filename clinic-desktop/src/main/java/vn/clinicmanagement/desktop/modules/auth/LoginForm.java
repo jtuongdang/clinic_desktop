@@ -3,6 +3,7 @@ package vn.clinicmanagement.desktop.modules.auth;
 import vn.clinicmanagement.desktop.core.config.AppFonts;
 import vn.clinicmanagement.desktop.core.config.UIConstants;
 import vn.clinicmanagement.desktop.core.session.UserSession;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.modules.dashboard.MainDashboardFrame;
 import vn.clinicmanagement.application.auth.AuthenticateUserCommand;
 import vn.clinicmanagement.application.auth.AuthenticateUserHandler;
@@ -141,10 +142,11 @@ public class LoginForm extends JFrame {
                     if (scope == null) return;
 
                     UserSession session = UserSession.getInstance();
-                    session.setSession(user.userId(), user.username(), user.fullName(), role, scope);
+                    SessionLifecycleService lifecycle = AuthenticationCompositionRoot.createSessionLifecycleService(session);
+                    lifecycle.startSession(user.userId(), user.username(), user.fullName(), role, scope);
 
                     dispose();
-                    MainDashboardFrame dashboard = new MainDashboardFrame(user.username(), role.name());
+                    MainDashboardFrame dashboard = new MainDashboardFrame(user.username(), role.name(), lifecycle);
                     dashboard.setVisible(true);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();

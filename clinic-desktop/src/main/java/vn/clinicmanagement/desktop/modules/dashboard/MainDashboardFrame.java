@@ -4,6 +4,13 @@ import vn.clinicmanagement.desktop.core.components.RibbonButton;
 import vn.clinicmanagement.desktop.core.components.StatusBarPanel;
 import vn.clinicmanagement.desktop.core.config.UIConstants;
 import vn.clinicmanagement.desktop.core.session.UserSession;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.SessionLockOverlay;
+import vn.clinicmanagement.desktop.modules.auth.AuthenticationCompositionRoot;
+import vn.clinicmanagement.desktop.modules.auth.LoginForm;
+import vn.clinicmanagement.application.auth.AuthenticateUserCommand;
+import vn.clinicmanagement.application.auth.AuthenticatedUser;
+import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.desktop.modules.billing.BillingInvoicePanel;
 import vn.clinicmanagement.desktop.modules.catalog.CatalogPanel;
 import vn.clinicmanagement.desktop.modules.doctor.DoctorStationPanel;
@@ -17,6 +24,9 @@ import vn.clinicmanagement.desktop.modules.system.SystemConfigPanel;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.AWTEventListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,12 +41,21 @@ public class MainDashboardFrame extends JFrame {
     private final WorkspaceManager workspaceManager;
     private final Map<String, RibbonButton> ribbonButtons = new HashMap<>();
     private final boolean isDoctor;
+    private final SessionLifecycleService sessionLifecycle;
+    private final SessionLockOverlay lockOverlay;
+    private final Timer sessionMonitor;
+    private final AWTEventListener activityMonitor;
 
     public MainDashboardFrame() {
         this("admin", "Bác sĩ điều trị");
     }
 
     public MainDashboardFrame(String username, String role) {
+        this(username, role, AuthenticationCompositionRoot.createSessionLifecycleService(UserSession.getInstance()));
+    }
+
+    public MainDashboardFrame(String username, String role, SessionLifecycleService sessionLifecycle) {
+        this.sessionLifecycle = sessionLifecycle;
         this.isDoctor = role != null && (role.contains("Bác sĩ") || role.contains("Doctor"));
 
         if (isDoctor) {
@@ -76,6 +95,43 @@ public class MainDashboardFrame extends JFrame {
 
         // Khởi tạo WorkspaceManager
         this.workspaceManager = new WorkspaceManager(centerContainer, cardLayout, tabStripPanel);
+
+        this.lockOverlay = new SessionLockOverlay(this::reauthenticate, this::logout);
+        setGlassPane(lockOverlay);
+        this.activityMonitor = event -> {
+            if (event.getSource() instanceof Component component
+                    && (component == this || SwingUtilities.isDescendingFrom(component, this))) {
+                // Re-authentication controls remain interactive while the retained workspace is locked.
+                if (component == lockOverlay || SwingUtilities.isDescendingFrom(component, lockOverlay)) return;
+                SessionLifecycleService.State state = sessionLifecycle.recordActivity();
+                if (state == SessionLifecycleService.State.LOCKED_IDLE
+                        || state == SessionLifecycleService.State.LOCKED_ABSOLUTE) {
+                    if (event instanceof java.awt.event.InputEvent inputEvent) inputEvent.consume();
+                    showSessionLock(state);
+                }
+            }
+        };
+        Toolkit.getDefaultToolkit().addAWTEventListener(activityMonitor,
+                AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK
+                        | AWTEvent.MOUSE_WHEEL_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
+        this.sessionMonitor = new Timer(1000, e -> {
+            SessionLifecycleService.State state = sessionLifecycle.evaluate();
+            if (state == SessionLifecycleService.State.LOCKED_IDLE
+                    || state == SessionLifecycleService.State.LOCKED_ABSOLUTE) showSessionLock(state);
+        });
+        this.sessionMonitor.start();
+        addWindowListener(new WindowAdapter() {
+            @Override public void windowClosing(WindowEvent e) {
+                sessionMonitor.stop();
+                Toolkit.getDefaultToolkit().removeAWTEventListener(activityMonitor);
+                sessionLifecycle.clear();
+            }
+
+            @Override public void windowClosed(WindowEvent e) {
+                sessionMonitor.stop();
+                Toolkit.getDefaultToolkit().removeAWTEventListener(activityMonitor);
+            }
+        });
 
         // Top Ribbon: Xây dựng menu tương ứng theo vai trò Bác sĩ hoặc Admin
         JPanel ribbonBar = isDoctor ? buildDoctorRibbonBar() : buildAdminRibbonBar();
@@ -312,5 +368,52 @@ public class MainDashboardFrame extends JFrame {
 
     public WorkspaceManager getWorkspaceManager() {
         return workspaceManager;
+    }
+
+    private void showSessionLock(SessionLifecycleService.State state) {
+        lockOverlay.setAbsoluteExpiry(state == SessionLifecycleService.State.LOCKED_ABSOLUTE);
+        lockOverlay.setVisible(true);
+        lockOverlay.requestFocusInWindow();
+    }
+
+    private void reauthenticate(SessionLockOverlay.Credentials credentials) {
+        lockOverlay.setBusy(true);
+        lockOverlay.setMessage("Đang xác thực...");
+        char[] secret = credentials.password();
+        AuthenticateUserCommand command = new AuthenticateUserCommand(credentials.username(), secret);
+        java.util.Arrays.fill(secret, '\0');
+        credentials.clear();
+        new SwingWorker<Result<AuthenticatedUser>, Void>() {
+            @Override protected Result<AuthenticatedUser> doInBackground() {
+                return AuthenticationCompositionRoot.createHandler().handle(command);
+            }
+            @Override protected void done() {
+                try {
+                    Result<AuthenticatedUser> result = get();
+                    if (result.isFailure() || !sessionLifecycle.reauthenticate(result.valueOrThrow())) {
+                        lockOverlay.setMessage("Không thể tiếp tục: thông tin xác thực hoặc phạm vi hiện tại không còn hợp lệ.");
+                        return;
+                    }
+                    lockOverlay.setMessage("");
+                    lockOverlay.setVisible(false);
+                } catch (Exception ex) {
+                    lockOverlay.setMessage("Không thể xác thực lúc này. Hãy thử lại.");
+                } finally {
+                    lockOverlay.setBusy(false);
+                }
+            }
+        }.execute();
+    }
+
+    private void logout() {
+        int answer = JOptionPane.showConfirmDialog(this,
+                "Đăng xuất sẽ đóng không gian làm việc hiện tại. Bạn có chắc chắn muốn tiếp tục?",
+                "Xác nhận đăng xuất", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (answer != JOptionPane.YES_OPTION) return;
+        sessionMonitor.stop();
+        Toolkit.getDefaultToolkit().removeAWTEventListener(activityMonitor);
+        sessionLifecycle.clear();
+        dispose();
+        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 }
