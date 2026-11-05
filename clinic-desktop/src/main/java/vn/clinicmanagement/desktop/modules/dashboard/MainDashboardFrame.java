@@ -3,6 +3,7 @@ package vn.clinicmanagement.desktop.modules.dashboard;
 import vn.clinicmanagement.desktop.core.components.RibbonButton;
 import vn.clinicmanagement.desktop.core.components.StatusBarPanel;
 import vn.clinicmanagement.desktop.core.config.UIConstants;
+import vn.clinicmanagement.desktop.core.diagnostics.DesktopWorkerDiagnostics;
 import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.core.session.SessionLockOverlay;
@@ -30,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Màn hình Dashboard trung tâm (EHC Hospital Shell)
@@ -225,7 +227,14 @@ public class MainDashboardFrame extends JFrame {
                     }
                     lockOverlay.setMessage("");
                     lockOverlay.setVisible(false);
-                } catch (Exception ex) {
+                } catch (InterruptedException ex) {
+                    DesktopWorkerDiagnostics.restoreInterruptStatus();
+                    lockOverlay.setMessage("Không thể xác thực lúc này. Hãy thử lại.");
+                } catch (ExecutionException ex) {
+                    DesktopWorkerDiagnostics.logDashboardReauthenticationFailure(ex);
+                    lockOverlay.setMessage("Không thể xác thực lúc này. Hãy thử lại.");
+                } catch (RuntimeException ex) {
+                    DesktopWorkerDiagnostics.logDashboardReauthenticationFailure(ex);
                     lockOverlay.setMessage("Không thể xác thực lúc này. Hãy thử lại.");
                 } finally {
                     lockOverlay.setBusy(false);

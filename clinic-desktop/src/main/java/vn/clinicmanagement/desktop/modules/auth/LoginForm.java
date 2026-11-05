@@ -2,6 +2,7 @@ package vn.clinicmanagement.desktop.modules.auth;
 
 import vn.clinicmanagement.desktop.core.config.AppFonts;
 import vn.clinicmanagement.desktop.core.config.UIConstants;
+import vn.clinicmanagement.desktop.core.diagnostics.DesktopWorkerDiagnostics;
 import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.modules.dashboard.MainDashboardFrame;
@@ -164,6 +165,7 @@ public class LoginForm extends JFrame {
                     Thread.currentThread().interrupt();
                     JOptionPane.showMessageDialog(LoginForm.this, "Quá trình đăng nhập bị gián đoạn.", "Lỗi", JOptionPane.ERROR_MESSAGE);
                 } catch (ExecutionException ex) {
+                    DesktopWorkerDiagnostics.logLoginAuthenticationFailure(ex);
                     JOptionPane.showMessageDialog(LoginForm.this, "Không thể kết nối hoặc xác thực tài khoản.", "Lỗi", JOptionPane.ERROR_MESSAGE);
                 } finally {
                     if (!finalizing) {
@@ -236,6 +238,7 @@ public class LoginForm extends JFrame {
                     JOptionPane.showMessageDialog(
                             LoginForm.this, "Quá trình đăng nhập bị gián đoạn.", "Lỗi", JOptionPane.ERROR_MESSAGE);
                 } catch (ExecutionException ex) {
+                    DesktopWorkerDiagnostics.logLoginSessionCompletionFailure(ex);
                     UserSession.getInstance().clearSession();
                     JOptionPane.showMessageDialog(
                             LoginForm.this, "Không thể kết nối hoặc xác thực tài khoản.", "Lỗi", JOptionPane.ERROR_MESSAGE);
