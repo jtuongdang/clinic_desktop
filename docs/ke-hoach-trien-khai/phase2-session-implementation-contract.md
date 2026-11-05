@@ -1,6 +1,6 @@
 # Phase 2 — contract triển khai vòng đời phiên
 
-**Trạng thái:** Implementation contract dựa trên policy đã được chủ dự án duyệt. Thời lượng idle 15 phút, tuyệt đối 12 giờ; tự khóa giữ nguyên bản nháp; xác thực lại cùng tài khoản và vai trò. Không bổ sung login lockout.
+**Trạng thái:** Implementation contract dựa trên policy đã được chủ dự án duyệt. Thời lượng idle 15 phút, tuyệt đối 12 giờ; tự khóa giữ nguyên bản nháp; xác thực lại cùng tài khoản, vai trò và cặp cơ sở/khoa. Không bổ sung login lockout.
 
 ## 1. Cấu hình thời hạn
 
@@ -13,7 +13,7 @@
 - Mỗi lần đăng nhập tạo `sessionId`, `issuedAt`, `lastActivityAt`, `absoluteExpiresAt` và trạng thái khóa.
 - `UserSession` giữ role ID/code/name cùng một facility/department đã chọn. Station/workstation độc lập và không thay thế department scope.
 - Tính thời gian bằng `Clock`/`Instant` để kiểm thử xác định; hoạt động sau khi bị khóa không làm mới thời gian idle.
-- Logout, từ chối xác thực lại hoặc đóng workspace xóa toàn bộ session metadata.
+- Logout hoặc đóng workspace xóa toàn bộ session metadata. Xác thực lại sai/hủy không xóa hay thay đổi context; phiên tiếp tục bị khóa.
 
 ## 3. Khóa UI và xác thực lại
 
@@ -26,7 +26,7 @@
 ## 4. Phạm vi và kiểm thử
 
 - Chia implementation theo file scope: (A) repository cấu hình và migration; (B) policy/state machine; (C) desktop activity monitor, lock overlay và re-auth. Mỗi giao diện chung phải được merge/contract chốt trước task phụ thuộc.
-- Unit test ranh giới thời gian 14:59/15:00 phút và 11:59:59/12:00 giờ bằng `Clock` giả; test activity reset, lock persistence, absolute expiry, same-context re-auth, revoked assignment, cancellation và logout clear.
+- Unit test ranh giới thời gian 14:59/15:00 phút và 11:59:59/12:00 giờ bằng `Clock` giả; test activity reset, lock persistence, absolute expiry, same-context re-auth, revoked assignment, failed re-auth và logout clear.
 - Headless test cho state machine/session; desktop smoke test xác nhận overlay che toàn workspace và draft còn nguyên. Chỉ dùng dữ liệu tổng hợp; không nối SQL Server thật.
 
 ## 5. Không thuộc contract này
