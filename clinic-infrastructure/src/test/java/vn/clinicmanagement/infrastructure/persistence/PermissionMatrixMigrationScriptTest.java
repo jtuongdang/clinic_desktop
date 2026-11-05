@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PermissionMatrixMigrationScriptTest {
@@ -36,14 +38,21 @@ class PermissionMatrixMigrationScriptTest {
     }
 
     @Test
-    void migrationRunnerRegistersV7ImmediatelyAfterV6() throws ReflectiveOperationException {
+    void migrationRunnerRegistersV1ThroughV8InOrder() throws ReflectiveOperationException {
         var field = DatabaseMigrationRunner.class.getDeclaredField("MIGRATION_FILES");
         field.setAccessible(true);
         String[] migrationFiles = (String[]) field.get(null);
 
-        assertTrue(migrationFiles.length >= 2);
-        assertTrue(migrationFiles[migrationFiles.length - 2].endsWith("V6__Enhance_Audit_Tables_Append_Only.sql"));
-        assertTrue(migrationFiles[migrationFiles.length - 1].endsWith("V7__Harden_Permission_Matrix_Defaults.sql"));
+        assertEquals(List.of(
+                "migrations/V1__Initial_Clinic_Schema.sql",
+                "migrations/V2__Seed_Initial_Data.sql",
+                "migrations/V3__Repair_Demo_Account_Passwords.sql",
+                "migrations/V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
+                "migrations/V5__Seed_Session_Timeout_Parameters.sql",
+                "migrations/V6__Enhance_Audit_Tables_Append_Only.sql",
+                "migrations/V7__Harden_Permission_Matrix_Defaults.sql",
+                "migrations/V8__Seed_Approved_Permission_Grants.sql"
+        ), List.of(migrationFiles));
     }
 
     private static String readScript() throws IOException {

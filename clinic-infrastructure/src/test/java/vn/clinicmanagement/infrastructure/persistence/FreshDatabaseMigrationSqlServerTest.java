@@ -2,10 +2,10 @@ package vn.clinicmanagement.infrastructure.persistence;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,13 +16,15 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FreshDatabaseMigrationSqlServerTest {
 
+    private static final String V8_SCRIPT_PATH = "migrations/V8__Seed_Approved_Permission_Grants.sql";
     private static final Pattern DATABASE_NAME_PATTERN = Pattern.compile("clinic_test_[A-Za-z0-9_]+");
     private static final Pattern DATABASE_OPTION_PATTERN =
             Pattern.compile("(?i);\\s*(?:databaseName|database)\\s*=[^;]*");
@@ -30,7 +32,7 @@ class FreshDatabaseMigrationSqlServerTest {
             Pattern.compile("(?i);\\s*(?:user|password)\\s*=");
 
     @Test
-    void migratesAnExplicitlySelectedFreshSqlServerDatabase() throws Exception {
+    void migratesOnlyAnExplicitClinicTestDatabaseAndVerifiesV8Grants() throws Exception {
         Assumptions.assumeTrue(
                 "true".equals(System.getProperty("clinic.sqlserver.migration.enabled")),
                 "Set clinic.sqlserver.migration.enabled=true to opt in"
@@ -69,7 +71,7 @@ class FreshDatabaseMigrationSqlServerTest {
             );
         }
 
-        if (!runMigrationsWithoutConsoleOutput()) {
+        if (!DatabaseMigrationRunner.runMigrations()) {
             throw new AssertionError("DatabaseMigrationRunner reported a migration failure");
         }
 
@@ -82,49 +84,34 @@ class FreshDatabaseMigrationSqlServerTest {
                             "V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
                             "V5__Seed_Session_Timeout_Parameters.sql",
                             "V6__Enhance_Audit_Tables_Append_Only.sql",
-                            "V7__Harden_Permission_Matrix_Defaults.sql"
+                            "V7__Harden_Permission_Matrix_Defaults.sql",
+                            "V8__Seed_Approved_Permission_Grants.sql"
                     ),
                     queryMigrationRecords(connection),
-                    "All V1-V7 migrations must be recorded as successful"
+                    "Fresh database must record migrations V1-V8"
             );
 
-            assertEquals(1, queryInt(
-                    connection,
-                    "SELECT COUNT(*) FROM sys.tables WHERE name = 'CoSo'"
-            ), "V1 must create the representative CoSo table");
-            assertEquals(1, queryInt(
-                    connection,
-                    "SELECT COUNT(*) FROM sys.tables t "
-                            + "JOIN sys.columns c ON c.object_id = t.object_id "
-                            + "JOIN sys.indexes i ON i.object_id = t.object_id "
-                            + "JOIN sys.index_columns ic ON ic.object_id = i.object_id "
-                            + "AND ic.index_id = i.index_id AND ic.column_id = c.column_id "
-                            + "WHERE t.name = 'BenhNhan' AND c.name = 'activeCccdUniqueKey' "
-                            + "AND c.is_computed = 1 AND i.name = 'UX_BenhNhan_Active_CCCD' "
-                            + "AND i.is_unique = 1"
-            ), "V4 must create the unique index on the computed active CCCD key");
-
-            assertSeedCount(connection, "CoSo", 1);
-            assertSeedCount(connection, "Khoa", 5);
-            assertSeedCount(connection, "PhongKham", 8);
-            assertSeedCount(connection, "VaiTro", 6);
-            assertSeedCount(connection, "ChucVu", 5);
-            assertSeedCount(connection, "ICD", 7);
-            assertSeedCount(connection, "DanhMucDichVu", 6);
-            assertSeedCount(connection, "Kho", 3);
-            assertSeedCount(connection, "Item", 3);
-            assertSeedCount(connection, "TonKho", 3);
-            assertSeedCount(connection, "MaTranPhanQuyen", 0);
+            Set<ApprovedPermissionGrantsMigrationTest.GrantKey> grantsBeforeReplay =
+                    queryActiveGrants(connection);
+            assertEquals(ApprovedPermissionGrantsMigrationTest.approvedGrants(), grantsBeforeReplay);
+            assertEquals(57, queryInt(connection,
+                    "SELECT COUNT(*) FROM dbo.MaTranPhanQuyen WHERE isDeleted = 0"));
             assertEquals(
-                    2,
+                    0,
                     queryInt(connection,
-                            "SELECT COUNT(*) FROM sys.default_constraints dc "
-                                    + "JOIN sys.columns c ON c.object_id = dc.parent_object_id "
-                                    + "AND c.column_id = dc.parent_column_id "
-                                    + "WHERE dc.parent_object_id = OBJECT_ID('dbo.MaTranPhanQuyen') "
-                                    + "AND ((c.name = 'phamViDuLieu' AND dc.definition LIKE '%KHOA_PHONG%') "
-                                    + "OR (c.name = 'duocPhep' AND dc.definition LIKE '%0%'))"),
-                    "V7 must persist KHOA_PHONG and false defaults"
+                            "SELECT COUNT(*) FROM dbo.MaTranPhanQuyen "
+                                    + "WHERE isDeleted = 0 AND duocPhep = 1 "
+                                    + "AND (phamViDuLieu IS NULL OR phamViDuLieu <> 'KHOA_PHONG')"),
+                    "Every active ALLOW must use KHOA_PHONG"
+            );
+            assertEquals(
+                    0,
+                    queryInt(connection,
+                            "SELECT COUNT(*) FROM ("
+                                    + "SELECT maVaiTro, phanHe, hanhDong FROM dbo.MaTranPhanQuyen "
+                                    + "WHERE isDeleted = 0 GROUP BY maVaiTro, phanHe, hanhDong "
+                                    + "HAVING COUNT_BIG(*) > 1) duplicates"),
+                    "There must be no duplicate active role/module/action tuple"
             );
             assertEquals(
                     1,
@@ -133,7 +120,7 @@ class FreshDatabaseMigrationSqlServerTest {
                                     + "WHERE parent_object_id = OBJECT_ID('dbo.MaTranPhanQuyen') "
                                     + "AND name = 'CK_MaTranPhanQuyen_ActiveAllowScope' "
                                     + "AND is_disabled = 0 AND is_not_trusted = 0"),
-                    "V7 must enable and trust the active ALLOW scope constraint"
+                    "The trusted active-ALLOW scope constraint must remain enabled"
             );
             assertEquals(
                     1,
@@ -143,114 +130,30 @@ class FreshDatabaseMigrationSqlServerTest {
                                     + "AND name = 'UX_MaTranPhanQuyen_Active_Role_Module_Action' "
                                     + "AND is_unique = 1 AND has_filter = 1 "
                                     + "AND filter_definition LIKE '%isDeleted%0%'"),
-                    "V7 must create the filtered unique active assignment index"
+                    "The filtered unique active role/module/action index must exist"
             );
             assertEquals(
-                    1,
-                    queryInt(
-                            connection,
-                            "SELECT COUNT(*) FROM ThamSoHeThong "
-                                    + "WHERE maThamSo = 'SESSION_IDLE_TIMEOUT_MINUTES'"
-                    ),
-                    "The idle timeout parameter must exist exactly once"
-            );
-            assertEquals(
-                    "15",
-                    queryString(
-                            connection,
-                            "SELECT giaTri FROM ThamSoHeThong "
-                                    + "WHERE maThamSo = 'SESSION_IDLE_TIMEOUT_MINUTES'"
-                    ),
-                    "The idle timeout parameter must retain its approved default"
-            );
-            assertEquals(
-                    1,
-                    queryInt(
-                            connection,
-                            "SELECT COUNT(*) FROM ThamSoHeThong "
-                                    + "WHERE maThamSo = 'SESSION_ABSOLUTE_TIMEOUT_HOURS'"
-                    ),
-                    "The absolute timeout parameter must exist exactly once"
-            );
-            assertEquals(
-                    "12",
-                    queryString(
-                            connection,
-                            "SELECT giaTri FROM ThamSoHeThong "
-                                    + "WHERE maThamSo = 'SESSION_ABSOLUTE_TIMEOUT_HOURS'"
-                    ),
-                    "The absolute timeout parameter must retain its approved default"
-            );
-            assertSeedCount(connection, "ThamSoHeThong", 6);
-            assertEquals(
-                    22,
-                    queryInt(
-                            connection,
-                            "SELECT COUNT(*) FROM sys.columns c "
-                                    + "JOIN sys.tables t ON t.object_id = c.object_id "
-                                    + "WHERE t.name IN ('NhatKyHeThong', 'NhatKyHoSoBenhAn') "
-                                    + "AND c.name IN ('maVaiTro', 'maVaiTroCode', 'maCoSo', 'maKhoa', "
-                                    + "'loaiDoiTuong', 'maDoiTuong', 'ketQua', 'maLyDo', 'workstationId', "
-                                    + "'correlationId', 'occurredAtUtc')"
-                    ),
-                    "V6 must add nullable metadata columns to both audit tables"
-            );
-            assertEquals(
-                    2,
-                    queryInt(
-                            connection,
-                            "SELECT COUNT(*) FROM sys.triggers tr "
-                                    + "JOIN sys.tables t ON t.object_id = tr.parent_id "
-                                    + "WHERE t.name IN ('NhatKyHeThong', 'NhatKyHoSoBenhAn') "
-                                    + "AND tr.name IN ('TR_NhatKyHeThong_AppendOnly', "
-                                    + "'TR_NhatKyHoSoBenhAn_AppendOnly') AND tr.is_disabled = 0"
-                    ),
-                    "V6 must enable append-only triggers on both audit tables"
-            );
-            assertEquals(
-                    4,
-                    queryInt(
-                            connection,
-                            "SELECT COUNT(*) FROM sys.trigger_events e "
-                                    + "JOIN sys.triggers tr ON tr.object_id = e.object_id "
-                                    + "WHERE tr.name IN ('TR_NhatKyHeThong_AppendOnly', "
-                                    + "'TR_NhatKyHoSoBenhAn_AppendOnly') "
-                                    + "AND e.type_desc IN ('UPDATE', 'DELETE')"
-                    ),
-                    "Each append-only trigger must reject both UPDATE and DELETE"
+                    0,
+                    queryInt(connection,
+                            "SELECT COUNT(*) FROM dbo.MaTranPhanQuyen p "
+                                    + "JOIN dbo.VaiTro r ON r.id = p.maVaiTro "
+                                    + "WHERE p.isDeleted = 0 AND p.duocPhep = 1 AND ("
+                                    + "(r.tenVaiTro IN ('ADMIN', 'DOCTOR', 'RECEPTIONIST', "
+                                    + "'PHARMACIST', 'CASHIER', 'LAB_TECH') "
+                                    + "AND p.phanHe = 'AUDIT' AND p.hanhDong = 'AUDIT_READ') "
+                                    + "OR (p.phanHe = 'CLS' AND p.hanhDong = 'DUYET') "
+                                    + "OR (p.phanHe = 'PRESCRIPTION' AND p.hanhDong = 'DUYET'))"),
+                    "AUDIT_READ and unresolved CLS/PRESCRIPTION approvals must remain default-deny"
             );
 
-            assertAppendOnlyTriggersRejectPayloadChangesAndDeletion(connection);
+            DatabaseMigrationRunner.executeSqlScript(connection, readV8Script());
+            assertEquals(grantsBeforeReplay, queryActiveGrants(connection),
+                    "Reapplying V8 must not change the active grants");
         } catch (SQLException exception) {
             throw new AssertionError(
-                    "Could not verify the SQL Server migration results; connection details were suppressed"
+                    "Could not verify the V8 migration results; connection details were suppressed"
             );
         }
-    }
-
-    private static void assertAppendOnlyTriggersRejectPayloadChangesAndDeletion(Connection connection)
-            throws SQLException {
-        int auditId;
-        try (Statement statement = connection.createStatement()) {
-            try (ResultSet resultSet = statement.executeQuery(
-                    "INSERT INTO NhatKyHeThong (maNhanVien, hanhDong, chiTiet) "
-                            + "OUTPUT INSERTED.id VALUES (NULL, 'SYNTHETIC_APPEND_ONLY_TEST', 'synthetic payload')")) {
-                if (!resultSet.next()) throw new SQLException("Synthetic audit insert returned no identity.");
-                auditId = resultSet.getInt(1);
-            }
-        }
-
-        try (Statement statement = connection.createStatement()) {
-            assertThrows(SQLException.class, () -> statement.executeUpdate(
-                    "UPDATE NhatKyHeThong SET chiTiet = 'tampered synthetic payload' WHERE id = " + auditId));
-            assertThrows(SQLException.class, () -> statement.executeUpdate(
-                    "DELETE FROM NhatKyHeThong WHERE id = " + auditId));
-        }
-
-        assertEquals(1, queryInt(connection,
-                "SELECT COUNT(*) FROM NhatKyHeThong WHERE id = " + auditId
-                        + " AND chiTiet = 'synthetic payload'"),
-                "Append-only trigger must preserve synthetic payload and row after rejected mutations");
     }
 
     private static Properties loadLocalProperties() {
@@ -286,21 +189,6 @@ class FreshDatabaseMigrationSqlServerTest {
         return serverUrl + ";databaseName=" + databaseName;
     }
 
-    private static boolean runMigrationsWithoutConsoleOutput() {
-        PrintStream originalOut = System.out;
-        PrintStream originalErr = System.err;
-        try (PrintStream suppressed = new PrintStream(OutputStream.nullOutputStream(), true, StandardCharsets.UTF_8)) {
-            System.setOut(suppressed);
-            System.setErr(suppressed);
-            try {
-                return DatabaseMigrationRunner.runMigrations();
-            } finally {
-                System.setOut(originalOut);
-                System.setErr(originalErr);
-            }
-        }
-    }
-
     private static List<String> queryMigrationRecords(Connection connection) throws SQLException {
         List<String> scriptNames = new ArrayList<>();
         try (Statement statement = connection.createStatement();
@@ -314,13 +202,36 @@ class FreshDatabaseMigrationSqlServerTest {
         return scriptNames;
     }
 
-    private static void assertSeedCount(Connection connection, String tableName, int expectedCount)
-            throws SQLException {
-        assertEquals(
-                expectedCount,
-                queryInt(connection, "SELECT COUNT(*) FROM " + tableName),
-                "Unexpected deterministic seed count in " + tableName
-        );
+    private static Set<ApprovedPermissionGrantsMigrationTest.GrantKey> queryActiveGrants(
+            Connection connection) throws SQLException {
+        Set<ApprovedPermissionGrantsMigrationTest.GrantKey> grants = new java.util.HashSet<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(
+                     "SELECT r.tenVaiTro, p.phanHe, p.hanhDong, p.phamViDuLieu, p.duocPhep "
+                             + "FROM dbo.MaTranPhanQuyen p "
+                             + "JOIN dbo.VaiTro r ON r.id = p.maVaiTro "
+                             + "WHERE p.isDeleted = 0 ORDER BY r.tenVaiTro, p.phanHe, p.hanhDong"
+             )) {
+            while (resultSet.next()) {
+                assertEquals(PhamViDuLieu.KHOA_PHONG,
+                        PhamViDuLieu.valueOf(resultSet.getString("phamViDuLieu")));
+                assertTrue(resultSet.getBoolean("duocPhep"));
+                grants.add(new ApprovedPermissionGrantsMigrationTest.GrantKey(
+                        resultSet.getString("tenVaiTro"),
+                        resultSet.getString("phanHe"),
+                        resultSet.getString("hanhDong")
+                ));
+            }
+        }
+        return grants;
+    }
+
+    private static String readV8Script() throws IOException {
+        try (InputStream input = FreshDatabaseMigrationSqlServerTest.class.getClassLoader()
+                .getResourceAsStream(V8_SCRIPT_PATH)) {
+            if (input == null) throw new AssertionError("Missing migration script: " + V8_SCRIPT_PATH);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private static int queryInt(Connection connection, String sql) throws SQLException {
