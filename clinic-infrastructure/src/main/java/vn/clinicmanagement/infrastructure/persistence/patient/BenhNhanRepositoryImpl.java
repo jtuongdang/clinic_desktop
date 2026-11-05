@@ -211,6 +211,7 @@ public final class BenhNhanRepositoryImpl implements IBenhNhanRepository {
                 ps.setLong(3, patient.getVersion() == null ? 0L : patient.getVersion());
                 if (ps.executeUpdate() != 1) throw new IllegalStateException("Hồ sơ đã thay đổi hoặc không còn tồn tại.");
             }
+            patient.setVersion((patient.getVersion() == null ? 0L : patient.getVersion()) + 1);
             patient.setDeleted(true);
             patient.setDeletedAt(LocalDateTime.now());
             recordChange();

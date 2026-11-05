@@ -2,6 +2,9 @@ package vn.clinicmanagement.infrastructure.persistence.system;
 
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
+import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
+import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
 import vn.clinicmanagement.infrastructure.persistence.JdbcTransactionManager;
 import vn.clinicmanagement.infrastructure.persistence.JdbcUnitOfWork;
@@ -10,13 +13,18 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SystemRepositoryImplTest {
@@ -50,6 +58,61 @@ class SystemRepositoryImplTest {
 
         assertEquals(Optional.empty(), harness.read("SESSION_IDLE_TIMEOUT_MINUTES"));
         assertTrue(jdbc.sql.contains("isDeleted=0"));
+    }
+
+    @Test
+    void hydratesPermissionMatrixBaseMetadataAndFiltersDeletedRows() {
+        LocalDateTime createdAt = LocalDateTime.of(2025, 3, 4, 5, 6);
+        LocalDateTime updatedAt = LocalDateTime.of(2025, 4, 5, 6, 7);
+        SyntheticJdbc jdbc = new SyntheticJdbc(List.of(), List.of(
+                matrixRow(6, 23, 3L, createdAt, 12, updatedAt, 13, false, null, null),
+                matrixRow(7, 23, 4L, createdAt, 12, updatedAt, 13, true, updatedAt, 14)));
+        Harness harness = new Harness(jdbc);
+
+        List<MaTranPhanQuyen> matrix = harness.readMatrix(23);
+
+        assertEquals(1, matrix.size());
+        MaTranPhanQuyen permission = matrix.get(0);
+        assertEquals(6, permission.getId());
+        assertEquals(23, permission.getMaVaiTro());
+        assertEquals("reception", permission.getPhanHe());
+        assertEquals(HanhDongQuyen.XEM, permission.getHanhDong());
+        assertEquals(PhamViDuLieu.KHOA_PHONG, permission.getPhamViDuLieu());
+        assertTrue(permission.isDuocPhep());
+        assertEquals(3L, permission.getVersion());
+        assertEquals(createdAt, permission.getCreatedAt());
+        assertEquals(12, permission.getCreatedBy());
+        assertEquals(updatedAt, permission.getUpdatedAt());
+        assertEquals(13, permission.getUpdatedBy());
+        assertFalse(permission.isDeleted());
+        assertNull(permission.getDeletedAt());
+        assertNull(permission.getDeletedBy());
+        assertEquals(23, jdbc.boundRoleId);
+        assertTrue(jdbc.sql.contains("version, createdAt, createdBy, updatedAt, updatedBy, isDeleted, deletedAt, deletedBy"));
+        assertTrue(jdbc.sql.contains("WHERE maVaiTro=? AND isDeleted=0"));
+        assertTrue(jdbc.executedInsideTransaction);
+    }
+
+    private static Map<String, Object> matrixRow(
+            int id, int roleId, long version, LocalDateTime createdAt, int createdBy,
+            LocalDateTime updatedAt, int updatedBy, boolean deleted,
+            LocalDateTime deletedAt, Integer deletedBy) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", id);
+        row.put("maVaiTro", roleId);
+        row.put("phanHe", "reception");
+        row.put("hanhDong", HanhDongQuyen.XEM.name());
+        row.put("phamViDuLieu", PhamViDuLieu.KHOA_PHONG.name());
+        row.put("duocPhep", true);
+        row.put("version", version);
+        row.put("createdAt", Timestamp.valueOf(createdAt));
+        row.put("createdBy", createdBy);
+        row.put("updatedAt", Timestamp.valueOf(updatedAt));
+        row.put("updatedBy", updatedBy);
+        row.put("isDeleted", deleted);
+        row.put("deletedAt", deletedAt == null ? null : Timestamp.valueOf(deletedAt));
+        row.put("deletedBy", deletedBy);
+        return row;
     }
 
     @Test
@@ -100,6 +163,13 @@ class SystemRepositoryImplTest {
             return result.getValue().orElseThrow();
         }
 
+        private List<MaTranPhanQuyen> readMatrix(int roleId) {
+            Result<List<MaTranPhanQuyen>> result = transactions.inTransaction(
+                    () -> Result.success(repository.getMatrixByRoleId(roleId)));
+            assertTrue(result.isSuccess());
+            return result.getValue().orElseThrow();
+        }
+
         private static JdbcTransactionManager transactionManager(
                 JdbcUnitOfWork unitOfWork, java.sql.Connection connection) {
             try {
@@ -124,13 +194,20 @@ class SystemRepositoryImplTest {
     private static final class SyntheticJdbc {
         private final java.sql.Connection connection;
         private final List<ParameterRow> rows;
+        private final List<Map<String, Object>> matrixRows;
         private String sql;
         private String boundKey;
+        private int boundRoleId;
         private boolean transactionActive;
         private boolean executedInsideTransaction;
 
         private SyntheticJdbc(List<ParameterRow> rows) {
+            this(rows, List.of());
+        }
+
+        private SyntheticJdbc(List<ParameterRow> rows, List<Map<String, Object>> matrixRows) {
             this.rows = rows;
+            this.matrixRows = matrixRows;
             connection = (java.sql.Connection) Proxy.newProxyInstance(
                     java.sql.Connection.class.getClassLoader(),
                     new Class<?>[]{java.sql.Connection.class},
@@ -161,8 +238,19 @@ class SystemRepositoryImplTest {
                             boundKey = (String) args[1];
                             yield null;
                         }
+                        case "setInt" -> {
+                            boundRoleId = (int) args[1];
+                            yield null;
+                        }
                         case "executeQuery" -> {
                             executedInsideTransaction = transactionActive;
+                            if (sql.contains("FROM MaTranPhanQuyen")) {
+                                List<Map<String, Object>> matching = matrixRows.stream()
+                                        .filter(row -> ((Number) row.get("maVaiTro")).intValue() == boundRoleId)
+                                        .filter(row -> !((boolean) row.get("isDeleted")))
+                                        .toList();
+                                yield resultSet(matching);
+                            }
                             List<ParameterRow> matching = new ArrayList<>();
                             for (ParameterRow row : rows) {
                                 if (row.key().equals(boundKey)
@@ -170,21 +258,27 @@ class SystemRepositoryImplTest {
                                     matching.add(row);
                                 }
                             }
-                            yield resultSet(matching);
+                            yield resultSet(matching.stream()
+                                    .map(row -> Map.<String, Object>of("giaTri", row.value()))
+                                    .toList());
                         }
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     });
         }
 
-        private static java.sql.ResultSet resultSet(List<ParameterRow> matching) {
+        private static java.sql.ResultSet resultSet(List<Map<String, Object>> matching) {
             int[] cursor = {-1};
             return (java.sql.ResultSet) Proxy.newProxyInstance(
                     java.sql.ResultSet.class.getClassLoader(),
                     new Class<?>[]{java.sql.ResultSet.class},
                     (proxy, method, args) -> switch (method.getName()) {
                         case "next" -> ++cursor[0] < matching.size();
-                        case "getString" -> matching.get(cursor[0]).value();
+                        case "getString" -> matching.get(cursor[0]).get(args[0]);
+                        case "getInt" -> ((Number) matching.get(cursor[0]).get(args[0])).intValue();
+                        case "getLong" -> ((Number) matching.get(cursor[0]).get(args[0])).longValue();
+                        case "getBoolean" -> (boolean) matching.get(cursor[0]).get(args[0]);
+                        case "getObject", "getTimestamp" -> matching.get(cursor[0]).get(args[0]);
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     });

@@ -95,7 +95,8 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
                 bindEmployee(ps, employee);
                 ps.setObject(21, employee.getCreatedBy(), Types.INTEGER);
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) employee.setId(rs.getInt(1));
+                    if (!rs.next()) throw new IllegalStateException("Không nhận được ID nhân viên sau khi lưu.");
+                    employee.setId(rs.getInt(1));
                 }
             }
             recordChange();
@@ -140,6 +141,7 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
                 int changed = ps.executeUpdate();
                 if (changed == 0) throw new IllegalStateException("Nhân viên không tồn tại hoặc dữ liệu đã được cập nhật bởi người khác.");
             }
+            employee.setVersion((employee.getVersion() == null ? 0L : employee.getVersion()) + 1);
             employee.setDeleted(true);
             employee.setDeletedAt(LocalDateTime.now());
             recordChange();
@@ -181,7 +183,8 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
 
     @Override
     public List<VaiTro> getAssignedRoles(int employeeId) {
-        String sql = "SELECT vt.id, vt.tenVaiTro FROM NhanVien nv "
+        String sql = "SELECT vt.id, vt.tenVaiTro, vt.version, vt.createdAt, vt.createdBy, "
+                + "vt.updatedAt, vt.updatedBy, vt.isDeleted, vt.deletedAt, vt.deletedBy FROM NhanVien nv "
                 + "INNER JOIN NhanVienVaiTro nvt ON nvt.maNhanVien=nv.id "
                 + "INNER JOIN VaiTro vt ON vt.id=nvt.maVaiTro "
                 + "WHERE nv.id=? AND nv.hoatDong=1 AND nv.isDeleted=0 "
@@ -195,6 +198,14 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
                     VaiTro role = new VaiTro();
                     role.setId(rs.getInt("id"));
                     role.setTenVaiTro(rs.getString("tenVaiTro"));
+                    role.setVersion(rs.getLong("version"));
+                    role.setCreatedAt(localDateTime(rs, "createdAt"));
+                    role.setCreatedBy((Integer) rs.getObject("createdBy"));
+                    role.setUpdatedAt(localDateTime(rs, "updatedAt"));
+                    role.setUpdatedBy((Integer) rs.getObject("updatedBy"));
+                    role.setDeleted(rs.getBoolean("isDeleted"));
+                    role.setDeletedAt(localDateTime(rs, "deletedAt"));
+                    role.setDeletedBy((Integer) rs.getObject("deletedBy"));
                     roles.add(role);
                 }
                 return roles;

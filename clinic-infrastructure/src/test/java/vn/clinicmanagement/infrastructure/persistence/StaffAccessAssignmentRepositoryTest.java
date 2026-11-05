@@ -10,20 +10,24 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StaffAccessAssignmentRepositoryTest {
     @Test
     void mapsEveryActiveAssignedRoleIdAndCodeWithEmployeeBinding() {
         SyntheticJdbc jdbc = new SyntheticJdbc(List.of(
-                Map.of("id", 4, "tenVaiTro", "DOCTOR"),
-                Map.of("id", 9, "tenVaiTro", "PHARMACIST")));
+                roleRow(4, "DOCTOR"),
+                roleRow(9, "PHARMACIST")));
         Harness harness = new Harness(jdbc);
         List<VaiTro> roles = harness.read(repo -> repo.getAssignedRoles(27));
 
@@ -37,7 +41,32 @@ class StaffAccessAssignmentRepositoryTest {
         assertTrue(jdbc.sql.contains("nv.isDeleted=0"));
         assertTrue(jdbc.sql.contains("nvt.isDeleted=0"));
         assertTrue(jdbc.sql.contains("vt.isDeleted=0"));
+        assertTrue(jdbc.sql.contains("vt.version, vt.createdAt, vt.createdBy, vt.updatedAt, vt.updatedBy, "
+                + "vt.isDeleted, vt.deletedAt, vt.deletedBy"));
+        assertEquals(2L, roles.get(0).getVersion());
+        assertEquals(LocalDateTime.of(2025, 1, 2, 3, 4), roles.get(0).getCreatedAt());
+        assertEquals(11, roles.get(0).getCreatedBy());
+        assertEquals(LocalDateTime.of(2025, 2, 3, 4, 5), roles.get(0).getUpdatedAt());
+        assertEquals(12, roles.get(0).getUpdatedBy());
+        assertFalse(roles.get(0).isDeleted());
+        assertNull(roles.get(0).getDeletedAt());
+        assertNull(roles.get(0).getDeletedBy());
         assertTrue(jdbc.executedInsideTransaction);
+    }
+
+    private static Map<String, Object> roleRow(int id, String name) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", id);
+        row.put("tenVaiTro", name);
+        row.put("version", 2L);
+        row.put("createdAt", Timestamp.valueOf(LocalDateTime.of(2025, 1, 2, 3, 4)));
+        row.put("createdBy", 11);
+        row.put("updatedAt", Timestamp.valueOf(LocalDateTime.of(2025, 2, 3, 4, 5)));
+        row.put("updatedBy", 12);
+        row.put("isDeleted", false);
+        row.put("deletedAt", null);
+        row.put("deletedBy", null);
+        return row;
     }
 
     @Test
@@ -172,6 +201,9 @@ class StaffAccessAssignmentRepositoryTest {
                         case "next" -> ++cursor[0] < resultRows.size();
                         case "getInt" -> ((Number) resultRows.get(cursor[0]).get(args[0])).intValue();
                         case "getString" -> (String) resultRows.get(cursor[0]).get(args[0]);
+                        case "getLong" -> ((Number) resultRows.get(cursor[0]).get(args[0])).longValue();
+                        case "getBoolean" -> (boolean) resultRows.get(cursor[0]).get(args[0]);
+                        case "getObject", "getTimestamp" -> resultRows.get(cursor[0]).get(args[0]);
                         case "close" -> null;
                         case "toString" -> "SyntheticResultSet";
                         case "hashCode" -> System.identityHashCode(proxy);
