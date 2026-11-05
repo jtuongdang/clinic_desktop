@@ -3,6 +3,7 @@ package vn.clinicmanagement.infrastructure.persistence;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -13,6 +14,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * ============================================================================
@@ -93,8 +95,7 @@ public class DatabaseMigrationRunner {
             return true;
 
         } catch (Exception ex) {
-            System.err.println(" LỖI MIGRATION: " + ex.getMessage());
-            ex.printStackTrace();
+            printSafeMigrationFailure(System.err);
             return false;
         }
     }
@@ -163,7 +164,6 @@ public class DatabaseMigrationRunner {
                 sb.append(line).append("\n");
             }
         } catch (Exception ex) {
-            ex.printStackTrace();
             return null;
         }
         return sb.toString();
@@ -203,6 +203,19 @@ public class DatabaseMigrationRunner {
     }
 
     public static void main(String[] args) {
-        runMigrations();
+        System.exit(runMigrationsForCli(DatabaseMigrationRunner::runMigrations, System.err));
+    }
+
+    static int runMigrationsForCli(Supplier<Boolean> migration, PrintStream errorOutput) {
+        try {
+            return Boolean.TRUE.equals(migration.get()) ? 0 : 1;
+        } catch (Exception ex) {
+            printSafeMigrationFailure(errorOutput);
+            return 1;
+        }
+    }
+
+    private static void printSafeMigrationFailure(PrintStream errorOutput) {
+        errorOutput.println(" LỖI MIGRATION: Không thể hoàn tất quá trình migration.");
     }
 }

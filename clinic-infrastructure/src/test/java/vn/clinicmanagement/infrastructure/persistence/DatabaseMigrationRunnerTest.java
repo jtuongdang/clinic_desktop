@@ -2,9 +2,11 @@ package vn.clinicmanagement.infrastructure.persistence;
 
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Proxy;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -15,11 +17,45 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatabaseMigrationRunnerTest {
+
+    @Test
+    void cliMapsMigrationSuccessToZeroAndFailureToNonZero() {
+        assertEquals(0, DatabaseMigrationRunner.runMigrationsForCli(() -> true, System.err));
+        assertEquals(1, DatabaseMigrationRunner.runMigrationsForCli(() -> false, System.err));
+    }
+
+    @Test
+    void cliExceptionReturnsNonZeroAndPrintsOnlySafeDiagnostic() {
+        ByteArrayOutputStream capturedError = new ByteArrayOutputStream();
+        String secretUrl = "jdbc:sqlserver://synthetic-host;databaseName=synthetic-db";
+        String secretUsername = "synthetic-user";
+        String secretPassword = "synthetic-password";
+        RuntimeException failure = new RuntimeException(
+                "synthetic SQLException: " + secretUrl + " " + secretUsername + " " + secretPassword);
+
+        int status;
+        try (PrintStream errorOutput = new PrintStream(capturedError, true, StandardCharsets.UTF_8)) {
+            status = DatabaseMigrationRunner.runMigrationsForCli(() -> {
+                throw failure;
+            }, errorOutput);
+        }
+
+        String diagnostic = capturedError.toString(StandardCharsets.UTF_8);
+        assertEquals(1, status);
+        assertEquals(" LỖI MIGRATION: Không thể hoàn tất quá trình migration." + System.lineSeparator(), diagnostic);
+        assertFalse(diagnostic.contains(secretUrl));
+        assertFalse(diagnostic.contains(secretUsername));
+        assertFalse(diagnostic.contains(secretPassword));
+        assertFalse(diagnostic.contains("SQLException"));
+        assertFalse(diagnostic.contains("RuntimeException"));
+        assertFalse(diagnostic.contains("at "));
+    }
 
     @Test
     void executesV7BatchesThroughFakeJdbcWithoutOpeningDatabaseConnection() throws IOException, SQLException {
