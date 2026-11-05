@@ -196,3 +196,13 @@ ClinicOrchestrator task `0a565269-28b5-491a-85b6-abbe5ed81323` được tích h�
 **Còn lại dưới `PLAT-EVENT-01`:** (1) thiết kế/kiểm thử thu thập và dispatch event đúng ranh giới transaction, gồm hành vi rollback; (2) xác định và kiểm thử event ID/payload hợp lệ sau khi aggregate có định danh; (3) wiring handler thực theo contract nghiệp vụ/audit đã được duyệt; (4) xác định hành vi retry và liệu có cần outbox. Không có retry hoặc outbox được triển khai trong task publisher này. Parent `PLAT-EVENT-01` tiếp tục `[~]` In progress.
 
 **Bằng chứng kiểm định được ghi nhận:** configured JDK 17 `mvn -Djava.awt.headless=true clean verify` thành công với **252 tests, 0 failures, 0 errors, 4 SQL Server opt-in skips** trên 56 Surefire XML reports. Kết quả này là baseline verify mặc định; bốn skip là test SQL Server opt-in, không thuộc dispatcher.
+
+---
+
+## 9. Phụ lục cập nhật — UTC event metadata foundation (`PLAT-EVENT-UTC-01`, 06/11/2026)
+
+ClinicOrchestrator task `81d52408` được tích hợp cục bộ bằng commit `5510622`. Theo technical metadata decision DEC-TIME-01, `AbstractDomainEvent` nay mặc định lấy clock từ `Clock.systemUTC()` và chuyển `clock.instant()` thành `LocalDateTime` tại `ZoneOffset.UTC`. Giá trị trả về không chứa timezone hay offset; các trường ngày/giờ của nó được diễn giải là UTC. `IDomainEvent.getOccurredOn()` tài liệu hóa semantics này. Clock có thể được inject; hai test tổng hợp xác nhận một instant cố định vẫn ánh xạ sang UTC dù clock có zone `Asia/Tokyo`, và constructor từ chối `null` clock.
+
+**Giới hạn phạm vi:** đây chỉ là nền tảng timestamp cho metadata sự kiện. Event consumers/storage hiện có chưa được wiring với thay đổi này, không có schema hoặc dữ liệu lưu trữ nào được chuyển đổi; không hoàn tất event collection/dispatch theo transaction, aggregate payload/ID, handler nghiệp vụ hoặc audit workflow. `PLAT-EVENT-01` tiếp tục `[~]` In progress với các hạng mục đó còn mở.
+
+**Bằng chứng kiểm định được ghi nhận cho task:** configured JDK 17 `mvn -Djava.awt.headless=true clean verify` thành công với **254 tests, 0 failures, 0 errors, 4 SQL Server opt-in skips** trên 57 Surefire XML reports. Đây là default verify baseline mới; bốn SQL Server tests vẫn opt-in và không thuộc lượt mặc định.
