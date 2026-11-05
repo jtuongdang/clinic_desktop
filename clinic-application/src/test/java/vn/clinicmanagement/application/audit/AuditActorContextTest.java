@@ -1,6 +1,7 @@
 package vn.clinicmanagement.application.audit;
 
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 
@@ -53,8 +54,8 @@ class AuditActorContextTest {
     }
 
     @Test
-    void registrationCommandRequiresItsCreatorToMatchTheAuditActor() {
-        AuditActorContext context = new AuditActorContext(7, 31, "RECEPTION", 11, 21, null, CORRELATION_ID);
+    void registrationCommandRequiresItsCreatorToMatchTheAuthorizedActor() {
+        AuthorizationContext context = new AuthorizationContext(7, 31, "RECEPTION", 11, 21, CORRELATION_ID);
 
         assertThrows(IllegalArgumentException.class, () -> new RegisterPatientCommand(
                 null, null, 3, "synthetic", "synthetic", DoiTuongKham.THU_PHI, false, 9, context));

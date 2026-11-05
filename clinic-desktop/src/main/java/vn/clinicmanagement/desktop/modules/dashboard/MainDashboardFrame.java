@@ -256,13 +256,13 @@ public class MainDashboardFrame extends JFrame {
                 switch (title) {
                     case "Đăng Ký Khám Bệnh":
                     case "Danh Sách Đón Tiếp":
-                        workspaceManager.openView(new ReceptionPanel());
+                        workspaceManager.openView(new ReceptionPanel(sessionLifecycle));
                         break;
                     case "Danh Sách Bệnh Nhân":
                         workspaceManager.openView(new ExaminationPanel());
                         break;
                     case "Màn Hình Chờ Tổng Hợp":
-                        workspaceManager.openView(new ReceptionPanel());
+                        workspaceManager.openView(new ReceptionPanel(sessionLifecycle));
                         break;
                     case "Kiosk Đăng Ký Khám":
                         JOptionPane.showMessageDialog(this,

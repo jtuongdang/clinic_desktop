@@ -3,7 +3,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.reception.*;
 import vn.clinicmanagement.domain.facility.PhongKham;
-import vn.clinicmanagement.desktop.core.session.UserSession;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
 import vn.clinicmanagement.desktop.modules.reception.components.ClinicRoomStatusPanel;
 import vn.clinicmanagement.desktop.modules.reception.components.PatientRegistrationFormPanel;
@@ -36,11 +36,13 @@ public class ReceptionPanel extends BaseViewPanel {
     private final ClinicRoomStatusPanel statusPanel;
     private final ReceptionFooterBar footerBar;
     private final ReceptionCompositionRoot.Services services;
+    private final SessionLifecycleService sessionLifecycle;
     private boolean loading;
 
-    public ReceptionPanel() {
+    public ReceptionPanel(SessionLifecycleService sessionLifecycle) {
         super("reception", "Đăng Ký Khám Bệnh", "📋");
-        services = ReceptionCompositionRoot.create();
+        this.sessionLifecycle = java.util.Objects.requireNonNull(sessionLifecycle, "sessionLifecycle");
+        services = ReceptionCompositionRoot.create(sessionLifecycle);
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -144,8 +146,13 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     private void saveRegistration() {
+        var context = sessionLifecycle.currentAuthorizationContext();
+        if (context.isEmpty()) {
+            showError("Phiên làm việc không còn hoạt động. Đăng nhập lại trước khi đăng ký.");
+            return;
+        }
         final RegisterPatientCommand command;
-        try { command = formPanel.toRegisterCommand(UserSession.getInstance().getUserId()); }
+        try { command = formPanel.toRegisterCommand(context.get()); }
         catch (IllegalArgumentException ex) { showError(registrationFailureMessage("PATIENT_VALIDATION")); return; }
         footerBar.setSaving(true);
         new SwingWorker<Result<RegistrationReceipt>, Void>() {

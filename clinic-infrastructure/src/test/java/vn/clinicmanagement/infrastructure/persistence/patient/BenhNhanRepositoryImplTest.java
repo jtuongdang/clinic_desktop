@@ -12,6 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BenhNhanRepositoryImplTest {
     @Test
+    void scopedCccdLookupRequiresBothFacilityAndDepartmentOnLinkedVisit() {
+        String sql = BenhNhanRepositoryImpl.scopedCccdSql();
+
+        assertTrue(sql.contains("EXISTS (SELECT 1 FROM LuotKham lk"));
+        assertTrue(sql.contains("lk.maBenhNhan=BenhNhan.id"));
+        assertTrue(sql.contains("lk.maCoSo=?"));
+        assertTrue(sql.contains("lk.maKhoa=?"));
+        assertTrue(sql.contains("lk.isDeleted=0"));
+        assertFalse(sql.contains("OR lk.maCoSo"));
+    }
+
+    @Test
     void mapsOnlyTheActiveCccdIndexViolationWithoutLeakingTheDuplicateValue() {
         for (int errorCode : new int[]{2601, 2627}) {
             SQLException sqlException = new SQLException(

@@ -2,7 +2,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
-import vn.clinicmanagement.application.audit.AuditActorContext;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
 import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
@@ -13,6 +13,11 @@ import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
+import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseConnection;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseMigrationRunner;
 
@@ -23,6 +28,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -71,7 +78,9 @@ class ReceptionSqlServerPersistenceTest {
         List<Integer> generatedVisitIds = new ArrayList<>();
 
         try {
-            ReceptionCompositionRoot.Services services = ReceptionCompositionRoot.create();
+            SessionLifecycleService lifecycle = syntheticLifecycle();
+            AuthorizationContext authorizationContext = lifecycle.currentAuthorizationContext().orElseThrow();
+            ReceptionCompositionRoot.Services services = ReceptionCompositionRoot.create(lifecycle);
             var room = services.rooms().getActiveRooms().stream().findFirst()
                     .orElseThrow(() -> new AssertionError("No active seeded clinic room is available"));
 
@@ -93,7 +102,7 @@ class ReceptionSqlServerPersistenceTest {
 
             var registrationResult = services.registerPatient().handle(new RegisterPatientCommand(
                     patient, insurance, room.getId(), "WALK_IN", "Synthetic persistence test",
-                    DoiTuongKham.BHYT, false, 0, syntheticActorContext()));
+                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext));
             assertTrue(registrationResult.isSuccess(), "Synthetic reception registration failed");
             var receipt = registrationResult.valueOrThrow();
             registeredPatientId = receipt.patientId();
@@ -135,7 +144,7 @@ class ReceptionSqlServerPersistenceTest {
 
             var updateResult = services.registerPatient().handle(new RegisterPatientCommand(
                     updatedPatient, updatedInsurance, room.getId(), "WALK_IN", "Synthetic update persistence test",
-                    DoiTuongKham.BHYT, false, 0, syntheticActorContext()));
+                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext));
             assertTrue(updateResult.isSuccess(), "Synthetic existing-patient update failed");
             var updateReceipt = updateResult.valueOrThrow();
             assertEquals(registeredPatientId, updateReceipt.patientId(),
@@ -143,7 +152,7 @@ class ReceptionSqlServerPersistenceTest {
             assertTrue(updateReceipt.visitId() > 0, "Update registration did not return a visit identifier");
             generatedVisitIds.add(updateReceipt.visitId());
 
-            ReceptionCompositionRoot.Services freshServices = ReceptionCompositionRoot.create();
+            ReceptionCompositionRoot.Services freshServices = ReceptionCompositionRoot.create(lifecycle);
             List<PatientSearchItem> reloadedMatches = freshServices.searchPatients()
                     .handle(new SearchPatientsQuery(syntheticCccd)).valueOrThrow();
             assertEquals(1, reloadedMatches.size(),
@@ -189,8 +198,14 @@ class ReceptionSqlServerPersistenceTest {
         DatabaseConnection.configure(targetUrl, username, credentialValue);
     }
 
-    private static AuditActorContext syntheticActorContext() {
-        return new AuditActorContext(701, 31, "RECEPTION", 11, 21, "synthetic-workstation", UUID.randomUUID());
+    private static SessionLifecycleService syntheticLifecycle() {
+        SessionLifecycleService lifecycle = new SessionLifecycleService(UserSession.getInstance(),
+                new SessionTimeoutPolicy(Duration.ofMinutes(15), Duration.ofHours(12)), Clock.systemUTC());
+        lifecycle.startSession(701, "synthetic-reception", "Synthetic Reception",
+                new RoleChoice(31, "RECEPTION", "Synthetic Reception"),
+                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+                UUID.randomUUID().toString());
+        return lifecycle;
     }
 
     private static boolean runMigrationsWithoutLogging() {

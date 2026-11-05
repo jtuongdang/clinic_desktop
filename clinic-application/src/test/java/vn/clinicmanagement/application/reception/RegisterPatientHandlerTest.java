@@ -2,15 +2,19 @@ package vn.clinicmanagement.application.reception;
 
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.audit.AuditActionCode;
-import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.audit.AuditOutcome;
 import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.AuditReasonCode;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
+import vn.clinicmanagement.application.authorization.ActiveSessionPort;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
+import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
+import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
 import vn.clinicmanagement.domain.examination.LuotKham;
 import vn.clinicmanagement.domain.facility.CoSo;
 import vn.clinicmanagement.domain.facility.Khoa;
@@ -18,9 +22,15 @@ import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.domain.patient.PatientIdentityConflictException;
+import vn.clinicmanagement.domain.identity.NhanVien;
+import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
+import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
 import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
+import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.domain.repositories.IPhongKhamRepository;
+import vn.clinicmanagement.domain.repositories.ISystemRepository;
+import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 
 import java.lang.reflect.Proxy;
 import java.time.LocalDate;
@@ -43,8 +53,8 @@ class RegisterPatientHandlerTest {
     private static final String SYNTHETIC_CCCD = "synthetic-cccd-001";
     private static final UUID CORRELATION_ID =
             UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-    private static final AuditActorContext ACTOR =
-            new AuditActorContext(5, 31, "RECEPTION", FACILITY_ID, DEPARTMENT_ID, "station-01", CORRELATION_ID);
+    private static final AuthorizationContext ACTOR =
+            new AuthorizationContext(5, 31, "RECEPTION", FACILITY_ID, DEPARTMENT_ID, CORRELATION_ID);
 
     @Test
     void invalidCommandIsRejectedBeforeTransactionOrPersistence() {
@@ -96,6 +106,9 @@ class RegisterPatientHandlerTest {
         BenhNhan patient = validPatient();
         patient.setId(52);
         patient.setMaBenhNhanFormat("SYNTH-EXISTING-52");
+        fixture.duplicatePatient = validPatient();
+        fixture.duplicatePatient.setId(52);
+        fixture.duplicatePatient.setVersion(4L);
         BaoHiem insurance = validInsurance();
         BaoHiem currentInsurance = new BaoHiem();
         currentInsurance.setId(8);
@@ -182,6 +195,103 @@ class RegisterPatientHandlerTest {
         assertEquals(ACTOR.employeeId(), denial.actorEmployeeId());
         assertEquals(ACTOR.facilityId(), denial.facilityId());
         assertEquals(ACTOR.departmentId(), denial.departmentId());
+        assertNull(denial.resourceId());
+        assertNull(denial.resourceType());
+        assertEquals(1, fixture.transactions.failures);
+    }
+
+    @Test
+    void roomOutsideSelectedFacilityIsDeniedAndAudited() {
+        Fixture fixture = new Fixture();
+        fixture.room = activeRoom(FACILITY_ID + 1, DEPARTMENT_ID);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+
+        assertFailure(result, "AUTH_SCOPE_MISMATCH");
+        assertNoWritesOrVisit(fixture);
+        assertEquals(1, fixture.independentAuditEntries.size());
+        assertNull(fixture.independentAuditEntries.get(0).resourceId());
+    }
+
+    @Test
+    void missingPatientGrantIsDeniedAndAuditedWithoutFormOrPatientDetails() {
+        Fixture fixture = new Fixture();
+        fixture.grants.removeIf(grant -> grant.getPhanHe().equals("PATIENT"));
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+
+        assertFailure(result, "AUTHORIZATION_DENIED");
+        assertEquals(0, fixture.transactions.calls);
+        assertNoWritesOrVisit(fixture);
+        assertEquals(1, fixture.independentAuditEntries.size());
+        SystemAuditEntry denial = fixture.independentAuditEntries.get(0);
+        assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, denial.actionCode());
+        assertNull(denial.resourceId());
+        assertNull(denial.resourceType());
+        assertFalse(denial.toString().contains(SYNTHETIC_CCCD));
+        assertFalse(denial.toString().contains("Synthetic reason"));
+        assertFalse(denial.toString().contains("synthetic-insurance-001"));
+    }
+
+    @Test
+    void denialAuditFailureCannotPermitRegistrationOrExposeAuditError() {
+        Fixture fixture = new Fixture();
+        fixture.grants.removeIf(grant -> grant.getPhanHe().equals("PATIENT"));
+        fixture.independentAuditFailure =
+                new IllegalStateException("synthetic audit failure containing " + SYNTHETIC_CCCD);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+
+        assertFailure(result, "AUTHORIZATION_DENIED");
+        assertNoWritesOrVisit(fixture);
+        assertFalse(result.getError().orElseThrow().message().contains("synthetic audit failure"));
+        assertFalse(result.getError().orElseThrow().message().contains(SYNTHETIC_CCCD));
+    }
+
+    @Test
+    void existingPatientRequiresPatientUpdateGrant() {
+        Fixture fixture = new Fixture();
+        fixture.grants.removeIf(grant -> grant.getPhanHe().equals("PATIENT")
+                && grant.getHanhDong() == HanhDongQuyen.SUA);
+        BenhNhan patient = validPatient();
+        patient.setId(52);
+        fixture.duplicatePatient = validPatient();
+        fixture.duplicatePatient.setId(52);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
+
+        assertFailure(result, "AUTHORIZATION_DENIED");
+        assertEquals(0, fixture.transactions.calls);
+        assertEquals(0, fixture.patientUpdates.get());
+        assertEquals(0, fixture.visitCalls.get());
+        assertEquals(1, fixture.independentAuditEntries.size());
+    }
+
+    @Test
+    void visitRequiresReceptionCreateGrant() {
+        Fixture fixture = new Fixture();
+        fixture.grants.removeIf(grant -> grant.getPhanHe().equals("RECEPTION"));
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+
+        assertFailure(result, "AUTHORIZATION_DENIED");
+        assertEquals(0, fixture.transactions.calls);
+        assertNoWritesOrVisit(fixture);
+        assertEquals(1, fixture.independentAuditEntries.size());
+    }
+
+    @Test
+    void existingPatientOutsideScopeIsNeverUpdated() {
+        Fixture fixture = new Fixture();
+        BenhNhan patient = validPatient();
+        patient.setId(912);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
+
+        assertFailure(result, "PATIENT_DUPLICATE_CCCD");
+        assertEquals(0, fixture.patientUpdates.get());
+        assertEquals(0, fixture.insuranceAdds.get());
+        assertEquals(0, fixture.visitCalls.get());
         assertEquals(1, fixture.transactions.failures);
     }
 
@@ -302,7 +412,7 @@ class RegisterPatientHandlerTest {
             assertEquals(ACTOR.roleCode(), event.roleCode());
             assertEquals(ACTOR.facilityId(), event.facilityId());
             assertEquals(ACTOR.departmentId(), event.departmentId());
-            assertEquals(ACTOR.workstationId(), event.workstationId());
+            assertNull(event.workstationId());
             assertEquals(CORRELATION_ID, event.correlationId());
             assertEquals(AuditOutcome.SUCCESS, event.outcome());
             assertNull(event.reasonCode());
@@ -373,7 +483,7 @@ class RegisterPatientHandlerTest {
 
     private static Object defaultValue(String method) {
         return switch (method) {
-            case "getById", "getLatestByPatientId", "getByCCCD", "getByPhone" -> Optional.empty();
+            case "getById", "getLatestByPatientId", "getByCCCD", "getByCCCDInScope", "getByPhone" -> Optional.empty();
             case "getAll", "search", "getByPatientId", "getActiveRooms" -> List.of();
             default -> null;
         };
@@ -395,6 +505,10 @@ class RegisterPatientHandlerTest {
         private final List<SystemAuditEntry> independentAuditEntries = new ArrayList<>();
         private final TransactionProbe transactions = new TransactionProbe();
         private final RegisterPatientHandler handler;
+        private final List<MaTranPhanQuyen> grants = new ArrayList<>(List.of(
+                grant("PATIENT", HanhDongQuyen.TAO),
+                grant("PATIENT", HanhDongQuyen.SUA),
+                grant("RECEPTION", HanhDongQuyen.TAO)));
         private PhongKham room = activeRoom();
         private BenhNhan duplicatePatient;
         private BaoHiem currentInsurance;
@@ -403,6 +517,7 @@ class RegisterPatientHandlerTest {
         private RuntimeException insuranceFailure;
         private RuntimeException queueFailure;
         private RuntimeException auditFailure;
+        private RuntimeException independentAuditFailure;
         private AuditActionCode auditFailureAction;
         private int insuranceInsertId = 71;
         private LuotKham visit = visit(93, 9, "Q-009");
@@ -410,7 +525,7 @@ class RegisterPatientHandlerTest {
         private Fixture() {
             IBenhNhanRepository patients = proxy(IBenhNhanRepository.class, (method, args) -> {
                 return switch (method) {
-                    case "getByCCCD" -> Optional.ofNullable(duplicatePatient);
+                    case "getByCCCDInScope" -> Optional.ofNullable(duplicatePatient);
                     case "add" -> {
                         patientAdds.incrementAndGet();
                         if (identityConflictOnInsert) throw new PatientIdentityConflictException();
@@ -460,6 +575,7 @@ class RegisterPatientHandlerTest {
             });
             AuditWritePort audit = proxy(AuditWritePort.class, (method, args) -> {
                 if (method.equals("appendIndependently")) {
+                    if (independentAuditFailure != null) throw independentAuditFailure;
                     independentAuditEntries.add((SystemAuditEntry) args[0]);
                     return null;
                 }
@@ -470,8 +586,43 @@ class RegisterPatientHandlerTest {
                 transactions.stage("audit");
                 return null;
             });
-            handler = new RegisterPatientHandler(patients, insuranceCards, rooms, queue, transactions, audit);
+            handler = new RegisterPatientHandler(patients, insuranceCards, rooms, queue, transactions, audit,
+                    authorizationService());
         }
+
+        private AuthorizationService authorizationService() {
+            NhanVien employee = new NhanVien();
+            employee.setId(ACTOR.employeeId());
+            VaiTro role = new VaiTro();
+            role.setId(ACTOR.roleId());
+            role.setTenVaiTro(ACTOR.roleCode());
+            INhanVienRepository employeeRepository = proxy(INhanVienRepository.class, (method, args) -> switch (method) {
+                case "getById" -> Optional.of(employee);
+                case "getAssignedRoles" -> List.of(role);
+                case "getAssignedWorkScopes" -> List.of(new NhanVienWorkScope(
+                        FACILITY_ID, "Synthetic facility", DEPARTMENT_ID, "Synthetic department"));
+                default -> defaultValue(method);
+            });
+            ISystemRepository systemRepository = new ISystemRepository() {
+                @Override public List<MaTranPhanQuyen> getMatrixByRoleId(int roleId) { return grants; }
+                @Override public Optional<String> getSystemParameterValue(String key) { return Optional.empty(); }
+            };
+            ActiveSessionPort activeSessionPort = sessionId -> Optional.of(new ActiveSessionPort.ActiveSession(
+                    sessionId, ACTOR.employeeId(), ACTOR.roleId(), ACTOR.roleCode(),
+                    FACILITY_ID, DEPARTMENT_ID, true, true, true));
+            return new AuthorizationService(activeSessionPort, employeeRepository, systemRepository);
+        }
+    }
+
+    private static MaTranPhanQuyen grant(String module, HanhDongQuyen action) {
+        MaTranPhanQuyen grant = new MaTranPhanQuyen();
+        grant.setId(1);
+        grant.setMaVaiTro(ACTOR.roleId());
+        grant.setPhanHe(module);
+        grant.setHanhDong(action);
+        grant.setPhamViDuLieu(PhamViDuLieu.KHOA_PHONG);
+        grant.setDuocPhep(true);
+        return grant;
     }
 
     private static final class TransactionProbe implements TransactionBoundary {

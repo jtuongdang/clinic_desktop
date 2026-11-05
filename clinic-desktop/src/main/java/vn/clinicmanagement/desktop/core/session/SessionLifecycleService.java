@@ -1,5 +1,7 @@
 package vn.clinicmanagement.desktop.core.session;
 
+import vn.clinicmanagement.application.authorization.ActiveSessionPort;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.audit.AuditActionCode;
 import vn.clinicmanagement.application.audit.AuditOutcome;
 import vn.clinicmanagement.application.audit.AuditReasonCode;
@@ -18,6 +20,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -26,7 +29,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 /** Clock-driven idle and absolute timeout state transitions for the desktop session. */
-public final class SessionLifecycleService {
+public final class SessionLifecycleService implements ActiveSessionPort {
     public enum State { ACTIVE, LOCKED_IDLE, LOCKED_ABSOLUTE, LOGGED_OUT }
 
     private static final Logger LOGGER = Logger.getLogger(SessionLifecycleService.class.getName());
@@ -278,6 +281,38 @@ public final class SessionLifecycleService {
         return evaluate();
     }
 
+    @Override
+    public synchronized Optional<ActiveSession> findActiveSession(UUID requestedSessionId) {
+        State currentState = evaluate();
+        UUID currentSessionId = parseSessionId(session.getSessionId());
+        if (currentSessionId == null || !currentSessionId.equals(requestedSessionId)) {
+            return Optional.empty();
+        }
+        Instant now = clock.instant();
+        boolean notExpired = session.getAbsoluteExpiresAt() != null
+                && now.isBefore(session.getAbsoluteExpiresAt());
+        return Optional.of(new ActiveSession(
+                currentSessionId,
+                session.getUserId(),
+                session.getRoleId(),
+                session.getRoleCode(),
+                session.getFacilityId(),
+                session.getDepartmentId(),
+                currentState == State.ACTIVE,
+                !session.isLocked(),
+                notExpired));
+    }
+
+    public synchronized Optional<AuthorizationContext> currentAuthorizationContext() {
+        if (evaluate() != State.ACTIVE) return Optional.empty();
+        UUID currentSessionId = parseSessionId(session.getSessionId());
+        if (currentSessionId == null) return Optional.empty();
+        AuthorizationContext context = new AuthorizationContext(
+                session.getUserId(), session.getRoleId(), session.getRoleCode(),
+                session.getFacilityId(), session.getDepartmentId(), currentSessionId);
+        return context.isValid() ? Optional.of(context) : Optional.empty();
+    }
+
     public String lastAuditDiagnostic() {
         return lastAuditDiagnostic;
     }
@@ -379,6 +414,15 @@ public final class SessionLifecycleService {
             return UUID.fromString(sessionId.trim());
         } catch (IllegalArgumentException ignored) {
             return UUID.randomUUID();
+        }
+    }
+
+    private static UUID parseSessionId(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) return null;
+        try {
+            return UUID.fromString(sessionId.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 }

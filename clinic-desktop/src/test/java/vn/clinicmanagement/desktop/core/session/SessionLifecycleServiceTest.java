@@ -9,6 +9,7 @@ import vn.clinicmanagement.application.audit.AuditReasonCode;
 import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.MedicalRecordAuditEntry;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
+import vn.clinicmanagement.application.authorization.ActiveSessionPort;
 import vn.clinicmanagement.application.auth.AuthenticatedUser;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
@@ -181,6 +182,41 @@ class SessionLifecycleServiceTest {
         session.setSession(701, "synthetic.701", "Nhân viên mẫu", role, scope);
         assertEquals(SessionLifecycleService.State.LOGGED_OUT, lifecycle.evaluate());
         assertFalse(session.isLoggedOn());
+    }
+
+    @Test void activeSessionPortReturnsAnAtomicMatchingActorScopeSnapshot() {
+        start();
+        java.util.UUID activeId = java.util.UUID.fromString(session.getSessionId());
+
+        var snapshot = lifecycle.findActiveSession(activeId).orElseThrow();
+
+        assertEquals(activeId, snapshot.sessionId());
+        assertEquals(701, snapshot.employeeId());
+        assertEquals(42, snapshot.roleId());
+        assertEquals("DOCTOR", snapshot.roleCode());
+        assertEquals(11, snapshot.facilityId());
+        assertEquals(21, snapshot.departmentId());
+        assertTrue(snapshot.active());
+        assertTrue(snapshot.unlocked());
+        assertTrue(snapshot.notExpired());
+        assertTrue(lifecycle.findActiveSession(java.util.UUID.randomUUID()).isEmpty());
+    }
+
+    @Test void activeSessionPortReportsLockedAndExpiredSessionsAsInactive() {
+        start();
+        java.util.UUID activeId = java.util.UUID.fromString(session.getSessionId());
+        clock.advance(Duration.ofMinutes(15));
+
+        ActiveSessionPort.ActiveSession locked = lifecycle.findActiveSession(activeId).orElseThrow();
+        assertFalse(locked.active());
+        assertFalse(locked.unlocked());
+        assertTrue(locked.notExpired());
+
+        clock.advance(Duration.ofHours(12).minusMinutes(15));
+        ActiveSessionPort.ActiveSession expired = lifecycle.findActiveSession(activeId).orElseThrow();
+        assertFalse(expired.active());
+        assertFalse(expired.unlocked());
+        assertFalse(expired.notExpired());
     }
 
     @Test void lockingAndLogoutStillApplyWhenIndependentAuditWriteFailsAndDiagnosticsRemainSafe() {

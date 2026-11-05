@@ -3,6 +3,9 @@ package vn.clinicmanagement.infrastructure.persistence;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.audit.AuditActorContext;
+import vn.clinicmanagement.application.authorization.ActiveSessionPort;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.reception.GetReceptionQueueHandler;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
@@ -20,10 +23,12 @@ import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.infrastructure.persistence.facility.PhongKhamRepositoryImpl;
+import vn.clinicmanagement.infrastructure.persistence.identity.NhanVienRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.patient.BaoHiemRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.patient.BenhNhanRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.reception.ReceptionQueueRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.system.JdbcAuditRepositoryImpl;
+import vn.clinicmanagement.infrastructure.persistence.system.SystemRepositoryImpl;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,6 +48,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
@@ -112,6 +119,10 @@ class AuditSqlServerPersistenceTest {
         PhongKham room = services.rooms().getActiveRooms().stream().findFirst()
                 .orElseThrow(() -> new AssertionError("No active seeded clinic room is available"));
         AuditActorContext actorContext = resolveSeededActorContext(room, correlationId);
+        AuthorizationContext authorizationContext = new AuthorizationContext(actorContext.employeeId(),
+                actorContext.roleId(), actorContext.roleCode(), actorContext.facilityId(),
+                actorContext.departmentId(), actorContext.correlationId());
+        services.authorizationContext().set(authorizationContext);
 
         BenhNhan patient = new BenhNhan();
         patient.setHo("Synthetic");
@@ -147,7 +158,7 @@ class AuditSqlServerPersistenceTest {
                             DoiTuongKham.BHYT,
                             false,
                             actorContext.employeeId(),
-                            actorContext
+                            authorizationContext
                     )
             );
 
@@ -627,7 +638,8 @@ class AuditSqlServerPersistenceTest {
             PhongKhamRepositoryImpl rooms,
             RegisterPatientHandler registerPatient,
             SearchPatientsHandler searchPatients,
-            GetReceptionQueueHandler getQueue) {
+            GetReceptionQueueHandler getQueue,
+            AtomicReference<AuthorizationContext> authorizationContext) {
 
         private static ReceptionServices create() {
             JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
@@ -639,11 +651,23 @@ class AuditSqlServerPersistenceTest {
             ReceptionQueueRepositoryImpl queue = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
             JdbcAuditRepositoryImpl audit = new JdbcAuditRepositoryImpl(
                     connections, unitOfWork, DatabaseConnection::getConnection);
+            AtomicReference<AuthorizationContext> authorizationContext = new AtomicReference<>();
+            ActiveSessionPort activeSessions = sessionId -> {
+                AuthorizationContext context = authorizationContext.get();
+                if (context == null || !sessionId.equals(context.sessionId())) return Optional.empty();
+                return Optional.of(new ActiveSessionPort.ActiveSession(sessionId, context.employeeId(),
+                        context.roleId(), context.roleCode(), context.facilityId(), context.departmentId(),
+                        true, true, true));
+            };
+            AuthorizationService authorization = new AuthorizationService(activeSessions,
+                    new NhanVienRepositoryImpl(connections, unitOfWork),
+                    new SystemRepositoryImpl(connections, unitOfWork));
             return new ReceptionServices(
                     rooms,
-                    new RegisterPatientHandler(patients, insurance, rooms, queue, transactions, audit),
+                    new RegisterPatientHandler(patients, insurance, rooms, queue, transactions, audit, authorization),
                     new SearchPatientsHandler(patients, insurance),
-                    new GetReceptionQueueHandler(queue)
+                    new GetReceptionQueueHandler(queue),
+                    authorizationContext
             );
         }
     }

@@ -1,16 +1,20 @@
 package vn.clinicmanagement.application.reception;
 
 import vn.clinicmanagement.application.audit.AuditActionCode;
-import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.audit.AuditOutcome;
 import vn.clinicmanagement.application.audit.AuditReasonCode;
 import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.authorization.AuthorizationDecision;
+import vn.clinicmanagement.application.authorization.AuthorizationRequest;
+import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.common.CommandHandler;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
+import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
@@ -29,16 +33,19 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
     private final ReceptionQueuePort receptionQueue;
     private final TransactionBoundary transactions;
     private final AuditWritePort audit;
+    private final AuthorizationService authorization;
 
     public RegisterPatientHandler(IBenhNhanRepository patients, IBaoHiemRepository insuranceCards,
                                   IPhongKhamRepository rooms, ReceptionQueuePort receptionQueue,
-                                  TransactionBoundary transactions, AuditWritePort audit) {
+                                  TransactionBoundary transactions, AuditWritePort audit,
+                                  AuthorizationService authorization) {
         this.patients = patients;
         this.insuranceCards = insuranceCards;
         this.rooms = rooms;
         this.receptionQueue = receptionQueue;
         this.transactions = transactions;
         this.audit = audit;
+        this.authorization = authorization;
     }
 
     @Override
@@ -46,35 +53,48 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
         String validationError = validate(command);
         if (validationError != null) return Result.failure("PATIENT_VALIDATION", validationError);
 
+        AuthorizationContext context = command.authorizationContext();
+        boolean existing = command.patient().getId() != null && command.patient().getId() > 0;
+        HanhDongQuyen patientAction = existing ? HanhDongQuyen.SUA : HanhDongQuyen.TAO;
+        if (!isAuthorized(context, "PATIENT", patientAction)
+                || !isAuthorized(context, "RECEPTION", HanhDongQuyen.TAO)) {
+            return deny(context, AuditReasonCode.AUTH_FORBIDDEN);
+        }
+
         return transactions.inTransaction(() -> {
             try {
                 BenhNhan patient = command.patient();
-                boolean existing = patient.getId() != null && patient.getId() > 0;
                 PhongKham room = rooms.getById(command.roomId()).orElse(null);
                 if (room == null || !room.isHoatDong() || room.getKhoa() == null || room.getKhoa().getId() == null
                         || room.getKhoa().getCoSo() == null || room.getKhoa().getCoSo().getId() == null) {
                     return Result.failure("ROOM_UNAVAILABLE", "Phòng khám không hoạt động hoặc chưa gắn với cơ sở/khoa.");
                 }
-                if (room.getKhoa().getCoSo().getId() != command.actorContext().facilityId()
-                        || room.getKhoa().getId() != command.actorContext().departmentId()
-                        || room.getMaKhoa() != command.actorContext().departmentId()) {
-                    audit.appendIndependently(new SystemAuditEntry(
-                            command.actorContext().employeeId(), command.actorContext().roleId(),
-                            command.actorContext().roleCode(), command.actorContext().facilityId(),
-                            command.actorContext().departmentId(), AuditActionCode.AUTH_ACCESS_DENIED,
-                            null, null, AuditOutcome.DENIED, AuditReasonCode.SCOPE_MISMATCH,
-                            Instant.now(), command.actorContext().workstationId(), command.actorContext().correlationId()));
-                    return Result.failure("AUTH_SCOPE_MISMATCH",
-                            "Phòng khám không thuộc phạm vi cơ sở/khoa của phiên hiện tại.");
+                if (room.getKhoa().getCoSo().getId() != context.facilityId()
+                        || room.getKhoa().getId() != context.departmentId()
+                        || room.getMaKhoa() != context.departmentId()) {
+                    return deny(context, AuditReasonCode.SCOPE_MISMATCH);
                 }
-                if (!existing && patient.getSoCCCD() != null && !patient.getSoCCCD().isBlank()
-                        && patients.getByCCCD(patient.getSoCCCD()).isPresent()) {
-                    return Result.failure("PATIENT_DUPLICATE_CCCD", "CCCD đã có hồ sơ. Hãy tìm người bệnh và chọn hồ sơ hiện có.");
+
+                String cccd = patient.getSoCCCD();
+                var scopedPatient = cccd == null || cccd.isBlank()
+                        ? java.util.Optional.<BenhNhan>empty()
+                        : patients.getByCCCDInScope(cccd, context.facilityId(), context.departmentId());
+                if (existing) {
+                    if (scopedPatient.isEmpty()
+                            || !patient.getId().equals(scopedPatient.get().getId())) {
+                        return duplicateCccdFailure();
+                    }
+                    BenhNhan persistedPatient = scopedPatient.get();
+                    patient.setVersion(persistedPatient.getVersion());
+                    patient.setCreatedAt(persistedPatient.getCreatedAt());
+                    patient.setCreatedBy(persistedPatient.getCreatedBy());
+                } else if (scopedPatient.isPresent()) {
+                    return duplicateCccdFailure();
                 }
 
                 if (existing) patients.update(patient);
                 else patients.add(patient);
-                appendAudit(command.actorContext(),
+                appendAudit(context,
                         existing ? AuditActionCode.PATIENT_UPDATED : AuditActionCode.PATIENT_CREATED,
                         AuditResourceType.PATIENT, patient.getId());
 
@@ -86,40 +106,62 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                         card.setId(currentCard.get().getId());
                         card.setVersion(currentCard.get().getVersion());
                         insuranceCards.update(card);
-                        appendAudit(command.actorContext(), AuditActionCode.INSURANCE_UPDATED,
+                        appendAudit(context, AuditActionCode.INSURANCE_UPDATED,
                                 AuditResourceType.INSURANCE, card.getId());
                     } else {
                         insuranceCards.add(card);
-                        appendAudit(command.actorContext(), AuditActionCode.INSURANCE_CREATED,
+                        appendAudit(context, AuditActionCode.INSURANCE_CREATED,
                                 AuditResourceType.INSURANCE, card.getId());
                     }
                 }
 
-                int facilityId = room.getKhoa().getCoSo().getId();
-                int departmentId = room.getMaKhoa();
-                var visit = receptionQueue.registerVisit(patient.getId(), facilityId, departmentId,
+                var visit = receptionQueue.registerVisit(patient.getId(), context.facilityId(), context.departmentId(),
                         command.roomId(), command.registrationType(), command.reason(), command.payerType(),
                         command.priority(), command.createdBy());
-                appendAudit(command.actorContext(), AuditActionCode.VISIT_REGISTERED,
+                appendAudit(context, AuditActionCode.VISIT_REGISTERED,
                         AuditResourceType.VISIT, visit.getId());
 
                 return Result.success(new RegistrationReceipt(patient.getId(), patient.getMaBenhNhanFormat(),
                         visit.getId(), visit.getSoThuTu() == null ? 0 : visit.getSoThuTu(), visit.getSoThuTuDisplay()));
             } catch (PatientIdentityConflictException ex) {
-                return Result.failure("PATIENT_DUPLICATE_CCCD",
-                        "CCCD đã có hồ sơ. Hãy tìm người bệnh và chọn hồ sơ hiện có.");
+                return duplicateCccdFailure();
             } catch (RuntimeException ex) {
                 return Result.failure("PATIENT_REGISTRATION_FAILED", "Không thể lưu đăng ký. Dữ liệu chưa được ghi; hãy thử lại.");
             }
         });
     }
 
-    private void appendAudit(AuditActorContext actor, AuditActionCode actionCode,
+    private boolean isAuthorized(AuthorizationContext context, String module, HanhDongQuyen action) {
+        AuthorizationDecision decision = authorization.evaluate(new AuthorizationRequest(
+                context, module, action, context.facilityId(), context.departmentId()));
+        return decision.allowed();
+    }
+
+    private Result<RegistrationReceipt> deny(AuthorizationContext context, AuditReasonCode reasonCode) {
+        try {
+            audit.appendIndependently(new SystemAuditEntry(
+                    context.employeeId(), context.roleId(), context.roleCode(), context.facilityId(),
+                    context.departmentId(), AuditActionCode.AUTH_ACCESS_DENIED, null, null,
+                    AuditOutcome.DENIED, reasonCode, Instant.now(), null, context.sessionId()));
+        } catch (RuntimeException ignored) {
+            // A denial remains a denial even when its independent audit write is unavailable.
+        }
+        String code = reasonCode == AuditReasonCode.SCOPE_MISMATCH
+                ? "AUTH_SCOPE_MISMATCH" : "AUTHORIZATION_DENIED";
+        return Result.failure(code, "Không được phép thực hiện đăng ký trong phiên hiện tại.");
+    }
+
+    private static Result<RegistrationReceipt> duplicateCccdFailure() {
+        return Result.failure("PATIENT_DUPLICATE_CCCD",
+                "CCCD đã có hồ sơ. Hãy tìm người bệnh và chọn hồ sơ hiện có.");
+    }
+
+    private void appendAudit(AuthorizationContext actor, AuditActionCode actionCode,
                              AuditResourceType resourceType, Integer resourceId) {
         audit.appendInCurrentTransaction(new SystemAuditEntry(
                 actor.employeeId(), actor.roleId(), actor.roleCode(), actor.facilityId(), actor.departmentId(),
                 actionCode, resourceType, resourceId, AuditOutcome.SUCCESS, null, Instant.now(),
-                actor.workstationId(), actor.correlationId()));
+                null, actor.sessionId()));
     }
 
     private static String validate(RegisterPatientCommand command) {

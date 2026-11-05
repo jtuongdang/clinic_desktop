@@ -55,6 +55,22 @@ public final class BenhNhanRepositoryImpl implements IBenhNhanRepository {
     }
 
     @Override
+    public Optional<BenhNhan> getByCCCDInScope(String cccd, int facilityId, int departmentId) {
+        if (cccd == null || cccd.isBlank() || facilityId <= 0 || departmentId <= 0) return Optional.empty();
+        return queryOne(scopedCccdSql(), ps -> {
+            ps.setString(1, cccd.trim());
+            ps.setInt(2, facilityId);
+            ps.setInt(3, departmentId);
+        });
+    }
+
+    static String scopedCccdSql() {
+        return SELECT_COLUMNS + " WHERE soCCCD=? AND isDeleted=0 AND EXISTS "
+                + "(SELECT 1 FROM LuotKham lk WHERE lk.maBenhNhan=BenhNhan.id "
+                + "AND lk.maCoSo=? AND lk.maKhoa=? AND lk.isDeleted=0)";
+    }
+
+    @Override
     public Optional<BenhNhan> getByPhone(String phone) {
         if (phone == null || phone.isBlank()) return Optional.empty();
         return queryOne(SELECT_COLUMNS + " WHERE dienThoai=? AND isDeleted=0 ORDER BY id DESC", ps -> ps.setString(1, phone.trim()));

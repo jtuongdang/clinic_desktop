@@ -1,20 +1,30 @@
 package vn.clinicmanagement.application.reception;
 
 import org.junit.jupiter.api.Test;
-import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.audit.AuditWritePort;
+import vn.clinicmanagement.application.authorization.ActiveSessionPort;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
+import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
+import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
 import vn.clinicmanagement.domain.facility.CoSo;
 import vn.clinicmanagement.domain.facility.Khoa;
 import vn.clinicmanagement.domain.facility.PhongKham;
+import vn.clinicmanagement.domain.identity.NhanVien;
+import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
+import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.domain.patient.PatientIdentityConflictException;
 import vn.clinicmanagement.domain.repositories.IBaoHiemRepository;
 import vn.clinicmanagement.domain.repositories.IBenhNhanRepository;
+import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.domain.repositories.IPhongKhamRepository;
+import vn.clinicmanagement.domain.repositories.ISystemRepository;
+import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 
 import java.lang.reflect.Proxy;
 import java.time.LocalDate;
@@ -28,6 +38,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterPatientDuplicateCccdTest {
+    private static final UUID SESSION_ID =
+            UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final AuthorizationContext CONTEXT =
+            new AuthorizationContext(1, 31, "RECEPTION", 1, 2, SESSION_ID);
+
     @Test
     void duplicateDuringPatientInsertReturnsGuidanceAndRollsBackBeforeInsuranceOrVisit() {
         AtomicInteger insuranceCalls = new AtomicInteger();
@@ -35,7 +50,7 @@ class RegisterPatientDuplicateCccdTest {
         AtomicInteger patientInsertCalls = new AtomicInteger();
 
         IBenhNhanRepository patients = proxy(IBenhNhanRepository.class, (method, args) -> {
-            if (method.equals("getByCCCD")) return Optional.empty();
+            if (method.equals("getByCCCDInScope")) return Optional.empty();
             if (method.equals("add")) {
                 patientInsertCalls.incrementAndGet();
                 throw new PatientIdentityConflictException();
@@ -64,14 +79,7 @@ class RegisterPatientDuplicateCccdTest {
             }
         };
         RegisterPatientHandler handler = new RegisterPatientHandler(patients, insurance, rooms, queue, transactions,
-                new AuditWritePort() {
-                    @Override public void appendInCurrentTransaction(vn.clinicmanagement.application.audit.SystemAuditEntry entry) {}
-                    @Override public void appendIndependently(vn.clinicmanagement.application.audit.SystemAuditEntry entry) {}
-                    @Override public void appendMedicalRecordInCurrentTransaction(
-                            vn.clinicmanagement.application.audit.MedicalRecordAuditEntry entry) {}
-                    @Override public void appendMedicalRecordIndependently(
-                            vn.clinicmanagement.application.audit.MedicalRecordAuditEntry entry) {}
-                });
+                noOpAudit(), authorizationService());
 
         BenhNhan patient = new BenhNhan();
         patient.setHo("Nguyen");
@@ -82,9 +90,7 @@ class RegisterPatientDuplicateCccdTest {
         card.setSoBaoHiem("synthetic-insurance");
         card.setNgayHetHan(LocalDate.of(2030, 1, 1));
         RegisterPatientCommand command = new RegisterPatientCommand(patient, card, 3,
-                "Khám bệnh", "Synthetic test", DoiTuongKham.BHYT, false, 1,
-                new AuditActorContext(1, 31, "RECEPTION", 1, 2, null,
-                        UUID.fromString("123e4567-e89b-12d3-a456-426614174000")));
+                "Khám bệnh", "Synthetic test", DoiTuongKham.BHYT, false, 1, CONTEXT);
 
         Result<RegistrationReceipt> result = handler.handle(command);
 
@@ -96,6 +102,55 @@ class RegisterPatientDuplicateCccdTest {
         assertEquals(0, insuranceCalls.get());
         assertEquals(0, visitCalls.get());
         assertFalse(result.getError().orElseThrow().message().contains("synthetic-cccd"));
+    }
+
+    private static AuthorizationService authorizationService() {
+        NhanVien employee = new NhanVien();
+        employee.setId(CONTEXT.employeeId());
+        VaiTro role = new VaiTro();
+        role.setId(CONTEXT.roleId());
+        role.setTenVaiTro(CONTEXT.roleCode());
+        INhanVienRepository employeeRepository = proxy(INhanVienRepository.class, (method, args) -> switch (method) {
+            case "getById" -> Optional.of(employee);
+            case "getAssignedRoles" -> List.of(role);
+            case "getAssignedWorkScopes" -> List.of(new NhanVienWorkScope(
+                    1, "Synthetic facility", 2, "Synthetic department"));
+            default -> defaultValue(method);
+        });
+        ISystemRepository systemRepository = new ISystemRepository() {
+            @Override
+            public List<MaTranPhanQuyen> getMatrixByRoleId(int roleId) {
+                return List.of(permission("PATIENT", HanhDongQuyen.TAO),
+                        permission("RECEPTION", HanhDongQuyen.TAO));
+            }
+            @Override public Optional<String> getSystemParameterValue(String key) { return Optional.empty(); }
+        };
+        ActiveSessionPort activeSessionPort = id -> Optional.of(new ActiveSessionPort.ActiveSession(
+                id, CONTEXT.employeeId(), CONTEXT.roleId(), CONTEXT.roleCode(),
+                CONTEXT.facilityId(), CONTEXT.departmentId(), true, true, true));
+        return new AuthorizationService(activeSessionPort, employeeRepository, systemRepository);
+    }
+
+    private static AuditWritePort noOpAudit() {
+        return new AuditWritePort() {
+            @Override public void appendInCurrentTransaction(vn.clinicmanagement.application.audit.SystemAuditEntry entry) {}
+            @Override public void appendIndependently(vn.clinicmanagement.application.audit.SystemAuditEntry entry) {}
+            @Override public void appendMedicalRecordInCurrentTransaction(
+                    vn.clinicmanagement.application.audit.MedicalRecordAuditEntry entry) {}
+            @Override public void appendMedicalRecordIndependently(
+                    vn.clinicmanagement.application.audit.MedicalRecordAuditEntry entry) {}
+        };
+    }
+
+    private static MaTranPhanQuyen permission(String module, HanhDongQuyen action) {
+        MaTranPhanQuyen permission = new MaTranPhanQuyen();
+        permission.setId(1);
+        permission.setMaVaiTro(CONTEXT.roleId());
+        permission.setPhanHe(module);
+        permission.setHanhDong(action);
+        permission.setPhamViDuLieu(PhamViDuLieu.KHOA_PHONG);
+        permission.setDuocPhep(true);
+        return permission;
     }
 
     private static PhongKham activeRoom() {
@@ -128,7 +183,7 @@ class RegisterPatientDuplicateCccdTest {
 
     private static Object defaultValue(String method) {
         return switch (method) {
-            case "getById", "getLatestByPatientId", "getByCCCD", "getByPhone" -> Optional.empty();
+            case "getById", "getLatestByPatientId", "getByCCCD", "getByCCCDInScope", "getByPhone" -> Optional.empty();
             default -> null;
         };
     }

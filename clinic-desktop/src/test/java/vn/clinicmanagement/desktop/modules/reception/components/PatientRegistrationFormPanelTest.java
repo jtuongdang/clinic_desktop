@@ -3,6 +3,7 @@ package vn.clinicmanagement.desktop.modules.reception.components;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
@@ -120,7 +121,7 @@ class PatientRegistrationFormPanelTest {
             assertEquals(101, panel.selectedClinicRoomId());
 
             startSyntheticSession(9);
-            RegisterPatientCommand command = panel.toRegisterCommand(9);
+            RegisterPatientCommand command = panel.toRegisterCommand(authorizationContext());
             assertEquals("Synthetic Nguyen Van", command.patient().getHo());
             assertEquals("Mau", command.patient().getTen());
             assertEquals(LocalDate.of(1992, 4, 15), command.patient().getNgaySinh());
@@ -131,14 +132,13 @@ class PatientRegistrationFormPanelTest {
             assertEquals("SYNTH-BHYT-0001", command.insurance().getSoBaoHiem());
             assertEquals(101, command.roomId());
             assertEquals("Synthetic checkup reason", command.reason());
-            assertEquals(9, command.actorContext().employeeId());
-            assertEquals(31, command.actorContext().roleId());
-            assertEquals("RECEPTION", command.actorContext().roleCode());
-            assertEquals(11, command.actorContext().facilityId());
-            assertEquals(21, command.actorContext().departmentId());
-            assertEquals("synthetic-workstation", command.actorContext().workstationId());
+            assertEquals(9, command.authorizationContext().employeeId());
+            assertEquals(31, command.authorizationContext().roleId());
+            assertEquals("RECEPTION", command.authorizationContext().roleCode());
+            assertEquals(11, command.authorizationContext().facilityId());
+            assertEquals(21, command.authorizationContext().departmentId());
             assertEquals(UUID.fromString(UserSession.getInstance().getSessionId()),
-                    command.actorContext().correlationId());
+                    command.authorizationContext().sessionId());
         });
     }
 
@@ -266,7 +266,7 @@ class PatientRegistrationFormPanelTest {
             findByName(panel, "fullName", JTextField.class).setText("Synthetic New Entry");
             findByName(panel, "dateOfBirth", JTextField.class).setText("01/02/2000");
             startSyntheticSession(12);
-            RegisterPatientCommand newCommand = panel.toRegisterCommand(12);
+            RegisterPatientCommand newCommand = panel.toRegisterCommand(authorizationContext());
             assertNull(newCommand.patient().getId());
             assertNull(newCommand.patient().getUpdatedBy());
             assertEquals(12, newCommand.patient().getCreatedBy());
@@ -361,7 +361,7 @@ class PatientRegistrationFormPanelTest {
             insuranceNumberField.setText("SYNTH-BHYT-0504-NEW");
 
             startSyntheticSession(syntheticUpdaterUserId);
-            RegisterPatientCommand command = panel.toRegisterCommand(syntheticUpdaterUserId);
+            RegisterPatientCommand command = panel.toRegisterCommand(authorizationContext());
 
             assertEquals(401, command.roomId());
             assertEquals("Synthetic periodic follow-up", command.reason());
@@ -469,6 +469,12 @@ class PatientRegistrationFormPanelTest {
                 new RoleChoice(31, "RECEPTION", "Synthetic Reception"),
                 new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"));
         session.setWorkstationId("synthetic-workstation");
+    }
+
+    private static AuthorizationContext authorizationContext() {
+        UserSession session = UserSession.getInstance();
+        return new AuthorizationContext(session.getUserId(), session.getRoleId(), session.getRoleCode(),
+                session.getFacilityId(), session.getDepartmentId(), UUID.fromString(session.getSessionId()));
     }
 
     private static void onEdt(EdtAction action) throws Exception {

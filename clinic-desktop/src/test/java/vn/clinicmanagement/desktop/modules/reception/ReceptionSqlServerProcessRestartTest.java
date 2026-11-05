@@ -2,7 +2,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
-import vn.clinicmanagement.application.audit.AuditActorContext;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
 import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
@@ -11,6 +11,11 @@ import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
+import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
+import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseConnection;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseMigrationRunner;
 
@@ -23,6 +28,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,7 +85,9 @@ class ReceptionSqlServerProcessRestartTest {
         BenhNhan generatedPatient = null;
         BaoHiem generatedInsurance = null;
         try {
-            var services = ReceptionCompositionRoot.create();
+            SessionLifecycleService lifecycle = syntheticLifecycle();
+            AuthorizationContext authorizationContext = lifecycle.currentAuthorizationContext().orElseThrow();
+            var services = ReceptionCompositionRoot.create(lifecycle);
             var room = services.rooms().getActiveRooms().stream().findFirst()
                     .orElseThrow(() -> new AssertionError("No active seeded clinic room is available"));
 
@@ -101,8 +110,9 @@ class ReceptionSqlServerProcessRestartTest {
             insurance.setMucHuong(80);
 
             var result = services.registerPatient().handle(new RegisterPatientCommand(patient, insurance,
-                    room.getId(), "WALK_IN", "Synthetic process restart test", DoiTuongKham.BHYT, false, 0,
-                    syntheticActorContext()));
+                    room.getId(), "WALK_IN", "Synthetic process restart test", DoiTuongKham.BHYT, false,
+                    authorizationContext.employeeId(),
+                    authorizationContext));
             assertTrue(result.isSuccess(), "Synthetic reception registration failed");
             var receipt = result.valueOrThrow();
             patientId = receipt.patientId();
@@ -160,8 +170,14 @@ class ReceptionSqlServerProcessRestartTest {
         return new DatabaseCredentials(targetUrl, username, credentialValue);
     }
 
-    private static AuditActorContext syntheticActorContext() {
-        return new AuditActorContext(701, 31, "RECEPTION", 11, 21, "synthetic-workstation", UUID.randomUUID());
+    private static SessionLifecycleService syntheticLifecycle() {
+        SessionLifecycleService lifecycle = new SessionLifecycleService(UserSession.getInstance(),
+                new SessionTimeoutPolicy(Duration.ofMinutes(15), Duration.ofHours(12)), Clock.systemUTC());
+        lifecycle.startSession(701, "synthetic-reception", "Synthetic Reception",
+                new RoleChoice(31, "RECEPTION", "Synthetic Reception"),
+                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+                UUID.randomUUID().toString());
+        return lifecycle;
     }
 
     private static boolean runMigrationsWithoutLogging() {
@@ -275,7 +291,7 @@ class ReceptionSqlServerProcessRestartTest {
             int cardId = Integer.parseInt(requiredEnvironment(ENV_CARD_ID));
             int visitId = Integer.parseInt(requiredEnvironment(ENV_VISIT_ID));
 
-            var services = ReceptionCompositionRoot.create();
+            var services = ReceptionCompositionRoot.create(syntheticLifecycle());
             List<PatientSearchItem> matches = services.searchPatients()
                     .handle(new vn.clinicmanagement.application.reception.SearchPatientsQuery(cccd)).valueOrThrow();
             assertEquals(1, matches.size());
