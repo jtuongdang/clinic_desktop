@@ -65,4 +65,4 @@ Tài liệu giao diện có nêu ngưỡng 5 lần sai; ngưỡng, thời gian k
 
 ## Chốt trạng thái
 
-Các policy role/scope/session/audit đã được duyệt và có thể đưa vào implementation contract. Phase 2 vẫn đang triển khai; login lockout, audit retention cụ thể và role được cấp quyền tra cứu audit chưa được quyết định. Các hạng mục đó giữ default-deny/no-purge cho tới khi có quyết định.
+Các policy role/scope/session/audit đã được duyệt và có thể đưa vào implementation contract. Phase 2 vẫn đang triển khai; login lockout và audit retention cụ thể chưa được quyết định. Theo DEC-AUTHZ-10, `AUDIT_READ` bị deny cho mọi role, nên không có role nào được cấp quyền tra cứu audit; tiếp tục không purge tự động và không triển khai lockout.

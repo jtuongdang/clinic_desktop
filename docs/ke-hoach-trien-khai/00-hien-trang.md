@@ -17,7 +17,7 @@
 ## Migration và kiểm thử trong checkout
 
 - `DatabaseMigrationRunner` đăng ký tuần tự V1–V9 (`V1__Initial_Clinic_Schema.sql` đến `V9__Enforce_Active_Patient_Facility_Uniqueness.sql`) và dùng `SqlServerBatchSplitter` để tách `GO` đứng riêng trên dòng.
-- **Default verify:** bằng chứng chạy đầy đủ gần nhất với JDK 17 là `mvn -Djava.awt.headless=true clean verify`: **231 tests, 0 failures, 0 errors, 4 skipped**; cả 4 skip là SQL Server opt-in tests được bỏ qua có chủ đích khi chạy mặc định. Không tính các test skip này là đã chạy trong lượt verify mặc định.
+- **Default verify:** bằng chứng chạy đầy đủ gần nhất với JDK 17 là `mvn -Djava.awt.headless=true clean verify`: **237 tests, 0 failures, 0 errors, 4 skipped**; cả 4 skip là SQL Server opt-in tests được bỏ qua có chủ đích khi chạy mặc định. Không tính các test skip này là đã chạy trong lượt verify mặc định.
 - **SQL Server opt-in riêng:** `FreshDatabaseMigrationSqlServerTest` đã chạy thành công migration V1–V9 trên DB mới, tổng hợp `clinic_test_v9_20261106`; `ReceptionSqlServerPersistenceTest` đã xác minh luồng Tiếp đón qua `ReceptionCompositionRoot` trên DB tổng hợp này. Đây là bằng chứng tích hợp có phạm vi cụ thể, không thay thế các skip của lượt verify mặc định và không chứng minh toàn bộ UI desktop.
 - Failure-safety migration không còn là khoảng trống hoàn toàn: `DatabaseMigrationRunnerTest` kiểm tra batch lỗi và lỗi ghi migration tracking đều rollback, không commit; đồng thời giữ lỗi migration gốc nếu rollback cũng lỗi. Đây là coverage unit với JDBC giả lập, không phải bằng chứng rằng mọi kịch bản rollback khi chạy migration thực tế trên SQL Server đã được kiểm chứng.
 
