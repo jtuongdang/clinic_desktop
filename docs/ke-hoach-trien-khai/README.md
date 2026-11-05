@@ -33,6 +33,7 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [Phase 2 — Security implementation contract](phase2-implementation-contract.md) | Ranh giới tin cậy, role/scope/session/audit policy đã duyệt và thứ tự task implementation. |
 | [Phase 1 — Review migration V9](phase1-pat02-v9-review.md) | Review độc lập về unique active patient/facility link, migration safety và runtime test gaps. |
 | [Phase 1 — Patient–facility link contract](phase1-patient-facility-link-contract.md) | Hợp đồng triển khai idempotent link trong transaction tiếp nhận, không mở rộng quyền truy cập. |
+| [Phase 1 — Review tiền sử lâm sàng](phase1-tiensuben-review.md) | Đối chiếu policy bác sĩ ghi/sửa với scope, lượt khám, audit, khóa EMR và các quyết định Owner còn thiếu. |
 | [03 — Tiếp đón, bệnh nhân, nhân sự](phan-he/03-tiep-don-benh-nhan-nhan-su.md) | Patient, insurance, identity, staff, shift/attendance. |
 | [04 — Lịch hẹn và khám/EMR](phan-he/04-lich-hen-kham-emr.md) | Appointment, visit, diagnosis, vitals, prescriptions, care plan. |
 | [05 — Dịch vụ và cận lâm sàng](phan-he/05-dich-vu-can-lam-sang.md) | Catalog services, orders, lab/imaging result workflow. |
