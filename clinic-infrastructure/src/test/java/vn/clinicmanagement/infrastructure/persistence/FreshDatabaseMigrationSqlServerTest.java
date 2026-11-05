@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -19,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -104,6 +106,7 @@ class FreshDatabaseMigrationSqlServerTest {
                     "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID('BenhNhanCoSo') " +
                             "AND name = 'UX_BenhNhanCoSo_Active_Patient_Facility' AND is_unique = 1 AND has_filter = 1"
             ), "V9 must enforce unique active patient-facility links");
+            assertV9ActivePatientFacilityUniqueness(connection);
             assertEquals(1, queryInt(
                     connection,
                     "SELECT COUNT(*) FROM sys.tables t "
@@ -261,6 +264,99 @@ class FreshDatabaseMigrationSqlServerTest {
             throw new AssertionError(
                     "Could not verify the SQL Server migration results; connection details were suppressed"
             );
+        }
+    }
+
+    private static void assertV9ActivePatientFacilityUniqueness(Connection connection) throws SQLException {
+        String syntheticSuffix = UUID.randomUUID().toString();
+        int facilityId = -1;
+        int patientId = -1;
+        try {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO CoSo (tenCoSo) OUTPUT INSERTED.id VALUES (?)")) {
+                statement.setString(1, "Synthetic PAT-02 " + syntheticSuffix);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (!resultSet.next()) throw new SQLException("Synthetic facility insert returned no identity.");
+                    facilityId = resultSet.getInt(1);
+                }
+            }
+
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO BenhNhan (ho, ten, ngaySinh) OUTPUT INSERTED.id VALUES (?, ?, '2000-01-01')")) {
+                statement.setString(1, "Synthetic");
+                statement.setString(2, "PAT02" + syntheticSuffix.replace("-", ""));
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (!resultSet.next()) throw new SQLException("Synthetic patient insert returned no identity.");
+                    patientId = resultSet.getInt(1);
+                }
+            }
+
+            int syntheticPatientId = patientId;
+            int syntheticFacilityId = facilityId;
+            int firstLinkId = insertPatientFacilityLink(connection, syntheticPatientId, syntheticFacilityId);
+            SQLException duplicateFailure = assertThrows(SQLException.class,
+                    () -> insertPatientFacilityLink(connection, syntheticPatientId, syntheticFacilityId),
+                    "V9 must reject a second active link for the same patient-facility pair");
+            assertEquals(2601, duplicateFailure.getErrorCode(),
+                    "The duplicate must fail with SQL Server's unique-index violation code");
+            assertEquals(1, queryInt(connection,
+                    "SELECT COUNT(*) FROM BenhNhanCoSo WHERE maBenhNhan = " + patientId
+                            + " AND maCoSo = " + facilityId + " AND isDeleted = 0"),
+                    "The rejected duplicate must not create another active link");
+
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "UPDATE BenhNhanCoSo SET isDeleted = 1 WHERE id = ? AND isDeleted = 0")) {
+                statement.setInt(1, firstLinkId);
+                assertEquals(1, statement.executeUpdate(), "The synthetic link must be soft-deleted");
+            }
+
+            int replacementLinkId = insertPatientFacilityLink(connection, syntheticPatientId, syntheticFacilityId);
+            assertTrue(replacementLinkId != firstLinkId,
+                    "A new active link must be inserted after the prior link is soft-deleted");
+            assertEquals(1, queryInt(connection,
+                    "SELECT COUNT(*) FROM BenhNhanCoSo WHERE maBenhNhan = " + patientId
+                            + " AND maCoSo = " + facilityId + " AND isDeleted = 0"),
+                    "A soft-deleted link must not block one replacement active link");
+            assertEquals(2, queryInt(connection,
+                    "SELECT COUNT(*) FROM BenhNhanCoSo WHERE maBenhNhan = " + patientId
+                            + " AND maCoSo = " + facilityId),
+                    "The soft-deleted link and its active replacement must both remain recorded");
+        } finally {
+            if (patientId > 0 && facilityId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM BenhNhanCoSo WHERE maBenhNhan = ? AND maCoSo = ?")) {
+                    statement.setInt(1, patientId);
+                    statement.setInt(2, facilityId);
+                    statement.executeUpdate();
+                }
+            }
+            if (patientId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM BenhNhan WHERE id = ?")) {
+                    statement.setInt(1, patientId);
+                    statement.executeUpdate();
+                }
+            }
+            if (facilityId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM CoSo WHERE id = ?")) {
+                    statement.setInt(1, facilityId);
+                    statement.executeUpdate();
+                }
+            }
+        }
+    }
+
+    private static int insertPatientFacilityLink(Connection connection, int patientId, int facilityId)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO BenhNhanCoSo (maBenhNhan, maCoSo) OUTPUT INSERTED.id VALUES (?, ?)")) {
+            statement.setInt(1, patientId);
+            statement.setInt(2, facilityId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) throw new SQLException("Synthetic patient-facility insert returned no identity.");
+                return resultSet.getInt(1);
+            }
         }
     }
 
