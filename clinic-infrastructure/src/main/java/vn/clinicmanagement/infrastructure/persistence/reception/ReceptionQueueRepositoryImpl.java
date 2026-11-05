@@ -76,7 +76,7 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
                     visit.setId(rs.getInt(1));
                 }
             }
-            unitOfWork.recordChanges(1);
+            recordChange();
             return visit;
         });
     }
@@ -162,6 +162,10 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
     private <T> T withConnection(SqlWork<T> work) {
         try (JdbcConnectionProvider.Lease lease = connections.acquire()) { return work.execute(lease.connection()); }
         catch (SQLException ex) { throw new IllegalStateException("Lỗi ghi hàng đợi tiếp đón.", ex); }
+    }
+
+    private void recordChange() {
+        if (connections.isTransactionActive()) unitOfWork.recordChanges(1);
     }
 
     private static LocalDateTime localDateTime(ResultSet rs, String column) throws SQLException {
