@@ -117,11 +117,18 @@ public class ReceptionPanel extends BaseViewPanel {
             @Override protected void done() {
                 try {
                     var matches = get();
-                    if (matches.isEmpty()) { JOptionPane.showMessageDialog(ReceptionPanel.this, "Không tìm thấy hồ sơ phù hợp.", "Tìm người bệnh", JOptionPane.INFORMATION_MESSAGE); return; }
+                    if (matches.isEmpty()) {
+                        JOptionPane.showMessageDialog(ReceptionPanel.this,
+                                "Không tìm thấy hồ sơ phù hợp. Dữ liệu đang nhập vẫn được giữ nguyên.",
+                                "Tìm người bệnh", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
                     PatientSearchItem selected;
-                    if (matches.size() == 1) selected = matches.get(0);
+                    if (matches.size() == 1 && !formPanel.hasUnsavedInput()) selected = matches.get(0);
                     else {
-                        Object choice = JOptionPane.showInputDialog(ReceptionPanel.this, "Chọn hồ sơ người bệnh:", "Kết quả tìm kiếm", JOptionPane.PLAIN_MESSAGE, null, matches.toArray(), matches.get(0));
+                        Object choice = JOptionPane.showInputDialog(ReceptionPanel.this,
+                                "Chọn hồ sơ người bệnh hiện có (Hủy để giữ thông tin đang nhập):",
+                                "Kết quả tìm kiếm", JOptionPane.PLAIN_MESSAGE, null, matches.toArray(), matches.get(0));
                         if (!(choice instanceof PatientSearchItem item)) return;
                         selected = item;
                     }
@@ -142,7 +149,10 @@ public class ReceptionPanel extends BaseViewPanel {
                 footerBar.setSaving(false);
                 try {
                     Result<RegistrationReceipt> result = get();
-                    if (result.isFailure()) { showError(result.getError().orElseThrow().message()); return; }
+                    if (result.isFailure()) {
+                        handleRegistrationFailure(result.getError().orElseThrow());
+                        return;
+                    }
                     RegistrationReceipt receipt = result.getValue().orElseThrow();
                     JOptionPane.showMessageDialog(ReceptionPanel.this,
                             "Đã đăng ký người bệnh " + receipt.patientCode() + " · Số tiếp đón " + receipt.queueNumberDisplay(),
@@ -154,8 +164,48 @@ public class ReceptionPanel extends BaseViewPanel {
         }.execute();
     }
 
+    private void handleRegistrationFailure(Result.ApplicationError error) {
+        if ("PATIENT_DUPLICATE_CCCD".equals(error.code())) {
+            handleDuplicateCccd();
+            return;
+        }
+        showError(sanitizeUserMessage(error.message(), "Không thể lưu đăng ký. Vui lòng kiểm tra lại thông tin."));
+    }
+
+    private void handleDuplicateCccd() {
+        formPanel.prepareDuplicateCccdSearch();
+        String maskedCccd = formPanel.maskedEnteredCccd();
+        String cccdHint = maskedCccd.isEmpty() ? "vừa nhập" : "(" + maskedCccd + ")";
+        String message = "Số CCCD " + cccdHint + " đã có hồ sơ người bệnh trong hệ thống.\n"
+                + "Thông tin đang nhập vẫn được giữ lại và chưa phát sinh lượt khám mới.\n"
+                + "Bạn có muốn tìm và chọn hồ sơ hiện có để tiếp tục tiếp đón không?";
+        Object[] options = {"Tìm hồ sơ đã có", "Giữ thông tin đang nhập"};
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                message,
+                "Hồ sơ CCCD đã tồn tại",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE,
+                null,
+                options,
+                options[0]);
+        if (choice == JOptionPane.YES_OPTION) {
+            formPanel.searchByEnteredCccd();
+        }
+    }
+
+    private static String sanitizeUserMessage(String message, String fallback) {
+        if (message == null || message.isBlank()) return fallback;
+        String lower = message.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("sql") || lower.contains("jdbc") || lower.contains("exception")
+                || lower.contains("unique") || lower.contains("constraint") || lower.contains("duplicate key")) {
+            return fallback;
+        }
+        return message.replaceAll("\\b\\d{9,12}\\b", "***");
+    }
+
     private void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Tiếp đón người bệnh", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, sanitizeUserMessage(message, "Đã xảy ra lỗi khi xử lý yêu cầu."), "Tiếp đón người bệnh", JOptionPane.ERROR_MESSAGE);
     }
 
     private record ReceptionLoad(java.util.List<PhongKham> rooms, ReceptionQueueSnapshot snapshot) {}

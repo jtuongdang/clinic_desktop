@@ -111,9 +111,10 @@ public class PatientRegistrationFormPanel extends JPanel {
         bar.add(label("CCCD"));
         bar.add(txtSearchCccd);
         JButton search = new JButton("Tìm");
-        search.addActionListener(e -> {
-            if (onSearch != null) onSearch.accept(txtSearchPhone.getText().trim(), txtSearchCccd.getText().trim());
-        });
+        Runnable triggerSearch = this::triggerSearch;
+        search.addActionListener(e -> triggerSearch.run());
+        txtSearchPhone.addActionListener(e -> triggerSearch.run());
+        txtSearchCccd.addActionListener(e -> triggerSearch.run());
         bar.add(search);
         return bar;
     }
@@ -240,6 +241,56 @@ public class PatientRegistrationFormPanel extends JPanel {
     public void setOnServiceChanged(Consumer<String> listener) { onServiceChanged = listener; }
     public void setOnSearch(BiConsumer<String, String> listener) { onSearch = listener; }
 
+    public void triggerSearch() {
+        if (onSearch != null) onSearch.accept(txtSearchPhone.getText().trim(), txtSearchCccd.getText().trim());
+    }
+
+    public String enteredCccd() {
+        return txtCccd.getText().trim();
+    }
+
+    public String maskedEnteredCccd() {
+        return maskCccd(enteredCccd());
+    }
+
+    public static String maskCccd(String cccd) {
+        if (cccd == null) return "";
+        String trimmed = cccd.trim();
+        if (trimmed.isEmpty()) return "";
+        if (trimmed.length() <= 4) return "****";
+        return "***" + trimmed.substring(trimmed.length() - 4);
+    }
+
+    public void prepareDuplicateCccdSearch() {
+        String cccd = enteredCccd();
+        if (!cccd.isEmpty()) {
+            txtSearchPhone.setText("");
+            txtSearchCccd.setText(cccd);
+            txtSearchCccd.requestFocusInWindow();
+        } else {
+            String phone = txtPhone.getText().trim();
+            if (!phone.isEmpty()) txtSearchPhone.setText(phone);
+            txtCccd.requestFocusInWindow();
+        }
+    }
+
+    public void searchByEnteredCccd() {
+        prepareDuplicateCccdSearch();
+        triggerSearch();
+    }
+
+    public boolean hasUnsavedInput() {
+        return !txtFullName.getText().isBlank()
+                || !txtDateOfBirth.getText().isBlank()
+                || !txtPhone.getText().isBlank()
+                || !txtCccd.getText().isBlank()
+                || !txtAddress.getText().isBlank()
+                || !txtStreet.getText().isBlank()
+                || !txtBirthPlace.getText().isBlank()
+                || !txtReason.getText().isBlank()
+                || !txtInsuranceNumber.getText().isBlank();
+    }
+
     public String selectedClinicRoomName() { return chooserClinicRoom.getText().trim(); }
 
     public int selectedClinicRoomId() {
@@ -252,7 +303,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         selectedInsurance = insurance;
         txtPatientCode.setText(value(patient.getMaBenhNhanFormat()));
         txtFullName.setText(patient.getHoTen());
-        cbGender.setSelectedItem(switch (patient.getGioiTinh()) { case M -> "Nam"; case F -> "Nữ"; default -> "Khác"; });
+        GioiTinh gender = patient.getGioiTinh();
+        cbGender.setSelectedItem(gender == GioiTinh.F ? "Nữ" : gender == GioiTinh.O ? "Khác" : "Nam");
         txtDateOfBirth.setText(format(patient.getNgaySinh()));
         txtBirthPlace.setText(value(patient.getNoiSinh()));
         txtStreet.setText(value(patient.getSoNhaThonPho()));
