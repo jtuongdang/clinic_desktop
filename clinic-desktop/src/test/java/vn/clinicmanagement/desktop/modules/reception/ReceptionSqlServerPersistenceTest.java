@@ -23,6 +23,7 @@ import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
 import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.core.session.UserSession;
+import vn.clinicmanagement.desktop.modules.reception.components.PatientRegistrationFormPanel;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseConnection;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseMigrationRunner;
 import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
@@ -34,6 +35,7 @@ import vn.clinicmanagement.infrastructure.persistence.system.SystemRepositoryImp
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -41,14 +43,22 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -119,26 +129,118 @@ class ReceptionSqlServerPersistenceTest {
                     authorizationContext, lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().stream().findFirst()
                     .orElseThrow(() -> new AssertionError("No active seeded clinic room is available"));
 
-            BenhNhan patient = new BenhNhan();
-            patient.setHo("Synthetic");
-            patient.setTen("Patient" + generatedSuffix);
-            patient.setNgaySinh(LocalDate.of(1990, 1, 2));
-            patient.setGioiTinh(GioiTinh.M);
-            patient.setDienThoai(syntheticPhone);
-            patient.setSoCCCD(syntheticCccd);
-            patient.setDiaChi("Synthetic test address");
+            LocalDate birthDate = LocalDate.of(1990, 1, 2);
+            LocalDate cccdIssueDate = LocalDate.of(2010, 3, 4);
+            LocalDate copayExemptDate = today.minusMonths(3);
+            LocalDate fiveYearDate = today.minusYears(5);
+            String patientName = "Synthetic Nguyen Patient" + generatedSuffix;
+            String patientPhone = syntheticPhone;
+            String patientAddress = "Synthetic test address " + generatedSuffix;
+            String patientEmail = "synthetic." + generatedSuffix + "@example.invalid";
+            String patientStreet = "Synthetic street " + generatedSuffix;
+            String patientBirthplace = "Synthetic birthplace";
+            String patientIssuePlace = "Synthetic issuing office";
+            String patientWorkplace = "Synthetic workplace";
+            String patientOccupation = "Synthetic occupation";
+            String patientContactName = "Synthetic contact";
+            String patientContactPhone = "08" + generatedSuffix;
+            String provinceCode = "SP" + generatedSuffix.substring(0, 4);
+            String districtCode = "SD" + generatedSuffix.substring(0, 4);
+            String wardCode = "SW" + generatedSuffix.substring(0, 4);
+            String insuranceFacilityCode = "SF" + generatedSuffix.substring(0, 4);
+            String insuranceFacilityName = "Synthetic BHYT facility";
+            String insuranceAddress = "Synthetic insurance address";
+            BenhNhan expectedPatient = new BenhNhan();
+            expectedPatient.setHo("Synthetic Nguyen");
+            expectedPatient.setTen("Patient" + generatedSuffix);
+            expectedPatient.setNgaySinh(birthDate);
+            expectedPatient.setGioiTinh(GioiTinh.M);
+            expectedPatient.setDienThoai(patientPhone);
+            expectedPatient.setEmail(patientEmail);
+            expectedPatient.setSoCCCD(syntheticCccd);
+            expectedPatient.setDiaChi(patientAddress);
+            expectedPatient.setSoNhaThonPho(patientStreet);
+            expectedPatient.setNoiSinh(patientBirthplace);
+            expectedPatient.setNgayCapCCCD(cccdIssueDate);
+            expectedPatient.setNoiCapCCCD(patientIssuePlace);
+            expectedPatient.setNoiLamViec(patientWorkplace);
+            expectedPatient.setNgheNghiep(patientOccupation);
+            expectedPatient.setDanToc("Tày");
+            expectedPatient.setQuocTich("Việt Nam");
+            expectedPatient.setMaTinh(provinceCode);
+            expectedPatient.setMaHuyen(districtCode);
+            expectedPatient.setMaXa(wardCode);
+            expectedPatient.setNguoiLienHeTen(patientContactName);
+            expectedPatient.setNguoiLienHeDienThoai(patientContactPhone);
+            BaoHiem expectedInsurance = new BaoHiem();
+            expectedInsurance.setLoaiBaoHiem(LoaiBaoHiem.BHYT);
+            expectedInsurance.setSoBaoHiem(syntheticCardNumber);
+            expectedInsurance.setNgayBatDau(initialCardStart);
+            expectedInsurance.setNgayHetHan(initialCardEnd);
+            expectedInsurance.setMucHuong(80);
+            expectedInsurance.setMaNoiSong("K2");
+            expectedInsurance.setMaNoiDangKyKCB(insuranceFacilityCode);
+            expectedInsurance.setNoiDangKyKCB(insuranceFacilityName);
+            expectedInsurance.setDiaChiThe(insuranceAddress);
+            expectedInsurance.setDungTuyen(false);
+            expectedInsurance.setCoGiayKhaiSinh(true);
+            expectedInsurance.setKhongGiuThe(true);
+            expectedInsurance.setMienCungChiTra(true);
+            expectedInsurance.setNgayMienCungChiTra(copayExemptDate);
+            expectedInsurance.setNgayDu5NamLienTuc(fiveYearDate);
+            RegisterPatientCommand registrationCommand = onEdt(() -> {
+                PatientRegistrationFormPanel form = new PatientRegistrationFormPanel();
+                form.setClinicRooms(List.of(room));
+                setText(form, "txtFullName", patientName);
+                setText(form, "txtDateOfBirth", "02/01/1990");
+                setCombo(form, "cbGender", "Nam");
+                setText(form, "txtPhone", patientPhone);
+                setText(form, "txtEmail", patientEmail);
+                setText(form, "txtCccd", syntheticCccd);
+                setText(form, "txtAddress", patientAddress);
+                setText(form, "txtStreet", patientStreet);
+                setText(form, "txtBirthPlace", patientBirthplace);
+                setText(form, "txtCccdIssueDate", "04/03/2010");
+                setText(form, "txtCccdIssuePlace", patientIssuePlace);
+                setText(form, "txtWorkplace", patientWorkplace);
+                setText(form, "txtOccupation", patientOccupation);
+                setCombo(form, "cbEthnicity", "Tày");
+                setCombo(form, "cbNationality", "Việt Nam");
+                setText(form, "txtProvinceCode", provinceCode);
+                setText(form, "txtDistrictCode", districtCode);
+                setText(form, "txtWardCode", wardCode);
+                setText(form, "txtContactName", patientContactName);
+                setText(form, "txtContactPhone", patientContactPhone);
+                setCombo(form, "cbRegistrationType", "Khám bệnh");
+                setCombo(form, "cbPayerType", "BHYT");
+                setCheckBox(form, "chkPriority", true);
+                setText(form, "txtReason", "Synthetic persistence test");
+                setText(form, "txtInsuranceNumber", syntheticCardNumber);
+                setText(form, "txtInsuranceStartDate", formatDate(initialCardStart));
+                setText(form, "txtInsuranceEndDate", formatDate(initialCardEnd));
+                setText(form, "txtInsuranceRate", "80");
+                setCombo(form, "cbLivingArea", "K2");
+                setText(form, "txtFacilityCode", insuranceFacilityCode);
+                setText(form, "txtFacilityName", insuranceFacilityName);
+                setText(form, "txtInsuranceAddress", insuranceAddress);
+                setCombo(form, "cbRoute", "Trái tuyến");
+                setCheckBox(form, "chkBirthCertificate", true);
+                setCheckBox(form, "chkNotHoldingCard", true);
+                setCheckBox(form, "chkExemptCopay", true);
+                setText(form, "txtCopayExemptDate", formatDate(copayExemptDate));
+                setText(form, "txtFiveYearDate", formatDate(fiveYearDate));
+                return form.toRegisterCommand(lifecycle.currentAuthorizationContext().orElseThrow(),
+                        lifecycle.currentAuditActorContext().orElseThrow());
+            });
+            assertEquals(authorizationContext, registrationCommand.authorizationContext(),
+                    "Registration form command must use the active synthetic session context");
+            assertEquals(room.getId(), registrationCommand.roomId(),
+                    "Registration form command must use the selected active clinic room");
+            BenhNhan patient = registrationCommand.patient();
+            BaoHiem insurance = registrationCommand.insurance();
+            assertPatientAndInsurance(patient, insurance, expectedPatient, expectedInsurance);
 
-            BaoHiem insurance = new BaoHiem();
-            insurance.setLoaiBaoHiem(LoaiBaoHiem.BHYT);
-            insurance.setSoBaoHiem(syntheticCardNumber);
-            insurance.setNgayBatDau(initialCardStart);
-            insurance.setNgayHetHan(initialCardEnd);
-            insurance.setMucHuong(80);
-
-            var registrationResult = services.registerPatient().handle(new RegisterPatientCommand(
-                    patient, insurance, room.getId(), "WALK_IN", "Synthetic persistence test",
-                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext,
-                    lifecycle.currentAuditActorContext().orElseThrow()));
+            var registrationResult = services.registerPatient().handle(registrationCommand);
             assertTrue(registrationResult.isSuccess(), "Synthetic reception registration failed");
             var receipt = registrationResult.valueOrThrow();
             registeredPatientId = receipt.patientId();
@@ -157,9 +259,8 @@ class ReceptionSqlServerPersistenceTest {
             assertNotNull(initialMatch.latestInsurance(), "BHYT card was not returned after registration");
             assertEquals(generatedCardId, initialMatch.latestInsurance().getId(),
                     "BHYT card identifier changed during initial reload");
-            assertPatientAndInsurance(initialMatch, "Patient" + generatedSuffix, LocalDate.of(1990, 1, 2),
-                    GioiTinh.M, syntheticCccd, syntheticPhone, "Synthetic test address", syntheticCardNumber, 80,
-                    initialCardStart, initialCardEnd);
+            assertPatientAndInsurance(initialMatch.patient(), initialMatch.latestInsurance(),
+                    expectedPatient, expectedInsurance);
             assertQueueContains(services.getQueue()
                             .handle(new GetReceptionQueueQuery(LocalDate.now(), authorizationContext,
                                     lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().queue(),
@@ -181,6 +282,15 @@ class ReceptionSqlServerPersistenceTest {
             updatedInsurance.setNgayBatDau(updatedCardStart);
             updatedInsurance.setNgayHetHan(updatedCardEnd);
             updatedInsurance.setMucHuong(90);
+            expectedPatient.setTen(updatedName);
+            expectedPatient.setNgaySinh(LocalDate.of(1991, 2, 3));
+            expectedPatient.setGioiTinh(GioiTinh.F);
+            expectedPatient.setDienThoai(updatedPhone);
+            expectedPatient.setDiaChi(updatedAddress);
+            expectedInsurance.setSoBaoHiem(updatedCardNumber);
+            expectedInsurance.setNgayBatDau(updatedCardStart);
+            expectedInsurance.setNgayHetHan(updatedCardEnd);
+            expectedInsurance.setMucHuong(90);
 
             var updateResult = services.registerPatient().handle(new RegisterPatientCommand(
                     updatedPatient, updatedInsurance, room.getId(), "WALK_IN", "Synthetic update persistence test",
@@ -202,9 +312,8 @@ class ReceptionSqlServerPersistenceTest {
             assertEquals(1, reloadedMatches.size(),
                     "Updating the patient created a duplicate active patient with the same CCCD");
             PatientSearchItem reloadedMatch = findByCccd(reloadedMatches, registeredPatientId);
-            assertPatientAndInsurance(reloadedMatch, updatedName, LocalDate.of(1991, 2, 3), GioiTinh.F,
-                    syntheticCccd, updatedPhone, updatedAddress, updatedCardNumber, 90, updatedCardStart,
-                    updatedCardEnd);
+            assertPatientAndInsurance(reloadedMatch.patient(), reloadedMatch.latestInsurance(),
+                    expectedPatient, expectedInsurance);
             assertEquals(generatedCardId, reloadedMatch.latestInsurance().getId(),
                     "Updating BHYT created a different current card instead of updating the existing card");
             List<ReceptionQueueItem> reloadedQueue = freshServices.getQueue()
@@ -389,23 +498,116 @@ class ReceptionSqlServerPersistenceTest {
                 .orElseThrow(() -> new AssertionError("Registered patient was not found by CCCD"));
     }
 
-    private static void assertPatientAndInsurance(PatientSearchItem match, String patientName, LocalDate birthDate,
-                                                  GioiTinh gender, String cccd, String phone, String address,
-                                                  String cardNumber, int coverage, LocalDate cardStart,
-                                                  LocalDate cardEnd) {
-        assertEquals(patientName, match.patient().getTen(), "Patient name did not persist");
-        assertEquals(birthDate, match.patient().getNgaySinh(), "Patient birth date did not persist");
-        assertEquals(gender, match.patient().getGioiTinh(), "Patient gender did not persist");
-        assertEquals(cccd, match.patient().getSoCCCD(), "Patient CCCD did not persist");
-        assertEquals(phone, match.patient().getDienThoai(), "Patient phone did not persist");
-        assertEquals(address, match.patient().getDiaChi(), "Patient address did not persist");
-        assertNotNull(match.latestInsurance(), "BHYT card was not returned with the patient");
-        assertEquals(cardNumber, match.latestInsurance().getSoBaoHiem(), "BHYT number did not persist");
-        assertEquals(LoaiBaoHiem.BHYT, match.latestInsurance().getLoaiBaoHiem(),
-                "Insurance type was not reloaded as BHYT");
-        assertEquals(coverage, match.latestInsurance().getMucHuong(), "BHYT coverage did not persist");
-        assertEquals(cardStart, match.latestInsurance().getNgayBatDau(), "BHYT start date did not persist");
-        assertEquals(cardEnd, match.latestInsurance().getNgayHetHan(), "BHYT expiry date did not persist");
+    private static void assertPatientAndInsurance(BenhNhan actualPatient, BaoHiem actualInsurance,
+                                                  BenhNhan expectedPatient, BaoHiem expectedInsurance) {
+        assertEquals(expectedPatient.getHo(), actualPatient.getHo(), "Patient family name did not persist");
+        assertEquals(expectedPatient.getTen(), actualPatient.getTen(), "Patient given name did not persist");
+        assertEquals(expectedPatient.getNgaySinh(), actualPatient.getNgaySinh(), "Patient birth date did not persist");
+        assertEquals(expectedPatient.getGioiTinh(), actualPatient.getGioiTinh(), "Patient gender did not persist");
+        assertEquals(expectedPatient.getDienThoai(), actualPatient.getDienThoai(), "Patient phone did not persist");
+        assertEquals(expectedPatient.getEmail(), actualPatient.getEmail(), "Patient email did not persist");
+        assertEquals(expectedPatient.getSoCCCD(), actualPatient.getSoCCCD(), "Patient CCCD did not persist");
+        assertEquals(expectedPatient.getDiaChi(), actualPatient.getDiaChi(), "Patient address did not persist");
+        assertEquals(expectedPatient.getSoNhaThonPho(), actualPatient.getSoNhaThonPho(),
+                "Patient street/neighborhood did not persist");
+        assertEquals(expectedPatient.getNoiSinh(), actualPatient.getNoiSinh(), "Patient birthplace did not persist");
+        assertEquals(expectedPatient.getNgayCapCCCD(), actualPatient.getNgayCapCCCD(),
+                "Patient CCCD issue date did not persist");
+        assertEquals(expectedPatient.getNoiCapCCCD(), actualPatient.getNoiCapCCCD(),
+                "Patient CCCD issue place did not persist");
+        assertEquals(expectedPatient.getNoiLamViec(), actualPatient.getNoiLamViec(),
+                "Patient workplace did not persist");
+        assertEquals(expectedPatient.getNgheNghiep(), actualPatient.getNgheNghiep(),
+                "Patient occupation did not persist");
+        assertEquals(expectedPatient.getDanToc(), actualPatient.getDanToc(), "Patient ethnicity did not persist");
+        assertEquals(expectedPatient.getQuocTich(), actualPatient.getQuocTich(),
+                "Patient nationality did not persist");
+        assertEquals(expectedPatient.getMaTinh(), actualPatient.getMaTinh(), "Patient province code did not persist");
+        assertEquals(expectedPatient.getMaHuyen(), actualPatient.getMaHuyen(),
+                "Patient district code did not persist");
+        assertEquals(expectedPatient.getMaXa(), actualPatient.getMaXa(), "Patient ward code did not persist");
+        assertEquals(expectedPatient.getNguoiLienHeTen(), actualPatient.getNguoiLienHeTen(),
+                "Patient contact name did not persist");
+        assertEquals(expectedPatient.getNguoiLienHeDienThoai(), actualPatient.getNguoiLienHeDienThoai(),
+                "Patient contact phone did not persist");
+
+        assertNotNull(actualInsurance, "BHYT card was not returned with the patient");
+        assertEquals(expectedInsurance.getLoaiBaoHiem(), actualInsurance.getLoaiBaoHiem(),
+                "Insurance type was not persisted");
+        assertEquals(expectedInsurance.getSoBaoHiem(), actualInsurance.getSoBaoHiem(),
+                "BHYT number did not persist");
+        assertEquals(expectedInsurance.getNgayBatDau(), actualInsurance.getNgayBatDau(),
+                "BHYT start date did not persist");
+        assertEquals(expectedInsurance.getNgayHetHan(), actualInsurance.getNgayHetHan(),
+                "BHYT expiry date did not persist");
+        assertEquals(expectedInsurance.getMucHuong(), actualInsurance.getMucHuong(),
+                "BHYT coverage did not persist");
+        assertEquals(expectedInsurance.getMaNoiSong(), actualInsurance.getMaNoiSong(),
+                "Insurance living-area code did not persist");
+        assertEquals(expectedInsurance.getMaNoiDangKyKCB(), actualInsurance.getMaNoiDangKyKCB(),
+                "Insurance facility code did not persist");
+        assertEquals(expectedInsurance.getNoiDangKyKCB(), actualInsurance.getNoiDangKyKCB(),
+                "Insurance facility name did not persist");
+        assertEquals(expectedInsurance.getDiaChiThe(), actualInsurance.getDiaChiThe(),
+                "Insurance address did not persist");
+        assertEquals(expectedInsurance.isDungTuyen(), actualInsurance.isDungTuyen(),
+                "Insurance route status did not persist");
+        assertEquals(expectedInsurance.isCoGiayKhaiSinh(), actualInsurance.isCoGiayKhaiSinh(),
+                "Insurance birth-certificate flag did not persist");
+        assertEquals(expectedInsurance.isKhongGiuThe(), actualInsurance.isKhongGiuThe(),
+                "Insurance card-retention flag did not persist");
+        assertEquals(expectedInsurance.isMienCungChiTra(), actualInsurance.isMienCungChiTra(),
+                "Insurance copay-exemption flag did not persist");
+        assertEquals(expectedInsurance.getNgayMienCungChiTra(), actualInsurance.getNgayMienCungChiTra(),
+                "Insurance copay-exemption date did not persist");
+        assertEquals(expectedInsurance.getNgayDu5NamLienTuc(), actualInsurance.getNgayDu5NamLienTuc(),
+                "Insurance five-year date did not persist");
+    }
+
+    private static <T> T onEdt(Callable<T> action) throws Exception {
+        if (SwingUtilities.isEventDispatchThread()) return action.call();
+        AtomicReference<T> result = new AtomicReference<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                result.set(action.call());
+            } catch (Exception ex) {
+                failure.set(ex);
+            } catch (Error ex) {
+                failure.set(ex);
+            }
+        });
+        Throwable ex = failure.get();
+        if (ex instanceof Exception exception) throw exception;
+        if (ex instanceof Error error) throw error;
+        if (ex != null) throw new IllegalStateException(ex);
+        return result.get();
+    }
+
+    private static void setText(PatientRegistrationFormPanel form, String fieldName, String value)
+            throws ReflectiveOperationException {
+        field(form, fieldName, JTextField.class).setText(value);
+    }
+
+    private static void setCombo(PatientRegistrationFormPanel form, String fieldName, String value)
+            throws ReflectiveOperationException {
+        field(form, fieldName, JComboBox.class).setSelectedItem(value);
+    }
+
+    private static void setCheckBox(PatientRegistrationFormPanel form, String fieldName, boolean value)
+            throws ReflectiveOperationException {
+        field(form, fieldName, JCheckBox.class).setSelected(value);
+    }
+
+    private static <T> T field(PatientRegistrationFormPanel form, String fieldName, Class<T> type)
+            throws ReflectiveOperationException {
+        Field field = PatientRegistrationFormPanel.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return type.cast(field.get(form));
+    }
+
+    private static String formatDate(LocalDate date) {
+        return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
     }
 
     private static void assertQueueContains(List<ReceptionQueueItem> queue, int visitId, int patientId) {
