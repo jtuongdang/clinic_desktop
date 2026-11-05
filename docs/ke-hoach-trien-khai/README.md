@@ -37,6 +37,7 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [Phase 1 — Patient–facility link contract](phase1-patient-facility-link-contract.md) | Hợp đồng triển khai idempotent link trong transaction tiếp nhận, không mở rộng quyền truy cập. |
 | [Phase 1 — Review tiền sử lâm sàng](phase1-tiensuben-review.md) | Đối chiếu policy bác sĩ ghi/sửa với scope, lượt khám, audit, khóa EMR và các quyết định Owner còn thiếu. |
 | [Phase 3 — Review vòng đời lượt khám](phase3-visit-lifecycle-review.md) | Map policy hủy/chuyển/sinh hiệu tới state machine, authorization, persistence, audit và màn hình hiện có. |
+| [Phase 3 — Visit transfer contract review](phase3-visit-transfer-contract-review.md) | Report-only đối chiếu DEC-AUTHZ-04b với transfer entry point, state, queue, authorization, audit, persistence, các owner decisions còn mở và acceptance gates; giữ SEC-01 làm hard gate. |
 | [Phase 3 — Appointment readiness review](phase3-appointment-readiness-review.md) | Report-only review về domain, UI, persistence, concurrency, scope, lifecycle, time, notification/payment, audit và các quyết định APPT còn mở; `SEC-01` vẫn là gate. |
 | [Phase 0 — Review cấu hình DB và secret](phase0-db-config-review.md) | Đối chiếu precedence environment/config, TLS, logging và cách chạy JAR đóng gói; không truy cập DB hay secret. |
 | [Phase 0 — Contract testable DB configuration](phase0-db-config-resolution-contract.md) | Ghi nhận precedence hiện tại, call-order edge cases và test matrix cấu hình tổng hợp; chưa chọn TLS hay external-JAR policy. |
