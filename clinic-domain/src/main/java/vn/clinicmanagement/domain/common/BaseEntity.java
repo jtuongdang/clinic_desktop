@@ -54,7 +54,10 @@ public abstract class BaseEntity<TId> {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
     public Integer getUpdatedBy() { return updatedBy; }
-    public void setUpdatedBy(Integer updatedBy) { this.updatedBy = updatedBy; }
+    public void setUpdatedBy(Integer updatedBy) {
+        validateNullableActor(updatedBy, "Người cập nhật bản ghi phải là người dùng hợp lệ.");
+        this.updatedBy = updatedBy;
+    }
 
     public boolean isDeleted() { return isDeleted; }
     public void setDeleted(boolean deleted) { isDeleted = deleted; }
@@ -63,20 +66,23 @@ public abstract class BaseEntity<TId> {
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 
     public Integer getDeletedBy() { return deletedBy; }
-    public void setDeletedBy(Integer deletedBy) { this.deletedBy = deletedBy; }
+    public void setDeletedBy(Integer deletedBy) {
+        validateNullableActor(deletedBy, "Người xóa bản ghi phải là người dùng hợp lệ.");
+        this.deletedBy = deletedBy;
+    }
 
     public void markAsUpdated(int updatedBy) {
+        validateActor(updatedBy, "Người cập nhật bản ghi phải là người dùng hợp lệ.");
         this.updatedAt = LocalDateTime.now();
         this.updatedBy = updatedBy;
-        if (this.version != null) this.version++;
     }
 
     public void softDelete(int deletedBy) {
+        validateActor(deletedBy, "Người xóa bản ghi phải là người dùng hợp lệ.");
         if (this.isDeleted) return;
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
         this.deletedBy = deletedBy;
-        if (this.version != null) this.version++;
     }
 
     public void restore() {
@@ -84,7 +90,14 @@ public abstract class BaseEntity<TId> {
         this.isDeleted = false;
         this.deletedAt = null;
         this.deletedBy = null;
-        if (this.version != null) this.version++;
+    }
+
+    private static void validateNullableActor(Integer actorId, String message) {
+        if (actorId != null) validateActor(actorId, message);
+    }
+
+    private static void validateActor(int actorId, String message) {
+        if (actorId <= 0) throw new IllegalArgumentException(message);
     }
 
     public void registerDomainEvent(IDomainEvent event) {

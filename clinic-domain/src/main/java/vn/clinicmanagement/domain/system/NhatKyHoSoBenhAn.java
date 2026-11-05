@@ -9,6 +9,22 @@ public class NhatKyHoSoBenhAn extends BaseEntity<Integer> {
     private String lyDo;
     private LocalDateTime thoiGian = LocalDateTime.now();
     public NhatKyHoSoBenhAn() {}
+    @Override
+    public void markAsUpdated(int updatedBy) {
+        throw new UnsupportedOperationException("Nhật ký hồ sơ bệnh án không thể cập nhật vòng đời.");
+    }
+    @Override
+    public void softDelete(int deletedBy) {
+        throw new UnsupportedOperationException("Nhật ký hồ sơ bệnh án không thể xóa mềm.");
+    }
+    @Override
+    public void restore() {
+        throw new UnsupportedOperationException("Nhật ký hồ sơ bệnh án không thể khôi phục.");
+    }
+    @Override
+    public void setDeleted(boolean deleted) {
+        throw new UnsupportedOperationException("Không thể thay đổi trạng thái xóa của nhật ký hồ sơ bệnh án.");
+    }
     public int getMaLuotKham() { return maLuotKham; }
     public void setMaLuotKham(int maLuotKham) { this.maLuotKham = maLuotKham; }
     public int getMaNhanVien() { return maNhanVien; }

@@ -9,6 +9,22 @@ public class NhatKyHeThong extends BaseEntity<Integer> {
     private String ipAddress;
     private LocalDateTime thoiGian = LocalDateTime.now();
     public NhatKyHeThong() {}
+    @Override
+    public void markAsUpdated(int updatedBy) {
+        throw new UnsupportedOperationException("Nhật ký hệ thống không thể cập nhật vòng đời.");
+    }
+    @Override
+    public void softDelete(int deletedBy) {
+        throw new UnsupportedOperationException("Nhật ký hệ thống không thể xóa mềm.");
+    }
+    @Override
+    public void restore() {
+        throw new UnsupportedOperationException("Nhật ký hệ thống không thể khôi phục.");
+    }
+    @Override
+    public void setDeleted(boolean deleted) {
+        throw new UnsupportedOperationException("Không thể thay đổi trạng thái xóa của nhật ký hệ thống.");
+    }
     public Integer getMaNhanVien() { return maNhanVien; }
     public void setMaNhanVien(Integer maNhanVien) { this.maNhanVien = maNhanVien; }
     public String getHanhDong() { return hanhDong; }
