@@ -1,6 +1,6 @@
 # 00 — Hiện trạng và nguyên tắc phân tích
 
-**Cập nhật:** 05/11/2026
+**Cập nhật:** 06/11/2026
 **Phạm vi:** Clinic Management Desktop — Java, Maven, JDBC, SQL Server, Java Swing.
 
 > Trạng thái phản ánh source và lịch sử Git quan sát được trong checkout. Code đã commit trên máy vẫn chưa đồng nghĩa với đã được đẩy lên remote, phát hành, hoặc nghiệm thu end-to-end.
@@ -11,23 +11,22 @@
 |---|---|---|
 | `clinic-domain` | Model theo patient, identity, facility, appointment, examination, prescription, inventory, billing, service, system và các miền khác; repository interfaces. | Nền model rộng. Sự tồn tại của model không chứng minh luồng nghiệp vụ hoàn chỉnh. |
 | `clinic-application` | `AuthenticateUserHandler`; reception handlers `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler`; `TransactionBoundary`, `CommandHandler`, `QueryHandler`. | Auth và một phần Tiếp đón có use case. Các use case khác còn cần nối, kiểm thử và nghiệm thu. |
-| `clinic-infrastructure` | JDBC, `DatabaseMigrationRunner`, `JdbcTransactionManager`, `JdbcUnitOfWork`; repositories `NhanVienRepositoryImpl`, `BenhNhanRepositoryImpl`, `BaoHiemRepositoryImpl`, `PhongKhamRepositoryImpl`, `ReceptionQueueRepositoryImpl`. | Có persistence cho auth và một phần Tiếp đón. Chưa có bằng chứng tích hợp SQL Server cho toàn bộ tiêu chí Tiếp đón. |
-| `clinic-desktop` | Swing UI cho auth, dashboard, reception, doctor/examination, paraclinical, pharmacy, billing, catalog, reports và system. Tiếp đón nối handlers qua `ReceptionCompositionRoot`; các thao tác tìm kiếm/tải/lưu dùng `SwingWorker`. Có headless form tests và SQL Server opt-in persistence/process tests. | Độ hoàn thiện khác nhau. Các test repository/process không tự chứng minh thao tác end-to-end trên cửa sổ Swing. |
+| `clinic-infrastructure` | JDBC, `DatabaseMigrationRunner`, `JdbcTransactionManager`, `JdbcUnitOfWork`; repositories `NhanVienRepositoryImpl`, `BenhNhanRepositoryImpl`, `BaoHiemRepositoryImpl`, `PhongKhamRepositoryImpl`, `ReceptionQueueRepositoryImpl`. Runner đăng ký migration V1–V9. | Có persistence cho auth và một phần Tiếp đón. Đã có bằng chứng SQL Server opt-in cho bootstrap schema V1–V9 và composition Tiếp đón trên DB tổng hợp riêng; không bao quát toàn bộ tiêu chí nghiệp vụ. |
+| `clinic-desktop` | Swing UI cho auth, dashboard, reception, doctor/examination, paraclinical, pharmacy, billing, catalog, reports và system. Tiếp đón nối handlers qua `ReceptionCompositionRoot`; các thao tác tìm kiếm/tải/lưu dùng `SwingWorker`. Có headless form tests và SQL Server opt-in persistence/process tests. | Độ hoàn thiện khác nhau. Cửa sổ Swing chưa được quan sát trực tiếp; tương tác toàn bộ desktop UI và UI-to-database E2E vẫn chưa được xác minh. |
 
 ## Migration và kiểm thử trong checkout
 
-- Migration runner đăng ký tuần tự bốn file: `V1__Initial_Clinic_Schema.sql`, `V2__Seed_Initial_Data.sql`, `V3__Repair_Demo_Account_Passwords.sql`, `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql`.
-- `DatabaseMigrationRunner` dùng `SqlServerBatchSplitter` để tách `GO` đứng riêng trên dòng; unit tests kiểm tra runner/splitter. `DatabaseMigrationRunnerTest` hiện xác nhận rollback khi batch/tracking write lỗi, không commit/ghi thành công, và giữ exception gốc nếu rollback lỗi (`5d68840`). `FreshDatabaseMigrationSqlServerTest` đã bootstrap thành công database synthetic trống V1–V4, xác nhận 4 migration records, seed counts và unique index V4. Database `clinic_test_migration_bootstrap_20261105` được giữ lại, có 0 patient rows.
-- Tại source snapshot `0d91903` có **18 test source / 78 test cases**: domain 4/21, application 5/26, infrastructure 5/21, desktop 4/10. Ba SQL Server integration tests là opt-in và được skip khi chạy mặc định.
-- Root JDK 17 `mvn clean verify` tại snapshot `0d91903` pass: 78 tests được phát hiện, 75 pass, 0 failures/errors, 3 skips (ba test SQL Server opt-in); cả năm Maven module thành công. Shaded JAR inspection không thấy metadata chữ ký dependency hoặc `db.properties` cục bộ. Auth tests kiểm tra handler/verifier bằng fixture tổng hợp, không xác nhận access scope hay audit.
-- SQL Server synthetic `clinic_orchestrator_review_20261105`: registration/update E2E pass 1/1 và JVM process-restart probe pass 1/1; child JVM khác xác nhận patient/BHYT/visit/queue sau khi parent JVM ghi. Test rows được soft-delete theo ID. Manual SQL checks cũng xác nhận rollback đa bảng, 8 queue registrations đồng thời có số riêng, và hai đăng ký cùng CCCD chỉ có một thành công. Đây chưa phải restart/interaction của ứng dụng Swing đầy đủ.
+- `DatabaseMigrationRunner` đăng ký tuần tự V1–V9 (`V1__Initial_Clinic_Schema.sql` đến `V9__Enforce_Active_Patient_Facility_Uniqueness.sql`) và dùng `SqlServerBatchSplitter` để tách `GO` đứng riêng trên dòng.
+- **Default verify:** bằng chứng chạy đầy đủ gần nhất với JDK 17 là `mvn -Djava.awt.headless=true clean verify`: **209 tests, 0 failures, 0 errors, 4 skipped**; cả 4 skip là SQL Server opt-in tests được bỏ qua có chủ đích khi chạy mặc định. Không tính các test skip này là đã chạy trong lượt verify mặc định.
+- **SQL Server opt-in riêng:** `FreshDatabaseMigrationSqlServerTest` đã chạy thành công migration V1–V9 trên DB mới, tổng hợp `clinic_test_v9_20261106`; `ReceptionSqlServerPersistenceTest` đã xác minh luồng Tiếp đón qua `ReceptionCompositionRoot` trên DB tổng hợp này. Đây là bằng chứng tích hợp có phạm vi cụ thể, không thay thế các skip của lượt verify mặc định và không chứng minh toàn bộ UI desktop.
+- Failure-safety migration không còn là khoảng trống hoàn toàn: `DatabaseMigrationRunnerTest` kiểm tra batch lỗi và lỗi ghi migration tracking đều rollback, không commit; đồng thời giữ lỗi migration gốc nếu rollback cũng lỗi. Đây là coverage unit với JDBC giả lập, không phải bằng chứng rằng mọi kịch bản rollback khi chạy migration thực tế trên SQL Server đã được kiểm chứng.
 
 ## Tiếp đón và trạng thái Git
 
-- `ReceptionCompositionRoot` nối các handler với JDBC. Test opt-in đã ghi patient+BHYT+visit+queue, tìm theo CCCD và đọc lại bằng composition mới. `ReceptionSqlServerProcessRestartTest` còn khởi động JVM con riêng và xác nhận search/BHYT/queue từ process thứ hai; đây chưa phải restart toàn bộ ứng dụng Swing.
-- SQL Server verification bổ sung: rollback đa bảng khi insert visit lỗi để lại 0 active rows cho patient/BHYT/visit; 8 đăng ký đồng thời nhận queue number duy nhất; hai đăng ký cùng CCCD cho đúng 1 commit và lỗi còn lại được ánh xạ `PATIENT_DUPLICATE_CCCD`. Các bản ghi test đã soft-delete.
-- Feature code snapshot hiện là `0d91903`; ngoài các vertical-slice tests trước đó, snapshot có migration rollback safety (`5d68840`), domain-event collection test (`a3071fc`), safe reception error mapping (`9b5ff17`) và staff role/scope assignment reads (`2d062f8`, `0d91903`). Đây là bằng chứng commit/test local; không phải phát hành hay nghiệm thu Phase 0/1.
-- Còn thiếu: xác minh cửa sổ và thao tác toàn bộ ứng dụng Swing/UI-to-database E2E, migration failure-safety, authorization/privacy/audit. Tiến trình Swing đã khởi tạo AWT event loop khi smoke test JDK 17, nhưng cửa sổ chưa được quan sát trực tiếp.
+- `ReceptionCompositionRoot` nối các handler Tiếp đón với JDBC; bằng chứng opt-in trên `clinic_test_v9_20261106` bao gồm migration mới V1–V9 và E2E composition cho Tiếp đón với dữ liệu tổng hợp. Không đưa credentials hay dữ liệu cá nhân vào tài liệu.
+- Code của feature đã được commit cục bộ trên `feature/patient-reception-workflow`; không có bằng chứng đã push hoặc phát hành. Các kết quả nêu trên không đồng nghĩa Phase 0, Phase 1 hoặc Phase 2 hoàn tất.
+- **UI chưa được xác minh:** do máy Mac đang khóa, cửa sổ Swing chưa được quan sát trực tiếp. Khởi tạo AWT/headless form tests không chứng minh hiển thị cửa sổ hay thao tác end-to-end trên toàn desktop UI; UI-to-database E2E vẫn chưa được xác minh.
+- Các giới hạn khác vẫn gồm nghiệm thu nghiệp vụ toàn diện và xác minh authorization/privacy/audit theo từng luồng; không suy ra hoàn tất phase từ source, test hoặc một lượt tích hợp có phạm vi giới hạn.
 
 ## Nguyên tắc đánh giá hoàn thiện
 
