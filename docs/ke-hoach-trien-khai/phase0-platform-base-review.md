@@ -369,8 +369,8 @@ Không tự đoán hoặc tự áp đặt các thay đổi sau đây nếu chưa
 3. **`[DEC-MODEL-DB-01 — Đã duyệt: tạo bảng theo phase triển khai model]`:**
    - 14 lớp miền (`DonDatHang`, `ChiTietDonDatHang`, `Stocktake`, `StocktakeCount`, `IdempotencyRecord`, `LichLamViecCoDinh`, `LichLamViecDieuChinh`, `DieuChinhChamCong`, `KyChamCong`, `NghiPhep`, `ChiTietBangLuong`, `CauHinhHoaHongLoaiDichVu`, `CauHinhTichHop`, `TokenLamMoi`) đã có class Java nhưng chưa có bảng trong `V1`–`V8`.
    - *Quyết định Owner ngày 05/11/2026:* giữ model trong roadmap và tạo schema/migration tương ứng khi phase của model được triển khai. Mỗi migration vẫn cần contract nghiệp vụ, quan hệ/constraint và acceptance riêng trước khi viết; không tạo một migration chung chỉ để đưa mọi class hiện có vào database.
-4. **`[Cần Owner quyết định 4 — Quy Tắc Chặn Xóa Mềm Khi Còn Bản Ghi Con Đang Hoạt Động]`:**
-   - *Câu hỏi cần chốt:* Khi gọi xóa mềm `BenhNhan` hoặc `NhanVien`, hệ thống phải từ chối xóa nếu còn `LuotKham`/`HoaDon`/`LichHen` đang hoạt động (`isDeleted = 0`), hay tự động thu hồi/xóa mềm dây chuyền các bản ghi phụ thuộc (như `BaoHiem`, `NhanVienVaiTro`, `NhanVienKhoa`, `PhanQuyenCoSo`)?
+4. **`[DEC-SOFTDELETE-01 — Đã duyệt: chặn bản ghi nghiệp vụ, cascade liên kết thuần]`:**
+   - *Quyết định Owner ngày 05/11/2026:* chặn xóa mềm bản ghi cha nếu còn hồ sơ/thuốc/tài chính hoạt động; chỉ cascade xóa mềm liên kết thuần. Không cascade sang dữ liệu nghiệp vụ. Từng aggregate cần định nghĩa cụ thể dependency/activity và quan hệ nào thật sự là liên kết thuần cùng test trước khi triển khai; không suy luận rằng mọi bảng phụ đều được cascade.
 
 ---
 
