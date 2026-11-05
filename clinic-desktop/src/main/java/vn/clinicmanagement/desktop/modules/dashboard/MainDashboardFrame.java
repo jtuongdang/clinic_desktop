@@ -15,7 +15,6 @@ import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.desktop.modules.billing.BillingInvoicePanel;
 import vn.clinicmanagement.desktop.modules.catalog.CatalogPanel;
 import vn.clinicmanagement.desktop.modules.doctor.DoctorStationPanel;
-import vn.clinicmanagement.desktop.modules.examination.ExaminationPanel;
 import vn.clinicmanagement.desktop.modules.home.HomeWelcomePanel;
 import vn.clinicmanagement.desktop.modules.paraclinical.ParaclinicalOrderPanel;
 import vn.clinicmanagement.desktop.modules.pharmacy.PharmacyDispensePanel;
@@ -163,8 +162,6 @@ public class MainDashboardFrame extends JFrame {
                 () -> workspaceManager.openView(new SystemConfigPanel()));
         addModuleButton(ribbon, "catalog", "Danh Mục", "📑",
                 () -> workspaceManager.openView(new CatalogPanel()));
-        addModuleButton(ribbon, "examination", "Khám Bệnh", "🩺",
-                () -> workspaceManager.openView(new ExaminationPanel()));
         addModuleButton(ribbon, "billing", "Viện Phí", "💳",
                 () -> workspaceManager.openView(new BillingInvoicePanel()));
         addModuleButton(ribbon, "paraclinical", "CĐHA Và Thăm Dò", "🩻",

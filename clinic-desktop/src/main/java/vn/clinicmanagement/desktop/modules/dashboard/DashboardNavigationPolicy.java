@@ -37,7 +37,6 @@ final class DashboardNavigationPolicy {
         grants.put("treatment", Set.of("EMR"));
         grants.put("system", Set.of("SYSTEM"));
         grants.put("catalog", Set.of("CATALOG"));
-        grants.put("examination", Set.of("PATIENT"));
         grants.put("billing", Set.of("BILLING"));
         grants.put("paraclinical", Set.of("CLS"));
         grants.put("pharmacy", Set.of("PRESCRIPTION", "INVENTORY"));

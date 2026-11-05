@@ -15,15 +15,15 @@ class DashboardNavigationPolicyTest {
                 Set.of("home", "catalog", "system"));
         assertNavigation("DOCTOR", Set.of("HOME", "PATIENT", "RECEPTION", "APPOINTMENT", "EMR",
                         "CLS", "PRESCRIPTION", "INVENTORY", "BILLING", "CATALOG"),
-                Set.of("home", "examination", "reception", "treatment", "paraclinical", "pharmacy", "billing", "catalog"));
+                Set.of("home", "reception", "treatment", "paraclinical", "pharmacy", "billing", "catalog"));
         assertNavigation("RECEPTIONIST", Set.of("HOME", "PATIENT", "RECEPTION", "APPOINTMENT", "CATALOG"),
-                Set.of("home", "examination", "reception", "catalog"));
+                Set.of("home", "reception", "catalog"));
         assertNavigation("PHARMACIST", Set.of("HOME", "PATIENT", "PRESCRIPTION", "INVENTORY", "CATALOG"),
-                Set.of("home", "examination", "pharmacy", "catalog"));
+                Set.of("home", "pharmacy", "catalog"));
         assertNavigation("CASHIER", Set.of("HOME", "PATIENT", "APPOINTMENT", "CLS", "BILLING", "CATALOG"),
-                Set.of("home", "examination", "paraclinical", "billing", "catalog"));
+                Set.of("home", "paraclinical", "billing", "catalog"));
         assertNavigation("LAB_TECH", Set.of("HOME", "PATIENT", "CLS", "CATALOG"),
-                Set.of("home", "examination", "paraclinical", "catalog"));
+                Set.of("home", "paraclinical", "catalog"));
     }
 
     @Test
@@ -36,6 +36,12 @@ class DashboardNavigationPolicyTest {
                 Set.of("UNKNOWN", "APPOINTMENT", "REPORTS", "AUDIT")).isEmpty());
         assertTrue(DashboardNavigationPolicy.visibleNavigationKeys(1, "ADMIN", Set.of("INVENTORY")).isEmpty(),
                 "A combined pharmacy panel requires both of its approved module grants.");
+    }
+
+    @Test
+    void patientReadGrantDoesNotExposeClinicalExaminationPanel() {
+        assertTrue(DashboardNavigationPolicy.visibleNavigationKeys(9, "RECEPTIONIST",
+                Set.of("PATIENT")).isEmpty());
     }
 
     @Test
