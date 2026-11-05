@@ -64,7 +64,7 @@ Các test Swing/headless xác minh hành vi component được kiểm thử, kh�
 
 ## 4. README và hướng dẫn sử dụng
 
-Root `README.md` đã có hướng dẫn onboarding cơ bản: yêu cầu Java/Maven, cấu hình SQL Server qua biến môi trường hoặc file local mẫu, chạy migration và build Maven. Vì vậy, nhận định ngày 04/11 rằng không có README onboarding là sai. README vẫn cần được đối chiếu/cập nhật theo quy trình chạy hiện tại và không thay thế runbook triển khai/vận hành. Tài liệu README có nhắc thông tin đăng nhập seed demo; báo cáo này không sao chép giá trị đó.
+Root `README.md` có hướng dẫn onboarding và hiện chỉ rõ lệnh build artifact desktop, chạy migration runner từ shaded JAR và mở ứng dụng bằng `java -jar`. Cấu hình local qua IntelliJ hoặc biến môi trường được phân biệt; artifact đã được kiểm tra có `Main-Class`, có migration runner và chỉ chứa `db.properties.example` (không chứa `db.properties`). Đây là kiểm tra cấu trúc artifact, không phải một lượt khởi động ứng dụng hoặc migration trên database. README không thay thế runbook triển khai/vận hành. Tài liệu README có nhắc tài khoản/mật khẩu seed demo; báo cáo này không sao chép giá trị đó.
 
 ## 5. Trạng thái roadmap
 
