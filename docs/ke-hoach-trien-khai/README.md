@@ -36,6 +36,7 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [Phase 1 — Review tiền sử lâm sàng](phase1-tiensuben-review.md) | Đối chiếu policy bác sĩ ghi/sửa với scope, lượt khám, audit, khóa EMR và các quyết định Owner còn thiếu. |
 | [Phase 3 — Review vòng đời lượt khám](phase3-visit-lifecycle-review.md) | Map policy hủy/chuyển/sinh hiệu tới state machine, authorization, persistence, audit và màn hình hiện có. |
 | [Phase 0 — Review cấu hình DB và secret](phase0-db-config-review.md) | Đối chiếu precedence environment/config, TLS, logging và cách chạy JAR đóng gói; không truy cập DB hay secret. |
+| [Phase 0 — Contract testable DB configuration](phase0-db-config-resolution-contract.md) | Ghi nhận precedence hiện tại, call-order edge cases và test matrix cấu hình tổng hợp; chưa chọn TLS hay external-JAR policy. |
 | [03 — Tiếp đón, bệnh nhân, nhân sự](phan-he/03-tiep-don-benh-nhan-nhan-su.md) | Patient, insurance, identity, staff, shift/attendance. |
 | [04 — Lịch hẹn và khám/EMR](phan-he/04-lich-hen-kham-emr.md) | Appointment, visit, diagnosis, vitals, prescriptions, care plan. |
 | [05 — Dịch vụ và cận lâm sàng](phan-he/05-dich-vu-can-lam-sang.md) | Catalog services, orders, lab/imaging result workflow. |
