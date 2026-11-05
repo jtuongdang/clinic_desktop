@@ -38,7 +38,7 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Phụ thuộc:** Phase 1 và Phase 2.
 **Phạm vi:** `LichHen`, `NguonLich`, `LuotKham`, `SinhHieu`; đặt/đổi/hủy, check-in/no-show, queue lifecycle, vitals.
 **Còn lại:** chống tạo lượt khám trùng; ghi người/thời điểm đo; chuyển trạng thái hợp lệ; quyền theo phạm vi và audit; persist/reload/concurrency tests.
-**Task review đang chạy:** `VIS-REVIEW-01` (`fbe75a15-9ad0-4956-aa29-ea101c1fd714`, Codex) ánh xạ các quyết định đã duyệt về hủy lượt, chuyển khoa/phòng và sinh hiệu tới model, màn hình và persistence hiện có trước khi chia implementation tasks.
+**Review hoàn tất:** [`phase3-visit-lifecycle-review.md`](phase3-visit-lifecycle-review.md), task `VIS-REVIEW-01` (`fbe75a15-9ad0-4956-aa29-ea101c1fd714`, Codex, commit `8358d67`). Policy hủy/chuyển/sinh hiệu đã duyệt nhưng chưa có workflow; implementation cần bổ sung guard, persistence, audit và tests. Các luồng Phase 3 vẫn đóng tới khi security gate và các dependency nghiệp vụ được hoàn tất.
 
 ## Phase 4 — Clinical EMR
 
