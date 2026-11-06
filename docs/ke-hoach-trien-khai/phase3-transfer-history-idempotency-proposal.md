@@ -1,8 +1,56 @@
 # VIS-TRANSFER-HISTORY-REPLAY-PROPOSAL-01 — Transfer history and idempotent replay
 
-**Status: Non-binding proposal for Owner review only.** This document analyzes the two remaining choices under approved `VIS-TRANSFER-OWNER-DECISION-RECON-04`: transfer history and replay semantics. It does not approve or authorize a schema, code, audit-policy, permission, or runtime change. Transfer remains default-deny while SEC-01 and the required implementation evidence are open.
+**Status: Non-binding proposal for Owner review only.** The dated RECON-05 addendum below is the controlling statement of approved outcomes and remaining proposal choices. The original proposal is retained below as historical context; its options on history and replay outcomes are resolved by RECON-05. Nothing here approves or authorizes a schema, code, audit-policy, permission, or runtime change. Transfer remains default-deny; SEC-01 is **OPEN**.
 
-## 1. Fixed contract and current evidence
+## RECON-05 addendum — 2026-11-06 (approved contract and remaining choices)
+
+**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06. This addendum carries forward and does not reopen `VIS-TRANSFER-OWNER-DECISION-RECON-04`. It supersedes the historical alternatives and recommendations below wherever they concern decisions RECON-05 has resolved.
+
+### Approved facts — fixed outcomes, not implementation choices
+
+- Require both a dedicated immutable transfer-history record and a successful security audit event in the same database transaction as the transfer mutation and queue allocation. History and audit are separate required artifacts, not substitutes; if either required write fails, all writes in that transaction roll back together.
+- After a commit, a retry with the same key and same canonical payload reauthorizes the actor and returns only the stored operation receipt. It does not repeat allocation, transfer, history, or successful-audit side effects.
+- Reuse of the same key with a different payload returns a conflict without writes.
+- A timeout retry reuses the same key and resolves whether the original operation committed or rolled back before proceeding. A timeout alone is not proof of rollback.
+- These outcomes do not decide key scope/lifetime, canonical field list or normalization, exact receipt content, concurrent-wait deadline or indeterminate response, or reservation of denied/failed attempts.
+
+### Recommendations for unresolved implementation details (non-binding)
+
+| Decision area | Recommended option | Alternatives and tradeoffs |
+|---|---|---|
+| Key scope and lifetime | Scope a high-entropy operation key to one transfer operation and authenticated actor/source scope; retain the binding for a documented retry/reconciliation window, and never silently rebind or expire a key while an original result could still be unresolved. | A global namespace is simpler but risks cross-actor key collisions/disclosure; session-only scope complicates reconnect recovery. Short expiry reduces storage but can permit a delayed retry to repeat an operation; indefinite retention increases storage and privacy/retention burden. Owner must define scope and retention/expiry behavior. |
+| Key generation and storage | Generate an unpredictable key at the trusted client boundary once per user intent, persist it durably across retry/restart, and send the same key on every retry. Store a unique scoped key binding, canonical-payload fingerprint, outcome, and minimal receipt transactionally with success. Do not treat the key as authorization. | Server-generated keys require durable client recovery before a lost response; caller-selected keys need collision/quality controls. Fingerprint-only comparison minimizes stored payload but requires versioned canonicalization; retaining the full request simplifies diagnosis but increases sensitive-data exposure. |
+| Canonical payload | Define a versioned canonical form before implementation. Bind the visit identity and expected version; source and destination facility/department/room identities as applicable; reason code; optional note under an Owner-approved privacy/normalization rule; and any priority or other client-supplied mutable field. Explicitly classify server-derived fields such as `queueDate` and allocation result so retries cannot change the original command. | Binding fewer fields risks treating materially different commands as equal; binding volatile/server-derived fields can cause false conflicts. Specify Unicode, whitespace, null/empty, identifier, and version normalization consistently; do not normalize away meaningful note content. Owner must approve the exact field set and rules. |
+| Receipt minimization | Return only an opaque transfer/operation reference, committed outcome, and the minimum status needed to establish replay success. Avoid patient details, destination queue contents/numbers, reason note, and other data not necessary to confirm the original result. | A richer receipt aids client display and support but broadens disclosure on replay and can become stale. Any additional fields require explicit need and authorization review. |
+| Concurrent duplicates | Serialize on the scoped key and let duplicates wait for the original transaction up to an explicit bounded deadline. If resolved committed, return the stored receipt after reauthorization; if conclusively rolled back, permit the same-key request to proceed once. If still unresolved at deadline, return an explicitly indeterminate/retryable response and require retry with the same key. | Immediate conflict is easier but gives the client no resolution; unbounded wait risks tying up resources; racing without serialization can duplicate side effects. Exact wait/deadline and client response remain Owner decisions. |
+| Process/connection loss | Recover from durable committed key/receipt state using the same key. Where no conclusive outcome is visible, reconcile against the authoritative transaction state; absence of a visible receipt alone is not proof of rollback while the original may still be active or commit outcome unknown. Never proceed under a new key until resolved. | Client-side memory or audit correlation alone cannot reliably establish the outcome after restart. A separate reconciliation workflow is operable but needs explicit ownership, access control, and failure handling. |
+| Denied/failed attempts and purge | Do not reserve a key for authorization-denied or validation-rejected attempts; authorize and validate before any reservation with externally visible effect. Keep successful bindings through the approved retry/reconciliation retention window; purge only after that window and any required audit/history retention or legal hold, with a defined safe-reuse rule. Define separately whether a conclusively rolled-back attempt leaves a temporary reservation. | Reserving all attempts can block correction/retry and retain unnecessary data; reserving none can permit key guessing or noisy retry abuse unless rate-limited and monitored. Longer retention improves recovery but increases storage/privacy burden. Owner must decide reservation and purge details. |
+
+### Decision matrix and owner checklist
+
+| Topic | RECON-05 status | Owner decision still required |
+|---|---|---|
+| Transfer history and successful security audit | **Approved:** both required, separate artifacts; same transaction as mutation/allocation; failure of either rolls back the transaction. | No reopening of whether both are required. Implementation details and retention/access controls remain subject to separate approval. |
+| Equal-payload committed replay | **Approved:** reauthorize actor; return only stored receipt; do not repeat side effects. | Exact minimal receipt fields. |
+| Different-payload key reuse | **Approved:** conflict, no writes. | Conflict representation/message may be specified without changing outcome. |
+| Timeout and in-flight duplicate | **Approved:** same-key retry; resolve commit versus rollback first; timeout is not rollback proof. | Key scope/lifetime; wait deadline and indeterminate response; process/connection-loss reconciliation protocol. |
+| Key and canonical command binding | Not settled. | Scope; generation/storage; exact canonical fields and normalization/versioning; treatment of priority, optional note, and server-derived values. |
+| Denied/failed attempt reservation and data lifecycle | Not settled. | Which outcomes reserve a key, retention/expiry and safe reuse, purge/hold coordination with history and audit. |
+| Receipt and access | Outcome fixed; representation/access not settled. | Minimal fields, reauthorization checks, and any separate operational/support access rules. |
+
+Before any transfer implementation, the Owner must explicitly decide each open item in the final column, including how audit and immutable history retention/access are coordinated without conflating their purposes. The security audit records security attribution; transfer history records structured transfer facts. Neither replaces the other.
+
+### Synthetic validation scenarios (proposal; no runtime test executed)
+
+Use synthetic visit, actor, room, and key values only. Test concurrent same-key/same-payload submissions produce one committed mutation, allocation, history record, and successful audit, with later responses returning the stored receipt only after reauthorization. Test same-key/different-payload returns conflict with no additional writes. Inject timeout before commit and after commit, then retry with the same key and verify the outcome is resolved without duplicate effects; also simulate process/connection loss while commit status is indeterminate and ensure the client does not proceed using a new key. Inject history-write and audit-write failures independently and confirm all required transaction writes roll back. Test authorization revocation before replay, bounded duplicate wait/deadline, and denied/failed-attempt reservation and purge behavior once Owner decisions are made.
+
+**Gate:** These are non-binding design and test recommendations. No runtime implementation, schema, permission, grant, policy, or gate is approved here. **SEC-01 remains OPEN and transfer remains default-deny. Separate Owner approval and workflow acceptance are still required** before any implementation or runtime enablement.
+
+## Historical proposal snapshot — original RECON-04-era analysis, retained for context
+
+The alternatives and recommendations in Sections 2–4 below were written before RECON-05. They are historical only where superseded: history choice is resolved in favor of both immutable transfer history and successful security audit in one transaction; the replay/conflict/timeout outcomes are fixed by the addendum. Do not use any earlier alternatives below to reopen those outcomes. Recommendations about remaining implementation details are not approvals.
+
+## 1. Historical RECON-04 contract and evidence snapshot
 
 RECON-04 fixes transfer actor/scope, eligible visit states, destination-room requirements, new destination queue number with priority preserved, preserved visit status/`ngayKham`/examination timestamps, mandatory fixed reason code and optional short note, separate `queueDate` in `Asia/Ho_Chi_Minh`, linked-work preservation, UTC technical/audit metadata, and transaction/concurrency requirements. It leaves open exactly the history model and replay outcome, including reuse of one key with a different payload; neither may be inferred from earlier proposals ([decision-gap memo](phase3-visit-transfer-decision-gaps.md#L80-L92), [transfer contract review](phase3-visit-transfer-contract-review.md#L61-L70)).
 
@@ -15,7 +63,9 @@ Current audit evidence constrains the choices:
 - Prior linked-work review finds that although V1 can represent services, prescriptions/results, and billing records attached to a visit, the checked-in application lacks the readers/adapters needed to prove safe handoff. Transfer must remain fail-closed until that evidence exists ([linked-work review](phase3-transfer-linked-work-eligibility-review.md#L7-L16), [implementation gaps](phase3-transfer-linked-work-eligibility-review.md#L57-L65)).
 - The inventory `IdempotencyRecord` is a mutable domain model with a local-clock 24-hour default expiry; it has no demonstrated transfer consumer or durable replay path ([model](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/inventory/IdempotencyRecord.java#L5-L22), [prior persistence analysis](phase3-transfer-queue-history-persistence-proposal.md#L40-L45)).
 
-## 2. Transfer-history alternatives
+## 2. Historical transfer-history alternatives — resolved by RECON-05
+
+The options below record the pre-RECON-05 analysis only; they are not current Owner choices. RECON-05 requires both dedicated immutable transfer history and a successful security audit event in the same transaction.
 
 All three alternatives must preserve the approved append-only audit requirements and the transaction boundary. The successful visit/location/queue mutation, required audit event, and whichever history/receipt artifact Owner selects must commit or roll back together. The existing audit port has a current-transaction append path; using an independent connection for a success event would not satisfy that atomicity requirement ([`AuditWritePort`](../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditWritePort.java#L3-L10), [prior transaction proposal](phase3-transfer-queue-history-persistence-proposal.md#L75-L95)).
 
@@ -27,7 +77,9 @@ All three alternatives must preserve the approved append-only audit requirements
 
 **Non-binding recommendation for Owner consideration:** Prefer the **combined** approach if a later approved implementation needs both queryable visit transfer history and security attribution: keep structured before/after and receipt facts in an immutable transfer record, and emit the minimal successful audit event with stable linkage in the same transaction. Do not put clinical narrative or unrestricted note text in general audit payloads. Treat this as a design preference only; an Owner decision is required before implementation. This aligns with, but does not elevate to policy, the earlier persistence proposal's section 5 recommendation ([prior proposal](phase3-transfer-queue-history-persistence-proposal.md#L110-L119)).
 
-## 3. Replay alternatives and failure cases
+## 3. Historical replay alternatives and failure cases — outcomes resolved by RECON-05
+
+The following alternatives are retained to explain the earlier analysis, not to reopen the approved outcomes. The RECON-05 addendum controls equal-payload replay, different-payload conflict, and timeout retry semantics. The implementation details still open there remain proposals until Owner approval.
 
 Replay identity must be distinct from correlation: correlation joins events from an attempt, while an idempotency key identifies a caller's requested operation across retries. A persisted receipt/fingerprint is necessary for reliable recovery; neither the current audit schema nor the unused inventory model establishes that transfer capability. The exact key namespace, payload equality rules, lifetime, and authorization on replay remain Owner choices ([prior persistence proposal, section 6](phase3-transfer-queue-history-persistence-proposal.md#L120-L142)).
 
@@ -45,7 +97,9 @@ Under any selected replay policy, a key must not act as an authorization capabil
 
 **Non-binding recommendation for Owner consideration:** Bind one key to one canonical request in a clearly defined actor/operation scope. For a committed equal request, return its original minimal receipt without repeating side effects; for a different request under that key, reject without writes; after a timeout, retry only with the same key and resolve the committed receipt versus rolled-back attempt before proceeding. Require a later implementation contract to define canonicalization, key scope/lifetime, authorization, wait/unknown-outcome behavior, and whether failed attempts reserve keys. None of these replay outcomes is approved by RECON-04.
 
-## 4. Exact Owner decisions required
+## 4. Historical Owner decision list — superseded by RECON-05 addendum
+
+This list reflects the pre-RECON-05 snapshot and is not the current decision checklist. Items resolved by RECON-05 must not be reopened; consult the addendum above for the remaining Owner choices.
 
 Before any implementation, the Owner must explicitly decide:
 
