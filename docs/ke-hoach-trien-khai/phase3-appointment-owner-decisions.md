@@ -85,3 +85,45 @@ Các chính sách đã duyệt tiếp tục có hiệu lực: mỗi phiên có m
 - **FACT sources:** [appointment readiness review](phase3-appointment-readiness-review.md), especially its source map, lifecycle/concurrency, scope, conversion, time, audit/privacy, notification, and acceptance sections; `LichHen.java`, `TrangThaiLichHen.java`, `NguonLich.java`, `ILichHenRepository.java`, V1 appointment/visit DDL, and V8 approved-grants seed. These sources identify gaps; they do not supply the unresolved policy values.
 - **RAG-first record:** attempted project RAG retrieval before opening repository sources, but the sandbox denied permission to run the external RAG script and returned no excerpts. This addendum therefore uses the task-supplied guidance, the readiness review, and inspected source facts; it does not claim successful task-specific RAG retrieval. No cache/index workaround or database access was attempted.
 - This dated proposal is not an approval, grant change, schema/code change, or authorization to implement or enable appointments. Keep `SEC-01` **OPEN / default-deny**.
+
+## Addendum — Owner-approved action and capacity decisions (2026-11-06)
+
+**Contract:** `APPT-OWNER-DECISION-RECON-02` (`84c00d27-e4e1-463b-9964-67543c9ccb28`), Owner-confirmed 2026-11-06.
+
+**Status and effect:** The following decisions supersede the corresponding unresolved choices and recommendations in the historical proposal above. The original proposal text is retained as a historical snapshot; it is not itself approval. This addendum records policy decisions only: no grant, schema, runtime, patient-facing access, payment behavior, or workflow implementation is authorized. `SEC-01` remains **OPEN / default-deny**, and appointment implementation remains gated by the baseline and separate APPT workflow acceptance.
+
+### Approved action mapping
+
+- Existing `APPOINTMENT:XEM` means read only.
+- Existing `APPOINTMENT:TAO` allows creation only; a newly created appointment starts at `CHO_XAC_NHAN`.
+- Existing `APPOINTMENT:SUA` allows editing and rescheduling only.
+- Cancellation, confirmation, check-in, no-show/reversal, and conversion to `LuotKham` remain **DENY / unimplemented** until a separate action-specific policy, guard, and acceptance are approved.
+- `CASHIER:XEM` remains read only. No grant is added or broadened. All actions remain within the exact selected facility/department session scope. Patient self-service remains **DENY / unimplemented**.
+
+### Approved capacity basis
+
+- Capacity is one appointment per doctor at a time within the selected facility/department pair. Any overlapping interval for that doctor conflicts. Interpret intervals as half-open `[start,end)`: a booking ending exactly when the next starts is allowed.
+- A room is not required as an appointment capacity resource for this MVP basis; do not implicitly add room scheduling.
+- Overbooking is denied. No waitlist or exception role is approved.
+
+### Still unresolved before implementation
+
+These values and acceptance conditions are expressly not decided by this addendum and must not be inferred from the current schema, grants, or historical recommendations:
+
+- Required fields and source mapping.
+- Positive duration policy and appointment types; working hours, breaks, and holidays.
+- Which appointment statuses and soft-deleted records occupy capacity, and when capacity is released.
+- Reschedule limit; cancellation reason and cutoff policy.
+- Check-in window and late-arrival handling; no-show policy.
+- Conversion preconditions and idempotency.
+- Notifications, consent, and content.
+- Time-zone persistence details.
+- Audit and schema decisions, concurrency controls, and UI workflow acceptance.
+
+Appointment deposits, payments, refunds, and billing remain **DENY**.
+
+### Evidence and retrieval record
+
+- **FACT:** The inspected `LichHen` model defaults new appointments to `CHO_XAC_NHAN`; it has doctor, facility, nullable department, start/end, and payment-related fields. Its existing confirmation method is coupled to cash-deposit recording. `ILichHenRepository.countAppointmentsInSlot` accepts doctor and interval only; the status enum has no no-show status. These are source facts, not authorization or implementation.
+- **INFERENCE:** Existing model/repository shapes do not establish action guards, selected-pair enforcement, conflict serialization, or lifecycle acceptance. The approved capacity policy does not settle the explicitly open status/soft-delete capacity semantics.
+- **RAG-first:** Attempted project RAG retrieval before opening repository sources in this task. The sandbox denied permission to run the external retrieval script in non-interactive mode, so no task-specific excerpts were returned. This record uses the supplied approved contract and retrieved project evidence, plus read-only inspection of the appointment model, repository interface, status enum, and readiness review. No cache/index workaround or database access was attempted.
