@@ -52,7 +52,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * default {@code clinicDb} and fails closed when an unsafe or non-test target is supplied.
  * Requires only {@code CLINIC_TEST_SQLSERVER_URL}, {@code CLINIC_TEST_SQLSERVER_USERNAME},
  * and {@code CLINIC_TEST_SQLSERVER_PASSWORD}; application configuration is never a source.
- * The URL must explicitly select the exact database and must not contain credentials.
+ * The URL must explicitly select the exact database, require encryption and certificate
+ * validation via {@code encrypt=true;trustServerCertificate=false}, and contain no credentials.
  */
 class NhanVienRepositorySqlServerTest {
 
@@ -495,6 +496,10 @@ class NhanVienRepositorySqlServerTest {
                         + "credentials or alternate authentication");
             }
             String value = parameters.group(2).trim();
+            if ((normalizedName.equals("encrypt") && !value.equalsIgnoreCase("true"))
+                    || (normalizedName.equals("trustservercertificate") && !value.equalsIgnoreCase("false"))) {
+                throw new IllegalStateException("SQL Server test URL requires encrypt=true and trustServerCertificate=false");
+            }
             if (name.equalsIgnoreCase("databaseName") || name.equalsIgnoreCase("database")) {
                 databaseSelectors++;
                 if (value.startsWith("{")) {
@@ -510,6 +515,9 @@ class NhanVienRepositorySqlServerTest {
         }
         if (databaseSelectors != 1) {
             throw new IllegalStateException("SQL Server URL must explicitly select the synthetic database");
+        }
+        if (!propertyNames.containsAll(Set.of("encrypt", "trustservercertificate"))) {
+            throw new IllegalStateException("SQL Server test URL requires encrypt=true and trustServerCertificate=false");
         }
         return targetUrl.toString();
     }
@@ -533,10 +541,11 @@ class NhanVienSqlServerTargetGuardTest {
 
     private static final String DATABASE_NAME = "clinic_test_employee_guard";
     private static final String URL = "jdbc:sqlserver://synthetic-host:1433";
+    private static final String TLS = ";encrypt=true;trustServerCertificate=false";
 
     @Test
     void acceptsOneMatchingSelector_andPreservesTlsAndBracedValues() {
-        String tls = ";encrypt=true;trustServerCertificate=false;hostNameInCertificate=synthetic-host";
+        String tls = TLS + ";hostNameInCertificate=synthetic-host";
         String braced = ";applicationName={synthetic;database=clinicDb;escaped}}value}";
         assertEquals(URL + ";databaseName=" + DATABASE_NAME + braced + tls,
                 NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + ";databaseName=" + DATABASE_NAME
@@ -547,10 +556,51 @@ class NhanVienSqlServerTargetGuardTest {
     }
 
     @Test
+    void acceptsExplicitTlsWithoutHostnameOverride_andPreservesSettings() {
+        // Without hostNameInCertificate, JDBC validates the server name from the URL.
+        for (String tls : List.of(TLS, "; TrUsTsErVeRcErTiFiCaTe = FALSE ; EnCrYpT = TRUE ")) {
+            String configuredUrl = URL + ";databaseName=" + DATABASE_NAME + tls;
+            assertEquals(configuredUrl,
+                    NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(configuredUrl, DATABASE_NAME));
+        }
+    }
+
+    @Test
+    void rejectsMissingDisabledMalformedOrBypassTls_withoutExposingInputs() {
+        for (String tls : List.of("", ";encrypt=true", ";trustServerCertificate=false",
+                ";encrypt=false;trustServerCertificate=false",
+                ";encrypt=true;trustServerCertificate=true",
+                ";encrypt=false;trustServerCertificate=true",
+                ";encrypt=;trustServerCertificate=false",
+                ";encrypt=invalid_encryption_marker;trustServerCertificate=false",
+                ";encrypt=optional;trustServerCertificate=false",
+                ";encrypt=true;trustServerCertificate=",
+                ";encrypt=true;trustServerCertificate=invalid_certificate_marker",
+                ";encrypt={true;trustServerCertificate=false}",
+                TLS + ";ENCRYPT=false", TLS + ";TRUSTSERVERCERTIFICATE=true")) {
+            Map<String, String> inputs = Map.of(
+                    "CLINIC_TEST_SQLSERVER_URL", URL + ";databaseName=" + DATABASE_NAME
+                            + ";applicationName=synthetic_input_marker" + tls,
+                    "CLINIC_TEST_SQLSERVER_USERNAME", "synthetic_user_marker",
+                    "CLINIC_TEST_SQLSERVER_PASSWORD", "synthetic_secret_marker");
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                    () -> NhanVienRepositorySqlServerTest.testConnectionString(DATABASE_NAME, inputs::get));
+            for (String value : inputs.values()) {
+                assertFalse(failure.toString().contains(value), "Validation must not render test inputs");
+            }
+            for (String marker : List.of("synthetic-host", DATABASE_NAME, "synthetic_input_marker",
+                    "invalid_encryption_marker", "invalid_certificate_marker")) {
+                assertFalse(failure.toString().contains(marker), "Validation must not render URL values");
+            }
+            assertNull(failure.getCause());
+        }
+    }
+
+    @Test
     void usesOnlyDedicatedInputs_andEscapesCredentialsWithoutTrimmingSecrets() {
         List<String> requestedKeys = new ArrayList<>();
         Map<String, String> inputs = Map.of(
-                "CLINIC_TEST_SQLSERVER_URL", URL + ";databaseName=" + DATABASE_NAME,
+                "CLINIC_TEST_SQLSERVER_URL", URL + ";databaseName=" + DATABASE_NAME + TLS,
                 "CLINIC_TEST_SQLSERVER_USERNAME", "synthetic};user=other",
                 "CLINIC_TEST_SQLSERVER_PASSWORD", " synthetic};database=clinicDb;secret ");
         String connectionString = NhanVienRepositorySqlServerTest.testConnectionString(DATABASE_NAME, key -> {
@@ -561,7 +611,7 @@ class NhanVienSqlServerTargetGuardTest {
                 "CLINIC_TEST_SQLSERVER_PASSWORD"), new HashSet<>(requestedKeys));
         assertEquals(3, requestedKeys.size());
         // Use a boolean assertion so a failure cannot render credential-bearing strings.
-        assertTrue((URL + ";databaseName=" + DATABASE_NAME
+        assertTrue((URL + ";databaseName=" + DATABASE_NAME + TLS
                 + ";user={synthetic}};user=other};password={ synthetic}};database=clinicDb;secret }")
                 .equals(connectionString), "Dedicated credentials must be escaped and preserved");
     }
@@ -569,7 +619,7 @@ class NhanVienSqlServerTargetGuardTest {
     @Test
     void rejectsMissingOrBlankDedicatedInputs_evenWhenApplicationEnvironmentIsComplete() {
         Map<String, String> complete = Map.of(
-                "CLINIC_TEST_SQLSERVER_URL", URL + ";databaseName=" + DATABASE_NAME,
+                "CLINIC_TEST_SQLSERVER_URL", URL + ";databaseName=" + DATABASE_NAME + TLS,
                 "CLINIC_TEST_SQLSERVER_USERNAME", "synthetic_user_marker",
                 "CLINIC_TEST_SQLSERVER_PASSWORD", "synthetic_secret_marker");
         for (String missingKey : complete.keySet()) {
@@ -601,7 +651,7 @@ class NhanVienSqlServerTargetGuardTest {
                 URL + ";databaseName=" + DATABASE_NAME + ";database=" + DATABASE_NAME,
                 "jdbc:postgresql://synthetic-host/" + DATABASE_NAME,
                 "jdbc:sqlserver://;databaseName=" + DATABASE_NAME)) {
-            Map<String, String> inputs = Map.of("CLINIC_TEST_SQLSERVER_URL", url,
+            Map<String, String> inputs = Map.of("CLINIC_TEST_SQLSERVER_URL", url + TLS,
                     "CLINIC_TEST_SQLSERVER_USERNAME", "synthetic_user_marker",
                     "CLINIC_TEST_SQLSERVER_PASSWORD", "synthetic_secret_marker");
             IllegalStateException failure = assertThrows(IllegalStateException.class,
@@ -622,7 +672,7 @@ class NhanVienSqlServerTargetGuardTest {
                 ";accessTokenCallbackClass=synthetic", ";encrypt=true;ENCRYPT=false")) {
             assertThrows(IllegalStateException.class,
                     () -> NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(
-                            URL + ";databaseName=" + DATABASE_NAME + properties, DATABASE_NAME));
+                            URL + ";databaseName=" + DATABASE_NAME + TLS + properties, DATABASE_NAME));
         }
     }
 
@@ -636,7 +686,7 @@ class NhanVienSqlServerTargetGuardTest {
                 ";password={synthetic;databaseName=" + DATABASE_NAME + "}",
                 ";databaseName=" + DATABASE_NAME + ";password={unterminated")) {
             assertThrows(IllegalStateException.class,
-                    () -> NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + properties, DATABASE_NAME));
+                    () -> NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + properties + TLS, DATABASE_NAME));
         }
         assertThrows(AssertionError.class,
                 () -> NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + ";databaseName=clinicDb", "clinicDb"));
