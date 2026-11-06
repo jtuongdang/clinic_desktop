@@ -1,14 +1,22 @@
 # SEC-01 — Baseline acceptance theo Definition A
 
 **Ngày cập nhật:** 06/11/2026
-**Trạng thái:** `[~]` — manual desktop visual smoke là hạng mục nghiệm thu duy nhất còn lại của Definition A (chưa hoàn tất visual smoke; không tuyên bố thành công trực quan).
+**Trạng thái hiện tại** `[~]`. Desktop cần nối lại xác thực, phiên và các đường nghiệp vụ đã có sau khi khôi phục từ `main`. Sau khi build và kiểm thử lại các đường nối này, cần thực hiện visual smoke theo Definition A.
 **Gate được Owner duyệt:** Definition A; các workflow tương lai (transfer, appointment, EMR, CLS, pharmacy, inventory, billing, HR/admin) tiếp tục default-deny cho đến khi có acceptance riêng và không phải điều kiện chặn đóng baseline SEC-01.
 
 ## Phạm vi baseline
 
 Baseline này xác nhận identity/session, default-deny, grant đã duyệt, các đường đọc/ghi tiếp đón hiện có, audit và giao diện bảo mật trong phạm vi đã triển khai. Không xác nhận transfer, billing, EMR, CLS, pharmacy, inventory, appointment deposit, audit reader hoặc quản trị tài khoản. Những workflow đó phải tiếp tục bị từ chối/không có đường gọi cho tới khi acceptance riêng đạt.
 
-## Checklist và bằng chứng
+## Bằng chứng trên nhánh sau khôi phục
+
+- `982c1f6` khôi phục `clinic-desktop` từ `main` (`6aabb85`). Domain, Application và Infrastructure giữ nguyên tại lần khôi phục. Các lớp và test Desktop đã bỏ được đối chiếu trong [báo cáo bảo toàn thiết kế](desktop-main-ui-preservation-review.md).
+- `mvn -Djava.awt.headless=true clean test` dừng tại Desktop do lời gọi constructor `AuthenticateUserHandler` cũ và hai lời gọi `AuthenticatedUser.roleName()`. Cần khôi phục luồng hoàn tất đăng nhập với một vai trò và đúng cặp cơ sở/khoa trước khi mở dashboard. [Báo cáo tương thích xác thực Desktop](desktop-main-auth-compatibility-review.md)
+- Bản `main` chạy riêng để Owner kiểm tra thiết kế. Visual smoke nghiệm thu bảo mật phải dùng bản ứng viên có luồng xác thực và phân quyền đã nối, với dữ liệu synthetic theo quy trình chạy UI thủ công. [Hướng dẫn chạy UI](phase1-doctor-ui-visual-smoke-runbook.md)
+
+## Checklist và bằng chứng trước khôi phục
+
+Các dòng PASS bên dưới là snapshot trước `982c1f6`. Đối chiếu lại bằng chứng trên commit ứng viên trước khi áp dụng cho lần nghiệm thu mới.
 
 | Hạng mục | Trạng thái | Bằng chứng / giới hạn |
 |---|---|---|
@@ -31,4 +39,4 @@ Baseline này xác nhận identity/session, default-deny, grant đã duyệt, c�
 
 ## Điều kiện đóng SEC-01
 
-Thực hiện và ghi nhận manual desktop visual smoke ở trên — đây là hạng mục nghiệm thu Definition A duy nhất còn mở. Sau khi đạt, cập nhật checklist cùng revision/build và đổi SEC-01 sang complete nếu không có regression mới. Không yêu cầu triển khai transfer, billing, CLS, pharmacy, inventory hoặc các workflow tương lai để đóng Definition A; các workflow tương lai tiếp tục default-deny cho đến khi có acceptance riêng.
+Khôi phục luồng Desktop theo Definition A, chạy lại build và các kiểm thử liên quan trên commit ứng viên, rồi ghi kết quả manual visual smoke cùng revision. Chỉ đóng SEC-01 khi toàn bộ checklist trên commit đó đạt. Không yêu cầu triển khai transfer, billing, CLS, pharmacy, inventory hoặc các workflow tương lai để đóng Definition A; các workflow tương lai tiếp tục default-deny cho đến khi có acceptance riêng.
