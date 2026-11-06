@@ -138,3 +138,24 @@ In accordance with project conventions, the following guidance and documentation
 12. `docs/ke-hoach-trien-khai/phase2-auth-persistence-review.md`
 13. `docs/ke-hoach-trien-khai/phase2-authz-enforcement-review.md`
 14. `docs/ke-hoach-trien-khai/phase2-login-throttle-implementation-review.md`
+
+---
+
+## 7. Dated addendum — TLS fixture guard reconciliation (2026-11-06)
+
+This addendum preserves the review above as its original historical snapshot. **FINDING-TEST-01** described the then-current gap and retains its original **Medium** severity as a historical assessment; it is now **resolved at the synthetic test-fixture URL-guard boundary only**, by integrated commit `45bd425` (task `d76d146d-b4ea-4e40-8057-835e38b5c4e4`).
+
+The accepted contract `PHASE0-DB-DEPLOY-DECISION-RECON-02` still requires encrypted SQL Server connections and certificate plus server-identity validation, rejects `trustServerCertificate` bypass, and requires failures for invalid/untrusted/expired/mismatched certificates ([resolution contract, line 9](phase0-db-config-resolution-contract.md#L9)). The current `syntheticDatabaseUrl` guard rejects non-`true` `encrypt` and non-`false` `trustServerCertificate` values (lines 498–502), then requires both properties (lines 516–520); it also rejects malformed URL properties (lines 486–488) ([current fixture source, lines 463–522](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L463-L522)). `NhanVienSqlServerTargetGuardTest` accepts valid explicit TLS properties (lines 546–565) and rejects missing, disabled, malformed, or bypass values with synthetic inputs (lines 568–585) ([guard tests](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L546-L585)).
+
+This evidence establishes URL-guard behavior only. Microsoft documents `encrypt=true` as requesting TLS encryption and describes certificate-name validation when `trustServerCertificate=false` as JDBC connection-property behavior ([Microsoft JDBC connection properties: `encrypt`, `hostNameInCertificate`](https://learn.microsoft.com/en-us/sql/connect/jdbc/setting-the-connection-properties?view=sql-server-ver17#encrypt)). That mechanism description is not evidence of a negotiated TLS handshake, certificate-chain/name validation against a live server, or employee SQL persistence acceptance. No SQL Server was connected for this reconciliation; **FINDING-TEST-02 therefore remains Low / Informational and live employee persistence remains unverified**. The supplied full JDK 17 validation result for the integrated change was 443 tests, 0 failures/errors, 6 SQL Server opt-in skips, and 77 Surefire XML reports; these test results do not constitute live database or TLS-handshake acceptance. **FINDING-TEST-03 remains Low / Informational**, unchanged by this evidence.
+
+No database, local properties, or credentials were accessed for this documentation change.
+
+### Guidance read for this addendum
+
+- `docs/PROJECT_CONVENTIONS.md` (Orchestrator baseline supplied in the task)
+- `README.md`, `DOMAIN_ANALYSIS.md`, and `ERD_DIAGRAM.md` (supplied in the task)
+- `docs/ke-hoach-trien-khai/phase0-repository-contract-review.md` (retrieved excerpt supplied in the task)
+- `docs/ke-hoach-trien-khai/phase0-db-test-isolation-review.md` (target review and retrieved excerpts supplied in the task)
+- `docs/ke-hoach-trien-khai/phase0-db-config-resolution-contract.md` and `docs/ke-hoach-trien-khai/phase0-deployment-config-tls-decision-proposal.md` (retrieved excerpts supplied in the task)
+- Microsoft Learn, *Set the Connection Properties - JDBC Driver for SQL Server* (connection-property mechanism reference)
