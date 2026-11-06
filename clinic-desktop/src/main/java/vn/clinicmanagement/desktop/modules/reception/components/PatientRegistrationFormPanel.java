@@ -19,6 +19,7 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -72,6 +73,9 @@ public class PatientRegistrationFormPanel extends JPanel {
     private final JTextField txtFiveYearDate = input(92);
 
     private final Map<String, PhongKham> roomsByName = new HashMap<>();
+    // Keep only the draft's ID while protected catalog data is cleared. Null means a fresh draft;
+    // zero means an empty choice, which must never fall back to a different room automatically.
+    private Integer draftClinicRoomId;
     private BenhNhan selectedPatient;
     private BaoHiem selectedInsurance;
     private Consumer<String> onClinicRoomChanged;
@@ -223,12 +227,29 @@ public class PatientRegistrationFormPanel extends JPanel {
     }
 
     public void setClinicRooms(List<PhongKham> rooms) {
-        roomsByName.clear();
+        clearClinicRooms();
         if (rooms != null) rooms.forEach(room -> roomsByName.put(room.getTenPhong(), room));
         String[] names = roomsByName.keySet().stream().sorted(String.CASE_INSENSITIVE_ORDER).toArray(String[]::new);
         chooserClinicRoom.setItems(names);
-        chooserClinicRoom.setText(names.length == 0 ? "" : names[0]);
-        if (onClinicRoomChanged != null && names.length > 0) onClinicRoomChanged.accept(names[0]);
+        String selected = draftClinicRoomId == null ? (names.length == 0 ? "" : names[0])
+                : roomsByName.values().stream().filter(room -> Objects.equals(room.getId(), draftClinicRoomId))
+                        .map(PhongKham::getTenPhong).findFirst().orElse("");
+        chooserClinicRoom.setText(selected);
+        draftClinicRoomId = selectedClinicRoomId();
+        if (onClinicRoomChanged != null) onClinicRoomChanged.accept(selected.isEmpty() ? null : selected);
+    }
+
+    public void clearClinicRooms() {
+        if (!roomsByName.isEmpty()) draftClinicRoomId = selectedClinicRoomId();
+        roomsByName.clear();
+        chooserClinicRoom.setItems(new String[0]);
+        chooserClinicRoom.setText("");
+        if (onClinicRoomChanged != null) onClinicRoomChanged.accept(null);
+    }
+
+    public void discardClinicRoomSelection() {
+        clearClinicRooms();
+        draftClinicRoomId = null;
     }
 
     public void setClinicalServices(List<String> services) {

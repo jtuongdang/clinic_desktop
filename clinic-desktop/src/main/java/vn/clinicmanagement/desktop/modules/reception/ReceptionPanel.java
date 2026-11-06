@@ -150,6 +150,7 @@ public class ReceptionPanel extends BaseViewPanel implements SessionLifecycleSer
                 || (context != null && observedSession != null
                 && !context.equals(observedSession) && !resumedDraft)) {
             formPanel.clearForm();
+            formPanel.discardClinicRoomSelection();
             clearSearchInput(formPanel);
         }
         if (context != null || state == SessionLifecycleService.State.LOGGED_OUT) observedSession = context;
@@ -186,7 +187,7 @@ public class ReceptionPanel extends BaseViewPanel implements SessionLifecycleSer
 
     private void clearProtectedReads() {
         if (activeDialog != null) activeDialog.dispose();
-        formPanel.setClinicRooms(List.of());
+        formPanel.clearClinicRooms();
         statusPanel.setQueue(List.of());
         statusPanel.setRoomSummaries(List.of());
         statusPanel.setSelectedClinicRoom(null);
@@ -234,7 +235,7 @@ public class ReceptionPanel extends BaseViewPanel implements SessionLifecycleSer
             clearProtectedReads();
             return;
         }
-        formPanel.setClinicRooms(List.of());
+        formPanel.clearClinicRooms();
         statusPanel.setQueue(List.of());
         statusPanel.setRoomSummaries(List.of());
         topToolbar.setNextQueueNumber(null);
