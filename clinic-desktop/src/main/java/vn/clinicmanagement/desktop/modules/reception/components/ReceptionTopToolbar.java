@@ -19,6 +19,11 @@ import java.awt.geom.RoundRectangle2D;
  */
 public class ReceptionTopToolbar extends JPanel {
 
+    private JButton btnRefresh;
+    private JButton btnNew;
+    private Runnable onRefresh;
+    private Runnable onNew;
+
     public ReceptionTopToolbar() {
         setLayout(new BorderLayout());
         setPreferredSize(new Dimension(1000, 50));
@@ -31,8 +36,16 @@ public class ReceptionTopToolbar extends JPanel {
 
         leftGroup.add(createActionButton("Menu", ReceptionIcons.createMenuIcon()));
         leftGroup.add(createActionButton("In", ReceptionIcons.createPrintIcon()));
-        leftGroup.add(createActionButton("Làm Mới", ReceptionIcons.createRefreshIcon()));
-        leftGroup.add(createActionButton("Bệnh Nhân Mới", ReceptionIcons.createNewPatientIcon()));
+        btnRefresh = createActionButton("Làm Mới", ReceptionIcons.createRefreshIcon());
+        btnNew = createActionButton("Bệnh Nhân Mới", ReceptionIcons.createNewPatientIcon());
+        btnRefresh.addActionListener(e -> {
+            if (onRefresh != null) onRefresh.run();
+        });
+        btnNew.addActionListener(e -> {
+            if (onNew != null) onNew.run();
+        });
+        leftGroup.add(btnRefresh);
+        leftGroup.add(btnNew);
         leftGroup.add(createActionButton("Nhập Thẻ BH", ReceptionIcons.createAddInsuranceIcon()));
         leftGroup.add(createActionButton("Kiểm Tra Thẻ BH", ReceptionIcons.createVerifyCardIcon()));
 
@@ -97,6 +110,14 @@ public class ReceptionTopToolbar extends JPanel {
 
         add(leftGroup, BorderLayout.WEST);
         add(rightGroup, BorderLayout.EAST);
+    }
+
+    public void setOnRefresh(Runnable listener) {
+        this.onRefresh = listener;
+    }
+
+    public void setOnNew(Runnable listener) {
+        this.onNew = listener;
     }
 
     private JButton createActionButton(String title, Icon icon) {

@@ -1,6 +1,14 @@
 package vn.clinicmanagement.desktop.modules.reception.components;
 
+import vn.clinicmanagement.application.audit.AuditActorContext;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.reception.RegisterPatientCommand;
 import vn.clinicmanagement.desktop.core.config.AppFonts;
+import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
+import vn.clinicmanagement.domain.common.enums.GioiTinh;
+import vn.clinicmanagement.domain.patient.BaoHiem;
+import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.domain.facility.PhongKham;
 
 import javax.swing.*;
 import javax.swing.border.CompoundBorder;
@@ -9,6 +17,15 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BiConsumer;
 
 /**
  * Khung nhập liệu thông tin bệnh nhân và thông tin thẻ BHYT.
@@ -54,6 +71,52 @@ public class PatientRegistrationFormPanel extends JPanel {
 
     private MedicalPopupChooser chooserService;
     private MedicalPopupChooser chooserClinicRoom;
+    private final List<PhongKham> clinicRooms = new ArrayList<>();
+    private Integer patientId;
+    private BiConsumer<String, String> onSearchListener;
+
+    private JComboBox<String> cbDoiTuong;
+    private JCheckBox chkUuTien;
+    private JTextField txtPhoneSearch;
+    private JTextField txtCccdSearch;
+    private JTextField txtMaBn;
+    private JTextField txtHoTen;
+    private JComboBox<String> cbGioiTinh;
+    private JTextField txtDay;
+    private JTextField txtMonth;
+    private JTextField txtYear;
+    private JTextField txtNoiSinh;
+    private JTextField txtSoNhaThonPho;
+    private JTextField txtAdministrativeCode;
+    private JLabel lblAddress;
+    private JTextField txtJob;
+    private JTextField txtPhone;
+    private JTextField txtEmail;
+    private JComboBox<String> cbDanToc;
+    private JComboBox<String> cbQuocTich;
+    private JTextField txtCccd;
+    private JTextField txtCccdD;
+    private JTextField txtCccdM;
+    private JTextField txtCccdY;
+    private JTextField txtNoiCap;
+    private JTextField txtWork;
+    private JComboBox<String> cbDkKham;
+    private JTextField txtTime;
+    private JTextField txtReason;
+    private JCheckBox chkCoGiayKhaiSinh;
+    private JCheckBox chkKhongGiuThe;
+    private final JTextField[] insuranceNumberFields = new JTextField[4];
+    private JComboBox<String> cbNoiSong;
+    private JTextField txtInsuranceFacilityCode;
+    private JTextField txtInsuranceFacilityName;
+    private JTextField txtInsuranceStartDate;
+    private JTextField txtInsuranceEndDate;
+    private JTextField txtDiaChiThe;
+    private JComboBox<String> cbTuyen;
+    private JLabel lblRate;
+    private JCheckBox chkKhongCungChiTra;
+    private final JTextField[] insuranceExemptionDateFields = new JTextField[3];
+    private final JTextField[] insuranceFiveYearDateFields = new JTextField[3];
 
     public PatientRegistrationFormPanel() {
         setLayout(new BorderLayout());
@@ -70,11 +133,11 @@ public class PatientRegistrationFormPanel extends JPanel {
 
         JLabel lblDoiTuong = new JLabel("Đối tượng:");
         lblDoiTuong.setFont(AppFonts.BODY_BOLD);
-        JComboBox<String> cbDoiTuong = new JComboBox<>(new String[]{"Viện phí", "BHYT", "Dịch vụ"});
+        cbDoiTuong = new JComboBox<>(new String[]{"Viện phí", "BHYT", "Dịch vụ"});
         cbDoiTuong.setFont(AppFonts.BODY);
         cbDoiTuong.setPreferredSize(new Dimension(95, 20));
 
-        JCheckBox chkUuTien = new JCheckBox("ĐN vn tiền");
+        chkUuTien = new JCheckBox("ĐN vn tiền");
         chkUuTien.setFont(AppFonts.SMALL_BOLD);
         chkUuTien.setForeground(new Color(205, 35, 35)); // Màu đỏ chuẩn
         chkUuTien.setOpaque(false);
@@ -85,11 +148,13 @@ public class PatientRegistrationFormPanel extends JPanel {
 
         JLabel lblPhone = new JLabel("Số điện thoại:");
         lblPhone.setFont(AppFonts.BODY);
-        JTextField txtPhoneSearch = createInput(80, 22);
+        txtPhoneSearch = createInput(80, 22);
 
         JLabel lblCccdSearch = new JLabel("Số CCCD:");
         lblCccdSearch.setFont(AppFonts.BODY);
-        JTextField txtCccdSearch = createInput(110, 22);
+        txtCccdSearch = createInput(110, 22);
+        txtPhoneSearch.addActionListener(e -> fireSearch());
+        txtCccdSearch.addActionListener(e -> fireSearch());
 
         searchBar.add(lblDoiTuong);
         searchBar.add(cbDoiTuong);
@@ -135,6 +200,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         formContainer.add(columns, BorderLayout.CENTER);
 
         add(formContainer, BorderLayout.CENTER);
+        txtTime.setText(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")));
     }
 
     /** Cột trái: Thông tin hành chính bệnh nhân */
@@ -146,13 +212,11 @@ public class PatientRegistrationFormPanel extends JPanel {
         // Dòng 1: Mã BN, Họ và tên
         JPanel r1 = createRowPanel();
         r1.add(createLabel("Mã BN:", 65));
-        JTextField txtMaBn = createInput(100, 22);
-        txtMaBn.setText("22000326");
+        txtMaBn = createInput(100, 22);
         txtMaBn.setFont(AppFonts.BODY_BOLD);
         r1.add(txtMaBn);
         r1.add(createLabel("Họ và tên:"));
-        JTextField txtHoTen = createInput(285, 22);
-        txtHoTen.setText("NGUYỄN THỊ LIÊN");
+        txtHoTen = createInput(285, 22);
         txtHoTen.setFont(AppFonts.BODY_BOLD);
         r1.add(txtHoTen);
         p.add(r1);
@@ -160,7 +224,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         // Dòng 2: Giới tính, Ngày sinh (3 ô), 22 tuổi, Nơi sinh
         JPanel r2 = createRowPanel();
         r2.add(createLabel("Giới tính:", 65));
-        JComboBox<String> cbGioiTinh = new JComboBox<>(new String[]{"Nữ", "Nam"});
+        cbGioiTinh = new JComboBox<>(new String[]{"Nữ", "Nam"});
         cbGioiTinh.setFont(AppFonts.BODY);
         cbGioiTinh.setPreferredSize(new Dimension(100, 20));
         r2.add(cbGioiTinh);
@@ -168,9 +232,9 @@ public class PatientRegistrationFormPanel extends JPanel {
         r2.add(createLabel("Ngày sinh:", 63));
         JPanel birthDateFields = new JPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
         birthDateFields.setOpaque(false);
-        JTextField txtDay = createInput(26, 22); txtDay.setText("25"); txtDay.setHorizontalAlignment(SwingConstants.CENTER);
-        JTextField txtMonth = createInput(26, 22); txtMonth.setText("10"); txtMonth.setHorizontalAlignment(SwingConstants.CENTER);
-        JTextField txtYear = createInput(44, 22); txtYear.setText("2000"); txtYear.setHorizontalAlignment(SwingConstants.CENTER);
+        txtDay = createInput(26, 22); txtDay.setHorizontalAlignment(SwingConstants.CENTER);
+        txtMonth = createInput(26, 22); txtMonth.setHorizontalAlignment(SwingConstants.CENTER);
+        txtYear = createInput(44, 22); txtYear.setHorizontalAlignment(SwingConstants.CENTER);
         birthDateFields.add(txtDay);
         birthDateFields.add(txtMonth);
         birthDateFields.add(txtYear);
@@ -185,7 +249,7 @@ public class PatientRegistrationFormPanel extends JPanel {
 
         r2.add(Box.createHorizontalStrut(72));
         r2.add(createLabel("Nơi sinh:", 56));
-        JTextField txtNoiSinh = createInput(216, 22); txtNoiSinh.setText("bắc ninh");
+        txtNoiSinh = createInput(216, 22);
         r2.add(txtNoiSinh);
         p.add(r2);
 
@@ -193,14 +257,17 @@ public class PatientRegistrationFormPanel extends JPanel {
         JPanel r3 = createRowPanel();
         r3.setLayout(new FlowLayout(FlowLayout.LEFT, 3, 0));
         r3.add(createLabel("SN/thôn/phố:", 77));
-        r3.add(createInput(100, 22));
+        txtSoNhaThonPho = createInput(100, 22);
+        r3.add(txtSoNhaThonPho);
         r3.add(createLabel("Ty/Hộ/Xp:", 61));
-        r3.add(createInput(100, 22));
+        txtAdministrativeCode = createInput(100, 22);
+        r3.add(txtAdministrativeCode);
 
-        r3.add(createLabel("Bắc Ninh - H. Quế Võ - Thị trấn Phố Mới", 304));
+        lblAddress = createLabel("", 304);
+        r3.add(lblAddress);
 
         r3.add(createLabel("Nghề nghiệp:"));
-        JTextField txtJob = createInput(65, 22); txtJob.setText("Nhân dân");
+        txtJob = createInput(65, 22);
         r3.add(txtJob);
         r3.add(createBrowseButton());
         p.add(r3);
@@ -208,19 +275,20 @@ public class PatientRegistrationFormPanel extends JPanel {
         // Dòng 4: Điện thoại, Email, Dân tộc, Quốc tịch
         JPanel r4 = createRowPanel();
         r4.add(createLabel("Điện thoại:", 65));
-        JTextField txtPhone = createInput(100, 22); txtPhone.setText("012345678");
+        txtPhone = createInput(100, 22);
         r4.add(txtPhone);
         r4.add(createLabel("Email:", 55));
-        r4.add(createInput(100, 22));
+        txtEmail = createInput(100, 22);
+        r4.add(txtEmail);
         r4.add(Box.createHorizontalStrut(10));
         r4.add(createLabel("Dân tộc:", 50));
-        JComboBox<String> cbDanToc = new JComboBox<>(new String[]{"Kinh", "Tày", "Thái", "Mường", "Khác"});
+        cbDanToc = new JComboBox<>(new String[]{"Kinh", "Tày", "Thái", "Mường", "Khác"});
         cbDanToc.setFont(AppFonts.BODY);
         cbDanToc.setPreferredSize(new Dimension(109, 20));
         r4.add(cbDanToc);
         r4.add(Box.createHorizontalStrut(3));
         r4.add(createLabel("Quốc tịch:", 61));
-        JComboBox<String> cbQuocTich = new JComboBox<>(new String[]{"Việt nam", "Khác"});
+        cbQuocTich = new JComboBox<>(new String[]{"Việt nam", "Khác"});
         cbQuocTich.setFont(AppFonts.BODY);
         cbQuocTich.setPreferredSize(new Dimension(212, 20));
         r4.add(cbQuocTich);
@@ -229,21 +297,21 @@ public class PatientRegistrationFormPanel extends JPanel {
         // Dòng 5: CMND/CCCD, Ngày cấp, Nơi cấp
         JPanel r5 = createRowPanel();
         r5.add(createLabel("CMND/CCCD:", 83));
-        JTextField txtCccd = createInput(100, 22); txtCccd.setText("111122222333");
+        txtCccd = createInput(100, 22);
         r5.add(txtCccd);
         r5.add(createLabel("Ngày cấp:", 60));
         JPanel issueDateFields = new JPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
         issueDateFields.setOpaque(false);
-        JTextField txtCccdD = createInput(26, 22); txtCccdD.setText("01"); txtCccdD.setHorizontalAlignment(SwingConstants.CENTER);
-        JTextField txtCccdM = createInput(26, 22); txtCccdM.setText("01"); txtCccdM.setHorizontalAlignment(SwingConstants.CENTER);
-        JTextField txtCccdY = createInput(44, 22); txtCccdY.setText("2018"); txtCccdY.setHorizontalAlignment(SwingConstants.CENTER);
+        txtCccdD = createInput(26, 22); txtCccdD.setHorizontalAlignment(SwingConstants.CENTER);
+        txtCccdM = createInput(26, 22); txtCccdM.setHorizontalAlignment(SwingConstants.CENTER);
+        txtCccdY = createInput(44, 22); txtCccdY.setHorizontalAlignment(SwingConstants.CENTER);
         issueDateFields.add(txtCccdD);
         issueDateFields.add(txtCccdM);
         issueDateFields.add(txtCccdY);
         r5.add(issueDateFields);
         r5.add(Box.createHorizontalStrut(11));
         r5.add(createLabel("Nơi cấp:", 51));
-        JTextField txtNoiCap = createInput(374, 22); txtNoiCap.setText("bắc ninh");
+        txtNoiCap = createInput(374, 22);
         r5.add(txtNoiCap);
         p.add(r5);
 
@@ -256,23 +324,23 @@ public class PatientRegistrationFormPanel extends JPanel {
         r6.add(btnTtKhac);
         r6.add(Box.createHorizontalStrut(372));
         r6.add(createLabel("Nơi làm việc:", 78));
-        JTextField txtWork = createInput(267, 22); txtWork.setText("hà nội");
+        txtWork = createInput(267, 22);
         r6.add(txtWork);
         p.add(r6);
 
         // Dòng 7: ĐK khám, Lúc, Lý do khám
         JPanel r7 = createRowPanel();
         r7.add(createLabel("ĐK khám:", 65));
-        JComboBox<String> cbDkKham = new JComboBox<>(new String[]{"Khám bệnh", "Tái khám", "Cấp cứu"});
+        cbDkKham = new JComboBox<>(new String[]{"Khám bệnh", "Tái khám", "Cấp cứu"});
         cbDkKham.setFont(AppFonts.BODY);
         cbDkKham.setPreferredSize(new Dimension(100, 20));
         r7.add(cbDkKham);
         r7.add(createLabel("Lúc:", 29));
-        JTextField txtTime = createInput(126, 22); txtTime.setText("10:39 23/08/2022");
+        txtTime = createInput(126, 22);
         r7.add(txtTime);
         r7.add(Box.createHorizontalStrut(6));
         r7.add(createLabel("Lý do khám:", 73));
-        JTextField txtReason = createInput(109, 22); txtReason.setText("đau mỏi");
+        txtReason = createInput(109, 22);
         r7.add(txtReason);
         p.add(r7);
 
@@ -324,14 +392,14 @@ public class PatientRegistrationFormPanel extends JPanel {
         lblBhyt.setFont(AppFonts.BODY_BOLD);
         rHead.add(lblBhyt);
 
-        JCheckBox chkTe = new JCheckBox("TE có giấy khai sinh");
-        chkTe.setFont(AppFonts.SMALL);
-        chkTe.setForeground(new Color(205, 30, 30));
-        chkTe.setOpaque(false);
-        chkTe.setPreferredSize(new Dimension(chkTe.getPreferredSize().width, 20));
-        rHead.add(chkTe);
+        chkCoGiayKhaiSinh = new JCheckBox("TE có giấy khai sinh");
+        chkCoGiayKhaiSinh.setFont(AppFonts.SMALL);
+        chkCoGiayKhaiSinh.setForeground(new Color(205, 30, 30));
+        chkCoGiayKhaiSinh.setOpaque(false);
+        chkCoGiayKhaiSinh.setPreferredSize(new Dimension(chkCoGiayKhaiSinh.getPreferredSize().width, 20));
+        rHead.add(chkCoGiayKhaiSinh);
 
-        JCheckBox chkKhongGiuThe = new JCheckBox("Không giữ thẻ BHYT");
+        chkKhongGiuThe = new JCheckBox("Không giữ thẻ BHYT");
         chkKhongGiuThe.setFont(AppFonts.SMALL);
         chkKhongGiuThe.setForeground(new Color(205, 30, 30));
         chkKhongGiuThe.setOpaque(false);
@@ -344,13 +412,17 @@ public class PatientRegistrationFormPanel extends JPanel {
         r1.add(createLabel("Số BHYT:", 64));
         JPanel insuranceNumberFields = new JPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
         insuranceNumberFields.setOpaque(false);
-        insuranceNumberFields.add(createInput(35, 22));
-        insuranceNumberFields.add(createInput(35, 22));
-        insuranceNumberFields.add(createInput(35, 22));
-        insuranceNumberFields.add(createInput(115, 22));
+        this.insuranceNumberFields[0] = createInput(35, 22);
+        this.insuranceNumberFields[1] = createInput(35, 22);
+        this.insuranceNumberFields[2] = createInput(35, 22);
+        this.insuranceNumberFields[3] = createInput(115, 22);
+        insuranceNumberFields.add(this.insuranceNumberFields[0]);
+        insuranceNumberFields.add(this.insuranceNumberFields[1]);
+        insuranceNumberFields.add(this.insuranceNumberFields[2]);
+        insuranceNumberFields.add(this.insuranceNumberFields[3]);
         r1.add(insuranceNumberFields);
         r1.add(createLabel("Nơi sống:", 58));
-        JComboBox<String> cbNoiSong = new JComboBox<>(new String[]{"", "K1", "K2", "K3"});
+        cbNoiSong = new JComboBox<>(new String[]{"", "K1", "K2", "K3"});
         cbNoiSong.setFont(AppFonts.BODY);
         cbNoiSong.setPreferredSize(new Dimension(50, 20));
         r1.add(cbNoiSong);
@@ -359,34 +431,37 @@ public class PatientRegistrationFormPanel extends JPanel {
         // Dòng 2: KCBBĐ
         JPanel r2 = createInsuranceRowPanel();
         r2.add(createLabel("KCBBĐ:", 64));
-        r2.add(createInput(65, 22));
-        r2.add(createInput(270, 22));
+        txtInsuranceFacilityCode = createInput(65, 22);
+        txtInsuranceFacilityName = createInput(270, 22);
+        r2.add(txtInsuranceFacilityCode);
+        r2.add(txtInsuranceFacilityName);
         p.add(r2);
 
         // Dòng 3: Hạn thẻ
         JPanel r3 = createInsuranceRowPanel();
         r3.add(createLabel("Hạn thẻ:", 64));
-        r3.add(createInput(100, 22));
+        txtInsuranceStartDate = createInput(100, 22);
+        r3.add(txtInsuranceStartDate);
         r3.add(new JLabel(" - "));
-        r3.add(createInput(100, 22));
+        txtInsuranceEndDate = createInput(100, 22);
+        r3.add(txtInsuranceEndDate);
         p.add(r3);
 
         // Dòng 4: Địa chỉ thẻ
         JPanel r4 = createInsuranceRowPanel();
         r4.add(createLabel("Địa chỉ thẻ:", 66));
-        JTextField txtDiaChiThe = createInput(335, 22);
-        txtDiaChiThe.setText("Bắc Ninh - H. Quế Võ - Thị trấn Phố Mới");
+        txtDiaChiThe = createInput(335, 22);
         r4.add(txtDiaChiThe);
         p.add(r4);
 
         // Dòng 5: Tuyến KCB
         JPanel r5 = createInsuranceRowPanel();
         r5.add(createLabel("Tuyến KCB:", 71));
-        JComboBox<String> cbTuyen = new JComboBox<>(new String[]{"", "Đúng tuyến", "Trái tuyến"});
+        cbTuyen = new JComboBox<>(new String[]{"", "Đúng tuyến", "Trái tuyến"});
         cbTuyen.setFont(AppFonts.BODY);
         cbTuyen.setPreferredSize(new Dimension(224, 20));
         r5.add(cbTuyen);
-        JLabel lblRate = new JLabel("0%");
+        lblRate = new JLabel("0%");
         lblRate.setFont(AppFonts.BODY_BOLD);
         lblRate.setForeground(new Color(0, 95, 205));
         lblRate.setBorder(new EmptyBorder(0, 4, 0, 0));
@@ -395,7 +470,7 @@ public class PatientRegistrationFormPanel extends JPanel {
 
         // Dòng 6: Giấy chứng nhận không cùng chi trả
         JPanel r6 = createInsuranceRowPanel();
-        JCheckBox chkKhongCungChiTra = new JCheckBox("Giấy chứng nhận không cùng chi trả trong năm");
+        chkKhongCungChiTra = new JCheckBox("Giấy chứng nhận không cùng chi trả trong năm");
         chkKhongCungChiTra.setFont(AppFonts.SMALL);
         chkKhongCungChiTra.setForeground(new Color(0, 80, 185)); // Màu xanh lam chuẩn
         chkKhongCungChiTra.setOpaque(false);
@@ -406,17 +481,23 @@ public class PatientRegistrationFormPanel extends JPanel {
         // Dòng 7: Ngày miễn cùng chi trả
         JPanel r7 = createInsuranceRowPanel();
         r7.add(createLabel("Ngày miễn cùng chi trả:", 188));
-        r7.add(createInput(25, 22));
-        r7.add(createInput(25, 22));
-        r7.add(createInput(45, 22));
+        insuranceExemptionDateFields[0] = createInput(25, 22);
+        insuranceExemptionDateFields[1] = createInput(25, 22);
+        insuranceExemptionDateFields[2] = createInput(45, 22);
+        r7.add(insuranceExemptionDateFields[0]);
+        r7.add(insuranceExemptionDateFields[1]);
+        r7.add(insuranceExemptionDateFields[2]);
         p.add(r7);
 
         // Dòng 8: Ngày đóng đủ 5 năm liên tục
         JPanel r8 = createInsuranceRowPanel();
         r8.add(createLabel("Ngày đóng đủ 5 năm liên tục:", 188));
-        r8.add(createInput(25, 22));
-        r8.add(createInput(25, 22));
-        r8.add(createInput(45, 22));
+        insuranceFiveYearDateFields[0] = createInput(25, 22);
+        insuranceFiveYearDateFields[1] = createInput(25, 22);
+        insuranceFiveYearDateFields[2] = createInput(45, 22);
+        r8.add(insuranceFiveYearDateFields[0]);
+        r8.add(insuranceFiveYearDateFields[1]);
+        r8.add(insuranceFiveYearDateFields[2]);
         p.add(r8);
 
         return p;
@@ -467,5 +548,272 @@ public class PatientRegistrationFormPanel extends JPanel {
         btn.setPreferredSize(new Dimension(22, 20));
         btn.setMargin(new Insets(0, 0, 0, 0));
         return btn;
+    }
+
+    public void setClinicRooms(List<PhongKham> rooms) {
+        Objects.requireNonNull(rooms, "rooms");
+        clinicRooms.clear();
+        clinicRooms.addAll(rooms);
+        String selectedRoom = chooserClinicRoom.getText();
+        String[] roomNames = rooms.stream().map(PhongKham::getTenPhong).toArray(String[]::new);
+        chooserClinicRoom.setItems(roomNames);
+        if (rooms.stream().anyMatch(room -> room.getTenPhong().equalsIgnoreCase(selectedRoom))) {
+            chooserClinicRoom.setText(selectedRoom);
+        } else {
+            chooserClinicRoom.setText(roomNames.length == 0 ? "" : roomNames[0]);
+        }
+    }
+
+    public void setOnSearch(BiConsumer<String, String> listener) {
+        this.onSearchListener = listener;
+    }
+
+    private void fireSearch() {
+        if (onSearchListener != null) {
+            onSearchListener.accept(txtPhoneSearch.getText().trim(), txtCccdSearch.getText().trim());
+        }
+    }
+
+    public void selectPatient(BenhNhan patient, BaoHiem insurance) {
+        Objects.requireNonNull(patient, "patient");
+        patientId = patient.getId();
+        txtMaBn.setText(nullToEmpty(patient.getMaBenhNhanFormat()));
+        txtHoTen.setText(patient.getHoTen());
+        cbGioiTinh.setSelectedItem(patient.getGioiTinh() == GioiTinh.F ? "Nữ" : "Nam");
+        setDateFields(patient.getNgaySinh(), txtDay, txtMonth, txtYear);
+        txtNoiSinh.setText(nullToEmpty(patient.getNoiSinh()));
+        txtSoNhaThonPho.setText(nullToEmpty(patient.getSoNhaThonPho()));
+        txtAdministrativeCode.setText(nullToEmpty(patient.getMaXa()));
+        lblAddress.setText(nullToEmpty(patient.getDiaChi()));
+        txtJob.setText(nullToEmpty(patient.getNgheNghiep()));
+        txtPhone.setText(nullToEmpty(patient.getDienThoai()));
+        txtEmail.setText(nullToEmpty(patient.getEmail()));
+        selectComboValue(cbDanToc, patient.getDanToc());
+        selectComboValue(cbQuocTich, patient.getQuocTich());
+        txtCccd.setText(nullToEmpty(patient.getSoCCCD()));
+        setDateFields(patient.getNgayCapCCCD(), txtCccdD, txtCccdM, txtCccdY);
+        txtNoiCap.setText(nullToEmpty(patient.getNoiCapCCCD()));
+        txtWork.setText(nullToEmpty(patient.getNoiLamViec()));
+        if (insurance == null) {
+            clearInsuranceFields();
+        } else {
+            setInsuranceFields(insurance);
+        }
+    }
+
+    public void clearForm() {
+        patientId = null;
+        txtPhoneSearch.setText("");
+        txtCccdSearch.setText("");
+        txtMaBn.setText("");
+        txtHoTen.setText("");
+        cbGioiTinh.setSelectedIndex(0);
+        clearDateFields(txtDay, txtMonth, txtYear);
+        txtNoiSinh.setText("");
+        txtSoNhaThonPho.setText("");
+        txtAdministrativeCode.setText("");
+        lblAddress.setText("");
+        txtJob.setText("");
+        txtPhone.setText("");
+        txtEmail.setText("");
+        cbDanToc.setSelectedIndex(0);
+        cbQuocTich.setSelectedIndex(0);
+        txtCccd.setText("");
+        clearDateFields(txtCccdD, txtCccdM, txtCccdY);
+        txtNoiCap.setText("");
+        txtWork.setText("");
+        cbDkKham.setSelectedIndex(0);
+        txtTime.setText(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")));
+        txtReason.setText("");
+        cbDoiTuong.setSelectedIndex(0);
+        chkUuTien.setSelected(false);
+        chooserService.setText("");
+        chooserClinicRoom.setText(clinicRooms.isEmpty() ? "" : clinicRooms.get(0).getTenPhong());
+        clearInsuranceFields();
+    }
+
+    public RegisterPatientCommand toRegisterCommand(AuthorizationContext authorizationContext,
+                                                    AuditActorContext auditActorContext) {
+        BenhNhan patient = new BenhNhan();
+        patient.setId(patientId);
+        patient.setMaBenhNhanFormat(txtMaBn.getText().trim());
+        String fullName = txtHoTen.getText().trim();
+        int lastSpace = fullName.lastIndexOf(' ');
+        patient.setHo(lastSpace < 0 ? "" : fullName.substring(0, lastSpace).trim());
+        patient.setTen(lastSpace < 0 ? fullName : fullName.substring(lastSpace + 1).trim());
+        patient.setGioiTinh("Nữ".equals(cbGioiTinh.getSelectedItem()) ? GioiTinh.F : GioiTinh.M);
+        patient.setNgaySinh(dateFromFields(txtDay, txtMonth, txtYear));
+        patient.setNoiSinh(txtNoiSinh.getText().trim());
+        patient.setSoNhaThonPho(txtSoNhaThonPho.getText().trim());
+        patient.setMaXa(txtAdministrativeCode.getText().trim());
+        patient.setDiaChi(lblAddress.getText());
+        patient.setNgheNghiep(txtJob.getText().trim());
+        patient.setDienThoai(txtPhone.getText().trim());
+        patient.setEmail(txtEmail.getText().trim());
+        patient.setDanToc(Objects.toString(cbDanToc.getSelectedItem(), ""));
+        patient.setQuocTich(Objects.toString(cbQuocTich.getSelectedItem(), ""));
+        patient.setSoCCCD(txtCccd.getText().trim());
+        patient.setNgayCapCCCD(dateFromFields(txtCccdD, txtCccdM, txtCccdY));
+        patient.setNoiCapCCCD(txtNoiCap.getText().trim());
+        patient.setNoiLamViec(txtWork.getText().trim());
+
+        BaoHiem insurance = buildInsurance();
+        int roomId = clinicRooms.stream()
+                .filter(room -> room.getTenPhong().equalsIgnoreCase(chooserClinicRoom.getText().trim()))
+                .map(PhongKham::getId)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("A clinic room must be selected."));
+        DoiTuongKham payerType = switch (Objects.toString(cbDoiTuong.getSelectedItem(), "")) {
+            case "BHYT" -> DoiTuongKham.BHYT;
+            case "Dịch vụ" -> DoiTuongKham.DICH_VU_YEU_CAU;
+            default -> DoiTuongKham.THU_PHI;
+        };
+        return new RegisterPatientCommand(patient, insurance, roomId,
+                Objects.toString(cbDkKham.getSelectedItem(), ""),
+                txtReason.getText().trim(), payerType, chkUuTien.isSelected(),
+                authorizationContext.employeeId(), authorizationContext, auditActorContext);
+    }
+
+    private BaoHiem buildInsurance() {
+        String insuranceNumber = textFromFields(insuranceNumberFields);
+        if (insuranceNumber.isBlank() && txtInsuranceFacilityCode.getText().isBlank()
+                && txtInsuranceFacilityName.getText().isBlank()
+                && txtInsuranceStartDate.getText().isBlank() && txtInsuranceEndDate.getText().isBlank()
+                && txtDiaChiThe.getText().isBlank() && cbNoiSong.getSelectedIndex() == 0
+                && cbTuyen.getSelectedIndex() == 0 && "0%".equals(lblRate.getText())
+                && textFromFields(insuranceExemptionDateFields).isBlank()
+                && textFromFields(insuranceFiveYearDateFields).isBlank()
+                && !chkCoGiayKhaiSinh.isSelected() && !chkKhongGiuThe.isSelected()
+                && !chkKhongCungChiTra.isSelected()) {
+            return null;
+        }
+        BaoHiem insurance = new BaoHiem();
+        insurance.setMaBenhNhan(patientId == null ? 0 : patientId);
+        insurance.setSoBaoHiem(insuranceNumber);
+        insurance.setMaNoiSong(Objects.toString(cbNoiSong.getSelectedItem(), ""));
+        insurance.setMaNoiDangKyKCB(txtInsuranceFacilityCode.getText().trim());
+        insurance.setNoiDangKyKCB(txtInsuranceFacilityName.getText().trim());
+        insurance.setNgayBatDau(parseDate(txtInsuranceStartDate.getText()));
+        insurance.setNgayHetHan(parseDate(txtInsuranceEndDate.getText()));
+        insurance.setDiaChiThe(txtDiaChiThe.getText().trim());
+        insurance.setDungTuyen(!"Trái tuyến".equals(cbTuyen.getSelectedItem()));
+        insurance.setMucHuong(parsePercentage(lblRate.getText()));
+        insurance.setCoGiayKhaiSinh(chkCoGiayKhaiSinh.isSelected());
+        insurance.setKhongGiuThe(chkKhongGiuThe.isSelected());
+        insurance.setMienCungChiTra(chkKhongCungChiTra.isSelected());
+        insurance.setNgayMienCungChiTra(dateFromFields(insuranceExemptionDateFields));
+        insurance.setNgayDu5NamLienTuc(dateFromFields(insuranceFiveYearDateFields));
+        return insurance;
+    }
+
+    private void setInsuranceFields(BaoHiem insurance) {
+        setTextFields(insuranceNumberFields, insurance.getSoBaoHiem(), new int[]{2, 1, 2});
+        selectComboValue(cbNoiSong, insurance.getMaNoiSong());
+        txtInsuranceFacilityCode.setText(nullToEmpty(insurance.getMaNoiDangKyKCB()));
+        txtInsuranceFacilityName.setText(nullToEmpty(insurance.getNoiDangKyKCB()));
+        txtInsuranceStartDate.setText(formatDate(insurance.getNgayBatDau()));
+        txtInsuranceEndDate.setText(formatDate(insurance.getNgayHetHan()));
+        txtDiaChiThe.setText(nullToEmpty(insurance.getDiaChiThe()));
+        cbTuyen.setSelectedItem(insurance.isDungTuyen() ? "Đúng tuyến" : "Trái tuyến");
+        lblRate.setText(insurance.getMucHuong() + "%");
+        chkCoGiayKhaiSinh.setSelected(insurance.isCoGiayKhaiSinh());
+        chkKhongGiuThe.setSelected(insurance.isKhongGiuThe());
+        chkKhongCungChiTra.setSelected(insurance.isMienCungChiTra());
+        setDateFields(insurance.getNgayMienCungChiTra(), insuranceExemptionDateFields);
+        setDateFields(insurance.getNgayDu5NamLienTuc(), insuranceFiveYearDateFields);
+    }
+
+    private void clearInsuranceFields() {
+        for (JTextField field : insuranceNumberFields) field.setText("");
+        cbNoiSong.setSelectedIndex(0);
+        txtInsuranceFacilityCode.setText("");
+        txtInsuranceFacilityName.setText("");
+        txtInsuranceStartDate.setText("");
+        txtInsuranceEndDate.setText("");
+        txtDiaChiThe.setText("");
+        cbTuyen.setSelectedIndex(0);
+        lblRate.setText("0%");
+        chkCoGiayKhaiSinh.setSelected(false);
+        chkKhongGiuThe.setSelected(false);
+        chkKhongCungChiTra.setSelected(false);
+        clearDateFields(insuranceExemptionDateFields);
+        clearDateFields(insuranceFiveYearDateFields);
+    }
+
+    private static void setTextFields(JTextField[] fields, String value, int[] segmentLengths) {
+        String remaining = nullToEmpty(value);
+        for (int i = 0; i < fields.length; i++) {
+            int length = i < segmentLengths.length ? segmentLengths[i] : remaining.length();
+            int end = Math.min(length, remaining.length());
+            fields[i].setText(remaining.substring(0, end));
+            remaining = remaining.substring(end);
+        }
+    }
+
+    private static String textFromFields(JTextField[] fields) {
+        StringBuilder value = new StringBuilder();
+        for (JTextField field : fields) value.append(field.getText().trim());
+        return value.toString();
+    }
+
+    private static LocalDate dateFromFields(JTextField... fields) {
+        String day = fields[0].getText().trim();
+        String month = fields[1].getText().trim();
+        String year = fields[2].getText().trim();
+        if (day.isEmpty() && month.isEmpty() && year.isEmpty()) return null;
+        try {
+            return LocalDate.of(Integer.parseInt(year), Integer.parseInt(month), Integer.parseInt(day));
+        } catch (NumberFormatException | DateTimeException exception) {
+            throw new IllegalArgumentException("Date fields must contain a valid day, month, and year.", exception);
+        }
+    }
+
+    private static LocalDate parseDate(String value) {
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) return null;
+        try {
+            return LocalDate.parse(trimmed, DateTimeFormatter.ofPattern("d/M/yyyy"));
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException("Date must use the day/month/year format.", exception);
+        }
+    }
+
+    private static void setDateFields(LocalDate date, JTextField... fields) {
+        if (date == null) {
+            clearDateFields(fields);
+            return;
+        }
+        fields[0].setText(String.format("%02d", date.getDayOfMonth()));
+        fields[1].setText(String.format("%02d", date.getMonthValue()));
+        fields[2].setText(Integer.toString(date.getYear()));
+    }
+
+    private static void clearDateFields(JTextField... fields) {
+        for (JTextField field : fields) field.setText("");
+    }
+
+    private static String formatDate(LocalDate date) {
+        return date == null ? "" : date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+    }
+
+    private static int parsePercentage(String value) {
+        String digits = value.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? 0 : Integer.parseInt(digits);
+    }
+
+    private static void selectComboValue(JComboBox<String> combo, String value) {
+        if (value == null || value.isBlank()) return;
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            if (value.equalsIgnoreCase(combo.getItemAt(i))) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+        combo.setSelectedItem(value);
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 }
