@@ -5,13 +5,15 @@
 **Trạng thái:** Báo cáo phân tích kỹ thuật; các lựa chọn điều chuyển dưới đây đã được đối soát theo quyết định Owner ngày 06/11/2026. Không thay đổi source code, schema migration, ma trận phân quyền, hoặc kích hoạt runtime workflow.<br>
 **Gate an ninh:** Mọi workflow điều chuyển tiếp tục bị từ chối (`DENY`) trong runtime theo cổng an ninh SEC-01 ([`phase2-implementation-contract.md:32-50`](phase2-implementation-contract.md#L32-L50)).
 
-> **Supersession — 06/11/2026:** Owner approved `VIS-TRANSFER-OWNER-DECISION-RECON-03`. Section 4 below is the current transfer decision ledger: the approved rules are closed, and only its six enumerated choices remain open. The pre-approval options retained in the historical appendix are not current proposals or implementation authority. No resulting visit status or replay behavior is inferred.
+> **Prior snapshot — 06/11/2026:** Owner approved `VIS-TRANSFER-OWNER-DECISION-RECON-03`; its six open choices are retained as a dated historical snapshot.
+>
+> **Current supersession — 2026-11-06:** `VIS-TRANSFER-OWNER-DECISION-RECON-04` supersedes RECON-03 for visit status/timestamps, reason requirement, and queue date. Section 4 is the current ledger; only its four enumerated implementation areas remain unresolved. Historical options are not current proposals or implementation authority. Transfer remains default-deny under SEC-01.
 
 ---
 
 ## 1. Tóm tắt điều hành & Mục tiêu tài liệu
 
-Tài liệu này đối soát hiện trạng mã nguồn và tài liệu Phase 3 với quyết định Owner đã phê duyệt theo contract `VIS-TRANSFER-OWNER-DECISION-RECON-03`, nhằm tách chính sách cố định khỏi đúng các lựa chọn triển khai còn mở cho điều chuyển lượt khám (`LuotKham`).
+Tài liệu này đối soát hiện trạng mã nguồn và tài liệu Phase 3 với quyết định Owner đã phê duyệt theo contract hiện hành `VIS-TRANSFER-OWNER-DECISION-RECON-04`, nhằm tách chính sách cố định khỏi các lựa chọn triển khai còn mở cho điều chuyển lượt khám (`LuotKham`). Snapshot sáu lựa chọn mở của RECON-03 được giữ lại như lịch sử.
 
 Tài liệu tuân thủ nghiêm ngặt 3 nguyên tắc:
 1. **Không mở lại các chính sách đã duyệt (settled policies):** Giữ nguyên vai trò, phạm vi (role/scope), ranh giới hủy lượt và ranh giới ghi sinh hiệu làm biên cố định.
@@ -29,7 +31,8 @@ Các ranh giới sau đây đã được Owner phê duyệt chính thức tại 
   - `DOCTOR` (Bác sĩ): Chỉ được phép điều chuyển lượt khám **trong nội bộ khoa** mà phiên làm việc đã chọn (`source.facilityId == destination.facilityId == session.facilityId` và `source.departmentId == destination.departmentId == session.departmentId`, ví dụ: chuyển giữa các phòng khám trong cùng khoa).
   - Các vai trò khác (`ADMIN`, `PHARMACIST`, `CASHIER`, `LAB_TECH`): Hoàn toàn bị cấm (`DENY`) thực hiện điều chuyển.
   - **Ranh giới cô lập dữ liệu (`DEC-AUTHZ-03`):** Thao tác điều chuyển là một tác vụ cập nhật vị trí/trạng thái có guard chuyên biệt; thao tác này **tuyệt đối không cấp quyền đọc** hồ sơ bệnh nhân, lịch sử khám hay hàng đợi của khoa/phòng đích cho người thực hiện.
-* Các quy tắc điều chuyển bổ sung được Owner duyệt ngày 06/11/2026 theo `VIS-TRANSFER-OWNER-DECISION-RECON-03`: RECEPTIONIST chỉ chuyển `CHO_KHAM`; DOCTOR chuyển `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`; final/completed, hủy, soft-deleted hoặc EMR-locked đều bị từ chối. Phòng đích bắt buộc, active và thuộc khoa đích. Cấp số queue mới tại đích, giữ nguyên priority, không auto-promote.
+* Các quy tắc điều chuyển bổ sung được Owner duyệt ngày 06/11/2026 theo `VIS-TRANSFER-OWNER-DECISION-RECON-04`: RECEPTIONIST chỉ chuyển `CHO_KHAM`; DOCTOR chuyển `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`; final/completed, hủy, soft-deleted hoặc EMR-locked đều bị từ chối. Phòng đích bắt buộc, active và thuộc khoa đích. Cấp số queue mới tại đích, giữ nguyên priority, không auto-promote.
+* Khi chuyển, giữ nguyên trạng thái, `ngayKham` và examination timestamps hiện có. Dùng `queueDate` riêng bằng ngày địa phương `Asia/Ho_Chi_Minh`; không ghi đè ngày khám lâm sàng. Lý do bắt buộc là fixed reason code, short note tùy chọn; không dùng lại `lyDoKham`.
 * Giữ nguyên các liên kết dịch vụ, đơn thuốc, kết quả, hóa đơn và tài chính; không tự hủy/sửa liên kết, đổi billing hay tạo khoản thu trùng. Pending work chỉ được theo lượt nếu an toàn và đơn vị thực hiện/trách nhiệm vẫn nguyên vẹn; nếu không thì cần hoàn tất/handoff hoặc từ chối. Đơn thuốc đã phát hành, kết quả đã xác nhận và giao dịch tài chính đã post là bất biến; điều chỉnh thuộc workflow riêng được cấp quyền, đối soát và audit.
 * Bắt buộc nhất quán transaction, optimistic concurrency, domain invariants và exception-path tests. Metadata kỹ thuật/audit dùng UTC; thời gian nghiệp vụ dùng `Asia/Ho_Chi_Minh`.
 * **Ranh giới hủy lượt khám (`DEC-AUTHZ-04a`):**
@@ -59,8 +62,8 @@ Các ranh giới sau đây đã được Owner phê duyệt chính thức tại 
 ### 3.2. Chính sách đã phê duyệt (Policy)
 
 * `DEC-AUTHZ-04b`: `RECEPTIONIST` chỉ chuyển cùng cơ sở; `DOCTOR` chỉ trong khoa đã chọn; không chuyển xuyên cơ sở, không cấp quyền đọc dữ liệu khoa đích ([`phase2-role-permission-matrix-approval.md:8-18`](phase2-role-permission-matrix-approval.md#L8-L18)).
-* `VIS-TRANSFER-OWNER-DECISION-RECON-03`, Owner approved 06/11/2026: source status, required active destination room, new destination queue number with preserved priority/no auto-promotion, linked-work preservation/safe handoff, immutability, transaction consistency, optimistic concurrency, invariants, and exception-path tests are approved; see [`phase3-visit-transfer-contract-review.md`](phase3-visit-transfer-contract-review.md).
-* `DEC-TIME-01`: Technical/audit metadata uses UTC and clinic business time uses `Asia/Ho_Chi_Minh` ([`phase2-implementation-contract.md:8-12`](phase2-implementation-contract.md#L8-L12)); transfer effective-date boundary and queue business date remain open under the approved contract.
+* `VIS-TRANSFER-OWNER-DECISION-RECON-04`, Owner approved 2026-11-06: carried-forward actor/scope, status eligibility, target-room, queue-number/priority, linked-work, immutability, transaction/concurrency/invariant/test rules remain approved. New decisions preserve status/`ngayKham`/examination timestamps; require fixed reason code with optional short note; and use separate local-date `queueDate`. See [`phase3-visit-transfer-contract-review.md`](phase3-visit-transfer-contract-review.md).
+* `DEC-TIME-01`: Technical/audit metadata uses UTC and clinic business time uses `Asia/Ho_Chi_Minh` ([`phase2-implementation-contract.md:8-12`](phase2-implementation-contract.md#L8-L12)); `queueDate` uses the transfer-local business date, while persistence and transaction sampling details remain open.
 * Cổng an ninh `SEC-01`: Giữ trạng thái từ chối mặc định (`DENY`) ở tầng runtime cho tới khi implementation contract, guard, audit và bộ kiểm thử đạt chuẩn ([`phase2-implementation-contract.md:32-50`](phase2-implementation-contract.md#L32-L50)).
 
 ### 3.3. Suy luận kỹ thuật (Inference)
@@ -73,26 +76,35 @@ Các ranh giới sau đây đã được Owner phê duyệt chính thức tại 
 
 ## 4. Đối soát quyết định Owner — chính sách cố định và lựa chọn còn mở
 
-Provenance: approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-03`, 06/11/2026; cross-reference [`phase3-visit-transfer-contract-review.md`](phase3-visit-transfer-contract-review.md) and [`phase3-visit-lifecycle-owner-decisions.md`](phase3-visit-lifecycle-owner-decisions.md).
+Provenance: current approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-04`, 2026-11-06; cross-reference [`phase3-visit-transfer-contract-review.md`](phase3-visit-transfer-contract-review.md) and [`phase3-visit-lifecycle-owner-decisions.md`](phase3-visit-lifecycle-owner-decisions.md). The earlier RECON-03 ledger is preserved as a dated historical snapshot.
 
-**Đã duyệt — không còn là khoảng trống:** actor-specific source statuses and scope; no destination patient/history/queue reads; final/completed, cancelled, soft-deleted, and EMR-locked visits are denied; required active destination room belonging to the target department; new destination queue number with existing priority preserved and no auto-promotion; linked-record preservation, no automatic mutation/cancellation/billing change/duplicate charges; safe pending-work handoff or completion/denial; immutability of issued prescriptions, confirmed results, and posted financial transactions; transaction consistency, optimistic concurrency, domain invariants, exception-path tests; UTC technical/audit metadata and `Asia/Ho_Chi_Minh` business time. These policies do not establish the resulting visit status or replay result.
+**Đã duyệt — không còn là khoảng trống:** actor-specific source statuses and scope; no destination patient/history/queue reads; final/completed, cancelled, soft-deleted, and EMR-locked visits are denied; required active destination room belonging to the target department; new destination queue number with existing priority preserved and no auto-promotion; preserve visit status, `ngayKham`, and existing examination timestamps; mandatory fixed reason code with optional short note; separate transfer-local `queueDate` in `Asia/Ho_Chi_Minh`; linked-record preservation, no automatic mutation/cancellation/billing change/duplicate charges; safe pending-work handoff or completion/denial; immutability of issued prescriptions, confirmed results, and posted financial transactions; transaction consistency, optimistic concurrency, domain invariants, exception-path tests; UTC technical/audit metadata. Queue allocation does not rewrite the clinical visit date/timeline.
 
-**Chỉ còn sáu lựa chọn triển khai mở:**
+**Chỉ còn bốn nhóm chi tiết triển khai mở:**
 
-1. **Transfer reason:** Whether required, allowed reason-code set, and free-text rules.
-2. **Effective-date boundary:** Effective-date boundary and business date for the destination queue.
-3. **Queue sequence namespace/reuse:** Sequence namespace and number-reuse guarantees.
-4. **Visit status/timestamps:** Preserve or transition status/timestamps; do not infer a resulting status from source eligibility.
+1. **Reason taxonomy and note safeguards:** The fixed-code taxonomy, optional short note length/normalization constraints, and privacy rules. The fixed-code requirement and note optionality are settled; do not reuse clinical `lyDoKham`.
+2. **Queue allocation implementation:** Detailed persistence shape, sequence namespace, allocation reuse/gap policy, and exact transaction sampling semantics for approved `queueDate`. The queue date is the transfer-local business date and remains separate from `ngayKham`.
+3. **Transfer history:** Dedicated immutable transfer history, audit-only, or both.
+4. **Idempotent replay:** Replay outcome semantics, including a key reused with a different payload; do not infer replay behavior.
+
+The prior RECON-03 ledger had the six open choices reproduced in the historical snapshot below. RECON-04 resolves the reason requirement, queue date, and visit status/timestamp questions as stated above; the remaining open details are enumerated in the current four groups. Implementation evidence for safely resolving linked-work state and handoff is not yet complete. Keep transfer fail-closed until it can prove the approved requirements. This document does not authorize code, migration, grants, or runtime enablement.
+
+### Historical open-choice snapshot — RECON-03 (06/11/2026; superseded)
+
+At this dated snapshot, these six implementation choices remained open; this list is preserved for provenance only and is not the current ledger:
+
+1. **Transfer reason:** Whether a reason was required, the allowed reason-code set, and free-text rules.
+2. **Effective-date boundary:** The effective-date boundary and queue business date.
+3. **Queue sequence namespace/reuse:** Sequence namespace and number reuse guarantees.
+4. **Visit status/timestamps:** Whether status/timestamps would be preserved or transitioned.
 5. **Transfer history:** Dedicated immutable transfer history, audit-only, or both.
-6. **Idempotent replay:** Replay outcome semantics, including a key reused with a different payload; do not infer replay behavior.
-
-The implementation evidence for safely resolving linked-work state and handoff is not yet complete. Keep transfer fail-closed until it can prove the approved requirements. This document does not authorize code, migration, grants, or runtime enablement.
+6. **Idempotent replay:** Replay outcome semantics, including reuse of a key with a different payload.
 
 ## Historical pre-approval options (superseded 06/11/2026)
 
 The option analysis below records the report snapshot before Owner approval. It is retained for provenance only: no old option or recommendation remains a current unresolved decision or implementation instruction. The approved section 4 above controls.
 
-Historical snapshot: the original report presented seven candidate gap areas and options before the contract was approved. The options and recommendation language below are superseded; only the six open choices in current section 4 remain unresolved.
+Historical snapshot: the original report presented seven candidate gap areas and options before the contract was approved. The options and recommendation language below are superseded; the RECON-03 six-item open list and the pre-approval options do not replace the current RECON-04 ledger in section 4.
 
 ### Khoảng trống 1: Trạng thái lượt khám đủ điều kiện điều chuyển (Transfer-Eligible Statuses)
 * **Hiện trạng nguồn:** `TrangThaiLuotKham` có các giá trị: `CHO_KHAM`, `DANG_KHAM`, `DA_KHAM`, `KET_LUAN`, `HOAN_THANH`, `DA_HUY`, `CHO_CLS` ([`TrangThaiLuotKham.java:3-10`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/enums/TrangThaiLuotKham.java#L3-L10)). `LuotKham.java:43` có cờ `emrLocked`. Chính sách `DEC-AUTHZ-04b` chỉ nêu quyền của actor, chưa quy định lượt khám ở trạng thái nào thì được phép chuyển.

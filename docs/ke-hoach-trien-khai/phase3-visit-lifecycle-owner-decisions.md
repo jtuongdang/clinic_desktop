@@ -1,7 +1,7 @@
 # Phase 3 — Quyết định Owner cho vòng đời lượt khám
 
 **Task:** `VIS-LIFECYCLE-DECISIONS-01`
-**Trạng thái:** Các quyết định điều chuyển đã được Owner phê duyệt và đối soát ngày 06/11/2026 theo `VIS-TRANSFER-OWNER-DECISION-RECON-03`; workflow chưa mở.
+**Trạng thái:** Các quyết định điều chuyển đã được Owner phê duyệt và đối soát ngày 06/11/2026 theo `VIS-TRANSFER-OWNER-DECISION-RECON-04`; workflow chưa mở.
 **Gate:** Không cấp quyền hoặc thay đổi gate từ tài liệu này. Luồng điều chuyển vẫn default-deny và phụ thuộc SEC-01 cùng acceptance implementation riêng.
 
 ## Chính sách đã duyệt — không hỏi lại
@@ -11,6 +11,9 @@
 - Ranh giới actor/scope: `RECEPTIONIST` chỉ chuyển giữa các khoa trong cùng cơ sở; `DOCTOR` chỉ chuyển trong khoa đã chọn. Điều chuyển không cấp quyền đọc hồ sơ, lịch sử hoặc hàng đợi khoa đích.
 - Phòng đích bắt buộc, phải active và thuộc khoa đích.
 - Cấp số thứ tự mới tại queue đích, giữ nguyên mức ưu tiên hiện tại và không tự nâng ưu tiên.
+- Khi điều chuyển, giữ nguyên trạng thái lượt, `ngayKham` và các timestamp khám hiện có. Phân bổ queue đích không thay đổi ngày khám lâm sàng hoặc timeline khám.
+- Dùng ngày điều chuyển địa phương `Asia/Ho_Chi_Minh` làm ngày queue riêng `queueDate`, tách biệt và không ghi đè `ngayKham`; metadata kỹ thuật/audit vẫn dùng UTC.
+- Lý do điều chuyển bắt buộc dùng mã lý do cố định; ghi chú ngắn là tùy chọn. Không tái sử dụng trường lý do khám lâm sàng `lyDoKham`.
 - Giữ nguyên liên kết của chỉ định dịch vụ, đơn thuốc, kết quả, hóa đơn và hồ sơ tài chính; không tự hủy/sửa, không đổi billing và không tạo khoản thu trùng. Pending work chỉ được theo lượt nếu chứng minh an toàn và giữ nguyên đơn vị thực hiện/trách nhiệm; nếu không thì phải hoàn tất/handoff hoặc từ chối chuyển.
 - Đơn thuốc đã phát hành, kết quả đã xác nhận và giao dịch tài chính đã post là bất biến; mọi điều chỉnh thuộc workflow riêng được cấp quyền, đối soát và audit.
 - Bảo đảm nhất quán transaction, optimistic concurrency, domain invariants và kiểm thử exception paths.
@@ -18,22 +21,20 @@
 - Chỉ `DOCTOR` được ghi/sửa sinh hiệu.
 - Mỗi phiên sử dụng một role và một cặp cơ sở+khoa. Hành động nhạy cảm có guard ở Application, không dựa vào ẩn nút UI.
 
-Nguồn phê duyệt điều chuyển: `VIS-TRANSFER-OWNER-DECISION-RECON-03`, 06/11/2026; xem [transfer contract review](phase3-visit-transfer-contract-review.md) và [decision-gap memo](phase3-visit-transfer-decision-gaps.md). Actor/scope nền tảng được ghi trong [ma trận role/action đã duyệt](phase2-role-permission-matrix-approval.md); thời gian trong [Phase 2 implementation contract](phase2-implementation-contract.md). `VIS-01` hiện chỉ có các mảnh Domain và UI prototype; chưa có handler, repository lifecycle, audit events hoặc SQL acceptance ([review vòng đời lượt khám](phase3-visit-lifecycle-review.md), [transfer review](phase3-visit-transfer-contract-review.md)).
+Nguồn phê duyệt điều chuyển: `VIS-TRANSFER-OWNER-DECISION-RECON-04`, 2026-11-06; xem [transfer contract review](phase3-visit-transfer-contract-review.md) và [decision-gap memo](phase3-visit-transfer-decision-gaps.md). Hợp đồng này cập nhật các quyết định trước trong `VIS-TRANSFER-OWNER-DECISION-RECON-03`; actor/scope nền tảng được ghi trong [ma trận role/action đã duyệt](phase2-role-permission-matrix-approval.md), thời gian kỹ thuật/nghiệp vụ trong [Phase 2 implementation contract](phase2-implementation-contract.md). `VIS-01` hiện chỉ có các mảnh Domain và UI prototype; chưa có handler, repository lifecycle, audit events hoặc SQL acceptance ([review vòng đời lượt khám](phase3-visit-lifecycle-review.md), [transfer review](phase3-visit-transfer-contract-review.md)).
 
 ## Quyết định điều chuyển còn mở
 
-Chỉ các mục sau đây vẫn chưa được quyết định theo contract `VIS-TRANSFER-OWNER-DECISION-RECON-03`. Không suy diễn status đích hoặc kết quả replay:
+Chỉ các mục sau đây vẫn chưa được quyết định theo contract `VIS-TRANSFER-OWNER-DECISION-RECON-04`. Không suy diễn chi tiết triển khai chưa được duyệt:
 
 | Chủ đề còn mở | Phạm vi chưa được quyết định |
 |---|---|
-| Lý do điều chuyển | Có bắt buộc không; mã lý do/free text và giới hạn nội dung nào được dùng. |
-| Ngày hiệu lực | Ranh giới ngày hiệu lực và business date dùng cho queue. |
-| Namespace số queue | Phạm vi sequence và bảo đảm reuse/collision của số cấp mới. |
-| Status/thời điểm của lượt | Giữ hay chuyển trạng thái và timestamps; status nguồn đủ điều kiện không quyết định status kết quả. |
+| Mã lý do và ghi chú | Danh mục mã lý do; ràng buộc độ dài/chuẩn hóa của ghi chú; quy tắc privacy. |
+| Chi tiết phân bổ queue | Namespace sequence, reuse/gap policy và chính xác thời điểm transaction lấy mẫu `queueDate`; hình dạng persistence chưa được quyết định. |
 | Lịch sử điều chuyển | Lưu lịch sử bất biến riêng, chỉ audit, hay cả hai. |
-| Replay idempotent | Kết quả khi replay hoặc khi cùng key nhưng payload khác. Không giả định replay trả thành công hay phát sinh lại side effect. |
+| Replay idempotent | Semantics khi replay, bao gồm cùng key nhưng payload khác; không suy diễn kết quả. |
 
-Các lựa chọn trước đây bên dưới về hủy và sinh hiệu thuộc quyết định vòng đời riêng, không phải khoảng trống của contract điều chuyển này; chúng không thay đổi quy tắc điều chuyển đã duyệt.
+Status, `ngayKham`, examination timestamps, tính bắt buộc của mã lý do, `queueDate` tách biệt theo ngày địa phương và ranh giới timezone đã được quyết định; không đưa chúng trở lại danh sách mở. Các lựa chọn trước đây về hủy và sinh hiệu thuộc quyết định vòng đời riêng. Snapshot sáu lựa chọn mở theo `VIS-TRANSFER-OWNER-DECISION-RECON-03` ngày 06/11/2026 được giữ tại [transfer contract review](phase3-visit-transfer-contract-review.md) và [decision-gap memo](phase3-visit-transfer-decision-gaps.md), nay đã được RECON-04 thay thế.
 
 ## Các quyết định vòng đời khác (ngoài contract điều chuyển)
 
@@ -49,7 +50,7 @@ Các lựa chọn trước đây bên dưới về hủy và sinh hiệu thuộc
 
 1. **Không triển khai hủy trước khi xác định được nguồn dữ liệu chỉ định/thu phí.** Trong transaction kiểm tra current status/version, active orders và posted receipts; nếu service không sẵn sàng hoặc kết quả mơ hồ thì từ chối.
 2. **Tách command:** `CancelVisitCommand`, `TransferVisitCommand`, `RecordVitalsCommand` với context lấy từ session; không làm một mutation tổng quát dựa trên enum/setter.
-3. **Transfer persistence:** cập nhật location/queue theo quy tắc đã duyệt và trong transaction nhất quán; lựa chọn lịch sử riêng/audit-only/cả hai cùng payload lý do vẫn mở. Không tự chọn loại lưu vết hoặc triển khai migration.
+3. **Transfer persistence:** cập nhật location/queue theo quy tắc đã duyệt trong transaction nhất quán; lưu queue date ở `queueDate` riêng, không ghi đè `ngayKham` hoặc examination timestamps. Mã lý do cố định là bắt buộc, ghi chú ngắn tùy chọn; taxonomy, note constraints/privacy, transaction sampling và lựa chọn lịch sử riêng/audit-only/cả hai vẫn mở. Không tự chọn loại lưu vết hoặc triển khai migration.
 4. **Sinh hiệu:** lưu actor và measurement time riêng; đọc lại theo authorization/audit. Nếu cho phép sửa, giữ lịch sử hoặc audit diff không chứa narrative thừa.
 5. **Tắt các menu prototype** cho tới khi command và guard đã nối; UI chỉ là lớp thao tác, không thay authorization.
 
