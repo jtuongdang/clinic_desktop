@@ -65,6 +65,7 @@ import javax.swing.SwingUtilities;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReceptionSqlServerPersistenceTest {
@@ -93,9 +94,8 @@ class ReceptionSqlServerPersistenceTest {
         String formattedPhoneSuffix = generatedSuffix.substring(0, 3) + "."
                 + generatedSuffix.substring(3, 6) + "-" + generatedSuffix.substring(6);
         String syntheticCardNumber = "SYNTH" + generatedSuffix;
-        LocalDate today = LocalDate.now();
-        LocalDate initialCardStart = today.minusDays(1);
-        LocalDate initialCardEnd = today.plusYears(1);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate initialCardEnd = today.minusDays(1);
         LocalDate updatedCardStart = today.minusDays(2);
         LocalDate updatedCardEnd = today.plusYears(2);
         int registeredPatientId = 0;
@@ -181,7 +181,7 @@ class ReceptionSqlServerPersistenceTest {
             BaoHiem expectedInsurance = new BaoHiem();
             expectedInsurance.setLoaiBaoHiem(LoaiBaoHiem.BHYT);
             expectedInsurance.setSoBaoHiem(syntheticCardNumber);
-            expectedInsurance.setNgayBatDau(initialCardStart);
+            expectedInsurance.setNgayBatDau(null);
             expectedInsurance.setNgayHetHan(initialCardEnd);
             expectedInsurance.setMucHuong(80);
             expectedInsurance.setMaNoiSong("K2");
@@ -222,7 +222,7 @@ class ReceptionSqlServerPersistenceTest {
                 setCheckBox(form, "chkPriority", true);
                 setText(form, "txtReason", "Synthetic persistence test");
                 setText(form, "txtInsuranceNumber", syntheticCardNumber);
-                setText(form, "txtInsuranceStartDate", formatDate(initialCardStart));
+                setText(form, "txtInsuranceStartDate", "");
                 setText(form, "txtInsuranceEndDate", formatDate(initialCardEnd));
                 setText(form, "txtInsuranceRate", "80");
                 setCombo(form, "cbLivingArea", "K2");
@@ -271,6 +271,21 @@ class ReceptionSqlServerPersistenceTest {
                     "BHYT card identifier changed during initial reload");
             assertPatientAndInsurance(initialMatch.patient(), initialMatch.latestInsurance(),
                     expectedPatient, expectedInsurance);
+            ReceptionCompositionRoot.Services freshRegistrationServices = ReceptionCompositionRoot.create(lifecycle);
+            List<PatientSearchItem> freshRegistrationMatches = freshRegistrationServices.searchPatients()
+                    .handle(new SearchPatientsQuery(syntheticCccd, authorizationContext,
+                            lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow();
+            assertEquals(1, freshRegistrationMatches.size(),
+                    "Registered synthetic patient was not uniquely returned by scoped CCCD search");
+            PatientSearchItem freshRegistrationMatch = findByCccd(freshRegistrationMatches, registeredPatientId);
+            assertNotNull(freshRegistrationMatch.latestInsurance(),
+                    "Fresh scoped CCCD reload did not return the registered BHYT card");
+            assertEquals(generatedCardId, freshRegistrationMatch.latestInsurance().getId(),
+                    "BHYT card identifier changed during fresh registration reload");
+            assertNull(freshRegistrationMatch.latestInsurance().getNgayBatDau(),
+                    "Unknown BHYT start date must remain null after persistence");
+            assertEquals(initialCardEnd, freshRegistrationMatch.latestInsurance().getNgayHetHan(),
+                    "Past BHYT expiry must persist as the exact LocalDate");
             assertQueueContains(services.getQueue()
                             .handle(new GetReceptionQueueQuery(LocalDate.now(), authorizationContext,
                                     lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().queue(),
