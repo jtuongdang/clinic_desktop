@@ -1,5 +1,18 @@
 # Phase 0: DB configuration resolution contract
 
+## Owner-approved addendum — 2026-11-06: A1 selector interface resolved
+
+**Contract:** `PHASE0-DB-CONFIG-EXPLICIT-PATH-OWNER-DECISION-01`, ID `d31d0af7-8ab7-47b6-a114-12c8ea42fbe6`; Owner-confirmed 2026-11-06. This addendum resolves **only A1's external-file path/interface**. Read it with the [authoritative deployment/TLS decisions](phase0-deployment-config-tls-decision-proposal.md) and [remaining-decisions record](phase0-db-config-remaining-decisions-proposal.md).
+
+- **A1 interface — RESOLVED:** the process environment variable `CLINIC_DB_CONFIG_FILE` explicitly selects an **absolute filesystem path** to the external properties file for IntelliJ and packaged-JAR launch. It controls a path, not a database credential.
+- **No implicit discovery:** do not search the current working directory (CWD), the JAR's directory, classpath, or adjacent directories. When the selector is absent, the deployment profile may resolve environment/secret-injection values without an external file, subject to remaining resolver decisions. Absent is distinct from present-but-blank.
+- **Previously approved requirements remain fixed:** `PHASE0-DB-DEPLOY-DECISION-RECON-02` requires both source classes and mandatory SQL Server encryption plus certificate/server-identity validation. Invalid, untrusted, expired, or identity-mismatched certificates must fail closed; no `trustServerCertificate` bypass, disabled encryption, or driver-default fallback. Under `PHASE0-DB-CONFIG-SOURCE-PRECEDENCE-OWNER-DECISION-01`, environment/secret injection wins per key present in both sources; the selected file supplies only keys absent from the environment.
+- **Still OPEN / non-binding:** present-but-blank or relative selector behavior; missing, unreadable, or malformed selected-file handling and any fallback after an error; properties syntax, duplicate/unknown keys and normalization; combined `DB_CONNECTION_STRING` versus split values; blank/partial credentials and integrated authentication; `DB_DRIVER`; URL construction/default database; file-only secrets, source split and redaction. A2–A8 remain OPEN, as do A1 error semantics. Current resolver behavior does not decide these policies.
+
+The original review, proposals, implementation result, guidance and validation sections below are retained as **historical snapshots**. Earlier statements that source coverage, file path/interface or TLS policy are undecided are superseded only within the approved scope above; unrelated findings and recommendations remain unchanged and do not become approved policy. Historical test/build results are not validation of this addendum or evidence that the selector is implemented.
+
+This addendum records no code, tests, packaging, launcher, runtime, database connection or migration change and authorizes none. Phase 0 packaged-JAR/release readiness and `SEC-01` remain **OPEN**; downstream gated workflows remain **default-deny**.
+
 ## Scope and conclusion
 
 This is a report-only architecture and contract review of `DatabaseConnection`, its callers, the example properties resource, README guidance, Maven packaging, and tests. No implementation or test code was changed. No local `db.properties`, environment values, or credential material were read, and no database was contacted.
@@ -50,7 +63,7 @@ Lazy behavior should be a single snapshot per `DatabaseConnection` lifecycle: fi
 - **Partial credentials:** Existing behavior allows an absent username and does not validate a missing password. The pair-required proposal above needs confirmation against supported JDBC authentication modes; alternatively document and test the intended valid combinations.
 - **Malformed inputs and property-load failures:** There is no dialect-independent test for a malformed JDBC URL before the driver sees it. Agree whether only structural incompleteness is rejected by the resolver and leave driver syntax errors downstream, and whether unreadable properties fail closed or retain current ignore behavior.
 - **TLS and certificate validation:** Policy remains unspecified. The sample's explicit options are not a deployment policy.
-- **External JAR configuration:** No external configuration path is implemented or documented. Whether to add one remains a deployment decision.
+- **External JAR configuration — file path/interface RESOLVED by the 2026-11-06 addendum above:** `CLINIC_DB_CONFIG_FILE` selects an absolute external properties-file path for IntelliJ/JAR, with no implicit directory discovery. Historical finding retained: “No external configuration path is implemented or documented. Whether to add one remains a deployment decision.” This finding predates the approved interface; selector error/fallback semantics and implementation evidence remain open.
 
 ## Focused synthetic test sequence
 
