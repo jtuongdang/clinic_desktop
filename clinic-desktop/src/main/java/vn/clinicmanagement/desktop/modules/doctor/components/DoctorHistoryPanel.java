@@ -12,8 +12,13 @@ import java.util.List;
 /** Read-only patient-level history returned by the separately authorized history query. */
 public class DoctorHistoryPanel extends JPanel {
     private static final String EMPTY_MESSAGE = "Chưa có dữ liệu tiền sử bệnh đã xác thực.";
+    private static final String LOADING_MESSAGE = "Đang tải tiền sử bệnh...";
+    private static final String UNAVAILABLE_MESSAGE = "Không thể tải tiền sử bệnh.";
 
-    private final JLabel historyStatus = new JLabel(EMPTY_MESSAGE, SwingConstants.CENTER);
+    private final JLabel historyStatus = new JLabel("", SwingConstants.CENTER);
+    private final JLabel loadingLabel = new JLabel(LOADING_MESSAGE, SwingConstants.CENTER);
+    private final JProgressBar loadingProgress = new JProgressBar();
+    private final JPanel loadingStatus = new JPanel(new BorderLayout(0, 8));
     private final DefaultTableModel historyModel = new DefaultTableModel(
             new Object[]{"Loại tiền sử", "Nội dung"}, 0) {
         @Override
@@ -39,6 +44,17 @@ public class DoctorHistoryPanel extends JPanel {
         historyStatus.setBorder(new EmptyBorder(12, 8, 12, 8));
         add(historyStatus, BorderLayout.CENTER);
 
+        loadingLabel.setFont(AppFonts.BODY);
+        loadingLabel.setForeground(new Color(100, 110, 120));
+        loadingProgress.setIndeterminate(true);
+        loadingProgress.setPreferredSize(new Dimension(180, 16));
+        loadingProgress.getAccessibleContext().setAccessibleName(LOADING_MESSAGE);
+        loadingProgress.getAccessibleContext().setAccessibleDescription(
+                "Tiến trình tải tiền sử bệnh đang được thực hiện.");
+        loadingStatus.setOpaque(false);
+        loadingStatus.add(loadingLabel, BorderLayout.CENTER);
+        loadingStatus.add(loadingProgress, BorderLayout.SOUTH);
+
         historyTable.setFont(AppFonts.BODY);
         historyTable.setRowHeight(28);
         historyTable.setFillsViewportHeight(true);
@@ -48,7 +64,7 @@ public class DoctorHistoryPanel extends JPanel {
 
     public void showLoading() {
         clearRows();
-        historyStatus.setText("Đang tải tiền sử bệnh...");
+        showStatus(loadingStatus);
     }
 
     public void showHistory(List<TienSuBenh> histories) {
@@ -71,18 +87,22 @@ public class DoctorHistoryPanel extends JPanel {
 
     public void showUnavailable() {
         clearRows();
-        historyStatus.setText("Không thể tải tiền sử bệnh.");
+        historyStatus.setText(UNAVAILABLE_MESSAGE);
     }
 
     public void clearHistory() {
         clearRows();
-        historyStatus.setText(EMPTY_MESSAGE);
+        historyStatus.setText("");
     }
 
     private void clearRows() {
         historyModel.setRowCount(0);
+        showStatus(historyStatus);
+    }
+
+    private void showStatus(Component status) {
         removeAllExceptTitle();
-        add(historyStatus, BorderLayout.CENTER);
+        add(status, BorderLayout.CENTER);
         revalidate();
         repaint();
     }

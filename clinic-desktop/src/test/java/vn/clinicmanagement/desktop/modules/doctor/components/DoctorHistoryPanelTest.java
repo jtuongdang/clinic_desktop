@@ -11,15 +11,34 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DoctorHistoryPanelTest {
     @Test
-    void rendersOnlyQueryRowsInNonEditableHistoryTableAndClearsThem() throws Exception {
-        TienSuBenh history = history(501, "Synthetic history detail");
+    void showsLoadingAndTransitionsThroughHistoryStatesOnTheEdt() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             DoctorHistoryPanel panel = new DoctorHistoryPanel();
-            panel.showHistory(List.of(history));
 
+            panel.showLoading();
+            JLabel loadingLabel = findLabel(panel, "Đang tải tiền sử bệnh...");
+            JProgressBar progress = findProgressBar(panel);
+            assertNotNull(loadingLabel);
+            assertTrue(loadingLabel.isVisible());
+            assertNotNull(progress);
+            assertTrue(progress.isVisible());
+            assertTrue(progress.isIndeterminate());
+            assertEquals("Đang tải tiền sử bệnh...",
+                    progress.getAccessibleContext().getAccessibleName());
+            assertFalse(containsText(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực."));
+            assertFalse(containsText(panel, "Không thể tải tiền sử bệnh."));
+
+            panel.showHistory(List.of());
+            assertEquals("Chưa có dữ liệu tiền sử bệnh đã xác thực.",
+                    findLabel(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực.").getText());
+            assertNull(findProgressBar(panel));
+
+            panel.showHistory(List.of(history(501, "Synthetic history detail")));
             JTable table = findTable(panel);
             assertNotNull(table);
             assertEquals(1, table.getRowCount());
@@ -28,17 +47,23 @@ class DoctorHistoryPanelTest {
             assertFalse(table.getModel().isCellEditable(0, 0));
             assertFalse(table.getModel().isCellEditable(0, 1));
             assertFalse(containsMutationButton(panel));
+            assertFalse(containsText(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực."));
 
-            panel.clearHistory();
+            panel.showUnavailable();
+            assertEquals("Không thể tải tiền sử bệnh.",
+                    findLabel(panel, "Không thể tải tiền sử bệnh.").getText());
             assertEquals(0, table.getRowCount());
             assertFalse(containsText(panel, "Synthetic history detail"));
-            assertEquals("Chưa có dữ liệu tiền sử bệnh đã xác thực.",
-                    findLabel(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực.").getText());
+            assertNull(findProgressBar(panel));
 
-            panel.showHistory(List.of());
+            panel.showLoading();
+            assertNotNull(findProgressBar(panel));
+            panel.clearHistory();
             assertEquals(0, table.getRowCount());
-            assertEquals("Chưa có dữ liệu tiền sử bệnh đã xác thực.",
-                    findLabel(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực.").getText());
+            assertFalse(containsText(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực."));
+            assertFalse(containsText(panel, "Không thể tải tiền sử bệnh."));
+            assertFalse(containsText(panel, "Đang tải tiền sử bệnh..."));
+            assertNull(findProgressBar(panel));
         });
     }
 
@@ -57,6 +82,17 @@ class DoctorHistoryPanelTest {
             if (component instanceof Container child) {
                 JTable table = findTable(child);
                 if (table != null) return table;
+            }
+        }
+        return null;
+    }
+
+    private static JProgressBar findProgressBar(Container container) {
+        for (Component component : container.getComponents()) {
+            if (component instanceof JProgressBar progressBar) return progressBar;
+            if (component instanceof Container child) {
+                JProgressBar progressBar = findProgressBar(child);
+                if (progressBar != null) return progressBar;
             }
         }
         return null;
