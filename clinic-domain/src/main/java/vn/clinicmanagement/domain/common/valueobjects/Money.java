@@ -3,7 +3,6 @@ package vn.clinicmanagement.domain.common.valueobjects;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Locale;
 import java.util.Objects;
 
 public final class Money implements Serializable, Comparable<Money> {
@@ -19,8 +18,11 @@ public final class Money implements Serializable, Comparable<Money> {
 
     public Money(BigDecimal amount, String currency) {
         if (amount == null) throw new IllegalArgumentException("Số tiền không được null.");
+        if (currency != null && !CURRENCY_VND.equalsIgnoreCase(currency)) {
+            throw new IllegalArgumentException("Chỉ hỗ trợ tiền tệ VND.");
+        }
         this.amount = amount.setScale(2, RoundingMode.HALF_UP);
-        this.currency = currency != null ? currency.toUpperCase(Locale.ROOT) : CURRENCY_VND;
+        this.currency = CURRENCY_VND;
     }
 
     public static Money of(long amount) { return new Money(BigDecimal.valueOf(amount)); }
