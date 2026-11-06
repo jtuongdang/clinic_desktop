@@ -1,35 +1,45 @@
 # VIS-TRANSFER-REASON-POLICY-01 — Transfer reason code taxonomy, note normalization, and privacy policy proposal
 
-**Status:** Source-grounded proposal only, reconciled under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-04` (superseding `VIS-TRANSFER-OWNER-DECISION-RECON-03` and `VIS-TRANSFER-SOURCE-RECON-01`). Snapshot: 2026-11-06. No Java, tests, migration, permission, policy or database changes. SEC-01 and all downstream gates remain OPEN; transfer remains default-deny pending its separately approved implementation and acceptance. SEC-01 Definition A does not itself accept future workflows ([baseline acceptance:4–9,23–32][sec01]).
+**Status:** Non-binding optional-note proposal; updated 2026-11-06 under Owner-approved `VIS-TRANSFER-OWNER-DECISION-RECON-05`, carrying forward RECON-04 unchanged. Six reason codes and their permitted roles are approved; optional-note policy remains unapproved. No Java, tests, migration, permission, policy or database changes. SEC-01 and all downstream gates remain OPEN; transfer remains default-deny pending its separately approved implementation and acceptance. SEC-01 Definition A does not itself accept future workflows ([baseline acceptance:4–9,23–32][sec01]).
 
-**Contract:** This correction is authorized by task-supplied approved contract v1 `PHASE0-PHASE3-REVIEW-AND-TRACKING-DOCS-01`. The original proposal records `VIS-TRANSFER-OPEN-DECISION-PROPOSALS-01`; fixed transfer policy is reconciled under `VIS-TRANSFER-OWNER-DECISION-RECON-04`. The recommendations below are proposed technical policy choices for Owner review, not additional owner approvals. This document is explicitly non-binding and does not authorize a table, schema, audit mapping, grant or runtime workflow. Only this Markdown deliverable is in scope.
+**Contract:** Current authority is the task-supplied approved contract v1 `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06, retaining `VIS-TRANSFER-OWNER-DECISION-RECON-04`. Earlier `PHASE0-PHASE3-REVIEW-AND-TRACKING-DOCS-01` / `VIS-TRANSFER-OPEN-DECISION-PROPOSALS-01` proposal context is historical. This document proposes only the remaining optional-note decisions; it does not approve policy, choose a database column/schema, or authorize permissions, runtime enablement or gate closure. Separate Owner approval and transfer workflow acceptance are still required. Only this Markdown deliverable is in scope.
+
+## RECON-05 follow-up addendum — 2026-11-06 (current reading)
+
+**Approved facts, not proposals:** RECON-05 resolves the six-code role matrix in section 3, requires dedicated immutable transfer history **plus** successful security audit in the mutation/allocation DB transaction, and fixes queue allocation and replay outcomes summarized in section 1. RECON-04's mandatory fixed business reason and **optional** short note remain unchanged. Business reason and note must never enter `AuditReasonCode` or auth/authorization `NhatKyHeThong.maLyDo`; keep the fixed code separate from free text. No code or note expands actor/status/scope eligibility, destination reads, linked-work changes or billing authority.
+
+**Remaining proposal:** Sections 4–7 recommend a bounded, single-line, optional operational note and compare a more restrictive alternative. Length, whitespace, allowed characters, privacy handling, UI/log behavior, exact logical/physical storage field and retention boundaries all still need separate Owner approval. Neither the recommendation nor this dated reconciliation constitutes acceptance. SEC-01 stays **OPEN** and runtime transfer stays **default-deny** until the separately required guards, persistence, audit, concurrency, rollback, security and workflow acceptance pass.
+
+**Supersession map:** Section 3 Options 1 and 3 and the former taxonomy/role choices D1/D2 are resolved historical material, not current alternatives. Former D4's history-vs-audit-only choice is superseded by required history **and** audit; exact fields/persistence/retention are still open. Code-only would contradict the approved optional note and is not an option here. The former 255-character recommendation was incomplete; section 4 now supplies a concrete proposal, not a binding normalization/canonicalization contract.
 
 ---
 
 ## 1. Fixed decisions and reconciliation
 
-The task-supplied contract `VIS-TRANSFER-OWNER-DECISION-RECON-04` is the binding authority for the following owner-approved transfer rules; this proposal takes them as settled invariants and does not reopen them:
+The task-supplied contracts `VIS-TRANSFER-OWNER-DECISION-RECON-04` and `VIS-TRANSFER-OWNER-DECISION-RECON-05` are the binding authority for the following owner-approved transfer rules; this proposal takes them as settled invariants and does not reopen them:
 
 | Owner-approved rule | Reason and note policy consequence |
 |---|---|
-| Transfer reason is mandatory as a fixed reason code; a short note is optional. | Every transfer command must supply a valid fixed business reason code from a taxonomy still awaiting approval. An empty, null, or unlisted reason code must fail closed; illustrative error names `TRANSFER_REASON_REQUIRED` / `INVALID_TRANSFER_REASON_CODE` are proposals, not an approved API. A short note is strictly optional. |
+| Transfer reason is mandatory as a fixed reason code; a short note is optional. | Every transfer command must supply a valid fixed business reason code from the approved six-code role matrix in section 3. An empty, null, or unlisted reason code must fail closed; illustrative error names `TRANSFER_REASON_REQUIRED` / `INVALID_TRANSFER_REASON_CODE` are proposals, not an approved API. A short note is strictly optional. |
 | Clinical reason-for-examination fields (`lyDoKham`) must not be reused. | Transfer is an administrative/operational queue routing movement between clinic rooms, whereas `lyDoKham` is the clinical reason-for-examination field ([`LuotKham.java:41`][visit-domain]). `lyDoChuyenTuyen` is a separate clinical referral field in the end-of-examination section ([`LuotKham.java:66-71`][visit-domain]). Neither clinical field may be overwritten, appended to, or reused for queue transfer. |
 | Preserve visit status, `ngayKham`, and examination timestamps during transfer. | Preserved visit status (`CHO_KHAM`, `DANG_KHAM`, or `CHO_CLS`), clinical visit date `ngayKham`, and existing examination timestamps (`thoiGianBatDauKham`, `thoiGianKetThucKham`) remain intact during transfer. Queue allocation and transfer logging must not alter the clinical visit timeline. |
-| Destination queue date is a separate `queueDate` in `Asia/Ho_Chi_Minh`, distinct from `ngayKham`. | Allocate destination queue using the transfer date as a separate `queueDate` in `Asia/Ho_Chi_Minh`. Never mutate clinical `ngayKham`. |
-| RECEPTIONIST transfers only `CHO_KHAM`; DOCTOR transfers only `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`. Other roles and final/completed, cancelled, soft-deleted, or EMR-locked visits are denied. | Persisted state must satisfy the approved eligibility rules. Additional role-to-reason restrictions remain proposals; a code never expands actor/status eligibility. |
-| An active destination room belonging to the destination department is required. RECEPTIONIST may transfer between departments within the same facility; DOCTOR stays in the session-selected department. Transfer grants no destination patient/history/queue reads. | All taxonomy options remain bounded by these scope rules, including codes whose labels mention specialty or patient preference. |
+| Destination queue date is a separate `queueDate` in `Asia/Ho_Chi_Minh`, distinct from `ngayKham`. | Share one `(roomId, queueDate)` room/day number stream between registration and transfer. Never reuse a committed number; visible gaps are allowed. Capture one SQL Server UTC instant at transaction start and derive `queueDate` in `Asia/Ho_Chi_Minh`. Never mutate clinical `ngayKham`. Schema, allocator implementation, cutover and legacy-data behavior remain open. |
+| RECEPTIONIST transfers only `CHO_KHAM`; DOCTOR transfers only `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`. Other roles and final/completed, cancelled, soft-deleted, or EMR-locked visits are denied. | Persisted state must satisfy the approved eligibility rules. The six-code role restrictions are approved; a code never expands actor/status eligibility. |
+| An active destination room belonging to the destination department is required. RECEPTIONIST may transfer between departments within the same facility; DOCTOR stays in the session-selected department. Transfer grants no destination patient/history/queue reads. | All approved codes remain bounded by these scope rules, including codes whose labels mention specialty or patient preference. |
 | Allocate a new destination queue number, preserve existing priority, and never auto-promote. | A transfer reason cannot grant a priority change or authorize a queue-number reuse policy. |
 | Preserve visit-linked service orders, prescriptions, results, invoices, and financial records. Do not automatically cancel or mutate them, alter billing, or create duplicate charges. | Reason codes must never imply automated billing recalculation, line-item voiding, or prescription cancellation. Any financial or clinical adjustment belongs to a separate authorized workflow. |
 | Pending work follows only when safe with performing unit and responsibility intact; otherwise require completion/handoff or deny. Issued prescriptions, confirmed results and posted financial transactions are immutable. | A reason code cannot substitute for eligibility evidence or authorize linked-work adjustments. Transaction consistency, optimistic concurrency, domain invariants and exception-path tests remain required. |
-| Technical/audit metadata uses UTC; clinic business time uses `Asia/Ho_Chi_Minh`. | Transfer event metadata records UTC timestamps, while effective operational day tracking uses `Asia/Ho_Chi_Minh`; clock and transaction sampling details remain unresolved. |
+| Dedicated immutable transfer history plus successful security audit are required in the same DB transaction as mutation/allocation. | Required history and audit writes fail/roll back together. Exact storage fields remain open. A future action may be `VISIT_TRANSFERRED`; an enum addition alone does not wire or emit an event. |
+| Idempotent committed replay requires reauthorization. | Same key + same canonical payload returns the stored receipt without repeated side effects, allocation, history or success audit. Same key + different payload conflicts without writes. After timeout, retry with the same key and determine commit vs rollback before proceeding; timeout alone never proves rollback. Key scope/lifetime, canonical fields/normalization, receipt, wait/indeterminate semantics and reservation of failed/denied attempts remain open. |
+| Technical/audit metadata uses UTC; clinic business time uses `Asia/Ho_Chi_Minh`. | Transfer event metadata records UTC timestamps, while effective operational day tracking uses `Asia/Ho_Chi_Minh`; RECON-05 fixes the transaction-start SQL Server UTC instant and local-date derivation; persistence details remain unresolved. |
 
-Provenance: approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-04`, 2026-11-06; cross-reference [`phase3-visit-transfer-contract-review.md:10-16`][contract-review] and [`phase3-visit-transfer-decision-gaps.md:83-90`][gap-memo].
+Provenance: task-supplied approved `VIS-TRANSFER-OWNER-DECISION-RECON-05`, 2026-11-06, retaining RECON-04; cross-reference [`phase3-visit-transfer-contract-review.md:10-16`][contract-review] and [`phase3-visit-transfer-decision-gaps.md:83-90`][gap-memo].
 
 ---
 
 ## 2. Inspected implementation and current limits of the evidence
 
-Repository citation paths resolve relative to this document; their line anchors were checked against this checkout. External primary references for string units are identified separately in section 4.
+The following implementation evidence and citations are retained from the earlier review, not newly verified source facts in this follow-up. Only the allowlisted proposal was opened locally; no Java, SQL or other source document was read. Existing implementation patterns were inspected through this retained evidence map and task-supplied retrieval excerpts. Source line anchors and absence findings below are historical; they do not prove current runtime behavior. External string-unit references are retained for context, not newly retrieved.
 
 | Area | Inspected source facts | Consequence / gap |
 |---|---|---|
@@ -41,15 +51,15 @@ Repository citation paths resolve relative to this document; their line anchors 
 | Audit database schema | [`V6__Enhance_Audit_Tables_Append_Only.sql:17-24,69-109`][audit-immutable] defines `maLyDo VARCHAR(100) NULL`, append-only state checks and triggers rejecting `UPDATE` and `DELETE` on both audit tables. | This is evidence of audit-column width and append-only enforcement, not transfer storage approval or a permanent-retention duration. Retention duration remains unresolved and purge remains prohibited ([baseline acceptance:27-28][sec01]). |
 | Desktop UI prototype | [`PatientQueueContextMenu.java:71-75`][ui-menu], [`ExaminationPanel.java:1080-1091`][ui-panel], and [`TransferRoomSelectDialog.java:15-34`][ui-dialog] implement a mock popup selecting room labels from a hardcoded array. | The UI prototype has no reason dropdown, no note text area, no validation, and performs no backend call. |
 
-Absence finding: no transfer reason enum, validation service, or normalization logic currently exists in `clinic-domain`, `clinic-application`, or `clinic-infrastructure`.
+Historical absence finding: no transfer reason enum, validation service, or normalization logic was found in `clinic-domain`, `clinic-application`, or `clinic-infrastructure`.
 
 ---
 
-## 3. Transfer reason code taxonomy options
+## 3. Approved six-code taxonomy and superseded historical options
 
-The approved contract requires a **fixed reason code**. Below are three practical taxonomy options evaluated against clinic operations, role governance, reporting utility, and extensibility.
+RECON-05 approves Option 2 and its permitted roles. Options 1 and 3 and their comparison are retained only as historical rationale; they are not open choices. No taxonomy or role amendment is proposed.
 
-### Option 1: Minimal Coarse-Grained Operational Taxonomy (4 Core Codes)
+### Historical Option 1 — superseded, not approved (4 codes)
 
 Defines a compact, universal set of 4 codes applicable across all outpatient clinics.
 
@@ -64,24 +74,24 @@ Defines a compact, universal set of 4 codes applicable across all outpatient cli
   - *Pros:* Minimum complexity; straightforward to implement as a simple Java enum (`TransferReasonCode`); low cognitive burden on staff; clean, unified management reporting.
   - *Cons:* Lacks granularity; does not distinguish between administrative triage mistakes and clinical equipment dependencies; does not restrict clinical referral decisions exclusively to clinicians.
 
-### Option 2: Role-Partitioned Operational Taxonomy (6 Codes — Recommended)
+### Option 2 — APPROVED by RECON-05 (6 codes; resolved)
 
-Proposes additional role-to-code eligibility within the fixed actor/status/scope boundaries of `DEC-AUTHZ-04b` and RECON-04. These additional restrictions are not approved policy. Every DOCTOR option remains within the session-selected department; no specialty label authorizes a cross-department transfer.
+These role-to-code restrictions are approved within the fixed actor/status/scope boundaries of `DEC-AUTHZ-04b` and RECON-04. Every DOCTOR option remains within the session-selected department; only RECEPTIONIST may change departments within the same facility. Labels and operational examples do not add eligibility rules or broaden scope.
 
 | Reason Code | Display Label (VN) | Operational Definition | Role Eligibility |
 |---|---|---|---|
 | `RECEPTION_TRIAGE_CORRECTION` | Tiếp đón phân luồng nhầm | Front desk misrouted patient during reception; corrected before consultation begins. | `RECEPTIONIST` only |
-| `PATIENT_SPECIALTY_PREFERENCE` | Người bệnh đổi nguyện vọng | Patient requests another room while waiting in `CHO_KHAM`; a department change is eligible only for `RECEPTIONIST` within the same facility. | `RECEPTIONIST`, `DOCTOR` |
-| `CLINIC_LOAD_BALANCING` | Điều phối lưu lượng hàng đợi | Shift patient between parallel rooms in the same department to balance wait times. | `RECEPTIONIST`, `DOCTOR` |
+| `PATIENT_SPECIALTY_PREFERENCE` | Người bệnh đổi nguyện vọng | Patient requests another room within approved actor/status/scope rules; a department change is eligible only for `RECEPTIONIST` within the same facility. | `RECEPTIONIST`, `DOCTOR` |
+| `CLINIC_LOAD_BALANCING` | Điều phối lưu lượng hàng đợi | Balance room queues within the already-approved actor/status/scope rules. | `RECEPTIONIST`, `DOCTOR` |
 | `CLINICAL_SPECIALTY_REFERRAL` | Chuyển khám chuyên khoa | Examining doctor requests another suitable specialty room within the session-selected department; deny a destination outside it. | `DOCTOR` only |
 | `DIAGNOSTIC_EQUIPMENT_NEED` | Cần trang thiết bị chuyên dụng | Room lacks specific diagnostic instrument (e.g., ENT endoscope, ultrasound machine) available in target room. | `DOCTOR` only |
 | `CLINICIAN_EMERGENCY_HANDOFF` | Bác sĩ bàn giao đột xuất | Doctor is called to an emergency, hospital round, or sudden absence; handoff of active queue. | `DOCTOR` only |
 
 - **Tradeoffs:**
-  - *Pros:* Could distinguish front-desk triage corrections from in-department clinical handoffs for reporting, while preserving approved transfer boundaries.
+  - *Pros:* Distinguishes front-desk triage corrections from in-department clinical handoffs for reporting, while preserving approved transfer boundaries.
   - *Cons:* Slightly larger code set; application validation guard must verify actor role against code eligibility.
 
-### Option 3: Two-Tier Extensible Taxonomy (System Category + Tenant Configuration)
+### Historical Option 3 — superseded, not approved (configurable catalog)
 
 Proposes 4 top-level system categories in Java (`ADMINISTRATIVE`, `CLINICAL`, `LOAD_MANAGEMENT`, `PATIENT_REQUEST`), with granular sub-reasons in a hypothetical table or configurable catalog (`DanhMucLyDoDieuChuyen`). The name and schema are unapproved.
 
@@ -89,119 +99,103 @@ Proposes 4 top-level system categories in Java (`ADMINISTRATIVE`, `CLINICAL`, `L
   - *Pros:* High extensibility; large multi-facility hospital systems can add custom sub-reasons without code changes or migrations.
   - *Cons:* Introduces substantial relational complexity, additional repository queries, caching needs, and catalog governance overhead. At current Phase 3 maturity, this represents speculative over-engineering before basic transfer capability exists.
 
-### Taxonomy Comparison Summary
+### Historical taxonomy comparison — decision resolved by RECON-05
 
 | Criteria | Option 1 (4 Core Codes) | Option 2 (Role-Partitioned 6 Codes) | Option 3 (Two-Tier Configurable) |
 |---|---|---|---|
 | **Simplicity & Implementation Effort** | Very High (trivial enum) | High (single enum + role validator) | Low (requires DB catalog + maintenance UI) |
-| **Additional Role-to-Code Restrictions (proposed)** | As listed above | Role-eligible validation | Dependent on catalog design |
+| **Role-to-code restrictions (historical comparison; Option 2 approved)** | As listed above | Role-eligible validation | Dependent on catalog design |
 | **Reporting & KPI Value** | Moderate (broad categories) | High (clear triage vs clinical vs contingency metrics) | Very High (customizable) |
 | **Extensibility without Migration** | Low (enum requires code release) | Moderate (stable core set covers operations) | High (runtime configuration) |
 | **Business Reason Storage (unresolved)** | Separate business code | Separate business code | Separate category/sub-code representation |
 
-None of these options maps business codes into `AuditReasonCode` or `NhatKyHeThong.maLyDo`. Transfer audit events, correlation and any separate operational payload contract require later review, regardless of which taxonomy is chosen.
+The approved six business codes never map into `AuditReasonCode` or `NhatKyHeThong.maLyDo`. RECON-05 requires history plus security audit; exact fields, correlation and the operational payload design remain open.
 
 ---
 
-## 4. Bounded note length and normalization options
+## 4. Optional-note recommendation and conservative alternative — NOT APPROVED
 
-Approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-04` specifies that a short note is **optional**. Because free text introduces data quality, normalization, and privacy risks, constraints must be established.
+The note stays optional for every approved code, including clinical handoff codes. Missing, null, empty or normalized-blank input must not require staff to invent text. The fixed business code is mandatory and remains a separate value. No clinical narrative is needed to justify an otherwise eligible transfer.
 
-### Note Length Boundaries
+### Recommendation N2: bounded operational note
 
-| Option | Proposed Limit | Storage Decision | Tradeoffs & Evaluation |
-|---|---|---|---|
-| **Option N1: Ultra-compact (100)** | 100; counting unit requires approval | Unicode-capable storage and capacity unresolved | Less space for an operational note. This limit is independent of the security audit `maLyDo` column. |
-| **Option N2: Standard Bounded Note (255 — Recommended)** | Propose 255 Unicode code points after normalization | SQL type, capacity and collation unresolved; not automatically `NVARCHAR(255)` | More room for a short Vietnamese note; approval must reconcile UI counting, Java validation and database capacity. |
-| **Option N3: Code only (policy amendment required)** | 0; reject notes | N/A | Would remove the Owner-approved optional-note capability. Retained only as a possible explicit policy amendment, not an implementation choice within RECON-04. |
+Recommend the following minimal deterministic policy for Owner review, applied at the future Application boundary as well as reflected in the UI. These steps describe a candidate **note** normalization policy; they do not settle the idempotency canonical field list or payload normalization.
 
-**Counting/storage mapping remains a decision.** Java 17 `String.length()` counts UTF-16 code units; `codePointCount(0, length())` counts Unicode code points ([Java 17 String documentation][java-string]). SQL Server `NVARCHAR(n)` sizes `n` in byte-pairs; with an SC-enabled collation, a supplementary code point consumes two such units ([SQL Server documentation][sql-nvarchar]). For example, 255 supplementary code points require 510 UTF-16 code units and cannot fit `NVARCHAR(255)`. A code point count also differs from a count of user-perceived grapheme clusters; NFC alone does not make those counts equal.
+1. **Optional input:** Missing/null becomes absent. Do not add a default note or concatenate the reason label into it.
+2. **Whitespace:** Map only TAB (U+0009), LF (U+000A), CR (U+000D), SPACE (U+0020), NBSP (U+00A0) and NARROW NBSP (U+202F) to ordinary U+0020 spaces. Collapse runs of those spaces and trim both ends. A CR/LF pair therefore becomes one separator, never silent word concatenation. Normalize an empty result to absent. Other whitespace/separators are rejected rather than relying on differing `trim()`, `isBlank()` or regex definitions.
+3. **Unicode:** Normalize nonempty text to NFC before counting. Permit Unicode letters (L), combining marks (M), decimal digits (Nd), punctuation (P), symbols (S) and ordinary U+0020 space. Reject all other categories, including controls not mapped in step 2, format characters (including bidi overrides and zero-width joiners), unpaired surrogates, private-use and unassigned characters. Pin the Unicode category/version behavior in the later implementation contract. Simple symbol/emoji code points can pass; sequences containing disallowed format characters cannot. No HTML/Markdown interpretation is authorized.
+4. **Length:** Allow at most **255 Unicode code points after normalization**; reject excess with a field-level error, never silently truncate. The UI counter must use the same unit/stage and explain normalization. A code point is not a user-perceived grapheme or a Java UTF-16 code unit. Storage validation must independently guarantee lossless round trips for the permitted repertoire.
+5. **Privacy/UI:** Show the fixed code separately and label the note “Ghi chú vận hành (không bắt buộc)”. Display guidance: “Không nhập thông tin định danh, liên hệ, chẩn đoán hoặc kết quả khám/xét nghiệm.” Provide no patient-derived suggestions, clinical prefill or mandatory-note rule. Show normalized text for review before submit; validation errors must not echo the rejected text into logs.
 
-Owner/implementation review must choose the count unit, normalized counting stage, supplementary-character/collation policy and compatible storage capacity, with rejection behavior that avoids silent truncation. A capacity such as `NVARCHAR(510)` could be evaluated for a 255-code-point policy with supplementary support; no SQL declaration, collation or mapping is approved here. Neither business code length nor note length derives from audit `maLyDo VARCHAR(100)`.
+This allows short Vietnamese operational text with diacritics and common punctuation without a complex language-specific whitelist. It does **not** prevent PHI. Recommend guidance and data minimization first; no new regex blocker is recommended until separately specified and reviewed (section 5).
 
-### Note Sanitization and Normalization Rules
+### Conservative alternative N1: smaller and narrower, still optional
 
-For later Application-boundary review, propose the following pipeline. It is not implemented or approved; whitespace handling and counting/storage decisions must be resolved before it becomes a deterministic contract:
+Use the same absent/whitespace/NFC pipeline, but limit to **100 Unicode code points** and allow only Unicode L/M/Nd, U+0020 and ASCII punctuation U+0021–U+007E that falls in category P. Other symbols, emoji and non-ASCII punctuation are rejected with an actionable inline message. Vietnamese letters/combining marks remain supported. This stricter repertoire reduces accidental formatting and free-text volume; it still cannot establish anonymity or prohibit diagnosis text automatically.
 
-1. **Null and Blank Collapsing:**
-   - If note is `null`, empty string `""`, or contains only whitespace (`note.isBlank()`), normalize to `null`.
-2. **Whitespace and Control Character Sanitization:**
-   - Choose whether to reject controls/multi-line input or replace line breaks and selected whitespace with single spaces; do not silently concatenate words by deleting separators.
-   - Specify the whitespace set and trimming method; `isBlank()`, `trim()` and a regex whitespace class are not interchangeable. Recheck for blank input after normalization.
-3. **Unicode Normalization:**
-   - Normalize string using Unicode Standard Form NFC (`Normalizer.normalize(note, Normalizer.Form.NFC)`) to ensure consistent indexing and character comparison for Vietnamese diacritics.
-4. **Length Enforcement:**
-   - If N2's code-point option is approved, count after all normalization and reject above 255; otherwise use the separately approved unit/limit. Check storage capacity independently. `TRANSFER_NOTE_EXCEEDS_MAX_LENGTH` is an illustrative proposed error name, not an existing contract.
-
----
-
-## 5. Privacy safeguards and audit minimization
-
-The safeguards below are non-binding engineering recommendations based on the current structured audit writer and the approved separation from clinical fields. They make no statutory or legal compliance claim.
-
-### Principle 1: Segregation of Clinical Narrative from Administrative Audit
-
-- **The Problem:** Free-text transfer notes can inadvertently contain Protected Health Information (PHI) or Personally Identifiable Information (PII), such as patient diagnoses, HIV/infectious status, phone numbers, or citizen ID numbers (CCCD).
-- **Existing Pattern:** [`JdbcAuditRepositoryImpl.java:18-27,113-165`][audit-writer] sets `chiTiet = NULL` and `lyDo = NULL` on its inserts. It stores structured metadata and the typed audit enum name (or null) in `maLyDo`.
-- **Proposed separation:** Keep optional notes outside the security audit tables and keep business transfer codes outside `AuditReasonCode` / `NhatKyHeThong.maLyDo`.
-  - A business reason explains why staff requested a move. A security audit reason explains an authentication/authorization outcome or an existing EMR audit exception; these are distinct meanings even when both are represented by codes.
-  - A future transfer audit event/action, minimal metadata and correlation to an operational record need a separately scoped contract. The current audit record does not contain both source and destination snapshots. No business-to-security reason mapping is proposed here.
-  - This proposal grants no audit-reader access; `AUDIT_READ` remains denied ([baseline acceptance:27][sec01]).
-
-### Principle 2: Storage of the Short Note in Dedicated Transfer History
-
-- Prefer a separate operational history representation for the business reason and optional note if the Owner chooses dedicated history or both history and audit. [`phase3-transfer-queue-history-persistence-proposal.md:59-65`][persistence-proposal] proposes `LichSuDieuChuyenLuotKham` with a mandatory reason and optional note; it approves no table or `ghiChu` column/type/width.
-- **Dedicated history, audit-only, or both remain unresolved.** An audit-only choice needs a new, correctly scoped design for retaining the required business reason independently of security reason semantics. The current audit API/schema is not evidence that audit-only transfer storage is supported. Optional-note persistence or transient handling also needs explicit review; do not silently discard notes or remove optional input. Free text must not bypass the existing audit writer's exclusion of free-text details.
-
-### Principle 3: Application-Level PII / PHI Guard Heuristics
-
-To actively discourage staff from typing sensitive identifiers into the optional short note, propose an application-level pre-validation check:
-
-- **Heuristic examples only:** Regex text `\b[0-9]{12}\b` and `\b0[0-9]{9}\b` flags standalone 12-digit and leading-zero 10-digit sequences. These are not identifier validity checks or comprehensive PII/PHI screening. If rejection is chosen, `TRANSFER_NOTE_CONTAINS_SENSITIVE_IDENTIFIER` is only a proposed error name. These are regex expressions, not escaped Java string literals; matching mode, boundary behavior, Unicode handling and preprocessing need specification.
-- **False positives:** Harmless operational numbers may match. A match does not establish that a note contains a CCCD or phone number.
-- **False negatives:** Spaced/hyphenated or international-format numbers, non-ASCII digits, embedded/obfuscated identifiers, names, addresses, diagnoses and other sensitive narrative may be missed. A non-match does not establish that a note is safe or anonymous. Synthetic edge cases must inform any later enforcement decision.
-- **Proposed UI guidance:** *"Ghi chú điều chuyển chỉ phục vụ điều phối hành chính/vận hành phòng khám; tuyệt đối không nhập thông tin chẩn đoán bệnh án, kết quả xét nghiệm hoặc số giấy tờ định danh."* Guidance and minimization remain necessary regardless of regex choice.
-
----
-
-## 6. Recommendations for Owner consideration (Proposal Only)
-
-The following specific recommendations are submitted for Owner consideration:
-
-> [!IMPORTANT]
-> **Proposal Recommendation Summary:**
-> 1. **Adopt Option 2 (Role-Partitioned Operational Taxonomy of 6 Codes):**
->    - `RECEPTION_TRIAGE_CORRECTION` (Receptionist only)
->    - `PATIENT_SPECIALTY_PREFERENCE` (Receptionist, Doctor)
->    - `CLINIC_LOAD_BALANCING` (Receptionist, Doctor)
->    - `CLINICAL_SPECIALTY_REFERRAL` (Doctor only)
->    - `DIAGNOSTIC_EQUIPMENT_NEED` (Doctor only)
->    - `CLINICIAN_EMERGENCY_HANDOFF` (Doctor only)
-> 2. **Consider Option N2 for Note Constraints:** Propose 255 Unicode code points after normalization, single-line, NFC-normalized, nullable when blank. Counting/storage mapping, collation and whitespace behavior still require explicit approval; `NVARCHAR(255)` is not an established mapping.
-> 3. **Adopt Strict Privacy Segregation:**
->    - Keep the fixed business reason distinct from the security `AuditReasonCode` / `NhatKyHeThong.maLyDo` vocabulary; do not write transfer codes into those fields.
->    - Prefer separate operational history for the reason and optional note if approved; names, fields, storage model and capacity remain unresolved. Keep notes outside security audit tables.
->    - Consider heuristic identifier checks with explicit false-positive/negative limitations; rejection versus advisory behavior remains an Owner decision.
-
----
-
-## 7. Exact unresolved Owner decisions
-
-Before any code, command, or schema implementation can proceed, the Owner must explicitly resolve the following five questions. No decision is inferred or assumed approved:
-
-| # | Unresolved Owner Decision Question | Options Requiring Explicit Choice |
+| Implication | Recommended N2 — proposed | Conservative N1 — proposed |
 |---|---|---|
-| **D1** | **Which reason code taxonomy is approved for clinic operations?** | - **Option 1:** Minimal 4 Core Codes (`WRONG_ROOM_ALLOCATION`, `SPECIALTY_CONSULTATION`, `OVERLOAD_REBALANCING`, `PATIENT_REQUEST`).<br>- **Option 2:** Role-Partitioned 6 Codes (`RECEPTION_TRIAGE_CORRECTION`, `PATIENT_SPECIALTY_PREFERENCE`, `CLINIC_LOAD_BALANCING`, `CLINICAL_SPECIALTY_REFERRAL`, `DIAGNOSTIC_EQUIPMENT_NEED`, `CLINICIAN_EMERGENCY_HANDOFF`).<br>- **Option 3:** Two-Tier Extensible Catalog with database configuration. |
-| **D2** | **Should role-to-code eligibility be enforced at the Application boundary?** | - **A (Enforced):** Commands fail closed if an actor supplies a code not authorized for their role (e.g., `RECEPTIONIST` submitting `CLINICAL_SPECIALTY_REFERRAL`).<br>- **B (Permissive):** All codes are available to all permitted transfer actors. |
-| **D3** | **What is the maximum allowed length and character policy for the optional short note?** | - **A:** Proposed 255 code points, single-line, NFC normalized.<br>- **B:** Proposed 100, single-line; count unit still to choose.<br>For either, explicitly decide code points versus Java UTF-16 code units (and any grapheme requirement), normalization/whitespace behavior, storage capacity and SQL collation. No automatic `NVARCHAR(n)` mapping.<br>- **C:** Code-only is retained only as a possible explicit amendment to the approved optional-note policy, not an available implementation choice under RECON-04. |
-| **D4** | **Where should the business reason and optional short note be persisted?** | Dedicated immutable history, audit-only, or both remain open. **A:** Prefer a separate operational record for reason/note (provisional name `LichSuDieuChuyenLuotKham`), with no approved fields/types. **B:** Evaluate transient-only note handling explicitly. An audit-only design must retain the mandatory business reason separately from security reason semantics; it is unsupported by the current audit API. No note or business code is to be inserted into security reason fields. D3-C requires a policy amendment. |
-| **D5** | **Should heuristic identifier checks be enforced on the short note?** | - **A (Enforced):** Reject matches of explicitly defined numeric heuristics, accepting false positives and false negatives.<br>- **B (Advisory):** UI guidance without backend regex rejection. Neither option provides comprehensive PII/PHI screening. |
+| UX | 255-point counter; ordinary Unicode punctuation/symbols accepted; pasted mapped whitespace becomes one line. Unsupported controls/format characters produce a field error. | 100-point counter; staff may need to shorten a note or replace typographic punctuation/symbols. Do not force a note when it is omitted. |
+| Storage capacity, not schema selection | Up to 510 UTF-16 code units for 255 supplementary code points; capacity/encoding/collation must be reviewed independently. | Upper bound of 200 UTF-16 code units for 100 permitted code points if any are supplementary; a 100-point limit is not automatically a 100-unit storage capacity. |
+| Test consequences | Normalized lengths 254/255/256; supplementary symbols accepted, zero-width-joiner sequences rejected; Vietnamese NFC equivalence and mapped whitespace. | Normalized lengths 99/100/101; Vietnamese accepted, typographic punctuation and symbols rejected; same blank/whitespace cases. |
+| Privacy/retention | More free-text capacity increases potential sensitive content; requires the same access/log/retention decisions as N1. | Less text and a narrower repertoire reduce volume, but names/clinical information can still fit. No weaker privacy controls are justified. |
+
+The limits do not derive from audit `maLyDo` width. Java UTF-16 and code-point units differ ([retained Java reference][java-string]); SQL Server Unicode storage capacity also has distinct units ([retained SQL Server reference][sql-nvarchar]). **No column, SQL type, width, collation, table or DDL is selected.** Removing notes entirely would amend RECON-04/05 and is not an alternative in this proposal.
+
+## 5. Privacy risks and proposed UI/log/storage boundaries
+
+These are engineering recommendations for separate approval, not a legal compliance claim or a PHI-detection guarantee.
+
+| Risk | Proposed boundary / handling | Remaining Owner choice |
+|---|---|---|
+| Staff can enter identifying or clinical narrative despite a short limit. | Keep notes operational; no names, identifiers, contact information, diagnoses, results or copied chart text. Use guidance and staff workflow review. Synthetic examples only, e.g. `Phong du phong san sang`. | Approve wording, training/escalation process and handling of an accidentally submitted sensitive note. |
+| Numeric heuristics can reject harmless operational text or miss sensitive content. | Do not infer safety from a non-match. Names, clinical narrative and obfuscated identifiers evade simple regexes; numeric matches can be false positives. Any later advisory or rejection rule needs exact matching/normalization, synthetic cases and separate approval. | Guidance only (recommended initially), advisory detection, or specified rejection. No heuristic is approved here. |
+| UI, debug output, exceptions or telemetry can duplicate text. | Treat the note as plain text; no rich rendering. No note/body in application/security logs, analytics, crash reports, validation messages, audit `chiTiet`/`lyDo`, or clipboard/export automation. Do not log request bodies. Render only in an authorized transfer view if later approved; no new history-reader grant or destination read follows from this document. | Exact readers, display locations, masking, exports, draft lifetime and error/retry behavior. |
+| Mandatory business code can be confused with a security reason or concatenated note. | Keep the approved code separate in command/history design. Neither code nor note belongs in `AuditReasonCode` or auth/authorization `NhatKyHeThong.maLyDo`. Security audit stays structured and free of note text; use only separately approved correlation metadata. | Exact payload/field mapping and receipt exposure; no business-to-auth reason mapping. |
+| Notes may be copied into receipts, replay storage or backups beyond their intended lifetime. | Recommend one authoritative note value associated with the required immutable operational history, not extra copies in receipts/logs. RECON-05 already mandates history **plus** security audit in the same transaction; required writes fail/roll back together. Do not silently drop a submitted note. | Persist the normalized note with history (recommended) or explicitly approve transient handling and communicate it before submission; exact logical field, physical mapping, null/absence representation, backup/replica/export boundaries remain unselected. |
+| Immutability can conflict with correction, minimization or eventual disposal. | Do not mutate immutable transfer history or purge audit records as a side effect of this proposal. Do not infer permanent retention from append-only enforcement. Sensitive-note remediation needs a separately approved process compatible with immutability. | Retention owner, purpose, duration/start event, legal-hold handling, expiry/disposal, backup retention and any separately authorized remediation mechanism. No duration, deletion job or retention change is approved. |
+
+The exact storage field is an explicit unresolved boundary: decide the logical owner and mapping separately from the fixed business code, and exclude clinical `lyDoKham` / `lyDoChuyenTuyen` and security reason fields. The historical name in the persistence proposal is not a table/column selection. Audit-only history is superseded and cannot satisfy RECON-05. Until field, access and retention choices are approved, there is no storage or runtime implementation authorization.
+
+## 6. Migration and focused testing considerations — future work only
+
+No code, test fixture, migration, grant or runtime gate is changed here. These are proposed acceptance cases for a later authorized implementation, using synthetic data only:
+
+- Verify the exact six-code role matrix independently of note validity. Omitted/null/empty/mapped-blank notes succeed only when every separately approved eligibility/authorization condition passes; DOCTOR stays in the selected department and RECEPTIONIST department transfers stay within the same facility. Reason/note never overrides status, room, linked-work or default-deny guards.
+- Verify the selected normalization order, exact whitespace set, CR/LF word separation, NFC-equivalent Vietnamese inputs, supplementary characters, forbidden controls/bidi/format characters, isolated surrogates, all length boundaries and lossless storage round trips. UI and Application validation agree; rejection never truncates or logs text. Freeze Unicode behavior for consistent upgrades.
+- Storage/cutover design must first choose logical/physical fields, Unicode capacity, absent representation, access and retention. Do not backfill fabricated notes or infer historical transfers from clinical fields. Existing visits/records without notes remain compatible. Legacy-data behavior, migration validation and rollback require separate approval; this proposal chooses none of them.
+- Verify no raw note/business reason reaches security reason fields, free-text audit details, telemetry, exceptions or unauthorized views. Verify retention/copy boundaries only after approved, including backups/replicas/exports and receipt exposure. Guidance and numeric heuristics, if later chosen, need synthetic false-positive/negative cases.
+- For future atomicity tests, failures in required history, success audit, allocation or mutation roll back together. Same key + same canonical payload after commit returns the stored receipt after reauthorization, without duplicate effects; different payload conflicts without writes. Resolve whether normalized note/absent equivalence participates in the canonical payload before implementing these tests. Do not infer replay equivalence from this recommendation. Test timeout recovery with the same key without assuming rollback.
+
+Queue allocation, history persistence, idempotency design, linked-work evidence and transfer-specific security acceptance remain separate workstreams. RECON-05's shared room/day stream, non-reuse of committed numbers, visible gaps and transaction-start SQL UTC sampling remain fixed. Preserve status, `ngayKham`, examination timestamps, priority and linked records; no financial changes. No workflow acceptance is claimed by this test plan.
+
+## 7. Concise Owner decision checklist — all note items still OPEN
+
+Resolved historical choices: former **D1/D2** (taxonomy/role eligibility) are approved as the exact six-code matrix; former **D4** history-vs-audit-only choice is superseded by mandatory immutable history **plus** successful security audit. Do not seek approval again for those fixed facts.
+
+- [ ] **Length/repertoire:** Choose proposed N2 (255 normalized code points, L/M/Nd/P/S + space), conservative N1 (100, L/M/Nd + ASCII punctuation + space), or specify another bounded optional-note policy. Approve count unit, Unicode behavior, error handling and no truncation.
+- [ ] **Normalization:** Approve or revise the exact whitespace mapping/collapse/trim set and NFC order, blank-to-absent handling and UI preview. Separately settle whether/how note participates in idempotency canonicalization; this checklist does not settle the other key/receipt/wait decisions.
+- [ ] **Privacy/UI/logs:** Approve guidance, guidance-only vs specified detection, authorized displays/readers, draft/error handling and exclusion from logs/audit free text. No reader grant or destination read is implied.
+- [ ] **Storage/retention:** Choose persisted normalized note vs explicitly disclosed transient handling; separately approve its exact logical/physical field, capacity/encoding, access, retention/start/hold/disposal and copy/backup/remediation boundaries. No database column/schema or duration has been selected.
+- [ ] **Separate approval and acceptance:** Record a distinct Owner approval of the note policy and a later implementation/workflow acceptance with required security, atomicity, rollback, concurrency and migration evidence. SEC-01 remains OPEN and transfer runtime default-deny meanwhile; no task-board/gate status is changed here.
 
 ---
 
 ## 8. Validation and guidance record
 
-### Guidance files read before editing
+### RECON-05 follow-up — 2026-11-06
+
+- Read task-supplied Mandatory guidance before editing: Orchestrator baseline `docs/PROJECT_CONVENTIONS.md`, `README.md`, supplied excerpts of `DOMAIN_ANALYSIS.md` and `ERD_DIAGRAM.md`; supplied retrieved excerpts of `phase3-visit-transfer-contract-review.md`, `phase3-transfer-linked-work-eligibility-review.md`, `phase3-visit-lifecycle-owner-decisions.md` and `phase3-visit-transfer-decision-gaps.md` (under `docs/ke-hoach-trien-khai/`). Read task-supplied approved RECON-05 contract, retaining RECON-04. Full truncated guidance was not opened outside the allowlist.
+- **RAG first:** Before any local repository read/search, ran `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'VIS-TRANSFER-OWNER-DECISION-RECON-05 optional transfer note reason taxonomy normalization privacy AuditReasonCode maLyDo'`. Exit 1: `sqlite3.OperationalError: unable to open database file` at `PRAGMA journal_mode=WAL`; no new excerpts returned. Used supplied retrieval/contract and the allowlisted proposal as fallback. No index/cache workaround or database access. RAG-first ordering satisfied; live retrieval blocked.
+- Local document read scope: only this proposal, including its historical implementation evidence map. `rg --files -g AGENTS.md -g '!target' -g '!node_modules'` returned exit 1/no matches in the worktree; no additional guidance file was opened. Historical source/link checks below were not rerun or claimed as current verification.
+- Validation: `git diff --check` passed (exit 0, no output). Read-only inline `python3` document assertions passed (exit 0): exact single-file tracked/untracked scope, dated addendum and supersession, exact six-code role matrix, RECON-04/05 boundaries, note optionality/recommendation/alternative, five unchecked Owner decisions, and Markdown reference definitions. Source targets/line anchors were not reopened or revalidated. No application tests run for this document-only change; future synthetic acceptance cases in section 6 remain unexecuted.
+- Acceptance: **PASS** allowlisted-only change plus dated addendum/supersession; **PASS** approved code/role and scope preservation with note policy unapproved; **PASS** privacy/recommendation/conservative alternative/checklist with no schema selection or runtime enablement; **PASS** RAG-first ordering and clean diff check. **Blocker:** live RAG retrieval failed as above; fallback evidence is limited to supplied excerpts, contract and retained proposal context. Separate note-policy approval and workflow acceptance are still required; SEC-01 remains OPEN/default-deny.
+
+### Historical guidance and validation record — superseded execution snapshot
+
+The remaining record describes the earlier review only. Its file reads, source inspections, commands and PASS claims are not current follow-up execution evidence.
+
+### Historical guidance files read before editing
 
 - Orchestrator-supplied baseline `docs/PROJECT_CONVENTIONS.md` (repository-local file absent).
 - Repository `README.md`.
@@ -220,9 +214,9 @@ Before any code, command, or schema implementation can proceed, the Owner must e
 
 Guidance inventory: no applicable `AGENTS.md` found at the target's checkout ancestors or checked filesystem ancestors. Repository-local `docs/PROJECT_CONVENTIONS.md`, `docs/DEVELOPMENT_CONVENTIONS.md`, `CONTRIBUTING.md`, `docs/README.md` and `ARCHITECTURE.md` are absent. The supplied baseline and available repository guidance above were used. Source citations below were inspected directly; the two external primary references establish only Java/SQL string units, not an implementation or legal contract.
 
-### RAG and environment execution record
+### Historical RAG and environment execution record
 
-- **Current review, 2026-11-06 — RAG first:** Before opening repository documents or running `rg`/`grep`, executed `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'điều chuyển lý do nghiệp vụ ghi chú AuditReasonCode NhatKyHeThong maLyDo Unicode UTF-16 NVARCHAR VIS-TRANSFER-OWNER-DECISION-RECON-04'`.
+- **Earlier review snapshot, 2026-11-06 — RAG first:** Before opening repository documents or running `rg`/`grep`, executed `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'điều chuyển lý do nghiệp vụ ghi chú AuditReasonCode NhatKyHeThong maLyDo Unicode UTF-16 NVARCHAR VIS-TRANSFER-OWNER-DECISION-RECON-04'`.
   - *Result:* Exit 1, `sqlite3.OperationalError: unable to open database file`, during Orchestrator configuration/index connection setup at `PRAGMA journal_mode=WAL`; no search excerpts returned.
   - *Primary guidance:* Used the task-supplied retrieved excerpts, then checked current Owner-decision and source evidence directly. No index/cache workaround, permission escalation, clinic DB connection or patient data access.
 - **Document checks:** `git diff --check` passes (exit 0, no output). Read-only Python checks verify reference definitions, local citation target existence/line bounds, required correction coverage and exact single-file scope. Citation claims were also reviewed against the cited source; these checks do not establish runtime acceptance.
