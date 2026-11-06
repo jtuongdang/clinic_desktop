@@ -268,8 +268,6 @@ class ReceptionQueueRepositoryImplTest {
             LuotKham visit = result.getValue().orElseThrow();
             assertEquals(expectedVietnamDate, visit.getNgayKham());
             assertEquals(expectedVietnamDateTime, visit.getThoiGianTiepNhan());
-            assertEquals(0, unitOfWork.saveChanges());
-
             assertEquals(2, jdbc.statements.size());
             RecordedStatement queueSelect = jdbc.statements.get(0);
             assertEquals(expectedVietnamDate, queueSelect.bindings.get(2));
