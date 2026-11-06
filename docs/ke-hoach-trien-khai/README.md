@@ -30,6 +30,9 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [Operations and release runbook](../OPERATIONS_RUNBOOK.md) | Hướng dẫn build/test, cấu hình, migration, launch và backup/restore rehearsal cho local hoặc controlled test deployment; ghi rõ gate chưa đạt. |
 | [Phase 0 — Review domain events](phase0-domain-events-review.md) | Vòng đời sự kiện miền, transaction timing, persistence, UI và test gaps. |
 | [Phase 0 — Review repository contracts](phase0-repository-contract-review.md) | Map model repository từ domain port tới adapter, use case, transaction và test. |
+| [Phase 0 — Value Object owner decisions](phase0-value-object-owner-decisions.md) | Các lựa chọn cần Owner chốt trước khi nối `DateRange`, `PhoneNumber` và `Money` vào form/handler/persistence. |
+| [Phase 3 — Appointment owner decisions](phase3-appointment-owner-decisions.md) | Các quyết định booking, capacity, status/check-in, notification và deposit trước APPT-01; deposit tiếp tục DENY. |
+| [Phase 3 — Visit lifecycle owner decisions](phase3-visit-lifecycle-owner-decisions.md) | Làm rõ operational contract cho hủy, điều chuyển và sinh hiệu; giữ nguyên role policies đã duyệt. |
 | [Phase 0 — Review error mapping](phase0-error-mapping-review.md) | Map lỗi từ domain/Application/JDBC tới thông báo Swing và rủi ro dữ liệu. |
 | [Phase 2 — Security implementation contract](phase2-implementation-contract.md) | Ranh giới tin cậy, role/scope/session/audit policy đã duyệt và thứ tự task implementation. |
 | [Phase 2 — Security gate closure review](phase2-security-exit-gate-review.md) | Report-only đối chiếu SEC-01, bằng chứng hiện có, dependency vòng giữa baseline và workflow về sau; đề xuất hai định nghĩa gate và sequence nghiệm thu không cấp quyền. |
