@@ -30,7 +30,7 @@ public final class AuthenticationCompositionRoot {
         JdbcAuditRepositoryImpl auditWritePort = new JdbcAuditRepositoryImpl(
                 connections, unitOfWork, DatabaseConnection::getConnection);
         return new AuthenticateUserHandler(
-                employees, new Pbkdf2PasswordHasher(), transactions, auditWritePort, Clock.systemUTC());
+                employees, employees, new Pbkdf2PasswordHasher(), transactions, auditWritePort, Clock.systemUTC());
     }
 
     public static CompleteLoginSessionHandler createCompleteLoginSessionHandler() {

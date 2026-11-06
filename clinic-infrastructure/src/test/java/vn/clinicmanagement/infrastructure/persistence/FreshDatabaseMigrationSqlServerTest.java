@@ -91,10 +91,11 @@ class FreshDatabaseMigrationSqlServerTest {
                             "V7__Harden_Permission_Matrix_Defaults.sql",
                             "V8__Seed_Approved_Permission_Grants.sql",
                             "V9__Enforce_Active_Patient_Facility_Uniqueness.sql",
-                            "V10__Add_TienSuBenh_Facility_Department_Scope.sql"
+                            "V10__Add_TienSuBenh_Facility_Department_Scope.sql",
+                            "V11__Add_Account_Login_Throttle.sql"
                     ),
                     queryMigrationRecords(connection),
-                    "All V1-V10 migrations must be recorded as successful"
+                    "All V1-V11 migrations must be recorded as successful"
             );
 
             assertEquals(1, queryInt(
@@ -108,6 +109,7 @@ class FreshDatabaseMigrationSqlServerTest {
             ), "V9 must enforce unique active patient-facility links");
             assertV9ActivePatientFacilityUniqueness(connection);
             assertV10ScopeSchema(connection);
+            assertV11LoginThrottleSchema(connection);
             assertEquals(1, queryInt(
                     connection,
                     "SELECT COUNT(*) FROM sys.tables t "
@@ -386,13 +388,14 @@ class FreshDatabaseMigrationSqlServerTest {
                 }
             }
             assertTrue(runMigrationsWithoutConsoleOutput(),
-                    "The real migration runner must apply V9 and V10 after the synthetic duplicate is resolved");
+                    "The real migration runner must apply V9-V11 after the synthetic duplicate is resolved");
             try (Connection connection = DatabaseConnection.getConnection()) {
                 assertEquals(0, queryInt(connection,
                                 "SELECT COUNT(*) FROM TienSuBenh WHERE id = " + legacyHistoryId
                                         + " AND (maCoSo IS NOT NULL OR maKhoa IS NOT NULL)"),
                         "V10 must leave legacy history ownership NULL rather than infer a scope");
                 assertV10RejectsMismatchedFacilityDepartment(connection, patientId, facilityId);
+                assertV11PreservesPopulatedEmployeeRows(connection);
             }
         } finally {
             if (legacyHistoryId > 0) {
@@ -428,6 +431,29 @@ class FreshDatabaseMigrationSqlServerTest {
                 "SELECT COUNT(*) FROM sys.triggers WHERE parent_id = OBJECT_ID('dbo.TienSuBenh') "
                         + "AND name = 'TR_TienSuBenh_Require_Scope_On_Insert' AND is_disabled = 0"),
                 "V10 must require an ownership pair on newly inserted history rows");
+    }
+
+    private static void assertV11LoginThrottleSchema(Connection connection) throws SQLException {
+        assertEquals(5, queryInt(connection,
+                "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.NhanVien') "
+                        + "AND name IN ('loginFailureWindowStartedAt', 'loginFailureCount', "
+                        + "'loginLastFailureAt', 'loginDelaySeconds', 'loginNextAllowedAt')"),
+                "V11 must add all five account throttle columns");
+        assertEquals(1, queryInt(connection,
+                "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('dbo.NhanVien') "
+                        + "AND name = 'CK_NhanVien_LoginThrottle_State' "
+                        + "AND is_disabled = 0 AND is_not_trusted = 0"),
+                "V11 must constrain persisted escalation values");
+    }
+
+    private static void assertV11PreservesPopulatedEmployeeRows(Connection connection) throws SQLException {
+        assertEquals(2, queryInt(connection, "SELECT COUNT(*) FROM dbo.NhanVien "
+                        + "WHERE id IN (1, 2) AND loginFailureCount = 0 AND loginDelaySeconds = 0"),
+                "V11 must preserve the existing seeded synthetic employees and initialize throttle defaults");
+        assertEquals(2, queryInt(connection, "SELECT COUNT(*) FROM dbo.NhanVien "
+                        + "WHERE id IN (1, 2) AND username IS NOT NULL AND passwordHash IS NOT NULL "
+                        + "AND hoatDong = 1 AND isDeleted = 0"),
+                "V11 must preserve username, password hash and employee status");
     }
 
     private static void assertV10RejectsMismatchedFacilityDepartment(

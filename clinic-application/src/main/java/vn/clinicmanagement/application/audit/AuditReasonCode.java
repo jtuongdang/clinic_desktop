@@ -2,6 +2,7 @@ package vn.clinicmanagement.application.audit;
 
 public enum AuditReasonCode {
     AUTH_INVALID,
+    AUTH_THROTTLED,
     AUTH_NO_ROLE,
     AUTH_NO_SCOPE,
     AUTH_FORBIDDEN,

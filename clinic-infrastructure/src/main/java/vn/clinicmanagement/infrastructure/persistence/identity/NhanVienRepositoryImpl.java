@@ -1,5 +1,6 @@
 package vn.clinicmanagement.infrastructure.persistence.identity;
 
+import vn.clinicmanagement.application.auth.AccountLoginThrottleStore;
 import vn.clinicmanagement.domain.common.IUnitOfWork;
 import vn.clinicmanagement.domain.identity.NhanVien;
 import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
@@ -26,7 +27,7 @@ import java.util.Optional;
 import java.util.Locale;
 
 /** SQL Server implementation of employee repository. */
-public final class NhanVienRepositoryImpl implements INhanVienRepository {
+public final class NhanVienRepositoryImpl implements INhanVienRepository, AccountLoginThrottleStore {
     private static final String SELECT_COLUMNS = "SELECT id, maNhanVien, ho, ten, soDienThoai, email, diaChi, "
             + "gioiTinh, ngaySinh, maChucVu, username, passwordHash, hoatDong, dangNhapCuoi, "
             + "chungChiHanhNghe, ngayVaoLam, ngayNghiViec, lyDoNghiViec, luongCoBan, heSoLuong, phuCap, "
@@ -264,6 +265,75 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
     }
 
     @Override
+    public Optional<AccountLoginThrottleStore.Snapshot> lockForUpdate(int employeeId) {
+        requireActiveTransaction();
+        String sql = "SELECT SYSUTCDATETIME() AS databaseNow, loginFailureWindowStartedAt, "
+                + "loginFailureCount, loginLastFailureAt, loginDelaySeconds, loginNextAllowedAt "
+                + "FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK) WHERE id=?";
+        try (JdbcConnectionProvider.Lease lease = connections.acquire();
+             PreparedStatement statement = lease.connection().prepareStatement(sql)) {
+            statement.setInt(1, employeeId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return Optional.empty();
+                return Optional.of(new AccountLoginThrottleStore.Snapshot(
+                        localDateTime(result, "databaseNow"),
+                        localDateTime(result, "loginFailureWindowStartedAt"),
+                        result.getInt("loginFailureCount"),
+                        localDateTime(result, "loginLastFailureAt"),
+                        result.getInt("loginDelaySeconds"),
+                        localDateTime(result, "loginNextAllowedAt")));
+            }
+        } catch (SQLException ex) {
+            throw persistenceFailure(ex);
+        }
+    }
+
+    @Override
+    public void recordFailure(
+            int employeeId, LocalDateTime windowStartedAt, int failureCount, int delaySeconds) {
+        requireActiveTransaction();
+        if (employeeId <= 0 || windowStartedAt == null || failureCount < 1
+                || !isAllowedDelay(delaySeconds)) {
+            throw new IllegalArgumentException("Invalid account login throttle state.");
+        }
+        String sql = "UPDATE dbo.NhanVien SET loginFailureWindowStartedAt=?, loginFailureCount=?, "
+                + "loginLastFailureAt=SYSUTCDATETIME(), loginDelaySeconds=?, "
+                + "loginNextAllowedAt=CASE WHEN ?=0 THEN NULL "
+                + "ELSE DATEADD(SECOND, ?, SYSUTCDATETIME()) END "
+                + "WHERE id=? AND hoatDong=1 AND isDeleted=0";
+        withConnection(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, windowStartedAt);
+                statement.setInt(2, failureCount);
+                statement.setInt(3, delaySeconds);
+                statement.setInt(4, delaySeconds);
+                statement.setInt(5, delaySeconds);
+                statement.setInt(6, employeeId);
+                requireSingleThrottleUpdate(statement.executeUpdate());
+            }
+            recordChange();
+            return null;
+        });
+    }
+
+    @Override
+    public void reset(int employeeId) {
+        requireActiveTransaction();
+        if (employeeId <= 0) throw new IllegalArgumentException("Employee ID must be positive.");
+        String sql = "UPDATE dbo.NhanVien SET loginFailureWindowStartedAt=NULL, loginFailureCount=0, "
+                + "loginLastFailureAt=NULL, loginDelaySeconds=0, loginNextAllowedAt=NULL "
+                + "WHERE id=? AND hoatDong=1 AND isDeleted=0";
+        withConnection(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setInt(1, employeeId);
+                requireSingleThrottleUpdate(statement.executeUpdate());
+            }
+            recordChange();
+            return null;
+        });
+    }
+
+    @Override
     public IUnitOfWork getUnitOfWork() { return unitOfWork; }
 
     private Optional<NhanVien> queryOne(String sql, SqlBinder binder) {
@@ -295,6 +365,23 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
 
     private void recordChange() {
         if (connections.isTransactionActive()) unitOfWork.recordChanges(1);
+    }
+
+    private void requireActiveTransaction() {
+        if (!connections.isTransactionActive()) {
+            throw new IllegalStateException("Account login throttle changes require an active transaction.");
+        }
+    }
+
+    private static boolean isAllowedDelay(int delaySeconds) {
+        return delaySeconds == 0 || delaySeconds == 30 || delaySeconds == 60 || delaySeconds == 120
+                || delaySeconds == 240 || delaySeconds == 480 || delaySeconds == 900;
+    }
+
+    private static void requireSingleThrottleUpdate(int updatedRows) {
+        if (updatedRows != 1) {
+            throw new IllegalStateException("Active account login throttle state could not be updated.");
+        }
     }
 
     private static NhanVien mapEmployee(ResultSet rs) throws SQLException {

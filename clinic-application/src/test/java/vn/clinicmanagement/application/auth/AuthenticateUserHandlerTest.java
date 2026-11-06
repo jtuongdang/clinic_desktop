@@ -8,7 +8,6 @@ import vn.clinicmanagement.application.audit.AuditResourceType;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.audit.MedicalRecordAuditEntry;
 import vn.clinicmanagement.application.audit.SystemAuditEntry;
-import vn.clinicmanagement.application.common.ApplicationFailureDiagnostics;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.identity.NhanVien;
@@ -19,415 +18,307 @@ import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import java.lang.reflect.Proxy;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.logging.Handler;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AuthenticateUserHandlerTest {
-    private static final int SYNTHETIC_EMPLOYEE_ID = 701;
-    private static final String SYNTHETIC_USERNAME = "synth.user.701";
-    private static final String SYNTHETIC_HASH = "synthetic-password-hash-701";
-    private static final String EXPECTED_INVALID_MESSAGE = "Tên đăng nhập hoặc mật khẩu không đúng.";
+    private static final int EMPLOYEE_ID = 701;
+    private static final String USERNAME = "synthetic.user.701";
+    private static final String HASH = "synthetic-hash-only";
+    private static final String INVALID_MESSAGE = "Tên đăng nhập hoặc mật khẩu không đúng.";
+    private static final LocalDateTime START = LocalDateTime.of(2026, 1, 15, 8, 0);
 
     @Test
-    void returnsEveryAssignedRoleAndScopeWithoutRecordingLoginOrSuccessAuditBeforeScopeSelection() {
+    void fifthFailureStartsThirtySecondDelayAndFirstFiveFailuresHaveNoDelay() {
         Fixture fixture = new Fixture();
-        fixture.roles = List.of(role(31, "admin"), role(42, "doctor"));
-        fixture.scopes = List.of(scope(11, "Cơ sở mẫu A", 21, "Khoa mẫu A"),
-                scope(12, "Cơ sở mẫu B", 22, "Khoa mẫu B"));
-        AuthenticateUserCommand command = commandWithSyntheticSecret("  " + SYNTHETIC_USERNAME + "  ");
 
-        Result<AuthenticatedUser> result = fixture.handler.handle(command);
-
-        assertTrue(result.isSuccess());
-        AuthenticatedUser user = result.valueOrThrow();
-        assertEquals(SYNTHETIC_EMPLOYEE_ID, user.userId());
-        assertEquals(SYNTHETIC_USERNAME, user.username());
-        assertEquals("Họ Mẫu Nhân Viên 701", user.fullName());
-        assertEquals(List.of(new AuthenticatedUser.RoleChoice(31, "ADMIN", "Quản trị viên (Admin)"),
-                new AuthenticatedUser.RoleChoice(42, "DOCTOR", "Bác sĩ điều trị (Doctor Station)")), user.roles());
-        assertEquals(List.of(new AuthenticatedUser.WorkScopeChoice(11, "Cơ sở mẫu A", 21, "Khoa mẫu A"),
-                new AuthenticatedUser.WorkScopeChoice(12, "Cơ sở mẫu B", 22, "Khoa mẫu B")), user.workScopes());
-        assertEquals(1, fixture.usernameLookupCalls.get());
-        assertEquals(1, fixture.roleLookupCalls.get());
-        assertEquals(1, fixture.scopeLookupCalls.get());
-        assertEquals(0, fixture.transactions.calls.get());
-        assertEquals(0, fixture.recordLoginCalls.get());
-        assertNull(fixture.recordedEmployeeId.get());
-        assertNull(fixture.recordedLoginAt.get());
-        assertTrue(fixture.audit.independentEntries.isEmpty());
-        assertTrue(fixture.audit.transactionalEntries.isEmpty());
-        assertThrows(UnsupportedOperationException.class, () -> user.roles().clear());
-        assertThrows(UnsupportedOperationException.class, () -> user.workScopes().clear());
-        assertPasswordBuffersCleared(command, fixture.lastPasswordPassedToVerifier.get());
-    }
-
-    @Test
-    void returnsIdenticalGenericErrorAndAppendsSafeIndependentAuditForMissingInactiveDeletedAndWrongCredentialAccounts() {
-        Fixture missing = new Fixture();
-        missing.employee = null;
-        AuthenticateUserCommand missingCommand = commandWithSyntheticSecret("missing.synth.user");
-        Result<AuthenticatedUser> missingResult = missing.handler.handle(missingCommand);
-
-        Fixture inactive = new Fixture();
-        inactive.employee.setHoatDong(false);
-        AuthenticateUserCommand inactiveCommand = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
-        Result<AuthenticatedUser> inactiveResult = inactive.handler.handle(inactiveCommand);
-
-        Fixture deleted = new Fixture();
-        deleted.employee.softDelete(999);
-        AuthenticateUserCommand deletedCommand = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
-        Result<AuthenticatedUser> deletedResult = deleted.handler.handle(deletedCommand);
-
-        Fixture wrongPassword = new Fixture();
-        wrongPassword.passwordVerified = false;
-        AuthenticateUserCommand wrongPasswordCommand = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
-        Result<AuthenticatedUser> wrongPasswordResult = wrongPassword.handler.handle(wrongPasswordCommand);
-
-        Result.ApplicationError expected = new Result.ApplicationError("AUTH_INVALID", EXPECTED_INVALID_MESSAGE);
-        for (Result<AuthenticatedUser> result : List.of(missingResult, inactiveResult, deletedResult, wrongPasswordResult)) {
-            assertTrue(result.isFailure());
-            Result.ApplicationError error = result.getError().orElseThrow();
-            assertEquals(expected, error);
-            assertFalse(error.message().contains(SYNTHETIC_USERNAME));
-            assertFalse(error.message().contains("missing.synth.user"));
+        for (int failure = 1; failure <= 5; failure++) {
+            Result<AuthenticatedUser> result = fixture.handle("wrong");
+            assertInvalid(result);
+            assertEquals(failure, fixture.throttle.state.failureCount());
+            assertEquals(failure == 5 ? 30 : 0, fixture.throttle.state.delaySeconds());
+            assertEquals(START, fixture.throttle.state.windowStartedAt());
         }
 
-        for (Fixture fixture : List.of(missing, inactive, deleted, wrongPassword)) {
-            assertEquals(0, fixture.transactions.calls.get());
-            assertEquals(0, fixture.recordLoginCalls.get());
-            assertEquals(0, fixture.roleLookupCalls.get());
-            assertEquals(0, fixture.scopeLookupCalls.get());
-            assertEquals(1, fixture.audit.independentEntries.size());
-            assertTrue(fixture.audit.transactionalEntries.isEmpty());
-            SystemAuditEntry entry = fixture.audit.independentEntries.get(0);
+        assertEquals(5, fixture.verifierCalls.get());
+        assertEquals(5, fixture.audit.entries.size());
+        for (SystemAuditEntry entry : fixture.audit.entries) {
             assertEquals(AuditActionCode.AUTH_LOGIN_FAILED, entry.actionCode());
-            assertEquals(fixture == missing ? null : AuditResourceType.EMPLOYEE, entry.resourceType());
-            assertEquals(AuditOutcome.FAILURE, entry.outcome());
             assertEquals(AuditReasonCode.AUTH_INVALID, entry.reasonCode());
+            assertEquals(AuditOutcome.FAILURE, entry.outcome());
+            assertEquals(EMPLOYEE_ID, entry.resourceId());
+            assertEquals(AuditResourceType.EMPLOYEE, entry.resourceType());
             assertNull(entry.roleCode());
-            assertNull(entry.facilityId());
-            assertNull(entry.departmentId());
-            assertEquals(fixture == missing ? null : SYNTHETIC_EMPLOYEE_ID, entry.resourceId());
-            assertNotNull(entry.correlationId());
-            assertNoSecretOrUsernameLeaked(entry, "missing.synth.user", SYNTHETIC_USERNAME);
+            assertNull(entry.workstationId());
         }
-        assertNull(missing.audit.independentEntries.get(0).actorEmployeeId());
-        assertEquals(SYNTHETIC_EMPLOYEE_ID, inactive.audit.independentEntries.get(0).actorEmployeeId());
-        assertEquals(SYNTHETIC_EMPLOYEE_ID, deleted.audit.independentEntries.get(0).actorEmployeeId());
-        assertEquals(SYNTHETIC_EMPLOYEE_ID, wrongPassword.audit.independentEntries.get(0).actorEmployeeId());
-
-        assertEquals(0, missing.verifierCalls.get());
-        assertEquals(0, inactive.verifierCalls.get());
-        assertEquals(0, deleted.verifierCalls.get());
-        assertEquals(1, wrongPassword.verifierCalls.get());
-        assertCommandBufferZeroized(missingCommand);
-        assertCommandBufferZeroized(inactiveCommand);
-        assertCommandBufferZeroized(deletedCommand);
-        assertPasswordBuffersCleared(wrongPasswordCommand, wrongPassword.lastPasswordPassedToVerifier.get());
     }
 
     @Test
-    void rejectsNullOrBlankUsernameBeforeRepositoryCallsAndAuditsSafeAnonymousFailure() {
+    void fixedWindowIsHalfOpenAtExactlyFifteenMinutes() {
+        Fixture beforeBoundary = new Fixture();
+        beforeBoundary.throttle.state = state(START.plusMinutes(14).plusSeconds(59), START, 4,
+                START.plusMinutes(14).plusSeconds(59), 0, null);
+        assertInvalid(beforeBoundary.handle("wrong"));
+        assertEquals(5, beforeBoundary.throttle.state.failureCount());
+        assertEquals(30, beforeBoundary.throttle.state.delaySeconds());
+
+        Fixture atBoundary = new Fixture();
+        atBoundary.throttle.now = START.plusMinutes(15);
+        atBoundary.throttle.state = state(atBoundary.throttle.now, START, 4,
+                atBoundary.throttle.now.minusSeconds(1), 0, null);
+        assertInvalid(atBoundary.handle("wrong"));
+        assertEquals(1, atBoundary.throttle.state.failureCount());
+        assertEquals(atBoundary.throttle.now, atBoundary.throttle.state.windowStartedAt());
+        assertEquals(0, atBoundary.throttle.state.delaySeconds());
+    }
+
+    @Test
+    void activeDelayIsGenericAuditedAndDoesNotVerifyOrMutateState() {
         Fixture fixture = new Fixture();
+        fixture.throttle.state = state(START, START, 5, START, 30, START.plusSeconds(30));
+        fixture.throttle.now = START.plusSeconds(29);
+        AccountLoginThrottleStore.Snapshot before = fixture.throttle.state;
 
-        Result<AuthenticatedUser> nullCommandResult = fixture.handler.handle(null);
-        AuthenticateUserCommand nullUsernameCommand = new AuthenticateUserCommand(null, "synthetic-secret".toCharArray());
-        Result<AuthenticatedUser> nullUsernameResult = fixture.handler.handle(nullUsernameCommand);
-        AuthenticateUserCommand blankCommand = new AuthenticateUserCommand("   \t  ", "synthetic-secret".toCharArray());
-        Result<AuthenticatedUser> blankCommandResult = fixture.handler.handle(blankCommand);
+        Result<AuthenticatedUser> result = fixture.handle("correct");
 
-        Result.ApplicationError expected = new Result.ApplicationError("AUTH_INVALID", EXPECTED_INVALID_MESSAGE);
-        assertEquals(expected, nullCommandResult.getError().orElseThrow());
-        assertEquals(expected, nullUsernameResult.getError().orElseThrow());
-        assertEquals(expected, blankCommandResult.getError().orElseThrow());
-        assertEquals(0, fixture.usernameLookupCalls.get());
-        assertEquals(0, fixture.roleLookupCalls.get());
-        assertEquals(0, fixture.scopeLookupCalls.get());
-        assertEquals(0, fixture.transactions.calls.get());
-        assertEquals(0, fixture.recordLoginCalls.get());
-        assertEquals(3, fixture.audit.independentEntries.size());
-        for (SystemAuditEntry entry : fixture.audit.independentEntries) {
-            assertEquals(AuditActionCode.AUTH_LOGIN_FAILED, entry.actionCode());
-            assertEquals(AuditOutcome.FAILURE, entry.outcome());
-            assertEquals(AuditReasonCode.AUTH_INVALID, entry.reasonCode());
-            assertNull(entry.actorEmployeeId());
-        }
-        assertCommandBufferZeroized(nullUsernameCommand);
-        assertCommandBufferZeroized(blankCommand);
+        assertInvalid(result);
+        assertEquals(0, fixture.verifierCalls.get());
+        assertEquals(before, fixture.throttle.state);
+        SystemAuditEntry entry = fixture.audit.entries.get(0);
+        assertEquals(AuditActionCode.AUTH_LOGIN_FAILED, entry.actionCode());
+        assertEquals(AuditReasonCode.AUTH_THROTTLED, entry.reasonCode());
+        assertEquals(AuditOutcome.FAILURE, entry.outcome());
+        assertNoCredentialMetadata(entry);
     }
 
     @Test
-    void rejectsAccountsWithoutActiveRoleOrValidScopeWithoutRecordingLoginAndAuditsDeniedReason() {
-        for (List<VaiTro> roles : List.of(List.<VaiTro>of(), Arrays.asList(null, role(0, "ADMIN"), role(32, "  ")))) {
-            Fixture noRoles = new Fixture();
-            noRoles.roles = roles;
-            AuthenticateUserCommand command = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
-
-            Result<AuthenticatedUser> result = noRoles.handler.handle(command);
-
-            assertTrue(result.isFailure());
-            assertEquals("AUTH_NO_ROLE", result.getError().orElseThrow().code());
-            assertEquals("Tài khoản chưa được gán vai trò hoạt động.", result.getError().orElseThrow().message());
-            assertEquals(1, noRoles.roleLookupCalls.get());
-            assertEquals(0, noRoles.scopeLookupCalls.get());
-            assertEquals(0, noRoles.transactions.calls.get());
-            assertEquals(0, noRoles.recordLoginCalls.get());
-            assertEquals(1, noRoles.audit.independentEntries.size());
-            SystemAuditEntry roleEntry = noRoles.audit.independentEntries.get(0);
-            assertEquals(AuditActionCode.AUTH_LOGIN_DENIED_NO_ROLE, roleEntry.actionCode());
-            assertEquals(AuditOutcome.DENIED, roleEntry.outcome());
-            assertEquals(AuditReasonCode.AUTH_NO_ROLE, roleEntry.reasonCode());
-            assertEquals(SYNTHETIC_EMPLOYEE_ID, roleEntry.actorEmployeeId());
-            assertNoSecretOrUsernameLeaked(roleEntry, SYNTHETIC_USERNAME);
-            assertPasswordBuffersCleared(command, noRoles.lastPasswordPassedToVerifier.get());
-        }
-
-        Fixture noScopes = new Fixture();
-        noScopes.scopes = List.of();
-        AuthenticateUserCommand noScopeCommand = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
-        Result<AuthenticatedUser> noScopeResult = noScopes.handler.handle(noScopeCommand);
-        assertTrue(noScopeResult.isFailure());
-        assertEquals("AUTH_NO_SCOPE", noScopeResult.getError().orElseThrow().code());
-        assertEquals(1, noScopes.roleLookupCalls.get());
-        assertEquals(1, noScopes.scopeLookupCalls.get());
-        assertEquals(0, noScopes.transactions.calls.get());
-        assertEquals(0, noScopes.recordLoginCalls.get());
-        assertEquals(1, noScopes.audit.independentEntries.size());
-        SystemAuditEntry scopeEntry = noScopes.audit.independentEntries.get(0);
-        assertEquals(AuditActionCode.AUTH_LOGIN_DENIED_NO_SCOPE, scopeEntry.actionCode());
-        assertEquals(AuditOutcome.DENIED, scopeEntry.outcome());
-        assertEquals(AuditReasonCode.AUTH_NO_SCOPE, scopeEntry.reasonCode());
-        assertEquals(SYNTHETIC_EMPLOYEE_ID, scopeEntry.actorEmployeeId());
-        assertNoSecretOrUsernameLeaked(scopeEntry, SYNTHETIC_USERNAME);
-        assertPasswordBuffersCleared(noScopeCommand, noScopes.lastPasswordPassedToVerifier.get());
-    }
-
-    @Test
-    void assignmentLookupsHappenOnlyAfterCredentialsAreVerified() {
+    void expiredDelaysEscalateToCapAndRemainThere() {
         Fixture fixture = new Fixture();
-        fixture.passwordVerified = false;
-        AuthenticateUserCommand command = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
+        for (int i = 0; i < 5; i++) assertInvalid(fixture.handle("wrong"));
+        assertEquals(30, fixture.throttle.state.delaySeconds());
 
-        Result<AuthenticatedUser> result = fixture.handler.handle(command);
+        for (int delay : List.of(60, 120, 240, 480, 900, 900)) {
+            LocalDateTime eligibleAt = fixture.throttle.state.nextAllowedAt();
+            fixture.throttle.now = eligibleAt.minusSeconds(1);
+            AccountLoginThrottleStore.Snapshot before = fixture.throttle.state;
+            int verifierCallsBeforeWait = fixture.verifierCalls.get();
+            assertInvalid(fixture.handle("correct"));
+            assertEquals(before, fixture.throttle.state);
+            assertEquals(verifierCallsBeforeWait, fixture.verifierCalls.get());
 
-        assertEquals(new Result.ApplicationError("AUTH_INVALID", EXPECTED_INVALID_MESSAGE), result.getError().orElseThrow());
+            fixture.throttle.now = eligibleAt;
+            assertInvalid(fixture.handle("wrong"));
+            assertEquals(delay, fixture.throttle.state.delaySeconds());
+            assertEquals(eligibleAt, fixture.throttle.state.lastFailureAt());
+            assertEquals(eligibleAt.plusSeconds(delay), fixture.throttle.state.nextAllowedAt());
+        }
+    }
+
+    @Test
+    void sequenceExpiresAtTwentyFourHoursAndStartsANewWindow() {
+        Fixture fixture = new Fixture();
+        fixture.throttle.now = START.plusHours(24);
+        fixture.throttle.state = state(fixture.throttle.now, START, 5, START, 900,
+                fixture.throttle.now.minusSeconds(1));
+
+        assertInvalid(fixture.handle("wrong"));
+
+        assertEquals(1, fixture.throttle.state.failureCount());
+        assertEquals(fixture.throttle.now, fixture.throttle.state.windowStartedAt());
+        assertEquals(0, fixture.throttle.state.delaySeconds());
+        assertNull(fixture.throttle.state.nextAllowedAt());
         assertEquals(1, fixture.verifierCalls.get());
-        assertEquals(0, fixture.roleLookupCalls.get());
-        assertEquals(0, fixture.scopeLookupCalls.get());
-        assertEquals(0, fixture.recordLoginCalls.get());
-        assertEquals(1, fixture.audit.independentEntries.size());
-        assertPasswordBuffersCleared(command, fixture.lastPasswordPassedToVerifier.get());
     }
 
     @Test
-    void returnsSafeGenericUnavailableErrorForRepositoryAndAuditFailures() {
-        String syntheticDiagnostic = "synthetic exception marker " + SYNTHETIC_USERNAME
-                + " synthetic-password-marker";
-
-        Fixture lookupFailure = new Fixture();
-        lookupFailure.lookupFailure = new IllegalStateException(syntheticDiagnostic);
-        Fixture roleFailure = new Fixture();
-        roleFailure.roleFailure = new IllegalStateException(syntheticDiagnostic);
-        Fixture scopeFailure = new Fixture();
-        scopeFailure.scopeFailure = new IllegalStateException(syntheticDiagnostic);
-        Fixture auditFailureOnInvalid = new Fixture();
-        auditFailureOnInvalid.passwordVerified = false;
-        auditFailureOnInvalid.audit.failure = new IllegalStateException(syntheticDiagnostic);
-
-        List<Fixture> fixtures = List.of(lookupFailure, roleFailure, scopeFailure, auditFailureOnInvalid);
-        List<AuthenticateUserCommand> commands = new ArrayList<>();
-        List<Result<AuthenticatedUser>> results = new ArrayList<>();
-        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
-            for (Fixture fixture : fixtures) {
-                AuthenticateUserCommand command = commandWithSyntheticSecret(SYNTHETIC_USERNAME);
-                commands.add(command);
-                results.add(fixture.handler.handle(command));
-            }
-
-            assertEquals(4, diagnostics.messages.size());
-            for (String message : diagnostics.messages) {
-                assertTrue(message.contains("operation=AUTHENTICATE_USER result=AUTH_UNAVAILABLE"));
-                assertTrue(message.matches(
-                        ".*correlationId=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*"));
-                String correlationId = message.substring(message.indexOf("correlationId=")
-                        + "correlationId=".length()).split(" ", 2)[0];
-                assertDoesNotThrow(() -> UUID.fromString(correlationId));
-                assertFalse(message.contains(syntheticDiagnostic));
-                assertFalse(message.contains(SYNTHETIC_USERNAME));
-                assertFalse(message.contains("synthetic-password-marker"));
-            }
-        }
-
-        for (Result<AuthenticatedUser> result : results) {
-            assertTrue(result.isFailure());
-            Result.ApplicationError error = result.getError().orElseThrow();
-            assertEquals("AUTH_UNAVAILABLE", error.code());
-            assertEquals("Không thể xác thực lúc này. Hãy kiểm tra kết nối cơ sở dữ liệu.", error.message());
-            assertFalse(error.message().contains(syntheticDiagnostic));
-            assertFalse(error.message().contains(SYNTHETIC_USERNAME));
-            assertFalse(error.message().contains("synthetic-password-marker"));
-        }
-        assertEquals(0, lookupFailure.transactions.calls.get());
-        assertEquals(0, lookupFailure.recordLoginCalls.get());
-        assertEquals(0, roleFailure.transactions.calls.get());
-        assertEquals(0, scopeFailure.transactions.calls.get());
-        assertEquals(0, auditFailureOnInvalid.transactions.calls.get());
-        assertEquals(0, auditFailureOnInvalid.recordLoginCalls.get());
-        for (int index = 0; index < fixtures.size(); index++) {
-            assertCommandBufferZeroized(commands.get(index));
-            char[] verifierBuffer = fixtures.get(index).lastPasswordPassedToVerifier.get();
-            if (verifierBuffer != null) assertCleared(verifierBuffer);
-        }
-    }
-
-    @Test
-    void expectedCredentialRoleAndScopeOutcomesDoNotEmitUnexpectedDiagnostics() {
-        Fixture invalidCredentials = new Fixture();
-        invalidCredentials.passwordVerified = false;
+    void successfulVerificationResetsThrottleBeforeRoleAndScopeChecks() {
         Fixture noRole = new Fixture();
-        noRole.roles = List.of();
-        Fixture noScope = new Fixture();
-        noScope.scopes = List.of();
+        noRole.throttle.state = state(START, START, 5, START, 30, START);
+        noRole.employeeHasRole = false;
+        noRole.assertResetBeforeAssignments = true;
 
-        try (CapturedDiagnostics diagnostics = new CapturedDiagnostics()) {
-            assertEquals("AUTH_INVALID", invalidCredentials.handler.handle(
-                    commandWithSyntheticSecret(SYNTHETIC_USERNAME)).getError().orElseThrow().code());
-            assertEquals("AUTH_NO_ROLE", noRole.handler.handle(
-                    commandWithSyntheticSecret(SYNTHETIC_USERNAME)).getError().orElseThrow().code());
-            assertEquals("AUTH_NO_SCOPE", noScope.handler.handle(
-                    commandWithSyntheticSecret(SYNTHETIC_USERNAME)).getError().orElseThrow().code());
-            assertTrue(diagnostics.messages.isEmpty());
-        }
+        Result<AuthenticatedUser> noRoleResult = noRole.handle("correct");
+
+        assertEquals("AUTH_NO_ROLE", noRoleResult.getError().orElseThrow().code());
+        assertEquals(1, noRole.throttle.resetCalls);
+        assertEquals(0, noRole.throttle.state.failureCount());
+        assertEquals(AuditActionCode.AUTH_LOGIN_DENIED_NO_ROLE, noRole.audit.entries.get(0).actionCode());
+
+        Fixture noScope = new Fixture();
+        noScope.throttle.state = state(START, START, 5, START, 30, START);
+        noScope.employeeHasScope = false;
+        noScope.assertResetBeforeAssignments = true;
+        Result<AuthenticatedUser> noScopeResult = noScope.handle("correct");
+        assertEquals("AUTH_NO_SCOPE", noScopeResult.getError().orElseThrow().code());
+        assertEquals(1, noScope.throttle.resetCalls);
+        assertEquals(AuditActionCode.AUTH_LOGIN_DENIED_NO_SCOPE, noScope.audit.entries.get(0).actionCode());
     }
 
-    private static final class CapturedDiagnostics implements AutoCloseable {
-        private final Logger logger = Logger.getLogger(ApplicationFailureDiagnostics.class.getName());
-        private final List<String> messages = new ArrayList<>();
-        private final Handler handler = new Handler() {
-            @Override public void publish(LogRecord record) { messages.add(record.getMessage()); }
-            @Override public void flush() {}
-            @Override public void close() {}
-        };
+    @Test
+    void inactiveOrDeletedAccountNeverVerifiesOrResetsThrottle() {
+        for (boolean deleted : List.of(false, true)) {
+            Fixture fixture = new Fixture();
+            fixture.employee.setHoatDong(false);
+            if (deleted) fixture.employee.softDelete(77);
+            fixture.throttle.state = state(START, START, 5, START, 30, START);
 
-        private CapturedDiagnostics() {
-            logger.addHandler(handler);
-        }
+            assertInvalid(fixture.handle("correct"));
 
-        @Override public void close() {
-            logger.removeHandler(handler);
+            assertEquals(0, fixture.verifierCalls.get());
+            assertEquals(0, fixture.throttle.resetCalls);
+            assertEquals(5, fixture.throttle.state.failureCount());
         }
     }
 
     @Test
-    void commandOwnsAnIndependentPasswordCopyAndZeroizesItWhenClosed() {
-        char[] callerInput = "synthetic-command-secret".toCharArray();
-        AuthenticateUserCommand command = new AuthenticateUserCommand("  synth.actor  ", callerInput);
+    void auditOrThrottlePersistenceFailureFailsClosedAndRollsBackState() {
+        Fixture auditFailure = new Fixture();
+        AccountLoginThrottleStore.Snapshot initial = auditFailure.throttle.state;
+        auditFailure.audit.failure = new IllegalStateException("synthetic audit failure");
 
-        Arrays.fill(callerInput, 'X');
-        assertEquals("synth.actor", command.username());
-        char[] firstCopy = command.passwordCopy();
-        assertArrayEquals("synthetic-command-secret".toCharArray(), firstCopy);
-        assertNotSame(firstCopy, command.passwordCopy());
-        Arrays.fill(firstCopy, 'Z');
-        assertArrayEquals("synthetic-command-secret".toCharArray(), command.passwordCopy());
+        Result<AuthenticatedUser> auditResult = auditFailure.handle("wrong");
 
-        command.close();
-        assertCommandBufferZeroized(command);
+        assertUnavailable(auditResult);
+        assertEquals(initial, auditFailure.throttle.state);
+        assertTrue(auditFailure.audit.entries.isEmpty());
 
-        AuthenticateUserCommand nullSafeCommand = new AuthenticateUserCommand(null, null);
-        assertEquals("", nullSafeCommand.username());
-        assertEquals(0, nullSafeCommand.passwordCopy().length);
-        nullSafeCommand.close();
-        assertEquals(0, nullSafeCommand.passwordCopy().length);
+        Fixture stateFailure = new Fixture();
+        AccountLoginThrottleStore.Snapshot initialState = stateFailure.throttle.state;
+        stateFailure.throttle.failure = new IllegalStateException("synthetic persistence failure");
+
+        Result<AuthenticatedUser> stateResult = stateFailure.handle("wrong");
+
+        assertUnavailable(stateResult);
+        assertEquals(initialState, stateFailure.throttle.state);
+        assertTrue(stateFailure.audit.entries.isEmpty());
     }
 
-    private static void assertNoSecretOrUsernameLeaked(SystemAuditEntry entry, String... forbiddenSubstrings) {
-        String combined = entry.toString();
-        assertFalse(combined.contains("synthetic-secret"), "Audit entry must not contain secret values");
-        assertFalse(combined.contains(SYNTHETIC_HASH), "Audit entry must not contain password hashes");
-        for (String forbidden : forbiddenSubstrings) {
-            assertFalse(combined.contains(forbidden), "Audit entry must not contain username: " + forbidden);
-        }
+    @Test
+    void unknownAndThrottledAccountsShareGenericPublicFailure() {
+        Fixture unknown = new Fixture();
+        unknown.employee = null;
+        Fixture throttled = new Fixture();
+        throttled.throttle.state = state(START, START, 5, START, 30, START.plusSeconds(30));
+        throttled.throttle.now = START;
+
+        Result<AuthenticatedUser> unknownResult = unknown.handle("synthetic-missing");
+        Result<AuthenticatedUser> throttledResult = throttled.handle("correct");
+
+        assertEquals(unknownResult.getError().orElseThrow(), throttledResult.getError().orElseThrow());
+        assertEquals(INVALID_MESSAGE, throttledResult.getError().orElseThrow().message());
+        assertEquals(0, throttled.verifierCalls.get());
+        assertEquals(AuditActionCode.AUTH_LOGIN_FAILED, unknown.audit.entries.get(0).actionCode());
+        assertEquals(AuditActionCode.AUTH_LOGIN_FAILED, throttled.audit.entries.get(0).actionCode());
+        assertEquals(AuditReasonCode.AUTH_THROTTLED, throttled.audit.entries.get(0).reasonCode());
     }
 
-    private static VaiTro role(int id, String code) {
-        VaiTro role = new VaiTro();
-        role.setId(id);
-        role.setTenVaiTro(code);
-        return role;
+    @Test
+    void blankUsernameUsesAnonymousAuditAndClosesOnlyCommandOwnedPasswordBuffer() {
+        Fixture fixture = new Fixture();
+        char[] callerPassword = "synthetic-secret".toCharArray();
+        AuthenticateUserCommand blank = new AuthenticateUserCommand("  \t ", callerPassword);
+
+        Result<AuthenticatedUser> result = fixture.handler.handle(blank);
+
+        assertInvalid(result);
+        assertEquals(0, fixture.verifierCalls.get());
+        assertEquals(0, fixture.throttle.state.failureCount());
+        assertEquals(1, fixture.audit.entries.size());
+        assertNull(fixture.audit.entries.get(0).actorEmployeeId());
+        assertEquals(AuditReasonCode.AUTH_INVALID, fixture.audit.entries.get(0).reasonCode());
+        assertArrayEquals(new char["synthetic-secret".length()], blank.passwordCopy());
+        assertArrayEquals("synthetic-secret".toCharArray(), callerPassword,
+                "The command owns and clears a copy without mutating caller memory");
+
+        Result<AuthenticatedUser> nullCommand = fixture.handler.handle(null);
+        assertInvalid(nullCommand);
+        assertEquals(2, fixture.audit.entries.size());
     }
 
-    private static NhanVienWorkScope scope(int facilityId, String facilityName, int departmentId, String departmentName) {
-        return new NhanVienWorkScope(facilityId, facilityName, departmentId, departmentName);
+    @Test
+    void wrongPasswordClearsVerifierCopyAndCommandOwnedPassword() {
+        Fixture fixture = new Fixture();
+        char[] callerPassword = "synthetic-secret".toCharArray();
+        AuthenticateUserCommand command = new AuthenticateUserCommand(USERNAME, callerPassword);
+
+        assertInvalid(fixture.handler.handle(command));
+
+        assertArrayEquals(new char["synthetic-secret".length()], fixture.lastPasswordPassedToVerifier);
+        assertArrayEquals(new char["synthetic-secret".length()], command.passwordCopy());
+        assertArrayEquals("synthetic-secret".toCharArray(), callerPassword);
     }
 
-    private static AuthenticateUserCommand commandWithSyntheticSecret(String username) {
-        return new AuthenticateUserCommand(username, "synthetic-secret-value-123".toCharArray());
+    private static AccountLoginThrottleStore.Snapshot state(
+            LocalDateTime now, LocalDateTime windowStart, int count,
+            LocalDateTime lastFailure, int delay, LocalDateTime nextAllowed) {
+        return new AccountLoginThrottleStore.Snapshot(now, windowStart, count, lastFailure, delay, nextAllowed);
     }
 
-    private static void assertPasswordBuffersCleared(AuthenticateUserCommand command, char[] verifierBuffer) {
-        assertCommandBufferZeroized(command);
-        assertNotNull(verifierBuffer);
-        assertCleared(verifierBuffer);
+    private static void assertInvalid(Result<AuthenticatedUser> result) {
+        assertTrue(result.isFailure());
+        assertEquals("AUTH_INVALID", result.getError().orElseThrow().code());
+        assertEquals(INVALID_MESSAGE, result.getError().orElseThrow().message());
     }
 
-    private static void assertCommandBufferZeroized(AuthenticateUserCommand command) {
-        char[] remaining = command.passwordCopy();
-        assertTrue(remaining.length > 0, "Expected non-empty secret buffer before zeroization check");
-        assertCleared(remaining);
+    private static void assertUnavailable(Result<AuthenticatedUser> result) {
+        assertTrue(result.isFailure());
+        assertEquals("AUTH_UNAVAILABLE", result.getError().orElseThrow().code());
+        assertFalse(result.getError().orElseThrow().message().contains("synthetic"));
     }
 
-    private static void assertCleared(char[] chars) {
-        for (char value : chars) assertEquals('\0', value, "Expected secret buffer to be cleared to '\\0'");
+    private static void assertNoCredentialMetadata(SystemAuditEntry entry) {
+        assertNull(entry.roleCode());
+        assertNull(entry.facilityId());
+        assertNull(entry.departmentId());
+        assertNull(entry.workstationId());
     }
 
-    private static NhanVien activeSyntheticEmployee() {
+    private static NhanVien syntheticEmployee() {
         NhanVien employee = new NhanVien();
-        employee.setId(SYNTHETIC_EMPLOYEE_ID);
-        employee.setMaNhanVien("NV-SYN-701");
-        employee.setHo("Họ Mẫu");
-        employee.setTen("Nhân Viên 701");
-        employee.setUsername(SYNTHETIC_USERNAME);
-        employee.setPasswordHash(SYNTHETIC_HASH);
+        employee.setId(EMPLOYEE_ID);
+        employee.setUsername(USERNAME);
+        employee.setHo("Sample");
+        employee.setTen("Employee");
+        employee.setPasswordHash(HASH);
         employee.setHoatDong(true);
         return employee;
     }
 
+    private static VaiTro role() {
+        VaiTro role = new VaiTro();
+        role.setId(31);
+        role.setTenVaiTro("ADMIN");
+        return role;
+    }
+
+    private static NhanVienWorkScope scope() {
+        return new NhanVienWorkScope(11, "Synthetic facility", 21, "Synthetic department");
+    }
+
     private static <T> T proxy(Class<T> type, Invocation invocation) {
-        Object instance = Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxyObj, method, args) -> {
+        return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> {
             if (method.getDeclaringClass() == Object.class) {
                 return switch (method.getName()) {
-                    case "equals" -> proxyObj == args[0];
-                    case "hashCode" -> System.identityHashCode(proxyObj);
-                    case "toString" -> type.getSimpleName() + " synthetic test proxy";
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "toString" -> type.getSimpleName() + " synthetic proxy";
                     default -> null;
                 };
             }
             return invocation.invoke(method.getName(), args);
-        });
-        return type.cast(instance);
+        }));
     }
 
     @FunctionalInterface
@@ -435,117 +326,142 @@ class AuthenticateUserHandlerTest {
         Object invoke(String method, Object[] args);
     }
 
-    private static final class Fixture {
-        private final AtomicInteger usernameLookupCalls = new AtomicInteger();
-        private final AtomicInteger roleLookupCalls = new AtomicInteger();
-        private final AtomicInteger scopeLookupCalls = new AtomicInteger();
-        private final AtomicInteger recordLoginCalls = new AtomicInteger();
+    private final class Fixture {
+        private NhanVien employee = syntheticEmployee();
         private final AtomicInteger verifierCalls = new AtomicInteger();
-        private final AtomicBoolean recordedInsideTransaction = new AtomicBoolean(false);
-        private final AtomicReference<Integer> recordedEmployeeId = new AtomicReference<>();
-        private final AtomicReference<LocalDateTime> recordedLoginAt = new AtomicReference<>();
-        private final AtomicReference<char[]> lastPasswordPassedToVerifier = new AtomicReference<>();
-        private final TransactionProbe transactions = new TransactionProbe();
-        private final AuditProbe audit = new AuditProbe();
+        private char[] lastPasswordPassedToVerifier;
+        private final FakeThrottleStore throttle = new FakeThrottleStore();
+        private final FakeAudit audit = new FakeAudit();
+        private final FakeTransaction transaction = new FakeTransaction(throttle, audit);
+        private boolean passwordCorrect;
+        private boolean employeeHasRole = true;
+        private boolean employeeHasScope = true;
+        private boolean assertResetBeforeAssignments;
         private final AuthenticateUserHandler handler;
 
-        private NhanVien employee = activeSyntheticEmployee();
-        private List<VaiTro> roles = List.of(role(31, "ADMIN"));
-        private List<NhanVienWorkScope> scopes = List.of(scope(11, "Cơ sở mẫu", 21, "Khoa mẫu"));
-        private boolean passwordVerified = true;
-        private RuntimeException lookupFailure;
-        private RuntimeException roleFailure;
-        private RuntimeException scopeFailure;
-        private RuntimeException loginFailure;
-
         private Fixture() {
-            INhanVienRepository employees = proxy(INhanVienRepository.class, (method, args) -> switch (method) {
-                case "getByUsername" -> {
-                    usernameLookupCalls.incrementAndGet();
-                    if (lookupFailure != null) throw lookupFailure;
-                    yield Optional.ofNullable(employee);
-                }
+            INhanVienRepository repository = proxy(INhanVienRepository.class, (method, args) -> switch (method) {
+                case "getByUsername" -> employee != null && !employee.isDeleted()
+                        ? Optional.of(employee) : Optional.empty();
+                case "getById" -> employee != null && !employee.isDeleted()
+                        ? Optional.of(employee) : Optional.empty();
                 case "getAssignedRoles" -> {
-                    roleLookupCalls.incrementAndGet();
-                    if (roleFailure != null) throw roleFailure;
-                    yield roles;
+                    if (assertResetBeforeAssignments) {
+                        assertEquals(0, throttle.state.failureCount());
+                        assertFalse(transaction.active);
+                    }
+                    yield employeeHasRole ? List.of(role()) : List.of();
                 }
-                case "getAssignedWorkScopes" -> {
-                    scopeLookupCalls.incrementAndGet();
-                    if (scopeFailure != null) throw scopeFailure;
-                    yield scopes;
-                }
-                case "recordSuccessfulLogin" -> {
-                    recordLoginCalls.incrementAndGet();
-                    recordedInsideTransaction.set(transactions.active.get());
-                    recordedEmployeeId.set((Integer) args[0]);
-                    recordedLoginAt.set((LocalDateTime) args[1]);
-                    if (loginFailure != null) throw loginFailure;
-                    yield null;
-                }
-                case "getRoleNames" -> List.of();
-                case "getById" -> Optional.empty();
-                case "getAll", "getActiveDoctors", "find" -> List.of();
-                case "exists" -> false;
+                case "getAssignedWorkScopes" -> employeeHasScope ? List.of(scope()) : List.of();
+                case "getAll", "getActiveDoctors", "find", "getRoleNames" -> List.of();
                 case "count" -> 0;
+                case "exists" -> false;
                 default -> null;
             });
-
-            PasswordHasher passwordHasher = (password, encodedHash) -> {
+            PasswordHasher hasher = (password, passwordHash) -> {
                 verifierCalls.incrementAndGet();
-                lastPasswordPassedToVerifier.set(password);
-                return passwordVerified && SYNTHETIC_HASH.equals(encodedHash);
+                lastPasswordPassedToVerifier = password;
+                return passwordCorrect && HASH.equals(passwordHash)
+                        && Arrays.equals(password, "correct".toCharArray());
             };
-            handler = new AuthenticateUserHandler(
-                    employees,
-                    passwordHasher,
-                    transactions,
-                    audit,
-                    Clock.fixed(Instant.parse("2026-01-15T08:00:00Z"), ZoneOffset.UTC));
+            handler = new AuthenticateUserHandler(repository, throttle, hasher, transaction,
+                    audit, ClockHolder.CLOCK);
+        }
+
+        private Result<AuthenticatedUser> handle(String secret) {
+            passwordCorrect = "correct".equals(secret);
+            char[] chars = secret.toCharArray();
+            return handler.handle(new AuthenticateUserCommand(USERNAME, chars));
         }
     }
 
-    private static final class AuditProbe implements AuditWritePort {
-        private final List<SystemAuditEntry> transactionalEntries = new ArrayList<>();
-        private final List<SystemAuditEntry> independentEntries = new ArrayList<>();
+    private static final class FakeThrottleStore implements AccountLoginThrottleStore {
+        private LocalDateTime now = START;
+        private Snapshot state = new Snapshot(START, null, 0, null, 0, null);
+        private int resetCalls;
+        private RuntimeException failure;
+
+        @Override
+        public Optional<Snapshot> lockForUpdate(int employeeId) {
+            if (failure != null) throw failure;
+            return Optional.of(new Snapshot(now, state.windowStartedAt(), state.failureCount(),
+                    state.lastFailureAt(), state.delaySeconds(), state.nextAllowedAt()));
+        }
+
+        @Override
+        public void recordFailure(int employeeId, LocalDateTime windowStartedAt, int failureCount, int delaySeconds) {
+            if (failure != null) throw failure;
+            state = new Snapshot(now, windowStartedAt, failureCount, now, delaySeconds,
+                    delaySeconds == 0 ? null : now.plusSeconds(delaySeconds));
+        }
+
+        @Override
+        public void reset(int employeeId) {
+            if (failure != null) throw failure;
+            resetCalls++;
+            state = new Snapshot(now, null, 0, null, 0, null);
+        }
+    }
+
+    private static final class FakeAudit implements AuditWritePort {
+        private final List<SystemAuditEntry> entries = new ArrayList<>();
         private RuntimeException failure;
 
         @Override
         public void appendInCurrentTransaction(SystemAuditEntry entry) {
             if (failure != null) throw failure;
-            transactionalEntries.add(entry);
+            entries.add(entry);
         }
 
         @Override
         public void appendIndependently(SystemAuditEntry entry) {
             if (failure != null) throw failure;
-            independentEntries.add(entry);
+            entries.add(entry);
         }
 
         @Override
         public void appendMedicalRecordInCurrentTransaction(MedicalRecordAuditEntry entry) {
-            throw new UnsupportedOperationException("Medical record audit is not used by authentication tests.");
+            throw new UnsupportedOperationException();
         }
 
         @Override
         public void appendMedicalRecordIndependently(MedicalRecordAuditEntry entry) {
-            throw new UnsupportedOperationException("Medical record audit is not used by authentication tests.");
+            throw new UnsupportedOperationException();
         }
     }
 
-    private static final class TransactionProbe implements TransactionBoundary {
-        private final AtomicInteger calls = new AtomicInteger();
-        private final AtomicBoolean active = new AtomicBoolean(false);
+    private static final class FakeTransaction implements TransactionBoundary {
+        private final FakeThrottleStore throttle;
+        private final FakeAudit audit;
+        private boolean active;
+
+        private FakeTransaction(FakeThrottleStore throttle, FakeAudit audit) {
+            this.throttle = throttle;
+            this.audit = audit;
+        }
 
         @Override
         public <T> Result<T> inTransaction(Supplier<Result<T>> operation) {
-            calls.incrementAndGet();
-            active.set(true);
+            AccountLoginThrottleStore.Snapshot before = throttle.state;
+            int resetBefore = throttle.resetCalls;
+            List<SystemAuditEntry> auditsBefore = new ArrayList<>(audit.entries);
+            active = true;
             try {
                 return operation.get();
+            } catch (RuntimeException ex) {
+                throttle.state = before;
+                throttle.resetCalls = resetBefore;
+                audit.entries.clear();
+                audit.entries.addAll(auditsBefore);
+                return Result.failure("TRANSACTION_FAILED", "synthetic transaction failure");
             } finally {
-                active.set(false);
+                active = false;
             }
         }
+    }
+
+    private static final class ClockHolder {
+        private static final java.time.Clock CLOCK = java.time.Clock.fixed(
+                Instant.parse("2026-01-15T08:00:00Z"), ZoneOffset.UTC);
     }
 }
