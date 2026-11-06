@@ -1,10 +1,40 @@
 # VIS-TRANSFER-REVIEW-01 — Visit transfer workflow contract review
 
-**Status:** Documentation-only RECON-05 contract addendum, 2026-11-06; prior source-review snapshot retained below. No application code, tests, schema, grants, runtime configuration, database or patient data changed or accessed.
+**Status:** Documentation-only RECON-06 supplement, 2026-11-06; earlier contract/source-review snapshots retained below. No application code, tests, schema, grants, runtime configuration, database or patient data changed or accessed.
 
-## RECON-05 addendum — 2026-11-06 (current approved contract)
+## RECON-06 addendum — 2026-11-06 (current approved N2 policy)
 
-**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06, following RAG-grounded proposals. This addendum controls over the historical snapshots below and carries forward `VIS-TRANSFER-OWNER-DECISION-RECON-04` without reopening its approved rules.
+**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-06`, contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`. This note-policy supplement controls over the historical RECON-05 snapshot below and carries RECON-04/05 forward unchanged except for N2.
+
+### N2 — Owner-approved optional transfer note policy
+
+- The note is optional for every approved reason. Missing/null remains absent; add no default and concatenate no reason label.
+- At the future Application boundary, map TAB (U+0009), LF (U+000A), CR (U+000D), SPACE (U+0020), NBSP (U+00A0), and NARROW NBSP (U+202F) to ordinary space; collapse runs and trim. Blank becomes absent; reject other separators/whitespace.
+- Normalize non-empty text to Unicode NFC. Permit Unicode letters (L), combining marks (M), decimal digits (Nd), punctuation (P), symbols (S), and ordinary space. Reject other controls, format characters (including bidi controls/overrides and ZWJ), unpaired surrogates, private-use and unassigned characters. Pin Unicode category/version behavior in the implementation contract.
+- Maximum 255 Unicode code points after normalization; reject excess, never truncate. UI counter uses the same unit/stage; persistence must round-trip permitted text without loss.
+- Label exactly **“Ghi chú vận hành (không bắt buộc)”** and warn **“Không nhập thông tin định danh, liên hệ, chẩn đoán hoặc kết quả khám/xét nghiệm.”** Do not prefill patient/clinical information. Show normalized text before submit. Rejected note content must not appear in logs.
+- This minimizes PHI risk but cannot guarantee anonymity or prevent PHI from being entered.
+
+Keep the fixed business reason separate from the note, `AuditReasonCode`/auth audit reason fields (including `NhatKyHeThong.maLyDo`), `lyDoKham` and `lyDoChuyenTuyen`. Physical field/table, storage placement and retention remain open: no schema or DDL is selected or authorized. N2 does not settle the broader idempotency canonical-command fields, permissions, runtime, gate or task-board status. SEC-01 remains **OPEN** and transfer remains **default-deny**.
+
+### Current implementation decisions still open — no answers inferred
+
+1. **Note storage/retention:** physical field/table, access, capacity/encoding and retention boundaries remain unapproved. Unicode category/version behavior must be pinned in the implementation contract.
+2. **Queue persistence/cutover:** P1 and M3 are design basis only; exact schema/DDL, indexes, counter initialization/locking, high-water reconciliation, migration/cutover and legacy semantics remain open.
+3. **Idempotency operation details:** key format/scope/lifetime, canonical command fields/version and note participation, receipt, duplicate wait/indeterminate response, commit resolution, failed-attempt reservation and expiry remain open. N2 does not resolve the broader canonical command.
+4. **Linked-work and acceptance:** evidence sources, safety/handoff outcomes and transfer-specific security/workflow acceptance remain open.
+
+### RECON-06 guidance, retrieval and validation record — 2026-11-06
+
+- Read supplied Mandatory guidance: `docs/PROJECT_CONVENTIONS.md`, `README.md`, and excerpts of `DOMAIN_ANALYSIS.md` and `ERD_DIAGRAM.md`; read supplied retrieved excerpts of `phase3-transfer-linked-work-eligibility-review.md`, `phase3-transfer-reason-policy-proposal.md`, `phase3-visit-lifecycle-owner-decisions.md`, `phase3-visit-transfer-decision-gaps.md`, and this review under `docs/ke-hoach-trien-khai/`. Read Owner-approved RECON-06 and its carried-forward RECON-04/05 contract.
+- **RAG first:** attempted `/Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 8 'VIS-TRANSFER-OWNER-DECISION-RECON-06 N2 optional transfer note normalization Unicode categories UI privacy RECON-05 transfer policy'` before local reads. Permission could not be obtained in non-interactive mode, so no RAG excerpts were returned. Used the task-supplied approved contract and retrieved excerpts as fallback; no cache/index workaround or database access.
+- Read-only implementation inspection: `TransferReasonCode` and `TransferReasonCodeTest` show the six-code taxonomy and role matrix; `AuditActionCode` has `VISIT_TRANSFERRED`. Bounded Java search found no N2 normalization, note UI, logging or storage implementation. No implementation was changed or authorized.
+- **Validation:** `git diff --check` and read-only document/scope assertions are run after editing; no application tests are appropriate for this documentation-only task.
+- **Acceptance:** N2 is recorded as approved, while field/table and retention remain open; historical RECON-05 proposal/open-choice snapshots are labeled; RECON-04/05 boundaries and SEC-01 OPEN/default-deny remain unchanged. Live RAG retrieval remains blocked as above.
+
+## Historical RECON-05 addendum — 2026-11-06 (superseded for N2)
+
+**Historical authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05` as understood before RECON-06. Its statement that the optional-note policy remained open is superseded above; RECON-04/05 rules outside N2 remain unchanged.
 
 ### Approved business reasons and unchanged authorization boundaries
 
@@ -45,9 +75,9 @@ These decisions do not select a schema, persistence shape, counter/ledger mechan
 - Same key + different payload: return a conflict without writes.
 - On timeout, retry with the same key and resolve whether the original transaction committed or rolled back before proceeding. Timeout alone never proves rollback; do not treat it as permission for a new operation.
 
-### Remaining decisions and evidence — no answers inferred
+### Historical RECON-05 remaining-decisions snapshot — superseded for N2
 
-1. **Optional note:** length, normalization, privacy safeguards and exact storage field.
+1. **Optional note:** at this snapshot, length, normalization and privacy safeguards were unapproved. RECON-06 has since approved N2; physical field/table and retention remain open.
 2. **Persistence and cutover:** shape/DDL for `queueDate`, the shared allocator, retained allocations, immutable history and idempotency receipts; counter/ledger implementation, migration, cutover and legacy semantics.
 3. **Idempotency details:** key scope/lifetime; canonical payload field list and normalization; exact receipt data; concurrent duplicate waiting, wait deadline, commit-resolution mechanism and indeterminate response; reservation of failed/denied attempts. Approved replay/conflict/timeout outcomes above are fixed.
 4. **Linked work and acceptance:** trustworthy eligibility readers, linked-work/handoff evidence and workflow acceptance; transfer-specific security acceptance. Reason codes do not prove linked-work safety.
@@ -120,16 +150,16 @@ Absence claims are bounded to repository-wide source searches for transfer names
 
 **Implementation evidence (not policy):** The reviewed checkout still has no transfer command, transfer guard, persisted transfer mutation/history, or transfer-specific tests. Therefore it cannot yet prove active destination-room ownership, safe linked-work handoff, or transaction/concurrency invariants. Until the necessary evidence exists, implementation must fail closed. Any destination queue/patient data read remains separately protected. Do not infer the resulting visit status or replay behavior from source status, queue allocation, optimistic concurrency, or this review.
 
-## Decisions still open
+## Historical decisions still open — RECON-05 source-review snapshot
 
-The Owner-approved contract leaves exactly these implementation choices unresolved; none reopens the approved transfer policy above:
+This list preserves the RECON-05 source-review snapshot. Use the current RECON-06 addendum and its implementation ledger above; this historical list is not the current decision ledger.
 
-1. **Reason detail:** The reason code taxonomy; note length/normalization constraints and privacy rules. A fixed reason code is mandatory and a short note is optional.
+1. **Reason detail:** At the time, the reason code taxonomy was fixed but note length/normalization constraints and privacy rules were not. RECON-06 has since approved N2; storage field/table and retention remain open.
 2. **Queue allocation detail:** Persistence shape, sequence namespace, allocation reuse/gap policy, and exact transaction sampling semantics for `queueDate`. `queueDate` itself is the transfer-local business date in `Asia/Ho_Chi_Minh`, distinct from preserved `ngayKham`.
 3. **Transfer history:** Dedicated immutable transfer history, audit-only, or both.
 4. **Idempotent replay:** Replay outcome semantics, including reuse of a key with a different payload. Do not infer a result.
 
-Resolved by RECON-04: preserve visit status, `ngayKham`, and existing examination timestamps; require a fixed reason code with an optional short note; use separate local-date `queueDate`. Provenance: `VIS-TRANSFER-OWNER-DECISION-RECON-04`, approved 2026-11-06; RECON-03's six-item open list above is a historical snapshot, not current policy. Technical/audit metadata remains UTC. Cross-reference the [decision-gap memo](phase3-visit-transfer-decision-gaps.md) and [lifecycle owner decisions](phase3-visit-lifecycle-owner-decisions.md).
+At this snapshot, RECON-04 had resolved preservation of visit status, `ngayKham`, and existing examination timestamps; fixed reason-code requirement with optional note; and separate local-date `queueDate`. RECON-03's six-item open list is historical, not current policy. Technical/audit metadata remains UTC. Cross-reference the [decision-gap memo](phase3-visit-transfer-decision-gaps.md) and [lifecycle owner decisions](phase3-visit-lifecycle-owner-decisions.md).
 
 ## Concrete acceptance gates for a later implementation task
 

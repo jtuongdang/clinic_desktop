@@ -1,12 +1,34 @@
 # Phase 3 — Quyết định Owner cho vòng đời lượt khám
 
 **Task:** `VIS-LIFECYCLE-DECISIONS-01`
-**Trạng thái:** Các quyết định điều chuyển đã được Owner phê duyệt và đối soát ngày 06/11/2026 theo `VIS-TRANSFER-OWNER-DECISION-RECON-05`, giữ nguyên các quy tắc RECON-04; workflow chưa mở.
+**Trạng thái:** Quyết định điều chuyển hiện hành được đối soát ngày 06/11/2026 theo `VIS-TRANSFER-OWNER-DECISION-RECON-06`, giữ nguyên RECON-04/05 ngoài N2 đã được bổ sung; workflow chưa mở.
 **Gate:** Không cấp quyền hoặc thay đổi gate từ tài liệu này. Luồng điều chuyển vẫn default-deny và phụ thuộc SEC-01 cùng acceptance implementation riêng.
 
-## RECON-05 addendum — 2026-11-06 (current approved contract)
+## RECON-06 addendum — 2026-11-06 (current approved N2 policy)
 
-**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06, following RAG-grounded proposals. This addendum controls over the historical snapshots below and carries forward `VIS-TRANSFER-OWNER-DECISION-RECON-04` without reopening its approved rules.
+**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-06`, contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`. This note-policy supplement carries RECON-04 and RECON-05 forward unchanged; it does not reopen actor, role, status, scope, queue, linked-work, history/audit or replay decisions.
+
+### N2 — ghi chú điều chuyển tùy chọn đã được Owner phê duyệt
+
+- Ghi chú tùy chọn với mọi mã lý do đã duyệt. Giá trị thiếu/null vẫn là absent; không thêm mặc định và không ghép nhãn lý do nghiệp vụ vào ghi chú.
+- Tại Application boundary trong tương lai, đổi TAB (U+0009), LF (U+000A), CR (U+000D), SPACE (U+0020), NBSP (U+00A0), NARROW NBSP (U+202F) thành ordinary space; gộp các chuỗi space và trim. Kết quả trống là absent; từ chối separator/whitespace khác.
+- Chuẩn hóa nội dung không rỗng sang Unicode NFC. Cho phép Unicode letters (L), combining marks (M), decimal digits (Nd), punctuation (P), symbols (S) và ordinary space. Từ chối control khác danh sách mapping, format (bao gồm bidi và ZWJ), unpaired surrogate, private-use và unassigned. Implementation contract phải ghim Unicode category/version behavior.
+- Tối đa 255 Unicode code points sau normalization; vượt giới hạn thì reject, không truncate. Bộ đếm UI dùng cùng đơn vị/giai đoạn; persistence phải round-trip nội dung hợp lệ không mất dữ liệu.
+- Nhãn chính xác: **“Ghi chú vận hành (không bắt buộc)”**. Cảnh báo: **“Không nhập thông tin định danh, liên hệ, chẩn đoán hoặc kết quả khám/xét nghiệm.”** Không prefill từ dữ liệu bệnh nhân/lâm sàng. Hiển thị nội dung đã normalize trước khi submit; nội dung bị reject không được xuất hiện trong logs.
+- Chính sách giảm thiểu rủi ro PHI, không bảo đảm ẩn danh và không thể bảo đảm người dùng không nhập PHI.
+
+Mã lý do nghiệp vụ cố định vẫn tách biệt khỏi ghi chú, `AuditReasonCode`/auth audit reason (`NhatKyHeThong.maLyDo`), `lyDoKham` và `lyDoChuyenTuyen`. Physical field/table, storage placement và retention vẫn **OPEN**; approval N2 không phải DDL/schema authorization. Các quyết định triển khai queue, idempotency, linked-work và acceptance vẫn mở theo đúng phạm vi; không quyết định này cấp quyền hoặc mở gate. SEC-01 remains **OPEN**; transfer remains **default-deny**.
+
+### Các quyết định triển khai còn mở — không suy diễn
+
+1. **Lưu trữ ghi chú:** logical/physical field, table placement, access, capacity/encoding/round-trip implementation và retention (purpose, duration, hold/disposal, copies/backups). Unicode category/version behavior phải được ghim trong implementation contract. Không chọn schema hoặc retention.
+2. **Queue persistence/cutover:** P1 + M3 là design basis; schema/DDL, indexes, locking, high-water reconciliation, migration/cutover và legacy semantics chưa được duyệt.
+3. **Idempotency operation details:** key/retention durations, exact key format/scope, canonical command fields/version and note participation, receipt, wait/indeterminate/commit-resolution details and reservation/retry handling. N2 normalization does not settle the broader canonical command contract.
+4. **Linked-work and workflow acceptance:** evidence sources, safety/handoff outcomes and separate security/workflow acceptance remain open.
+
+## Historical RECON-05 addendum — 2026-11-06 (superseded for N2)
+
+**Historical authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05` as understood before RECON-06. Its statement that note policy remained open is superseded by the RECON-06 addendum above; RECON-04/05 rules outside N2 remain unchanged.
 
 ### Approved business reasons and unchanged authorization boundaries
 
@@ -47,7 +69,7 @@ These decisions do not select a schema, persistence shape, counter/ledger mechan
 - Same key + different payload: return a conflict without writes.
 - On timeout, retry with the same key and resolve whether the original transaction committed or rolled back before proceeding. Timeout alone never proves rollback; do not treat it as permission for a new operation.
 
-### Remaining decisions and evidence — no answers inferred
+### Historical RECON-05 remaining decisions snapshot — superseded for N2
 
 1. **Optional note:** length, normalization, privacy safeguards and exact storage field.
 2. **Persistence and cutover:** shape/DDL for `queueDate`, the shared allocator, retained allocations, immutable history and idempotency receipts; counter/ledger implementation, migration, cutover and legacy semantics.
@@ -58,7 +80,7 @@ These decisions do not select a schema, persistence shape, counter/ledger mechan
 
 ## Historical transfer reconciliation and prior review record — through RECON-04
 
-The transfer reconciliation below is a historical snapshot superseded by RECON-05 on 2026-11-06. Its source inventory, guidance/validation claims and acceptance proposals are preserved. Transfer references below to “current”, “still open” or choices awaiting approval describe that dated snapshot only; the RECON-05 addendum above controls. Unrelated lifecycle decisions/proposals remain unchanged and are not settled by RECON-05. The old source findings have not been revalidated against implementation files for this documentation-only task.
+The transfer reconciliation below is a historical snapshot through RECON-04, superseded by RECON-05 and then supplemented by RECON-06 on 2026-11-06. Its source inventory, guidance/validation claims and acceptance proposals are preserved. References to “current”, “still open” or choices awaiting approval describe those dated snapshots only; the RECON-06 addendum above controls. Unrelated lifecycle decisions/proposals remain unchanged. The old source findings have not been revalidated against implementation files for this documentation-only task.
 
 ## Chính sách đã duyệt — không hỏi lại
 

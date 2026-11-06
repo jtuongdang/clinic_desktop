@@ -1,10 +1,27 @@
 # VIS-TRANSFER-REASON-POLICY-01 — Transfer reason code taxonomy, note normalization, and privacy policy proposal
 
-**Status:** Non-binding optional-note proposal; updated 2026-11-06 under Owner-approved `VIS-TRANSFER-OWNER-DECISION-RECON-05`, carrying forward RECON-04 unchanged. Six reason codes and their permitted roles are approved; optional-note policy remains unapproved. No Java, tests, migration, permission, policy or database changes. SEC-01 and all downstream gates remain OPEN; transfer remains default-deny pending its separately approved implementation and acceptance. SEC-01 Definition A does not itself accept future workflows ([baseline acceptance:4–9,23–32][sec01]).
+**Status:** Documentation-only RECON-06 supplement dated 2026-11-06. The six reason codes/roles and N2 optional-note policy are Owner-approved; the proposal and alternatives below are retained as historical material. RECON-04/05 remain controlling and unchanged outside the N2 decisions expressly resolved by RECON-06. No Java, tests, migration, permission, schema or runtime changes. SEC-01 and downstream gates remain OPEN; transfer remains default-deny pending separately authorized implementation and acceptance. SEC-01 Definition A does not itself accept future workflows ([baseline acceptance:4–9,23–32][sec01]).
 
-**Contract:** Current authority is the task-supplied approved contract v1 `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06, retaining `VIS-TRANSFER-OWNER-DECISION-RECON-04`. Earlier `PHASE0-PHASE3-REVIEW-AND-TRACKING-DOCS-01` / `VIS-TRANSFER-OPEN-DECISION-PROPOSALS-01` proposal context is historical. This document proposes only the remaining optional-note decisions; it does not approve policy, choose a database column/schema, or authorize permissions, runtime enablement or gate closure. Separate Owner approval and transfer workflow acceptance are still required. Only this Markdown deliverable is in scope.
+**Contract:** Current authority is the task-supplied Owner-approved v1 `VIS-TRANSFER-OWNER-DECISION-RECON-06` (`13d19fa9-eaed-404e-bdfc-4070daffd38a`), received 2026-11-06, carrying forward RECON-04/05 unchanged except for the explicit N2 note-policy decisions below. Earlier `PHASE0-PHASE3-REVIEW-AND-TRACKING-DOCS-01` / `VIS-TRANSFER-OPEN-DECISION-PROPOSALS-01` material and the RECON-05 proposal sections below are historical. RECON-06 does not select a physical field/table or retention policy, authorize DDL, permissions, runtime enablement or gate closure. Only this Markdown deliverable is in scope.
 
-## RECON-05 follow-up addendum — 2026-11-06 (current reading)
+## RECON-06 addendum — 2026-11-06 (current approved N2 policy)
+
+**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-06`, contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`. This supplement controls over the RECON-05 proposal snapshot below for N2 only and carries RECON-04/05 forward unchanged.
+
+### N2 — Owner-approved optional transfer note
+
+- The note is optional for every approved reason. Missing/null remains absent; do not add a default or concatenate the fixed business reason label. Keep the fixed business reason separate from the note, `AuditReasonCode`/authorization audit reason fields (including `NhatKyHeThong.maLyDo`), `lyDoKham`, and `lyDoChuyenTuyen`.
+- At the future Application boundary, map TAB (U+0009), LF (U+000A), CR (U+000D), SPACE (U+0020), NBSP (U+00A0), and NARROW NBSP (U+202F) to ordinary space; collapse runs and trim. A blank result is absent. Reject other separators/whitespace.
+- Normalize non-empty text to Unicode NFC. Permit Unicode letters (L), combining marks (M), decimal digits (Nd), punctuation (P), symbols (S), and ordinary space. Reject other controls, format characters (including bidi controls/overrides and ZWJ), unpaired surrogates, private-use and unassigned characters. Pin Unicode category/version behavior in the implementation contract.
+- Maximum 255 Unicode code points after normalization. Reject excess; never truncate. The UI counter uses the same unit and stage, and persistence must round-trip permitted text without loss.
+- Label the field exactly **“Ghi chú vận hành (không bắt buộc)”** and warn: **“Không nhập thông tin định danh, liên hệ, chẩn đoán hoặc kết quả khám/xét nghiệm.”** Do not prefill patient or clinical information. Show normalized text before submit. Rejected note content must not appear in logs.
+- This policy minimizes PHI risk; it cannot guarantee anonymity or prevent PHI from being entered.
+
+The physical note field/table, storage placement and retention remain open. N2 is design authority only: it does not authorize DDL, migrations, runtime behavior, permissions or grants. Broader idempotency canonical-command fields and their normalization are not settled by this note-policy approval. SEC-01 remains **OPEN** and transfer remains **default-deny**.
+
+## Historical RECON-05 follow-up addendum — 2026-11-06 (superseded for N2)
+
+This section records the pre-RECON-06 reading only. Its statements that note policy remained unapproved are historical; the RECON-06 addendum above is current for N2. RECON-04/05 rules outside that supplement remain unchanged.
 
 **Approved facts, not proposals:** RECON-05 resolves the six-code role matrix in section 3, requires dedicated immutable transfer history **plus** successful security audit in the mutation/allocation DB transaction, and fixes queue allocation and replay outcomes summarized in section 1. RECON-04's mandatory fixed business reason and **optional** short note remain unchanged. Business reason and note must never enter `AuditReasonCode` or auth/authorization `NhatKyHeThong.maLyDo`; keep the fixed code separate from free text. No code or note expands actor/status/scope eligibility, destination reads, linked-work changes or billing authority.
 
@@ -113,11 +130,11 @@ The approved six business codes never map into `AuditReasonCode` or `NhatKyHeTho
 
 ---
 
-## 4. Optional-note recommendation and conservative alternative — NOT APPROVED
+## 4. Historical optional-note proposal and conservative alternative — superseded by RECON-06
 
-The note stays optional for every approved code, including clinical handoff codes. Missing, null, empty or normalized-blank input must not require staff to invent text. The fixed business code is mandatory and remains a separate value. No clinical narrative is needed to justify an otherwise eligible transfer.
+The following preserves the pre-approval proposal snapshot, not current alternatives or implementation authority. N2 is approved by RECON-06 above; N1 is not an available alternative. The note stays optional for every approved code, including clinical handoff codes. Missing, null, empty or normalized-blank input must not require staff to invent text. The fixed business code is mandatory and remains a separate value. No clinical narrative is needed to justify an otherwise eligible transfer.
 
-### Recommendation N2: bounded operational note
+### Historical Recommendation N2: bounded operational note
 
 Recommend the following minimal deterministic policy for Owner review, applied at the future Application boundary as well as reflected in the UI. These steps describe a candidate **note** normalization policy; they do not settle the idempotency canonical field list or payload normalization.
 
@@ -129,11 +146,11 @@ Recommend the following minimal deterministic policy for Owner review, applied a
 
 This allows short Vietnamese operational text with diacritics and common punctuation without a complex language-specific whitelist. It does **not** prevent PHI. Recommend guidance and data minimization first; no new regex blocker is recommended until separately specified and reviewed (section 5).
 
-### Conservative alternative N1: smaller and narrower, still optional
+### Historical conservative alternative N1: superseded; not approved
 
 Use the same absent/whitespace/NFC pipeline, but limit to **100 Unicode code points** and allow only Unicode L/M/Nd, U+0020 and ASCII punctuation U+0021–U+007E that falls in category P. Other symbols, emoji and non-ASCII punctuation are rejected with an actionable inline message. Vietnamese letters/combining marks remain supported. This stricter repertoire reduces accidental formatting and free-text volume; it still cannot establish anonymity or prohibit diagnosis text automatically.
 
-| Implication | Recommended N2 — proposed | Conservative N1 — proposed |
+| Historical comparison only | N2 — proposal snapshot | N1 — proposal snapshot |
 |---|---|---|
 | UX | 255-point counter; ordinary Unicode punctuation/symbols accepted; pasted mapped whitespace becomes one line. Unsupported controls/format characters produce a field error. | 100-point counter; staff may need to shorten a note or replace typographic punctuation/symbols. Do not force a note when it is omitted. |
 | Storage capacity, not schema selection | Up to 510 UTF-16 code units for 255 supplementary code points; capacity/encoding/collation must be reviewed independently. | Upper bound of 200 UTF-16 code units for 100 permitted code points if any are supplementary; a 100-point limit is not automatically a 100-unit storage capacity. |
@@ -142,9 +159,9 @@ Use the same absent/whitespace/NFC pipeline, but limit to **100 Unicode code poi
 
 The limits do not derive from audit `maLyDo` width. Java UTF-16 and code-point units differ ([retained Java reference][java-string]); SQL Server Unicode storage capacity also has distinct units ([retained SQL Server reference][sql-nvarchar]). **No column, SQL type, width, collation, table or DDL is selected.** Removing notes entirely would amend RECON-04/05 and is not an alternative in this proposal.
 
-## 5. Privacy risks and proposed UI/log/storage boundaries
+## 5. Historical privacy-risk proposals and UI/log/storage boundaries
 
-These are engineering recommendations for separate approval, not a legal compliance claim or a PHI-detection guarantee.
+These are retained recommendations from the pre-RECON-06 proposal, not additional approved requirements or current open policy choices. They are not a legal compliance claim or a PHI-detection guarantee.
 
 | Risk | Proposed boundary / handling | Remaining Owner choice |
 |---|---|---|
@@ -157,7 +174,7 @@ These are engineering recommendations for separate approval, not a legal complia
 
 The exact storage field is an explicit unresolved boundary: decide the logical owner and mapping separately from the fixed business code, and exclude clinical `lyDoKham` / `lyDoChuyenTuyen` and security reason fields. The historical name in the persistence proposal is not a table/column selection. Audit-only history is superseded and cannot satisfy RECON-05. Until field, access and retention choices are approved, there is no storage or runtime implementation authorization.
 
-## 6. Migration and focused testing considerations — future work only
+## 6. Historical migration and focused-testing considerations — future work only
 
 No code, test fixture, migration, grant or runtime gate is changed here. These are proposed acceptance cases for a later authorized implementation, using synthetic data only:
 
@@ -169,9 +186,9 @@ No code, test fixture, migration, grant or runtime gate is changed here. These a
 
 Queue allocation, history persistence, idempotency design, linked-work evidence and transfer-specific security acceptance remain separate workstreams. RECON-05's shared room/day stream, non-reuse of committed numbers, visible gaps and transaction-start SQL UTC sampling remain fixed. Preserve status, `ngayKham`, examination timestamps, priority and linked records; no financial changes. No workflow acceptance is claimed by this test plan.
 
-## 7. Concise Owner decision checklist — all note items still OPEN
+## 7. Historical Owner decision checklist — superseded by RECON-06
 
-Resolved historical choices: former **D1/D2** (taxonomy/role eligibility) are approved as the exact six-code matrix; former **D4** history-vs-audit-only choice is superseded by mandatory immutable history **plus** successful security audit. Do not seek approval again for those fixed facts.
+This checklist is a preserved pre-RECON-06 snapshot; its open N2 choices have since been resolved as stated above. Do not treat it as the current decision ledger. The exact six-code matrix remains approved, and mandatory immutable history **plus** successful security audit remains unchanged.
 
 - [ ] **Length/repertoire:** Choose proposed N2 (255 normalized code points, L/M/Nd/P/S + space), conservative N1 (100, L/M/Nd + ASCII punctuation + space), or specify another bounded optional-note policy. Approve count unit, Unicode behavior, error handling and no truncation.
 - [ ] **Normalization:** Approve or revise the exact whitespace mapping/collapse/trim set and NFC order, blank-to-absent handling and UI preview. Separately settle whether/how note participates in idempotency canonicalization; this checklist does not settle the other key/receipt/wait decisions.
@@ -183,7 +200,15 @@ Resolved historical choices: former **D1/D2** (taxonomy/role eligibility) are ap
 
 ## 8. Validation and guidance record
 
-### RECON-05 follow-up — 2026-11-06
+### RECON-06 supplement — 2026-11-06
+
+- Read the task-supplied mandatory guidance: Orchestrator baseline `docs/PROJECT_CONVENTIONS.md`, `README.md`, and supplied excerpts of `DOMAIN_ANALYSIS.md` and `ERD_DIAGRAM.md`. Read supplied retrieved excerpts of `phase3-transfer-linked-work-eligibility-review.md`, `phase3-transfer-reason-policy-proposal.md`, `phase3-visit-lifecycle-owner-decisions.md`, `phase3-visit-transfer-decision-gaps.md`, and `phase3-visit-transfer-contract-review.md` under `docs/ke-hoach-trien-khai/`. Read Owner-approved `VIS-TRANSFER-OWNER-DECISION-RECON-06`, retaining RECON-04/05.
+- **RAG first:** Attempted the project RAG search before local repository reads: `python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 8 'VIS-TRANSFER-OWNER-DECISION-RECON-06 N2 optional transfer note normalization Unicode categories UI privacy RECON-05 transfer policy'`. The tool reported that permission could not be obtained in non-interactive mode; no new excerpts were returned. Used the task-supplied approved contract and retrieved excerpts as authority; no index/cache workaround or database access.
+- Inspected existing implementation within the read-only scope: `TransferReasonCode` and its test establish the six-code taxonomy/role matrix; `AuditActionCode` contains `VISIT_TRANSFERRED`. A bounded Java search found no N2 note normalization, note UI, logging or storage implementation. This documentation task does not authorize implementation.
+- **Validation:** `git diff --check` and read-only document/scope assertions are recorded after edits below. No application tests are appropriate for this documentation-only change.
+- **Acceptance:** N2 policy is marked Owner-approved without selecting storage or retention; superseded proposal text is explicitly historical; RECON-04/05 boundaries, SEC-01 OPEN and default-deny are retained. The live RAG retrieval remains blocked as above.
+
+### Historical RECON-05 follow-up — 2026-11-06 (superseded for N2)
 
 - Read task-supplied Mandatory guidance before editing: Orchestrator baseline `docs/PROJECT_CONVENTIONS.md`, `README.md`, supplied excerpts of `DOMAIN_ANALYSIS.md` and `ERD_DIAGRAM.md`; supplied retrieved excerpts of `phase3-visit-transfer-contract-review.md`, `phase3-transfer-linked-work-eligibility-review.md`, `phase3-visit-lifecycle-owner-decisions.md` and `phase3-visit-transfer-decision-gaps.md` (under `docs/ke-hoach-trien-khai/`). Read task-supplied approved RECON-05 contract, retaining RECON-04. Full truncated guidance was not opened outside the allowlist.
 - **RAG first:** Before any local repository read/search, ran `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'VIS-TRANSFER-OWNER-DECISION-RECON-05 optional transfer note reason taxonomy normalization privacy AuditReasonCode maLyDo'`. Exit 1: `sqlite3.OperationalError: unable to open database file` at `PRAGMA journal_mode=WAL`; no new excerpts returned. Used supplied retrieval/contract and the allowlisted proposal as fallback. No index/cache workaround or database access. RAG-first ordering satisfied; live retrieval blocked.
@@ -226,8 +251,8 @@ Guidance inventory: no applicable `AGENTS.md` found at the target's checkout anc
 ---
 
 [sec01]: phase2-sec01-baseline-acceptance.md#L4-L32
-[contract-review]: phase3-visit-transfer-contract-review.md#L10-L16
-[gap-memo]: phase3-visit-transfer-decision-gaps.md#L83-L90
+[contract-review]: phase3-visit-transfer-contract-review.md
+[gap-memo]: phase3-visit-transfer-decision-gaps.md
 [persistence-proposal]: phase3-transfer-queue-history-persistence-proposal.md#L59-L65
 [visit-domain]: ../../clinic-domain/src/main/java/vn/clinicmanagement/domain/examination/LuotKham.java#L41-L71
 [audit-reasons]: ../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditReasonCode.java#L3-L13
