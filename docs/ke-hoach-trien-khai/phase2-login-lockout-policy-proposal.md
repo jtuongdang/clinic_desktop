@@ -1,7 +1,7 @@
 # Đề xuất chính sách giới hạn đăng nhập sai
 
 **Task:** `SEC-LOCKOUT-POLICY-01`  
-**Trạng thái:** Chờ chủ dự án duyệt; chưa thay đổi code hoặc schema.  
+**Trạng thái:** Owner duyệt phương án B ngày 06/11/2026; triển khai theo task riêng, chưa đổi code/schema.
 **Ngày:** 06/11/2026
 
 ## Hiện trạng đã kiểm tra
@@ -25,6 +25,12 @@
 | **C — Chưa giới hạn đăng nhập sai** | Giữ hành vi hiện tại. | Không có khóa nhầm do chính sách. | Không có lớp giới hạn tốc độ ở tầng tài khoản; không phù hợp với mục tiêu bảo vệ thông tin xác thực. |
 
 **Khuyến nghị:** chọn **B** vì ứng dụng desktop có nguy cơ bị người khác cố ý nhập sai để làm gián đoạn tài khoản nhân viên. Nếu ưu tiên quy tắc đơn giản và chấp nhận khóa tạm do người khác gây ra, chọn A. Không khuyến nghị C.
+
+## Quyết định của Owner — 06/11/2026
+
+Owner chọn **B — trì hoãn tăng dần**. Policy được duyệt: sau 5 lần sai trong cửa sổ 15 phút, lần thử tiếp theo phải chờ 30 giây; thời gian chờ tăng gấp đôi theo các lần sai kế tiếp, tối đa 15 phút. Không khóa cứng tài khoản; đăng nhập thành công reset chuỗi sai; chuỗi sai hết hiệu lực sau 24 giờ không có lần sai mới. Tiếp tục dùng thông báo xác thực chung, lưu trạng thái nguyên tử theo tài khoản trong SQL Server và audit failure/throttle fail-closed như các điều khoản đề xuất. Implementation phải giữ nguyên tài khoản bị HR/Admin vô hiệu hóa; không thêm flow mở khóa thủ công. Chỉ áp dụng trên dữ liệu tổng hợp trong acceptance.
+
+**Triển khai:** Contract Orchestrator `a2c4ea7f-db14-4933-b8fc-a658972af395` được duyệt; task `baa9468c-40f3-4c8a-871d-949d00c43867` đang chạy bằng Codex CLI trên worktree/branch riêng. Chưa có code/migration được tích hợp; runtime acceptance còn chờ review.
 
 ## Quy tắc chung đề nghị áp dụng
 
