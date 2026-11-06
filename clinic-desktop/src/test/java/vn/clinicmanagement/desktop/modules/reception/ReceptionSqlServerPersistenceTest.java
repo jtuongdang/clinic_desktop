@@ -12,7 +12,6 @@ import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
 import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.application.reception.SearchPatientsQuery;
-import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
 import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
@@ -91,7 +90,8 @@ class ReceptionSqlServerPersistenceTest {
 
         String generatedSuffix = Long.toString(ThreadLocalRandom.current().nextLong(10_000_000L, 100_000_000L));
         String syntheticCccd = "0000" + generatedSuffix;
-        String syntheticPhone = "09" + generatedSuffix;
+        String formattedPhoneSuffix = generatedSuffix.substring(0, 3) + "."
+                + generatedSuffix.substring(3, 6) + "-" + generatedSuffix.substring(6);
         String syntheticCardNumber = "SYNTH" + generatedSuffix;
         LocalDate today = LocalDate.now();
         LocalDate initialCardStart = today.minusDays(1);
@@ -138,7 +138,8 @@ class ReceptionSqlServerPersistenceTest {
             LocalDate copayExemptDate = today.minusMonths(3);
             LocalDate fiveYearDate = today.minusYears(5);
             String patientName = "Synthetic Nguyen Patient" + generatedSuffix;
-            String patientPhone = syntheticPhone;
+            String patientPhone = "09" + generatedSuffix;
+            String formattedPatientPhone = "09 " + formattedPhoneSuffix;
             String patientAddress = "Synthetic test address " + generatedSuffix;
             String patientEmail = "synthetic." + generatedSuffix + "@example.invalid";
             String patientStreet = "Synthetic street " + generatedSuffix;
@@ -147,7 +148,8 @@ class ReceptionSqlServerPersistenceTest {
             String patientWorkplace = "Synthetic workplace";
             String patientOccupation = "Synthetic occupation";
             String patientContactName = "Synthetic contact";
-            String patientContactPhone = "08" + generatedSuffix;
+            String patientContactPhone = "+848" + generatedSuffix;
+            String formattedContactPhone = "+84 8 " + formattedPhoneSuffix;
             String provinceCode = "SP" + generatedSuffix.substring(0, 4);
             String districtCode = "SD" + generatedSuffix.substring(0, 4);
             String wardCode = "SW" + generatedSuffix.substring(0, 4);
@@ -198,7 +200,7 @@ class ReceptionSqlServerPersistenceTest {
                 setText(form, "txtFullName", patientName);
                 setText(form, "txtDateOfBirth", "02/01/1990");
                 setCombo(form, "cbGender", "Nam");
-                setText(form, "txtPhone", patientPhone);
+                setText(form, "txtPhone", formattedPatientPhone);
                 setText(form, "txtEmail", patientEmail);
                 setText(form, "txtCccd", syntheticCccd);
                 setText(form, "txtAddress", patientAddress);
@@ -214,7 +216,7 @@ class ReceptionSqlServerPersistenceTest {
                 setText(form, "txtDistrictCode", districtCode);
                 setText(form, "txtWardCode", wardCode);
                 setText(form, "txtContactName", patientContactName);
-                setText(form, "txtContactPhone", patientContactPhone);
+                setText(form, "txtContactPhone", formattedContactPhone);
                 setCombo(form, "cbRegistrationType", "Khám bệnh");
                 setCombo(form, "cbPayerType", "BHYT");
                 setCheckBox(form, "chkPriority", true);
@@ -242,7 +244,10 @@ class ReceptionSqlServerPersistenceTest {
                     "Registration form command must use the selected active clinic room");
             BenhNhan patient = registrationCommand.patient();
             BaoHiem insurance = registrationCommand.insurance();
-            assertPatientAndInsurance(patient, insurance, expectedPatient, expectedInsurance);
+            assertTrue(formattedPatientPhone.equals(patient.getDienThoai()),
+                    "Registration form must pass formatted primary phone input to the handler");
+            assertTrue(formattedContactPhone.equals(patient.getNguoiLienHeDienThoai()),
+                    "Registration form must pass formatted emergency contact phone input to the handler");
 
             var registrationResult = services.registerPatient().handle(registrationCommand);
             assertTrue(registrationResult.isSuccess(), "Synthetic reception registration failed");
@@ -250,6 +255,7 @@ class ReceptionSqlServerPersistenceTest {
             registeredPatientId = receipt.patientId();
             generatedCardId = insurance.getId();
             generatedVisitIds.add(receipt.visitId());
+            assertPatientAndInsurance(patient, insurance, expectedPatient, expectedInsurance);
             assertTrue(registeredPatientId > 0, "Registration did not return a patient identifier");
             assertTrue(receipt.visitId() > 0, "Registration did not return a visit identifier");
             assertTrue(generatedCardId > 0, "Registration did not return a BHYT card identifier");
@@ -271,14 +277,17 @@ class ReceptionSqlServerPersistenceTest {
                     receipt.visitId(), registeredPatientId);
 
             String updatedName = "Updated" + generatedSuffix;
-            String updatedPhone = "08" + generatedSuffix;
+            // Swap prefix forms so both fields exercise national and international storage.
+            String updatedPhone = "+843" + generatedSuffix;
+            String formattedUpdatedPhone = "+84 3 " + formattedPhoneSuffix;
+            String updatedContactPhone = "07" + generatedSuffix;
+            String formattedUpdatedContactPhone = "07 " + formattedPhoneSuffix;
             String updatedAddress = "Updated synthetic test address";
             String updatedCardNumber = syntheticCardNumber + "U";
             BenhNhan updatedPatient = initialMatch.patient();
             updatedPatient.setTen(updatedName);
             updatedPatient.setNgaySinh(LocalDate.of(1991, 2, 3));
             updatedPatient.setGioiTinh(GioiTinh.F);
-            updatedPatient.setDienThoai(updatedPhone);
             updatedPatient.setDiaChi(updatedAddress);
 
             BaoHiem updatedInsurance = initialMatch.latestInsurance();
@@ -290,16 +299,30 @@ class ReceptionSqlServerPersistenceTest {
             expectedPatient.setNgaySinh(LocalDate.of(1991, 2, 3));
             expectedPatient.setGioiTinh(GioiTinh.F);
             expectedPatient.setDienThoai(updatedPhone);
+            expectedPatient.setNguoiLienHeDienThoai(updatedContactPhone);
             expectedPatient.setDiaChi(updatedAddress);
             expectedInsurance.setSoBaoHiem(updatedCardNumber);
             expectedInsurance.setNgayBatDau(updatedCardStart);
             expectedInsurance.setNgayHetHan(updatedCardEnd);
             expectedInsurance.setMucHuong(90);
 
-            var updateResult = services.registerPatient().handle(new RegisterPatientCommand(
-                    updatedPatient, updatedInsurance, room.getId(), "WALK_IN", "Synthetic update persistence test",
-                    DoiTuongKham.BHYT, false, authorizationContext.employeeId(), authorizationContext,
-                    lifecycle.currentAuditActorContext().orElseThrow()));
+            RegisterPatientCommand updateCommand = onEdt(() -> {
+                PatientRegistrationFormPanel form = new PatientRegistrationFormPanel();
+                form.setClinicRooms(List.of(room));
+                form.selectPatient(updatedPatient, updatedInsurance);
+                setText(form, "txtPhone", formattedUpdatedPhone);
+                setText(form, "txtContactPhone", formattedUpdatedContactPhone);
+                setCombo(form, "cbRegistrationType", "Khám bệnh");
+                setCombo(form, "cbPayerType", "BHYT");
+                setText(form, "txtReason", "Synthetic update persistence test");
+                return form.toRegisterCommand(lifecycle.currentAuthorizationContext().orElseThrow(),
+                        lifecycle.currentAuditActorContext().orElseThrow());
+            });
+            assertTrue(formattedUpdatedPhone.equals(updateCommand.patient().getDienThoai()),
+                    "Update form must pass formatted primary phone input to the handler");
+            assertTrue(formattedUpdatedContactPhone.equals(updateCommand.patient().getNguoiLienHeDienThoai()),
+                    "Update form must pass formatted emergency contact phone input to the handler");
+            var updateResult = services.registerPatient().handle(updateCommand);
             assertTrue(updateResult.isSuccess(), "Synthetic existing-patient update failed");
             var updateReceipt = updateResult.valueOrThrow();
             assertEquals(registeredPatientId, updateReceipt.patientId(),
@@ -639,7 +662,9 @@ class ReceptionSqlServerPersistenceTest {
         assertEquals(expectedPatient.getTen(), actualPatient.getTen(), "Patient given name did not persist");
         assertEquals(expectedPatient.getNgaySinh(), actualPatient.getNgaySinh(), "Patient birth date did not persist");
         assertEquals(expectedPatient.getGioiTinh(), actualPatient.getGioiTinh(), "Patient gender did not persist");
-        assertEquals(expectedPatient.getDienThoai(), actualPatient.getDienThoai(), "Patient phone did not persist");
+        // Boolean assertions keep supplied phone values out of failure diagnostics.
+        assertTrue(expectedPatient.getDienThoai().equals(actualPatient.getDienThoai()),
+                "Canonical patient phone and its entered prefix did not persist");
         assertEquals(expectedPatient.getEmail(), actualPatient.getEmail(), "Patient email did not persist");
         assertEquals(expectedPatient.getSoCCCD(), actualPatient.getSoCCCD(), "Patient CCCD did not persist");
         assertEquals(expectedPatient.getDiaChi(), actualPatient.getDiaChi(), "Patient address did not persist");
@@ -663,8 +688,8 @@ class ReceptionSqlServerPersistenceTest {
         assertEquals(expectedPatient.getMaXa(), actualPatient.getMaXa(), "Patient ward code did not persist");
         assertEquals(expectedPatient.getNguoiLienHeTen(), actualPatient.getNguoiLienHeTen(),
                 "Patient contact name did not persist");
-        assertEquals(expectedPatient.getNguoiLienHeDienThoai(), actualPatient.getNguoiLienHeDienThoai(),
-                "Patient contact phone did not persist");
+        assertTrue(expectedPatient.getNguoiLienHeDienThoai().equals(actualPatient.getNguoiLienHeDienThoai()),
+                "Canonical emergency contact phone and its entered prefix did not persist");
 
         assertNotNull(actualInsurance, "BHYT card was not returned with the patient");
         assertEquals(expectedInsurance.getLoaiBaoHiem(), actualInsurance.getLoaiBaoHiem(),
