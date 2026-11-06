@@ -311,3 +311,13 @@ The current-root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed **443
 No tests or migrations targeted `clinicDb`; only synthetic fixtures were used. The ignored local `db.properties` was temporarily replaced for these runs and restored byte-for-byte. The connection property `encrypt=true;trustServerCertificate=true` was used only for these owner-directed, one-off local test connections. This is not certificate-validation acceptance and does not change the standing deployment requirement for TLS with validated server certificate and identity (`trustServerCertificate=false`).
 
 `NhanVienRepositorySqlServerTest` live persistence remains unverified: it was not run with the bypass connection, which its guard rejects; its accepted test URL requires `encrypt=true;trustServerCertificate=false`. `SEC-01` remains `[~]` / open pending interactive visual smoke; these headless and SQL persistence results do not satisfy that visual gate. No patient or credential data is recorded here, and no model or phase status is closed by this evidence.
+
+## Leadership Handover to leaderANTI & Swing Desktop Restoration — 07/11/2026
+
+Following rate-limit exhaustion on the OpenAI infrastructure for the Codex agent, project Owner officially appointed **`leaderANTI` (Google Antigravity AI)** as Tech Lead to assume command and drive the project to completion.
+
+- **Authority & Scope:** Full technical direction, contract management, agent task assignment, and local PR validation/integration under the ClinicOrchestrator framework. See details in [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md).
+- **Task `d25e0596-81f5-4bd7-aed8-ed7073174aec` Rescued:** Restored secure Swing login and session compatibility in `clinic-desktop` (`AuthenticationCompositionRoot`, `LoginForm`, `UserSession`, `SessionLifecycleService`, `SessionLockOverlay`). Confirmed 41 desktop tests pass and full 5-module reactor compile passes (Commit `0f15eae`).
+- **Task `4ea576cc-500c-4656-bd23-fdd0dd29e462` Integrated:** Produced authoritative reception wiring and behavior map in [`desktop-main-reception-wiring-review.md`](desktop-main-reception-wiring-review.md) (Commit `1799773`).
+- **Authoritative Baseline:** Combined reactor unit tests pass 100% (**393 tests, 0 failures, 0 errors, 7 SQL Server opt-in skips**). `clinicDb` runtime isolation per contract `18847587` and security gates `SEC-01` / `PAT-02` remain strictly OPEN / default-deny.
+
