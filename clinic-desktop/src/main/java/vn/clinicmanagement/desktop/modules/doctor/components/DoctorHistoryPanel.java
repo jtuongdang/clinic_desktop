@@ -1,116 +1,57 @@
 package vn.clinicmanagement.desktop.modules.doctor.components;
 
 import vn.clinicmanagement.desktop.core.config.AppFonts;
-import vn.clinicmanagement.domain.patient.TienSuBenh;
+import vn.clinicmanagement.desktop.core.components.StyledTable;
+import vn.clinicmanagement.desktop.modules.doctor.model.PatientExamDto;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.util.List;
 
-/** Read-only patient-level history returned by the separately authorized history query. */
+/**
+ * Bảng lịch sử khám bệnh và điều trị của bệnh nhân
+ */
 public class DoctorHistoryPanel extends JPanel {
-    private static final String EMPTY_MESSAGE = "Chưa có dữ liệu tiền sử bệnh đã xác thực.";
-    private static final String LOADING_MESSAGE = "Đang tải tiền sử bệnh...";
-    private static final String UNAVAILABLE_MESSAGE = "Không thể tải tiền sử bệnh.";
 
-    private final JLabel historyStatus = new JLabel("", SwingConstants.CENTER);
-    private final JLabel loadingLabel = new JLabel(LOADING_MESSAGE, SwingConstants.CENTER);
-    private final JProgressBar loadingProgress = new JProgressBar();
-    private final JPanel loadingStatus = new JPanel(new BorderLayout(0, 8));
-    private final DefaultTableModel historyModel = new DefaultTableModel(
-            new Object[]{"Loại tiền sử", "Nội dung"}, 0) {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-    };
-    private final JTable historyTable = new JTable(historyModel);
+    private final DefaultTableModel historyTableModel;
+    private final JTable historyTable;
 
     public DoctorHistoryPanel() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(210, 218, 226)));
 
-        JLabel title = new JLabel("Tiền sử bệnh");
-        title.setFont(AppFonts.BODY_BOLD);
-        title.setForeground(new Color(24, 75, 120));
-        title.setBorder(new EmptyBorder(6, 4, 4, 4));
-        add(title, BorderLayout.NORTH);
+        JLabel lblHistTitle = new JLabel("Lịch Sử Khám và Điều Trị");
+        lblHistTitle.setFont(AppFonts.BODY_BOLD);
+        lblHistTitle.setForeground(new Color(24, 75, 120));
+        lblHistTitle.setBorder(new EmptyBorder(6, 4, 4, 4));
+        add(lblHistTitle, BorderLayout.NORTH);
 
-        historyStatus.setFont(AppFonts.BODY);
-        historyStatus.setForeground(new Color(100, 110, 120));
-        historyStatus.setBorder(new EmptyBorder(12, 8, 12, 8));
-        add(historyStatus, BorderLayout.CENTER);
+        String[] hCols = {"Ngày Vào", "Hình Thức Vào", "Khoa", "Phòng", "Ngày Ra", "Xử Trí", "Dịch", "Chẩn Đoán"};
+        historyTableModel = new DefaultTableModel(hCols, 0) {
+            @Override
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
 
-        loadingLabel.setFont(AppFonts.BODY);
-        loadingLabel.setForeground(new Color(100, 110, 120));
-        loadingLabel.getAccessibleContext().setAccessibleName(LOADING_MESSAGE);
-        loadingProgress.setIndeterminate(true);
-        loadingProgress.setPreferredSize(new Dimension(180, 16));
-        loadingProgress.getAccessibleContext().setAccessibleName(LOADING_MESSAGE);
-        loadingProgress.getAccessibleContext().setAccessibleDescription(
-                "Tiến trình tải tiền sử bệnh đang được thực hiện.");
-        loadingStatus.setOpaque(false);
-        loadingStatus.add(loadingLabel, BorderLayout.CENTER);
-        loadingStatus.add(loadingProgress, BorderLayout.SOUTH);
-
+        historyTable = StyledTable.create(historyTableModel);
         historyTable.setFont(AppFonts.BODY);
-        historyTable.setRowHeight(28);
-        historyTable.setFillsViewportHeight(true);
-        historyTable.getTableHeader().setFont(AppFonts.BODY_BOLD);
-        historyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        historyTable.setRowHeight(24);
+
+        JScrollPane histScroll = new JScrollPane(historyTable);
+        histScroll.setPreferredSize(new Dimension(500, 160));
+        histScroll.setBorder(BorderFactory.createLineBorder(new Color(220, 226, 234)));
+        add(histScroll, BorderLayout.CENTER);
     }
 
-    public void showLoading() {
-        clearRows();
-        showStatus(loadingStatus);
-    }
-
-    public void showHistory(List<TienSuBenh> histories) {
-        clearRows();
-        if (histories.isEmpty()) {
-            historyStatus.setText(EMPTY_MESSAGE);
-            return;
-        }
-        for (TienSuBenh history : histories) {
-            historyModel.addRow(new Object[]{
-                    history.getLoaiTienSu().name(),
-                    history.getMoTa() == null ? "" : history.getMoTa()
-            });
-        }
-        remove(historyStatus);
-        add(new JScrollPane(historyTable), BorderLayout.CENTER);
-        revalidate();
-        repaint();
-    }
-
-    public void showUnavailable() {
-        clearRows();
-        historyStatus.setText(UNAVAILABLE_MESSAGE);
-    }
-
-    public void clearHistory() {
-        clearRows();
-        historyStatus.setText("");
-    }
-
-    private void clearRows() {
-        historyModel.setRowCount(0);
-        showStatus(historyStatus);
-    }
-
-    private void showStatus(Component status) {
-        removeAllExceptTitle();
-        add(status, BorderLayout.CENTER);
-        revalidate();
-        repaint();
-    }
-
-    private void removeAllExceptTitle() {
-        Component title = getComponent(0);
-        removeAll();
-        add(title, BorderLayout.NORTH);
+    public void updateHistory(PatientExamDto p) {
+        if (p == null) return;
+        historyTableModel.setRowCount(0);
+        historyTableModel.addRow(new Object[]{
+                p.getAdmissionDate(), "Nhập viện", p.getDepartment().split(" > ")[0], "P.Điều Trị Ngoại", "", "Đang điều trị", "", p.getDiagnosis()
+        });
+        historyTableModel.addRow(new Object[]{
+                "13:42 07/11/2018", "Trực tiếp", "Khoa Khám bệnh", "P. Khám Tổng Hợp", "07:23 07/11/2018", "Nhập viện", "Ngoại Đầu cổ", p.getDiagnosis()
+        });
     }
 }

@@ -1,528 +1,471 @@
 package vn.clinicmanagement.desktop.modules.reception.components;
 
-import vn.clinicmanagement.application.authorization.AuthorizationContext;
-import vn.clinicmanagement.application.audit.AuditActorContext;
-import vn.clinicmanagement.application.reception.RegisterPatientCommand;
-import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
-import vn.clinicmanagement.domain.common.enums.GioiTinh;
-import vn.clinicmanagement.domain.facility.PhongKham;
-import vn.clinicmanagement.domain.patient.BaoHiem;
-import vn.clinicmanagement.domain.patient.BenhNhan;
+import vn.clinicmanagement.desktop.core.config.AppFonts;
 
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import java.awt.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 
-/** Reception form bound to patient, BHYT and visit models. */
+/**
+ * Khung nhập liệu thông tin bệnh nhân và thông tin thẻ BHYT.
+ * Khớp 100% chi tiết trong ảnh chụp mẫu.
+ */
 public class PatientRegistrationFormPanel extends JPanel {
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    private final JTextField txtSearchPhone = input("searchPhone", 100);
-    private final JTextField txtSearchCccd = input("searchCccd", 120);
-    private final JTextField txtPatientCode = input("patientCode", 105);
-    private final JTextField txtFullName = input("fullName", 220);
-    private final JComboBox<String> cbGender = new JComboBox<>(new String[]{"Nam", "Nữ", "Khác"});
-    private final JTextField txtDateOfBirth = input("dateOfBirth", 92);
-    private final JTextField txtBirthPlace = input(150);
-    private final JTextField txtStreet = input(150);
-    private final JTextField txtProvinceCode = input(48);
-    private final JTextField txtDistrictCode = input(48);
-    private final JTextField txtWardCode = input(48);
-    private final JTextField txtAddress = input("address", 180);
-    private final JTextField txtOccupation = input(110);
-    private final JTextField txtPhone = input("phone", 100);
-    private final JTextField txtEmail = input(140);
-    private final JComboBox<String> cbEthnicity = new JComboBox<>(new String[]{"Kinh", "Tày", "Thái", "Mường", "Khác"});
-    private final JComboBox<String> cbNationality = new JComboBox<>(new String[]{"Việt Nam", "Khác"});
-    private final JTextField txtCccd = input("cccd", 120);
-    private final JTextField txtCccdIssueDate = input(92);
-    private final JTextField txtCccdIssuePlace = input(165);
-    private final JTextField txtWorkplace = input(150);
-    private final JTextField txtContactName = input(120);
-    private final JTextField txtContactPhone = input(100);
-    private final JComboBox<String> cbRegistrationType = new JComboBox<>(new String[]{"Khám bệnh", "Tái khám", "Cấp cứu"});
-    private final JTextField txtReason = input("reason", 150);
-    private final JComboBox<String> cbPayerType = new JComboBox<>(new String[]{"Viện phí", "BHYT", "Dịch vụ theo yêu cầu"});
-    private final JCheckBox chkPriority = new JCheckBox("Ưu tiên");
-    private final MedicalPopupChooser chooserService = new MedicalPopupChooser(new String[0], "", 200, 22);
-    private final MedicalPopupChooser chooserClinicRoom = new MedicalPopupChooser(new String[0], "", 220, 22);
+    public static final String[] CLINICAL_SERVICES = {
+            "Khám Nội",
+            "Khám Nhi",
+            "Khám Ngoại",
+            "Khám Mắt",
+            "Khám Răng",
+            "Khám Phụ sản",
+            "Khám Tai mũi họng",
+            "Khám Răng hàm mặt",
+            "Khám Ổ đồng",
+            "Hội chẩn ca bệnh khó chuyên ngành Nhi",
+            "Khám bệnh theo yêu cầu mời bác sỹ tuyến tỉnh [YC]",
+            "Khám bệnh theo yêu cầu mời BS tuyến TW [YC]",
+            "Khám tâm thần"
+    };
 
-    private final JTextField txtInsuranceNumber = input("insuranceNumber", 205);
-    private final JTextField txtInsuranceStartDate = input(92);
-    private final JTextField txtInsuranceEndDate = input(92);
-    private final JTextField txtInsuranceRate = input(42);
-    private final JComboBox<String> cbLivingArea = new JComboBox<>(new String[]{"", "K1", "K2", "K3"});
-    private final JTextField txtFacilityCode = input(90);
-    private final JTextField txtFacilityName = input(170);
-    private final JTextField txtInsuranceAddress = input(260);
-    private final JComboBox<String> cbRoute = new JComboBox<>(new String[]{"Đúng tuyến", "Trái tuyến"});
-    private final JCheckBox chkBirthCertificate = new JCheckBox("Trẻ em có giấy khai sinh");
-    private final JCheckBox chkNotHoldingCard = new JCheckBox("Không giữ thẻ BHYT");
-    private final JCheckBox chkExemptCopay = new JCheckBox("Miễn cùng chi trả trong năm");
-    private final JTextField txtCopayExemptDate = input(92);
-    private final JTextField txtFiveYearDate = input(92);
+    public static final String[] CLINIC_ROOMS = {
+            "Cấp cứu nhi",
+            "Cấp cứu sản",
+            "Phòng Tiêm Chủng",
+            "PK cách ly",
+            "PK ĐT ngoại trú tâm thần",
+            "PK Nhi 1",
+            "PK Nhi 2",
+            "PK Nhi 3",
+            "PK Nhi 4",
+            "PK TEST COVID",
+            "PK TEST PCR",
+            "PK theo yêu cầu nhi số 1",
+            "PK theo yêu cầu nhi số 2",
+            "PK theo yêu cầu Sản - Phụ khoa",
+            "PK sàng lọc chẩn đoán trước sinh và sơ sinh",
+            "PHÒNG QUẢN LÝ HS",
+            "PK Phụ nội"
+    };
 
-    private final Map<String, PhongKham> roomsByName = new HashMap<>();
-    // Keep only the draft's ID while protected catalog data is cleared. Null means a fresh draft;
-    // zero means an empty choice, which must never fall back to a different room automatically.
-    private Integer draftClinicRoomId;
-    private BenhNhan selectedPatient;
-    private BaoHiem selectedInsurance;
-    private Consumer<String> onClinicRoomChanged;
-    private Consumer<String> onServiceChanged;
-    private BiConsumer<String, String> onSearch;
+    private MedicalPopupChooser chooserService;
+    private MedicalPopupChooser chooserClinicRoom;
 
     public PatientRegistrationFormPanel() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
         setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(205, 215, 226)));
-        add(buildSearchBar(), BorderLayout.NORTH);
 
-        JPanel patientDetails = buildPatientDetails();
-        JPanel insuranceDetails = buildInsuranceDetails();
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, patientDetails, insuranceDetails);
-        split.setResizeWeight(.58);
-        split.setDividerSize(2);
-        split.setBorder(null);
-        add(split, BorderLayout.CENTER);
+        // --- 1. THANH TÌM KIẾM NHANH TRÊN CÙNG ---
+        JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 3));
+        searchBar.setBackground(new Color(248, 250, 252));
+        searchBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(225, 232, 240)));
+        searchBar.setPreferredSize(new Dimension(1000, 32));
+        searchBar.setMinimumSize(new Dimension(0, 32));
+        searchBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
 
-        chooserClinicRoom.setName("clinicRoom");
-        chooserClinicRoom.setOnSelectListener(name -> {
-            if (onClinicRoomChanged != null) onClinicRoomChanged.accept(name);
+        JLabel lblDoiTuong = new JLabel("Đối tượng:");
+        lblDoiTuong.setFont(AppFonts.BODY_BOLD);
+        JComboBox<String> cbDoiTuong = new JComboBox<>(new String[]{"Viện phí", "BHYT", "Dịch vụ"});
+        cbDoiTuong.setFont(AppFonts.BODY);
+        cbDoiTuong.setPreferredSize(new Dimension(95, 20));
+
+        JCheckBox chkUuTien = new JCheckBox("ĐN vn tiền");
+        chkUuTien.setFont(AppFonts.SMALL_BOLD);
+        chkUuTien.setForeground(new Color(205, 35, 35)); // Màu đỏ chuẩn
+        chkUuTien.setOpaque(false);
+
+        JLabel lblTimKiem = new JLabel("Tìm kiếm :");
+        lblTimKiem.setFont(AppFonts.BODY_BOLD);
+        lblTimKiem.setForeground(new Color(125, 25, 125)); // Tím đậm chuẩn EHC
+
+        JLabel lblPhone = new JLabel("Số điện thoại:");
+        lblPhone.setFont(AppFonts.BODY);
+        JTextField txtPhoneSearch = createInput(80, 22);
+
+        JLabel lblCccdSearch = new JLabel("Số CCCD:");
+        lblCccdSearch.setFont(AppFonts.BODY);
+        JTextField txtCccdSearch = createInput(110, 22);
+
+        searchBar.add(lblDoiTuong);
+        searchBar.add(cbDoiTuong);
+        searchBar.add(chkUuTien);
+        searchBar.add(lblTimKiem);
+        searchBar.add(lblPhone);
+        searchBar.add(txtPhoneSearch);
+        searchBar.add(lblCccdSearch);
+        searchBar.add(txtCccdSearch);
+
+        // --- 2. VÙNG FORM CHÍNH: CỘT TRÁI TÌM KIẾM/HÀNH CHÍNH, CỘT PHẢI BHYT ---
+        JPanel formContainer = new JPanel(new BorderLayout());
+        formContainer.setBackground(Color.WHITE);
+        formContainer.setBorder(new EmptyBorder(0, 2, 0, 2));
+
+        JPanel patientPanel = new JPanel(new BorderLayout());
+        patientPanel.setBackground(Color.WHITE);
+        patientPanel.add(searchBar, BorderLayout.NORTH);
+        patientPanel.add(buildPatientDemographicsPanel(), BorderLayout.CENTER);
+        JPanel insurancePanel = buildInsuranceCardPanel();
+        insurancePanel.setOpaque(true);
+        insurancePanel.setBackground(Color.WHITE);
+        insurancePanel.setBorder(new EmptyBorder(10, 0, 0, 0));
+        patientPanel.setMinimumSize(new Dimension(0, 0));
+        insurancePanel.setMinimumSize(new Dimension(0, 0));
+
+        JSplitPane columns = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, patientPanel, insurancePanel);
+        columns.setBorder(null);
+        columns.setDividerSize(1);
+        columns.setResizeWeight(0.58);
+        columns.setBackground(new Color(215, 224, 235));
+        columns.addComponentListener(new ComponentAdapter() {
+            private boolean initialized;
+
+            @Override
+            public void componentResized(ComponentEvent e) {
+                if (!initialized && columns.getWidth() > 0) {
+                    columns.setDividerLocation(0.58);
+                    initialized = true;
+                }
+            }
         });
-        chooserService.setOnSelectListener(name -> {
-            if (onServiceChanged != null) onServiceChanged.accept(name);
+        formContainer.add(columns, BorderLayout.CENTER);
+
+        add(formContainer, BorderLayout.CENTER);
+    }
+
+    /** Cột trái: Thông tin hành chính bệnh nhân */
+    private JPanel buildPatientDemographicsPanel() {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setOpaque(false);
+
+        // Dòng 1: Mã BN, Họ và tên
+        JPanel r1 = createRowPanel();
+        r1.add(createLabel("Mã BN:", 65));
+        JTextField txtMaBn = createInput(100, 22);
+        txtMaBn.setText("22000326");
+        txtMaBn.setFont(AppFonts.BODY_BOLD);
+        r1.add(txtMaBn);
+        r1.add(createLabel("Họ và tên:"));
+        JTextField txtHoTen = createInput(285, 22);
+        txtHoTen.setText("NGUYỄN THỊ LIÊN");
+        txtHoTen.setFont(AppFonts.BODY_BOLD);
+        r1.add(txtHoTen);
+        p.add(r1);
+
+        // Dòng 2: Giới tính, Ngày sinh (3 ô), 22 tuổi, Nơi sinh
+        JPanel r2 = createRowPanel();
+        r2.add(createLabel("Giới tính:", 65));
+        JComboBox<String> cbGioiTinh = new JComboBox<>(new String[]{"Nữ", "Nam"});
+        cbGioiTinh.setFont(AppFonts.BODY);
+        cbGioiTinh.setPreferredSize(new Dimension(100, 20));
+        r2.add(cbGioiTinh);
+
+        r2.add(createLabel("Ngày sinh:", 63));
+        JPanel birthDateFields = new JPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
+        birthDateFields.setOpaque(false);
+        JTextField txtDay = createInput(26, 22); txtDay.setText("25"); txtDay.setHorizontalAlignment(SwingConstants.CENTER);
+        JTextField txtMonth = createInput(26, 22); txtMonth.setText("10"); txtMonth.setHorizontalAlignment(SwingConstants.CENTER);
+        JTextField txtYear = createInput(44, 22); txtYear.setText("2000"); txtYear.setHorizontalAlignment(SwingConstants.CENTER);
+        birthDateFields.add(txtDay);
+        birthDateFields.add(txtMonth);
+        birthDateFields.add(txtYear);
+        r2.add(birthDateFields);
+        r2.add(Box.createHorizontalStrut(52));
+
+        JLabel lblAge = new JLabel("22 tuổi");
+        lblAge.setFont(AppFonts.BODY_BOLD);
+        lblAge.setForeground(new Color(0, 85, 204)); // Xanh lam chuẩn
+        lblAge.setBorder(new EmptyBorder(0, 4, 0, 4));
+        r2.add(lblAge);
+
+        r2.add(Box.createHorizontalStrut(72));
+        r2.add(createLabel("Nơi sinh:", 56));
+        JTextField txtNoiSinh = createInput(216, 22); txtNoiSinh.setText("bắc ninh");
+        r2.add(txtNoiSinh);
+        p.add(r2);
+
+        // Dòng 3: SN/thôn/phố, Ty/Hộ/Xp, Địa chỉ gợi ý, Nghề nghiệp
+        JPanel r3 = createRowPanel();
+        r3.setLayout(new FlowLayout(FlowLayout.LEFT, 3, 0));
+        r3.add(createLabel("SN/thôn/phố:", 77));
+        r3.add(createInput(100, 22));
+        r3.add(createLabel("Ty/Hộ/Xp:", 61));
+        r3.add(createInput(100, 22));
+
+        r3.add(createLabel("Bắc Ninh - H. Quế Võ - Thị trấn Phố Mới", 304));
+
+        r3.add(createLabel("Nghề nghiệp:"));
+        JTextField txtJob = createInput(65, 22); txtJob.setText("Nhân dân");
+        r3.add(txtJob);
+        r3.add(createBrowseButton());
+        p.add(r3);
+
+        // Dòng 4: Điện thoại, Email, Dân tộc, Quốc tịch
+        JPanel r4 = createRowPanel();
+        r4.add(createLabel("Điện thoại:", 65));
+        JTextField txtPhone = createInput(100, 22); txtPhone.setText("012345678");
+        r4.add(txtPhone);
+        r4.add(createLabel("Email:", 55));
+        r4.add(createInput(100, 22));
+        r4.add(Box.createHorizontalStrut(10));
+        r4.add(createLabel("Dân tộc:", 50));
+        JComboBox<String> cbDanToc = new JComboBox<>(new String[]{"Kinh", "Tày", "Thái", "Mường", "Khác"});
+        cbDanToc.setFont(AppFonts.BODY);
+        cbDanToc.setPreferredSize(new Dimension(109, 20));
+        r4.add(cbDanToc);
+        r4.add(Box.createHorizontalStrut(3));
+        r4.add(createLabel("Quốc tịch:", 61));
+        JComboBox<String> cbQuocTich = new JComboBox<>(new String[]{"Việt nam", "Khác"});
+        cbQuocTich.setFont(AppFonts.BODY);
+        cbQuocTich.setPreferredSize(new Dimension(212, 20));
+        r4.add(cbQuocTich);
+        p.add(r4);
+
+        // Dòng 5: CMND/CCCD, Ngày cấp, Nơi cấp
+        JPanel r5 = createRowPanel();
+        r5.add(createLabel("CMND/CCCD:", 83));
+        JTextField txtCccd = createInput(100, 22); txtCccd.setText("111122222333");
+        r5.add(txtCccd);
+        r5.add(createLabel("Ngày cấp:", 60));
+        JPanel issueDateFields = new JPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
+        issueDateFields.setOpaque(false);
+        JTextField txtCccdD = createInput(26, 22); txtCccdD.setText("01"); txtCccdD.setHorizontalAlignment(SwingConstants.CENTER);
+        JTextField txtCccdM = createInput(26, 22); txtCccdM.setText("01"); txtCccdM.setHorizontalAlignment(SwingConstants.CENTER);
+        JTextField txtCccdY = createInput(44, 22); txtCccdY.setText("2018"); txtCccdY.setHorizontalAlignment(SwingConstants.CENTER);
+        issueDateFields.add(txtCccdD);
+        issueDateFields.add(txtCccdM);
+        issueDateFields.add(txtCccdY);
+        r5.add(issueDateFields);
+        r5.add(Box.createHorizontalStrut(11));
+        r5.add(createLabel("Nơi cấp:", 51));
+        JTextField txtNoiCap = createInput(374, 22); txtNoiCap.setText("bắc ninh");
+        r5.add(txtNoiCap);
+        p.add(r5);
+
+        // Dòng 6: TT khác, Nơi làm việc
+        JPanel r6 = createRowPanel();
+        JButton btnTtKhac = new JButton("TT khác");
+        btnTtKhac.setFont(AppFonts.SMALL);
+        btnTtKhac.setPreferredSize(new Dimension(74, 22));
+        btnTtKhac.setMargin(new Insets(1, 4, 1, 4));
+        r6.add(btnTtKhac);
+        r6.add(Box.createHorizontalStrut(372));
+        r6.add(createLabel("Nơi làm việc:", 78));
+        JTextField txtWork = createInput(267, 22); txtWork.setText("hà nội");
+        r6.add(txtWork);
+        p.add(r6);
+
+        // Dòng 7: ĐK khám, Lúc, Lý do khám
+        JPanel r7 = createRowPanel();
+        r7.add(createLabel("ĐK khám:", 65));
+        JComboBox<String> cbDkKham = new JComboBox<>(new String[]{"Khám bệnh", "Tái khám", "Cấp cứu"});
+        cbDkKham.setFont(AppFonts.BODY);
+        cbDkKham.setPreferredSize(new Dimension(100, 20));
+        r7.add(cbDkKham);
+        r7.add(createLabel("Lúc:", 29));
+        JTextField txtTime = createInput(126, 22); txtTime.setText("10:39 23/08/2022");
+        r7.add(txtTime);
+        r7.add(Box.createHorizontalStrut(6));
+        r7.add(createLabel("Lý do khám:", 73));
+        JTextField txtReason = createInput(109, 22); txtReason.setText("đau mỏi");
+        r7.add(txtReason);
+        p.add(r7);
+
+        // Dòng 8: Dịch vụ, Phòng khám (Trạng thái sau khi chọn dịch vụ xong: Khám Nhi & Phòng Tiêm Chủng vàng)
+        JPanel r8 = createRowPanel();
+        r8.add(createLabel("Dịch vụ:", 65));
+        chooserService = new MedicalPopupChooser(CLINICAL_SERVICES, "Khám Nhi", 258, 20);
+        r8.add(chooserService);
+
+        r8.add(createLabel("Phòng khám:", 78));
+        chooserClinicRoom = new MedicalPopupChooser(CLINIC_ROOMS, "Phòng Tiêm Chủng", 395, 20);
+        chooserClinicRoom.setHighlighted(true); // Highlight nền vàng sau khi chọn dịch vụ xong khớp 100% ảnh chụp
+        r8.add(chooserClinicRoom);
+
+        // Sau khi chọn Dịch Vụ: Chuyển focus sang Phòng Khám và bôi vàng
+        chooserService.setOnSelectListener(svc -> {
+            chooserClinicRoom.requestFocusAndHighlight();
+            if (onServiceListener != null) {
+                onServiceListener.accept(svc);
+            }
         });
-        cbEthnicity.setSelectedItem("Kinh");
-        cbNationality.setSelectedItem("Việt Nam");
-        cbPayerType.setSelectedItem("Viện phí");
-        cbRoute.setSelectedItem("Đúng tuyến");
+
+        p.add(r8);
+
+        return p;
     }
 
-    private JPanel buildSearchBar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 3));
-        bar.setBackground(new Color(248, 250, 252));
-        bar.add(label("Tìm hồ sơ:"));
-        bar.add(label("SĐT"));
-        bar.add(txtSearchPhone);
-        bar.add(label("CCCD"));
-        bar.add(txtSearchCccd);
-        JButton search = new JButton("Tìm");
-        search.setName("searchButton");
-        Runnable triggerSearch = this::triggerSearch;
-        search.addActionListener(e -> triggerSearch.run());
-        txtSearchPhone.addActionListener(e -> triggerSearch.run());
-        txtSearchCccd.addActionListener(e -> triggerSearch.run());
-        bar.add(search);
-        return bar;
-    }
+    private java.util.function.Consumer<String> onServiceListener;
 
-    private JPanel buildPatientDetails() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new EmptyBorder(2, 4, 2, 4));
-        panel.setBackground(Color.WHITE);
-
-        JPanel row = row();
-        txtPatientCode.setEditable(false);
-        row.add(label("Mã BN")); row.add(txtPatientCode);
-        row.add(label("Họ tên*")); row.add(txtFullName);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Giới tính")); row.add(cbGender);
-        row.add(label("Ngày sinh*")); row.add(txtDateOfBirth);
-        row.add(label("Nơi sinh")); row.add(txtBirthPlace);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Số nhà/thôn/phố")); row.add(txtStreet);
-        row.add(label("Tỉnh/Huyện/Xã")); row.add(txtProvinceCode); row.add(txtDistrictCode); row.add(txtWardCode);
-        row.add(label("Địa chỉ")); row.add(txtAddress);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Điện thoại")); row.add(txtPhone);
-        row.add(label("Email")); row.add(txtEmail);
-        row.add(label("Nghề nghiệp")); row.add(txtOccupation);
-        row.add(label("Dân tộc")); row.add(cbEthnicity);
-        row.add(label("Quốc tịch")); row.add(cbNationality);
-        panel.add(row);
-
-        row = row();
-        row.add(label("CCCD")); row.add(txtCccd);
-        row.add(label("Ngày cấp")); row.add(txtCccdIssueDate);
-        row.add(label("Nơi cấp")); row.add(txtCccdIssuePlace);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Nơi làm việc")); row.add(txtWorkplace);
-        row.add(label("Người liên hệ")); row.add(txtContactName);
-        row.add(label("SĐT liên hệ")); row.add(txtContactPhone);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Đăng ký")); row.add(cbRegistrationType);
-        row.add(label("Đối tượng")); row.add(cbPayerType);
-        row.add(chkPriority);
-        row.add(label("Lý do")); row.add(txtReason);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Phòng khám*")); row.add(chooserClinicRoom);
-        panel.add(row);
-        return panel;
-    }
-
-    private JPanel buildInsuranceDetails() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new EmptyBorder(2, 8, 2, 4));
-        panel.setBackground(Color.WHITE);
-
-        JPanel row = row();
-        row.add(label("Thông tin BHYT")); row.add(chkBirthCertificate); row.add(chkNotHoldingCard);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Số thẻ")); row.add(txtInsuranceNumber);
-        row.add(label("Nơi sống")); row.add(cbLivingArea);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Giá trị từ")); row.add(txtInsuranceStartDate);
-        row.add(label("Đến")); row.add(txtInsuranceEndDate);
-        row.add(label("Mức hưởng %")); row.add(txtInsuranceRate);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Mã KCBBĐ")); row.add(txtFacilityCode);
-        row.add(label("Nơi đăng ký KCB")); row.add(txtFacilityName);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Địa chỉ trên thẻ")); row.add(txtInsuranceAddress);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Tuyến KCB")); row.add(cbRoute);
-        row.add(chkExemptCopay);
-        panel.add(row);
-
-        row = row();
-        row.add(label("Ngày miễn cùng chi trả")); row.add(txtCopayExemptDate);
-        row.add(label("Đủ 5 năm liên tục")); row.add(txtFiveYearDate);
-        panel.add(row);
-        return panel;
-    }
-
-    public void setClinicRooms(List<PhongKham> rooms) {
-        clearClinicRooms();
-        if (rooms != null) rooms.forEach(room -> roomsByName.put(room.getTenPhong(), room));
-        String[] names = roomsByName.keySet().stream().sorted(String.CASE_INSENSITIVE_ORDER).toArray(String[]::new);
-        chooserClinicRoom.setItems(names);
-        String selected = draftClinicRoomId == null ? (names.length == 0 ? "" : names[0])
-                : roomsByName.values().stream().filter(room -> Objects.equals(room.getId(), draftClinicRoomId))
-                        .map(PhongKham::getTenPhong).findFirst().orElse("");
-        chooserClinicRoom.setText(selected);
-        draftClinicRoomId = selectedClinicRoomId();
-        if (onClinicRoomChanged != null) onClinicRoomChanged.accept(selected.isEmpty() ? null : selected);
-    }
-
-    public void clearClinicRooms() {
-        if (!roomsByName.isEmpty()) draftClinicRoomId = selectedClinicRoomId();
-        roomsByName.clear();
-        chooserClinicRoom.setItems(new String[0]);
-        chooserClinicRoom.setText("");
-        if (onClinicRoomChanged != null) onClinicRoomChanged.accept(null);
-    }
-
-    public void discardClinicRoomSelection() {
-        clearClinicRooms();
-        draftClinicRoomId = null;
-    }
-
-    public void setClinicalServices(List<String> services) {
-        String[] values = services == null ? new String[0] : services.toArray(String[]::new);
-        chooserService.setItems(values);
-        chooserService.setText(values.length == 0 ? "" : values[0]);
-    }
-
-    public void setOnClinicRoomChanged(Consumer<String> listener) {
-        onClinicRoomChanged = listener;
-        if (listener != null && !chooserClinicRoom.getText().isBlank()) listener.accept(chooserClinicRoom.getText());
-    }
-
-    public void setOnServiceChanged(Consumer<String> listener) { onServiceChanged = listener; }
-    public void setOnSearch(BiConsumer<String, String> listener) { onSearch = listener; }
-
-    public void triggerSearch() {
-        if (onSearch != null) onSearch.accept(txtSearchPhone.getText().trim(), txtSearchCccd.getText().trim());
-    }
-
-    public String enteredCccd() {
-        return txtCccd.getText().trim();
-    }
-
-    public String maskedEnteredCccd() {
-        return maskCccd(enteredCccd());
-    }
-
-    public static String maskCccd(String cccd) {
-        if (cccd == null) return "";
-        String trimmed = cccd.trim();
-        if (trimmed.isEmpty()) return "";
-        if (trimmed.length() <= 4) return "****";
-        return "***" + trimmed.substring(trimmed.length() - 4);
-    }
-
-    public void prepareDuplicateCccdSearch() {
-        String cccd = enteredCccd();
-        if (!cccd.isEmpty()) {
-            txtSearchPhone.setText("");
-            txtSearchCccd.setText(cccd);
-            txtSearchCccd.requestFocusInWindow();
-        } else {
-            String phone = txtPhone.getText().trim();
-            if (!phone.isEmpty()) txtSearchPhone.setText(phone);
-            txtCccd.requestFocusInWindow();
+    public void setOnClinicRoomChanged(java.util.function.Consumer<String> listener) {
+        if (chooserClinicRoom != null) {
+            chooserClinicRoom.setOnSelectListener(listener);
         }
     }
 
-    public void searchByEnteredCccd() {
-        prepareDuplicateCccdSearch();
-        triggerSearch();
+    public void setOnServiceChanged(java.util.function.Consumer<String> listener) {
+        this.onServiceListener = listener;
     }
 
-    public boolean hasUnsavedInput() {
-        return !txtFullName.getText().isBlank()
-                || !txtDateOfBirth.getText().isBlank()
-                || !txtPhone.getText().isBlank()
-                || !txtCccd.getText().isBlank()
-                || !txtAddress.getText().isBlank()
-                || !txtStreet.getText().isBlank()
-                || !txtBirthPlace.getText().isBlank()
-                || !txtReason.getText().isBlank()
-                || !txtInsuranceNumber.getText().isBlank();
+    /** Cột phải: Thông tin thẻ BHYT */
+    private JPanel buildInsuranceCardPanel() {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setOpaque(false);
+
+        // Tiêu đề & 2 Checkbox đỏ
+        JPanel rHead = createInsuranceRowPanel();
+        JLabel lblBhyt = new JLabel("Thông tin thẻ BHYT");
+        lblBhyt.setFont(AppFonts.BODY_BOLD);
+        rHead.add(lblBhyt);
+
+        JCheckBox chkTe = new JCheckBox("TE có giấy khai sinh");
+        chkTe.setFont(AppFonts.SMALL);
+        chkTe.setForeground(new Color(205, 30, 30));
+        chkTe.setOpaque(false);
+        chkTe.setPreferredSize(new Dimension(chkTe.getPreferredSize().width, 20));
+        rHead.add(chkTe);
+
+        JCheckBox chkKhongGiuThe = new JCheckBox("Không giữ thẻ BHYT");
+        chkKhongGiuThe.setFont(AppFonts.SMALL);
+        chkKhongGiuThe.setForeground(new Color(205, 30, 30));
+        chkKhongGiuThe.setOpaque(false);
+        chkKhongGiuThe.setPreferredSize(new Dimension(chkKhongGiuThe.getPreferredSize().width, 20));
+        rHead.add(chkKhongGiuThe);
+        p.add(rHead);
+
+        // Dòng 1: Số BHYT (4 ô phân đoạn), Nơi sống
+        JPanel r1 = createInsuranceRowPanel();
+        r1.add(createLabel("Số BHYT:", 64));
+        JPanel insuranceNumberFields = new JPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
+        insuranceNumberFields.setOpaque(false);
+        insuranceNumberFields.add(createInput(35, 22));
+        insuranceNumberFields.add(createInput(35, 22));
+        insuranceNumberFields.add(createInput(35, 22));
+        insuranceNumberFields.add(createInput(115, 22));
+        r1.add(insuranceNumberFields);
+        r1.add(createLabel("Nơi sống:", 58));
+        JComboBox<String> cbNoiSong = new JComboBox<>(new String[]{"", "K1", "K2", "K3"});
+        cbNoiSong.setFont(AppFonts.BODY);
+        cbNoiSong.setPreferredSize(new Dimension(50, 20));
+        r1.add(cbNoiSong);
+        p.add(r1);
+
+        // Dòng 2: KCBBĐ
+        JPanel r2 = createInsuranceRowPanel();
+        r2.add(createLabel("KCBBĐ:", 64));
+        r2.add(createInput(65, 22));
+        r2.add(createInput(270, 22));
+        p.add(r2);
+
+        // Dòng 3: Hạn thẻ
+        JPanel r3 = createInsuranceRowPanel();
+        r3.add(createLabel("Hạn thẻ:", 64));
+        r3.add(createInput(100, 22));
+        r3.add(new JLabel(" - "));
+        r3.add(createInput(100, 22));
+        p.add(r3);
+
+        // Dòng 4: Địa chỉ thẻ
+        JPanel r4 = createInsuranceRowPanel();
+        r4.add(createLabel("Địa chỉ thẻ:", 66));
+        JTextField txtDiaChiThe = createInput(335, 22);
+        txtDiaChiThe.setText("Bắc Ninh - H. Quế Võ - Thị trấn Phố Mới");
+        r4.add(txtDiaChiThe);
+        p.add(r4);
+
+        // Dòng 5: Tuyến KCB
+        JPanel r5 = createInsuranceRowPanel();
+        r5.add(createLabel("Tuyến KCB:", 71));
+        JComboBox<String> cbTuyen = new JComboBox<>(new String[]{"", "Đúng tuyến", "Trái tuyến"});
+        cbTuyen.setFont(AppFonts.BODY);
+        cbTuyen.setPreferredSize(new Dimension(224, 20));
+        r5.add(cbTuyen);
+        JLabel lblRate = new JLabel("0%");
+        lblRate.setFont(AppFonts.BODY_BOLD);
+        lblRate.setForeground(new Color(0, 95, 205));
+        lblRate.setBorder(new EmptyBorder(0, 4, 0, 0));
+        r5.add(lblRate);
+        p.add(r5);
+
+        // Dòng 6: Giấy chứng nhận không cùng chi trả
+        JPanel r6 = createInsuranceRowPanel();
+        JCheckBox chkKhongCungChiTra = new JCheckBox("Giấy chứng nhận không cùng chi trả trong năm");
+        chkKhongCungChiTra.setFont(AppFonts.SMALL);
+        chkKhongCungChiTra.setForeground(new Color(0, 80, 185)); // Màu xanh lam chuẩn
+        chkKhongCungChiTra.setOpaque(false);
+        chkKhongCungChiTra.setPreferredSize(new Dimension(chkKhongCungChiTra.getPreferredSize().width, 20));
+        r6.add(chkKhongCungChiTra);
+        p.add(r6);
+
+        // Dòng 7: Ngày miễn cùng chi trả
+        JPanel r7 = createInsuranceRowPanel();
+        r7.add(createLabel("Ngày miễn cùng chi trả:", 188));
+        r7.add(createInput(25, 22));
+        r7.add(createInput(25, 22));
+        r7.add(createInput(45, 22));
+        p.add(r7);
+
+        // Dòng 8: Ngày đóng đủ 5 năm liên tục
+        JPanel r8 = createInsuranceRowPanel();
+        r8.add(createLabel("Ngày đóng đủ 5 năm liên tục:", 188));
+        r8.add(createInput(25, 22));
+        r8.add(createInput(25, 22));
+        r8.add(createInput(45, 22));
+        p.add(r8);
+
+        return p;
     }
 
-    public String selectedClinicRoomName() { return chooserClinicRoom.getText().trim(); }
-
-    public int selectedClinicRoomId() {
-        PhongKham room = roomsByName.get(selectedClinicRoomName());
-        return room == null ? 0 : room.getId();
+    private JPanel createRowPanel() {
+        JPanel r = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        r.setOpaque(false);
+        r.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+        return r;
     }
 
-    public void selectPatient(BenhNhan patient, BaoHiem insurance) {
-        selectedPatient = patient;
-        selectedInsurance = insurance;
-        txtPatientCode.setText(value(patient.getMaBenhNhanFormat()));
-        txtFullName.setText(patient.getHoTen());
-        GioiTinh gender = patient.getGioiTinh();
-        cbGender.setSelectedItem(gender == GioiTinh.F ? "Nữ" : gender == GioiTinh.O ? "Khác" : "Nam");
-        txtDateOfBirth.setText(format(patient.getNgaySinh()));
-        txtBirthPlace.setText(value(patient.getNoiSinh()));
-        txtStreet.setText(value(patient.getSoNhaThonPho()));
-        txtProvinceCode.setText(value(patient.getMaTinh()));
-        txtDistrictCode.setText(value(patient.getMaHuyen()));
-        txtWardCode.setText(value(patient.getMaXa()));
-        txtAddress.setText(value(patient.getDiaChi()));
-        txtOccupation.setText(value(patient.getNgheNghiep()));
-        txtPhone.setText(value(patient.getDienThoai()));
-        txtEmail.setText(value(patient.getEmail()));
-        cbEthnicity.setSelectedItem(valueOr(patient.getDanToc(), "Kinh"));
-        cbNationality.setSelectedItem(valueOr(patient.getQuocTich(), "Việt Nam"));
-        txtCccd.setText(value(patient.getSoCCCD()));
-        txtCccdIssueDate.setText(format(patient.getNgayCapCCCD()));
-        txtCccdIssuePlace.setText(value(patient.getNoiCapCCCD()));
-        txtWorkplace.setText(value(patient.getNoiLamViec()));
-        txtContactName.setText(value(patient.getNguoiLienHeTen()));
-        txtContactPhone.setText(value(patient.getNguoiLienHeDienThoai()));
-        if (insurance == null) clearInsuranceFields(); else loadInsurance(insurance);
+    private JPanel createInsuranceRowPanel() {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        row.setOpaque(false);
+        row.setMinimumSize(new Dimension(0, 20));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
+        return row;
     }
 
-    public void clearForm() {
-        selectedPatient = null;
-        selectedInsurance = null;
-        txtPatientCode.setText(""); txtFullName.setText(""); cbGender.setSelectedItem("Nam");
-        txtDateOfBirth.setText(""); txtBirthPlace.setText(""); txtStreet.setText("");
-        txtProvinceCode.setText(""); txtDistrictCode.setText(""); txtWardCode.setText(""); txtAddress.setText("");
-        txtOccupation.setText(""); txtPhone.setText(""); txtEmail.setText(""); txtCccd.setText("");
-        txtCccdIssueDate.setText(""); txtCccdIssuePlace.setText(""); txtWorkplace.setText("");
-        txtContactName.setText(""); txtContactPhone.setText(""); txtReason.setText(""); chkPriority.setSelected(false);
-        cbPayerType.setSelectedItem("Viện phí"); cbRegistrationType.setSelectedItem("Khám bệnh");
-        clearInsuranceFields();
+    private JLabel createLabel(String text) {
+        JLabel l = new JLabel(text);
+        l.setFont(AppFonts.BODY);
+        l.setForeground(new Color(25, 25, 25));
+        return l;
     }
 
-    public RegisterPatientCommand toRegisterCommand(AuthorizationContext authorizationContext,
-                                                   AuditActorContext auditActorContext) {
-        if (authorizationContext == null || !authorizationContext.isValid()) {
-            throw new IllegalArgumentException("An active authenticated session is required.");
-        }
-        int userId = authorizationContext.employeeId();
-        BenhNhan patient = new BenhNhan();
-        String fullName = txtFullName.getText().trim().replaceAll("\\s+", " ");
-        int split = fullName.lastIndexOf(' ');
-        if (split < 0) { patient.setHo(fullName); patient.setTen(""); }
-        else { patient.setHo(fullName.substring(0, split)); patient.setTen(fullName.substring(split + 1)); }
-        patient.setNgaySinh(parseDate(txtDateOfBirth, "Ngày sinh"));
-        patient.setGioiTinh(switch (String.valueOf(cbGender.getSelectedItem())) {
-            case "Nữ" -> GioiTinh.F; case "Khác" -> GioiTinh.O; default -> GioiTinh.M;
-        });
-        patient.setDienThoai(txtPhone.getText().trim());
-        patient.setEmail(blankToNull(txtEmail.getText()));
-        patient.setSoCCCD(blankToNull(txtCccd.getText()));
-        patient.setDiaChi(blankToNull(txtAddress.getText()));
-        patient.setSoNhaThonPho(blankToEmpty(txtStreet.getText()));
-        patient.setNoiSinh(blankToEmpty(txtBirthPlace.getText()));
-        patient.setNgayCapCCCD(parseOptionalDate(txtCccdIssueDate, "Ngày cấp CCCD"));
-        patient.setNoiCapCCCD(blankToEmpty(txtCccdIssuePlace.getText()));
-        patient.setNoiLamViec(blankToEmpty(txtWorkplace.getText()));
-        patient.setNgheNghiep(blankToEmpty(txtOccupation.getText()));
-        patient.setDanToc(valueOr(String.valueOf(cbEthnicity.getSelectedItem()), "Kinh"));
-        patient.setQuocTich(valueOr(String.valueOf(cbNationality.getSelectedItem()), "Việt Nam"));
-        patient.setMaTinh(blankToNull(txtProvinceCode.getText()));
-        patient.setMaHuyen(blankToNull(txtDistrictCode.getText()));
-        patient.setMaXa(blankToNull(txtWardCode.getText()));
-        patient.setNguoiLienHeTen(blankToNull(txtContactName.getText()));
-        patient.setNguoiLienHeDienThoai(blankToNull(txtContactPhone.getText()));
-        patient.setCreatedBy(userId > 0 ? userId : null);
-        if (selectedPatient != null) {
-            patient.setId(selectedPatient.getId());
-            patient.setMaBenhNhanFormat(selectedPatient.getMaBenhNhanFormat());
-            patient.setVersion(selectedPatient.getVersion());
-            patient.setCreatedAt(selectedPatient.getCreatedAt());
-            patient.setCreatedBy(selectedPatient.getCreatedBy());
-            patient.setUpdatedBy(userId > 0 ? userId : null);
-        }
-
-        BaoHiem insurance = toInsurance(userId);
-        DoiTuongKham payer = switch (String.valueOf(cbPayerType.getSelectedItem())) {
-            case "BHYT" -> DoiTuongKham.BHYT;
-            case "Dịch vụ theo yêu cầu" -> DoiTuongKham.DICH_VU_YEU_CAU;
-            default -> DoiTuongKham.THU_PHI;
-        };
-        PhongKham room = roomsByName.get(selectedClinicRoomName());
-        if (room == null) throw new IllegalArgumentException("Chọn phòng khám từ danh sách đã tải.");
-        return new RegisterPatientCommand(patient, insurance, room.getId(),
-                String.valueOf(cbRegistrationType.getSelectedItem()), txtReason.getText().trim(), payer,
-                chkPriority.isSelected(), userId, authorizationContext, auditActorContext);
+    private JLabel createLabel(String text, int width) {
+        JLabel l = createLabel(text);
+        l.setPreferredSize(new Dimension(width, 20));
+        return l;
     }
 
-    private BaoHiem toInsurance(int userId) {
-        String number = txtInsuranceNumber.getText().trim();
-        if (number.isBlank()) return null;
-        BaoHiem card = new BaoHiem();
-        card.setSoBaoHiem(number);
-        card.setNgayBatDau(parseOptionalDate(txtInsuranceStartDate, "Ngày bắt đầu thẻ BHYT"));
-        card.setNgayHetHan(parseOptionalDate(txtInsuranceEndDate, "Hạn thẻ BHYT"));
-        card.setMucHuong(parseInteger(txtInsuranceRate, 0, "Mức hưởng BHYT"));
-        card.setMaNoiSong(valueOr(String.valueOf(cbLivingArea.getSelectedItem()), ""));
-        card.setMaNoiDangKyKCB(blankToEmpty(txtFacilityCode.getText()));
-        card.setNoiDangKyKCB(blankToEmpty(txtFacilityName.getText()));
-        card.setDiaChiThe(blankToEmpty(txtInsuranceAddress.getText()));
-        card.setDungTuyen("Đúng tuyến".equals(cbRoute.getSelectedItem()));
-        card.setCoGiayKhaiSinh(chkBirthCertificate.isSelected());
-        card.setKhongGiuThe(chkNotHoldingCard.isSelected());
-        card.setMienCungChiTra(chkExemptCopay.isSelected());
-        card.setNgayMienCungChiTra(parseOptionalDate(txtCopayExemptDate, "Ngày miễn cùng chi trả"));
-        card.setNgayDu5NamLienTuc(parseOptionalDate(txtFiveYearDate, "Ngày đủ 5 năm liên tục"));
-        card.setCreatedBy(userId > 0 ? userId : null);
-        if (selectedInsurance != null) {
-            card.setId(selectedInsurance.getId());
-            card.setVersion(selectedInsurance.getVersion());
-            card.setCreatedAt(selectedInsurance.getCreatedAt());
-            card.setCreatedBy(selectedInsurance.getCreatedBy());
-            card.setUpdatedBy(userId > 0 ? userId : null);
-        }
-        return card;
+    private JTextField createInput(int w, int h) {
+        JTextField tf = new JTextField();
+        tf.setFont(AppFonts.BODY);
+        tf.setPreferredSize(new Dimension(w, Math.min(h, 20)));
+        tf.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(175, 188, 202), 1),
+                new EmptyBorder(1, 4, 1, 4)
+        ));
+        return tf;
     }
 
-    private void loadInsurance(BaoHiem insurance) {
-        txtInsuranceNumber.setText(value(insurance.getSoBaoHiem()));
-        txtInsuranceStartDate.setText(format(insurance.getNgayBatDau()));
-        txtInsuranceEndDate.setText(format(insurance.getNgayHetHan()));
-        txtInsuranceRate.setText(String.valueOf(insurance.getMucHuong()));
-        cbLivingArea.setSelectedItem(value(insurance.getMaNoiSong()));
-        txtFacilityCode.setText(value(insurance.getMaNoiDangKyKCB()));
-        txtFacilityName.setText(value(insurance.getNoiDangKyKCB()));
-        txtInsuranceAddress.setText(value(insurance.getDiaChiThe()));
-        cbRoute.setSelectedItem(insurance.isDungTuyen() ? "Đúng tuyến" : "Trái tuyến");
-        chkBirthCertificate.setSelected(insurance.isCoGiayKhaiSinh());
-        chkNotHoldingCard.setSelected(insurance.isKhongGiuThe());
-        chkExemptCopay.setSelected(insurance.isMienCungChiTra());
-        txtCopayExemptDate.setText(format(insurance.getNgayMienCungChiTra()));
-        txtFiveYearDate.setText(format(insurance.getNgayDu5NamLienTuc()));
+    private JButton createBrowseButton() {
+        JButton btn = new JButton("...");
+        btn.setFont(AppFonts.SMALL);
+        btn.setPreferredSize(new Dimension(22, 20));
+        btn.setMargin(new Insets(0, 0, 0, 0));
+        return btn;
     }
-
-    private void clearInsuranceFields() {
-        txtInsuranceNumber.setText(""); txtInsuranceStartDate.setText(""); txtInsuranceEndDate.setText("");
-        txtInsuranceRate.setText(""); cbLivingArea.setSelectedItem(""); txtFacilityCode.setText("");
-        txtFacilityName.setText(""); txtInsuranceAddress.setText(""); cbRoute.setSelectedItem("Đúng tuyến");
-        chkBirthCertificate.setSelected(false); chkNotHoldingCard.setSelected(false); chkExemptCopay.setSelected(false);
-        txtCopayExemptDate.setText(""); txtFiveYearDate.setText(""); selectedInsurance = null;
-    }
-
-    private static JPanel row() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 1));
-        panel.setOpaque(false);
-        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        return panel;
-    }
-
-    private static JLabel label(String value) {
-        JLabel label = new JLabel(value);
-        label.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        return label;
-    }
-
-    private static JTextField input(String name, int width) {
-        JTextField field = input(width);
-        field.setName(name);
-        return field;
-    }
-
-    private static JTextField input(int width) {
-        JTextField field = new JTextField();
-        field.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        field.setPreferredSize(new Dimension(width, 21));
-        field.setBorder(BorderFactory.createCompoundBorder(new LineBorder(new Color(175, 188, 202), 1), new EmptyBorder(1, 4, 1, 4)));
-        return field;
-    }
-
-    private static LocalDate parseDate(JTextField field, String label) {
-        LocalDate date = parseOptionalDate(field, label);
-        if (date == null) throw new IllegalArgumentException(label + " là bắt buộc (dd/MM/yyyy).");
-        return date;
-    }
-
-    private static LocalDate parseOptionalDate(JTextField field, String label) {
-        String value = field.getText().trim();
-        if (value.isBlank()) return null;
-        try { return LocalDate.parse(value, DATE_FORMAT); }
-        catch (DateTimeParseException ex) { throw new IllegalArgumentException(label + " phải theo định dạng dd/MM/yyyy."); }
-    }
-
-    private static int parseInteger(JTextField field, int fallback, String label) {
-        String value = field.getText().trim();
-        if (value.isBlank()) return fallback;
-        try { return Integer.parseInt(value); }
-        catch (NumberFormatException ex) { throw new IllegalArgumentException(label + " phải là số nguyên."); }
-    }
-
-    private static String format(LocalDate date) { return date == null ? "" : date.format(DATE_FORMAT); }
-    private static String value(String value) { return value == null ? "" : value; }
-    private static String valueOr(String value, String fallback) { return value == null || value.isBlank() ? fallback : value; }
-    private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-    private static String blankToEmpty(String value) { return value == null ? "" : value.trim(); }
 }

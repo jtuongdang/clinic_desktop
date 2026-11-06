@@ -1,434 +1,156 @@
 package vn.clinicmanagement.desktop.modules.doctor;
 
-import vn.clinicmanagement.application.audit.AuditActorContext;
-import vn.clinicmanagement.application.authorization.AuthorizationContext;
-import vn.clinicmanagement.application.patienthistory.GetPatientHistoryQuery;
-import vn.clinicmanagement.application.reception.GetDoctorQueueQuery;
-import vn.clinicmanagement.application.reception.ReceptionQueueItem;
-import vn.clinicmanagement.application.common.Result;
-import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
 import vn.clinicmanagement.desktop.core.config.AppFonts;
-import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
 import vn.clinicmanagement.desktop.modules.doctor.components.DoctorActionBar;
 import vn.clinicmanagement.desktop.modules.doctor.components.DoctorClinicalForm;
 import vn.clinicmanagement.desktop.modules.doctor.components.DoctorHistoryPanel;
 import vn.clinicmanagement.desktop.modules.doctor.components.DoctorQueueSidebar;
-import vn.clinicmanagement.domain.common.enums.LoaiTienSu;
-import vn.clinicmanagement.domain.patient.TienSuBenh;
+import vn.clinicmanagement.desktop.modules.doctor.model.PatientExamDto;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.time.LocalDate;
-import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 
-/** Doctor station read workflow for the scoped team queue and patient history. */
-public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycleService.SessionListener {
-    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
-    private static final String UNAVAILABLE_MESSAGE = "Không thể tải dữ liệu bác sĩ trong phiên hiện tại.";
+/**
+ * Màn hình Bàn Khám Bác Sĩ & Quản Lý Điều Trị (Doctor Station)
+ * Đóng gói độc lập trong package vn.clinicmanagement.desktop.modules.doctor
+ * Tách biệt hoàn toàn với Admin và các phân hệ khác để dễ mở rộng & bảo trì.
+ */
+public class DoctorStationPanel extends BaseViewPanel {
 
-    private final SessionLifecycleService sessionLifecycle;
-    private final Function<GetDoctorQueueQuery, Result<List<ReceptionQueueItem>>> queueReader;
-    private final Function<GetPatientHistoryQuery, Result<List<TienSuBenh>>> historyReader;
-    private final Timer sessionMonitor;
+    private final List<PatientExamDto> patientList = new ArrayList<>();
     private DoctorActionBar actionBar;
     private DoctorQueueSidebar queueSidebar;
     private DoctorClinicalForm clinicalForm;
     private DoctorHistoryPanel historyPanel;
-    private AuthorizationContext observedSession;
-    private volatile AuthorizationContext queueAuthorization;
-    private ReceptionQueueItem selectedItem;
-    private final AtomicLong requestGeneration = new AtomicLong();
-    private SwingWorker<List<ReceptionQueueItem>, Void> activeQueueWorker;
-    private SwingWorker<List<TienSuBenh>, Void> activeHistoryWorker;
-    private boolean active;
 
-    public DoctorStationPanel(SessionLifecycleService sessionLifecycle) {
-        this(sessionLifecycle, DoctorCompositionRoot.create(sessionLifecycle));
-    }
-
-    private DoctorStationPanel(
-            SessionLifecycleService sessionLifecycle,
-            DoctorCompositionRoot.Services services) {
-        this(sessionLifecycle, services.doctorQueue()::handle, services.patientHistory()::handle);
-    }
-
-    DoctorStationPanel(
-            SessionLifecycleService sessionLifecycle,
-            Function<GetDoctorQueueQuery, Result<List<ReceptionQueueItem>>> queueReader,
-            Function<GetPatientHistoryQuery, Result<List<TienSuBenh>>> historyReader) {
-        super("treatment", "Điều Trị", "");
-        this.sessionLifecycle = Objects.requireNonNull(sessionLifecycle, "sessionLifecycle");
-        this.queueReader = Objects.requireNonNull(queueReader, "queueReader");
-        this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
-        this.sessionMonitor = new Timer(500, event -> monitorSession());
+    public DoctorStationPanel() {
+        super("treatment", "Điều Trị", "👨‍⚕️");
+        initPatientData();
         buildUI();
+        queueSidebar.selectPatient(1); // Mặc định chọn TEST BN 033 như trong ảnh mẫu
+    }
+
+    private void initPatientData() {
+        patientList.add(new PatientExamDto("TEST BN 060", "18039321 - GD4", "Nữ", "1988", "30 tuổi",
+                "Phường Lê Thanh Nghị, TP Hải Dương", "GD-4-21-21-212-00060", "80%", "01/01/18 - 31/12/18",
+                "08:15 11/11/2018", "BS. Nguyễn Văn Tuấn", "Khoa Khám Bệnh > Phòng Nội 1", "Viêm họng cấp", "J02"));
+
+        patientList.add(new PatientExamDto("TEST BN 033", "18039327 - GD4", "Nam", "1995", "23 tuổi",
+                "Xã Việt Hồng, H. Thanh Hà, Hải Dương", "GD-4-21-21-212-12125", "80%", "01/01/18 - 31/12/18",
+                "09:40 11/11/2018", "Lê Tiến Quân", "Ngoại Đầu cổ > P.Điều Trị Ngoại DC", "D21 - Bướu lành khác của mô liên kết và mô mềm", "D21"));
+
+        patientList.add(new PatientExamDto("TEST BN 032", "18033325 - GD4", "Nữ", "1992", "26 tuổi",
+                "Huyện Tứ Kỳ, Hải Dương", "GD-4-21-21-212-12032", "80%", "01/01/18 - 31/12/18",
+                "08:45 11/11/2018", "Lê Tiến Quân", "Khoa Ngoại", "Viêm xoang hàm", "J01.0"));
+
+        patientList.add(new PatientExamDto("TEST BN 031", "18039225 - GD4", "Nam", "1978", "40 tuổi",
+                "Thị xã Kinh Môn, Hải Dương", "GD-4-21-21-212-12031", "80%", "01/01/18 - 31/12/18",
+                "09:00 11/11/2018", "BS. Trần Văn Hùng", "Khoa Tai Mũi Họng", "Viêm amidan hốc mủ", "J03.9"));
+
+        patientList.add(new PatientExamDto("TEST BN B30", "18039224 - GD4", "Nữ", "2000", "18 tuổi",
+                "TP Hải Dương", "GD-4-21-21-212-12030", "80%", "01/01/18 - 31/12/18",
+                "09:15 11/11/2018", "Lê Tiến Quân", "Khoa Ngoại", "Polyp mũi xoang", "J33.0"));
+
+        patientList.add(new PatientExamDto("PHẠM QUANG XX", "18039323 - DN4", "Nam", "1991", "27 tuổi",
+                "Huyện Nam Sách, Hải Dương", "DN-4-21-21-212-99999", "100%", "01/01/18 - 31/12/18",
+                "09:30 11/11/2018", "Lê Tiến Quân", "Khoa Khám Bệnh", "Rối loạn tiền đình", "H81.0"));
+
+        patientList.add(new PatientExamDto("PHẠM VĂN KHÁP", "18039229 - BT2", "Nam", "1965", "53 tuổi",
+                "Huyện Cẩm Giàng, Hải Dương", "BT-2-21-21-212-88888", "100%", "01/01/18 - 31/12/18",
+                "09:35 11/11/2018", "BS. Nguyễn Văn Tuấn", "Khoa Nội", "Tăng huyết áp", "I10"));
+
+        patientList.add(new PatientExamDto("TRẦN QUỐC CHÍNH", "18038221 - HT2", "Nam", "1958", "60 tuổi",
+                "TP Hải Dương", "HT-2-21-21-212-77777", "95%", "01/01/18 - 31/12/18",
+                "09:50 11/11/2018", "Lê Tiến Quân", "Ngoại Đầu cổ", "Viêm khớp dạng thấp", "M06.9"));
+
+        patientList.add(new PatientExamDto("NGUYỄN THỊ NHÀ", "18038790 - MS2", "Nữ", "1972", "46 tuổi",
+                "Huyện Gia Lộc, Hải Dương", "MS-2-21-21-212-66666", "80%", "01/01/18 - 31/12/18",
+                "10:00 11/11/2018", "BS. Trần Văn Hùng", "Khoa Mắt", "Đục thủy tinh thể", "H25"));
+
+        patientList.add(new PatientExamDto("NGUYỄN KIẾN SƠN", "18038797 - KC2", "Nam", "1984", "34 tuổi",
+                "Huyện Bình Giang, Hải Dương", "KC-2-21-21-212-55555", "80%", "01/01/18 - 31/12/18",
+                "10:15 11/11/2018", "Lê Tiến Quân", "Khoa Ngoại", "Chấn thương phần mềm", "T14.0"));
+
+        patientList.add(new PatientExamDto("NGUYỄN VĂN THÁI", "18038799 - GD4", "Nam", "1996", "22 tuổi",
+                "TP Hải Dương", "GD-4-21-21-212-44444", "80%", "01/01/18 - 31/12/18",
+                "10:20 11/11/2018", "BS. Nguyễn Văn Tuấn", "Khoa Khám Bệnh", "Viêm phế quản cấp", "J20.9"));
     }
 
     private void buildUI() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
+        // 1. Top Action Bar + Banner tóm tắt bệnh nhân
         actionBar = new DoctorActionBar();
-        actionBar.setOnRefresh(event -> refreshData());
         add(actionBar, BorderLayout.NORTH);
 
-        queueSidebar = new DoctorQueueSidebar();
-        queueSidebar.setOnPatientSelectedListener(this::onPatientChanged);
+        // 2. Main Split: Cột trái (Hàng đợi) + Cột phải (Hồ sơ khám)
+        JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        mainSplit.setDividerLocation(250);
+        mainSplit.setDividerSize(4);
+        mainSplit.setBorder(null);
 
-        clinicalForm = new DoctorClinicalForm();
-        historyPanel = new DoctorHistoryPanel();
+        // Cột trái
+        queueSidebar = new DoctorQueueSidebar(patientList);
+        queueSidebar.setOnPatientSelectedListener(this::onPatientChanged);
+        mainSplit.setLeftComponent(queueSidebar);
+
+        // Cột phải
+        JPanel rightWorkPanel = new JPanel(new BorderLayout());
+        rightWorkPanel.setBackground(Color.WHITE);
+
+        JTabbedPane clinicalTabs = new JTabbedPane();
+        clinicalTabs.setFont(AppFonts.BODY_BOLD);
+
+        // Tab "Bệnh Nhân"
         JPanel patientTab = new JPanel(new BorderLayout(0, 4));
         patientTab.setBackground(Color.WHITE);
         patientTab.setBorder(new EmptyBorder(8, 12, 8, 12));
+
+        clinicalForm = new DoctorClinicalForm();
         patientTab.add(clinicalForm, BorderLayout.NORTH);
+
+        historyPanel = new DoctorHistoryPanel();
         patientTab.add(historyPanel, BorderLayout.CENTER);
 
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.setFont(AppFonts.BODY_BOLD);
-        tabs.addTab("Bệnh nhân", patientTab);
-        tabs.addTab("Công khám", createPlaceholderTab("Chưa có dữ liệu công khám được nối."));
-        tabs.addTab("Thuốc", createPlaceholderTab("Chưa có dữ liệu đơn thuốc được nối."));
-        tabs.addTab("Xử trí", createPlaceholderTab("Chưa có dữ liệu xử trí được nối."));
-        tabs.addTab("Phản hồi", createPlaceholderTab("Chưa có dữ liệu cận lâm sàng được nối."));
+        clinicalTabs.addTab("Bệnh Nhân", patientTab);
+        clinicalTabs.addTab("Công Khám(1)", createPlaceholderTab("Nội dung chỉ định dịch vụ công khám & thủ thuật"));
+        clinicalTabs.addTab("Thuốc(2)", createPlaceholderTab("Danh sách thuốc & đơn thuốc ngoại trú / nội trú"));
+        clinicalTabs.addTab("Xử Trí", createPlaceholderTab("Phương án điều trị, phẫu thuật, chuyển viện hoặc hẹn tái khám"));
+        clinicalTabs.addTab("Phản Hồi", createPlaceholderTab("Phản hồi lâm sàng & kết quả chẩn đoán cận lâm sàng"));
 
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, queueSidebar, tabs);
-        split.setDividerLocation(280);
-        split.setDividerSize(4);
-        split.setBorder(null);
-        add(split, BorderLayout.CENTER);
+        rightWorkPanel.add(clinicalTabs, BorderLayout.CENTER);
+        mainSplit.setRightComponent(rightWorkPanel);
+
+        add(mainSplit, BorderLayout.CENTER);
+    }
+
+    private void onPatientChanged(PatientExamDto p) {
+        if (p == null) return;
+        actionBar.updatePatient(p);
+        clinicalForm.updatePatient(p);
+        historyPanel.updateHistory(p);
+    }
+
+    private JPanel createPlaceholderTab(String desc) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setBackground(Color.WHITE);
+        JLabel lbl = new JLabel("<html><center><h3>" + desc + "</h3><p style='color:gray'>Sẵn sàng kết nối dữ liệu khám bệnh EMR & chỉ định thuốc</p></center></html>", SwingConstants.CENTER);
+        p.add(lbl, BorderLayout.CENTER);
+        return p;
     }
 
     @Override
     public void onShow() {
-        if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(this::onShow);
-            return;
-        }
-        active = true;
-        observedSession = currentAuthorizationContext();
-        sessionLifecycle.addSessionListener(this);
-        sessionMonitor.start();
         refreshData();
     }
 
     @Override
-    public void onHide() {
-        if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(this::onHide);
-            return;
-        }
-        active = false;
-        sessionMonitor.stop();
-        sessionLifecycle.removeSessionListener(this);
-        observedSession = null;
-        cancelActiveWorkers();
-        clearProtectedData();
-    }
-
-    @Override
-    public void onSessionChanged() {
-        // Lifecycle events may arrive off the EDT; invalidate and interrupt before posting UI cleanup.
-        cancelActiveWorkers();
-        if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(this::handleSessionChange);
-            return;
-        }
-        handleSessionChange();
-    }
-
-    @Override
     public void refreshData() {
-        if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(this::refreshData);
-            return;
-        }
-
-        cancelActiveWorkers();
-        long generation = requestGeneration.incrementAndGet();
-        selectedItem = null;
-        actionBar.updatePatient(null);
-        clinicalForm.updatePatient(null);
-        historyPanel.clearHistory();
-        queueSidebar.clearQueue();
-
-        AuthorizationContext authorization = currentAuthorizationContext();
-        observedSession = authorization;
-        AuditActorContext auditActor = currentAuditActorContext();
-        if (authorization == null || !authorization.isValid() || !matchesActor(authorization, auditActor)) {
-            queueSidebar.showUnavailable();
-            historyPanel.showUnavailable();
-            return;
-        }
-
-        LocalDate businessDate = LocalDate.now(BUSINESS_ZONE);
-        queueSidebar.showLoading(businessDate);
-        GetDoctorQueueQuery query = new GetDoctorQueueQuery(businessDate, authorization, auditActor);
-        SwingWorker<List<ReceptionQueueItem>, Void> worker = new SwingWorker<>() {
-            @Override
-            protected List<ReceptionQueueItem> doInBackground() {
-                if (Thread.currentThread().isInterrupted()) {
-                    return List.of();
-                }
-                Result<List<ReceptionQueueItem>> result = queueReader.apply(query);
-                if (Thread.currentThread().isInterrupted()) {
-                    return List.of();
-                }
-                if (result == null || result.isFailure()) {
-                    throw new ProtectedReadFailure();
-                }
-                return List.copyOf(result.valueOrThrow());
-            }
-
-            @Override
-            protected void done() {
-                if (isCancelled() || generation != requestGeneration.get()) return;
-                if (!isCurrentSession(authorization)) {
-                    handleSessionChange();
-                    return;
-                }
-                try {
-                    queueSidebar.setQueue(get(), businessDate);
-                    queueAuthorization = authorization;
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    queueSidebar.showUnavailable();
-                } catch (ExecutionException | CancellationException exception) {
-                    queueSidebar.showUnavailable();
-                } catch (RuntimeException exception) {
-                    queueSidebar.showUnavailable();
-                } finally {
-                    synchronized (DoctorStationPanel.this) {
-                        if (activeQueueWorker == this) {
-                            activeQueueWorker = null;
-                        }
-                    }
-                }
-            }
-        };
-        synchronized (this) {
-            if (generation != requestGeneration.get()) return;
-            activeQueueWorker = worker;
-        }
-        worker.execute();
-    }
-
-    /** Clears protected queue and history data immediately, such as when the dashboard locks or logs out. */
-    public void clearSensitiveData() {
-        if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(this::clearSensitiveData);
-            return;
-        }
-        cancelActiveWorkers();
-        clearProtectedData();
-        queueSidebar.showUnavailable();
-        historyPanel.showUnavailable();
-    }
-
-    private void onPatientChanged(ReceptionQueueItem item) {
-        if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(() -> onPatientChanged(item));
-            return;
-        }
-        cancelActiveHistoryWorker();
-        long generation = requestGeneration.incrementAndGet();
-        AuthorizationContext authorization = currentAuthorizationContext();
-        AuditActorContext auditActor = currentAuditActorContext();
-        if (item != null && (authorization == null
-                || !authorization.isValid()
-                || !authorization.equals(queueAuthorization)
-                || !matchesActor(authorization, auditActor))) {
-            handleSessionChange();
-            return;
-        }
-
-        selectedItem = item;
-        historyPanel.clearHistory();
-        actionBar.updatePatient(item);
-        clinicalForm.updatePatient(item);
-        if (item == null) return;
-
-        historyPanel.showLoading();
-        GetPatientHistoryQuery query = new GetPatientHistoryQuery(item.patientId(), authorization, auditActor);
-        SwingWorker<List<TienSuBenh>, Void> worker = new SwingWorker<>() {
-            @Override
-            protected List<TienSuBenh> doInBackground() {
-                if (Thread.currentThread().isInterrupted()) {
-                    return List.of();
-                }
-                Result<List<TienSuBenh>> result = historyReader.apply(query);
-                if (Thread.currentThread().isInterrupted()) {
-                    return List.of();
-                }
-                if (result == null || result.isFailure()) {
-                    throw new ProtectedReadFailure();
-                }
-                return List.copyOf(result.valueOrThrow());
-            }
-
-            @Override
-            protected void done() {
-                if (isCancelled()
-                        || generation != requestGeneration.get()
-                        || selectedItem == null
-                        || selectedItem.patientId() != item.patientId()) {
-                    return;
-                }
-                if (!isCurrentSession(authorization)) {
-                    handleSessionChange();
-                    return;
-                }
-                try {
-                    List<TienSuBenh> histories = get();
-                    if (!isValidHistory(histories, item.patientId(), authorization)) {
-                        historyPanel.showUnavailable();
-                        return;
-                    }
-                    historyPanel.showHistory(histories);
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    historyPanel.showUnavailable();
-                } catch (ExecutionException | CancellationException exception) {
-                    historyPanel.showUnavailable();
-                } catch (RuntimeException exception) {
-                    historyPanel.showUnavailable();
-                } finally {
-                    synchronized (DoctorStationPanel.this) {
-                        if (activeHistoryWorker == this) {
-                            activeHistoryWorker = null;
-                        }
-                    }
-                }
-            }
-        };
-        synchronized (this) {
-            if (generation != requestGeneration.get()) return;
-            activeHistoryWorker = worker;
-        }
-        worker.execute();
-    }
-
-    void monitorSession() {
-        AuthorizationContext current = currentAuthorizationContext();
-        if (Objects.equals(observedSession, current)) return;
-        handleSessionChange();
-    }
-
-    private void handleSessionChange() {
-        if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(this::handleSessionChange);
-            return;
-        }
-        cancelActiveWorkers();
-        AuthorizationContext current = currentAuthorizationContext();
-        observedSession = current;
-        clearProtectedData();
-        if (current != null && (active || isShowing())) {
-            refreshData();
-        } else {
-            queueSidebar.showUnavailable();
-            historyPanel.showUnavailable();
-        }
-    }
-
-    private synchronized void cancelActiveWorkers() {
-        queueAuthorization = null;
-        requestGeneration.incrementAndGet();
-        if (activeQueueWorker != null) {
-            if (!activeQueueWorker.isDone()) {
-                activeQueueWorker.cancel(true);
-            }
-            activeQueueWorker = null;
-        }
-        if (activeHistoryWorker != null) {
-            if (!activeHistoryWorker.isDone()) {
-                activeHistoryWorker.cancel(true);
-            }
-            activeHistoryWorker = null;
-        }
-    }
-
-    private synchronized void cancelActiveHistoryWorker() {
-        requestGeneration.incrementAndGet();
-        if (activeHistoryWorker != null) {
-            if (!activeHistoryWorker.isDone()) {
-                activeHistoryWorker.cancel(true);
-            }
-            activeHistoryWorker = null;
-        }
-    }
-
-    synchronized SwingWorker<List<ReceptionQueueItem>, Void> activeQueueWorker() {
-        return activeQueueWorker;
-    }
-
-    synchronized SwingWorker<List<TienSuBenh>, Void> activeHistoryWorker() {
-        return activeHistoryWorker;
-    }
-
-    private void clearProtectedData() {
-        cancelActiveWorkers();
-        selectedItem = null;
-        if (actionBar != null) actionBar.updatePatient(null);
-        if (clinicalForm != null) clinicalForm.updatePatient(null);
-        if (historyPanel != null) historyPanel.clearHistory();
-        if (queueSidebar != null) queueSidebar.clearQueue();
-    }
-
-    private AuthorizationContext currentAuthorizationContext() {
-        Optional<AuthorizationContext> context = sessionLifecycle.currentAuthorizationContext();
-        return context.orElse(null);
-    }
-
-    private AuditActorContext currentAuditActorContext() {
-        return sessionLifecycle.currentAuditActorContext().orElse(null);
-    }
-
-    private boolean isCurrentSession(AuthorizationContext expected) {
-        return expected.equals(currentAuthorizationContext());
-    }
-
-    private static boolean matchesActor(AuthorizationContext authorization, AuditActorContext actor) {
-        return actor != null
-                && authorization.employeeId() == actor.employeeId()
-                && authorization.roleId() == actor.roleId()
-                && Objects.equals(authorization.roleCode(), actor.roleCode())
-                && authorization.facilityId() == actor.facilityId()
-                && authorization.departmentId() == actor.departmentId();
-    }
-
-    private static boolean isValidHistory(
-            List<TienSuBenh> histories, int patientId, AuthorizationContext authorization) {
-        for (TienSuBenh history : histories) {
-            LoaiTienSu category = history.getLoaiTienSu();
-            if (history.getMaBenhNhan() != patientId
-                    || !history.hasExactOwnershipScope(authorization.facilityId(), authorization.departmentId())
-                    || history.isDeleted()
-                    || (category != LoaiTienSu.BENH_NEN
-                    && category != LoaiTienSu.DI_UNG
-                    && category != LoaiTienSu.PHAU_THUAT)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private JPanel createPlaceholderTab(String message) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-        JLabel label = new JLabel(message, SwingConstants.CENTER);
-        panel.add(label, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private static final class ProtectedReadFailure extends RuntimeException {
-        private static final long serialVersionUID = 1L;
+        // Tải danh sách bệnh nhân từ Application / Domain Service
     }
 }

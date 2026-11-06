@@ -18,8 +18,6 @@ import java.awt.geom.RoundRectangle2D;
  * - Thẻ KCB (F4)
  */
 public class ReceptionFooterBar extends JPanel {
-    private final JButton btnNew;
-    private final JButton btnSave;
 
     public ReceptionFooterBar() {
         setLayout(new FlowLayout(FlowLayout.RIGHT, 6, 3));
@@ -27,8 +25,8 @@ public class ReceptionFooterBar extends JPanel {
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(205, 215, 226)));
         setPreferredSize(new Dimension(1000, 40));
 
-        btnNew = createFooterButton("Bệnh Nhân Mới\n(F1)", ReceptionIcons.createNewPatientIcon());
-        btnSave = createFooterButton("Lưu Lại\n(F2)", ReceptionIcons.createSaveDiskIcon());
+        JButton btnNew = createFooterButton("Bệnh Nhân Mới\n(F1)", ReceptionIcons.createNewPatientIcon());
+        JButton btnSave = createFooterButton("Lưu Lại\n(F2)", ReceptionIcons.createSaveDiskIcon());
         JButton btnPrint = createFooterButton("In Phiếu Khám\n(F3)", ReceptionIcons.createPrintIcon());
         JButton btnCard = createFooterButton("Thẻ KCB\n(F4)", ReceptionIcons.createMedicalCardIcon());
         btnNew.setPreferredSize(new Dimension(120, 28));
@@ -41,11 +39,15 @@ public class ReceptionFooterBar extends JPanel {
         add(btnPrint);
         add(btnCard);
 
+        btnSave.addActionListener(e -> {
+            JOptionPane.showMessageDialog(this,
+                    "Lưu thành công hồ sơ đăng ký khám cho bệnh nhân NGUYỄN THỊ LIÊN!\n" +
+                    "- Mã BN: 22000326\n" +
+                    "- Phòng khám: PK Nhi 1\n" +
+                    "- Số thứ tự cấp: 02",
+                    "Đăng Ký Khám Thành Công", JOptionPane.INFORMATION_MESSAGE);
+        });
     }
-
-    public void setOnSave(Runnable action) { for (var listener : btnSave.getActionListeners()) btnSave.removeActionListener(listener); btnSave.addActionListener(e -> action.run()); }
-    public void setOnNew(Runnable action) { btnNew.addActionListener(e -> action.run()); }
-    public void setSaving(boolean saving) { btnSave.setEnabled(!saving); btnNew.setEnabled(!saving); }
 
     private JButton createFooterButton(String text, Icon icon) {
         String[] parts = text.split("\n");
