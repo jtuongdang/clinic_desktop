@@ -201,3 +201,14 @@ Evidence checked against the current worktree at `2d10443`; the cited commits ar
 | `afcbac83-83f6-4c03-afe0-23f99799e608` · Copilot | Documentation-only, non-binding transfer-history/idempotency proposal; integrated `ce21af2`. See [`transfer history proposal`](phase3-transfer-history-idempotency-proposal.md). | Orchestrator validation passed. Owner decisions remain pending; no persistence or replay behavior is accepted by this proposal. Related open decisions are tracked in [transfer decision gaps](phase3-visit-transfer-decision-gaps.md). |
 
 RAG-first record: the task-specific project RAG command was attempted before repository documentation/search, but the non-interactive runtime could not obtain approval and returned no fresh excerpts. The supplied RAG excerpts in the task context were used as primary guidance. Proposal links above were checked against files in the repository. No phase or `SEC-01` is marked complete; `SEC-01` and downstream gates remain open/default-deny.
+
+## Recent decision-proposal review evidence — 06/11/2026
+
+These documentation-only, non-binding proposal tasks record review/integration evidence, not Owner approval or runtime implementation.
+
+| Orchestrator task · agent | Scope and evidence | Validation and remaining decisions |
+|---|---|---|
+| `3a75d86d-2285-42cc-8fc1-132feca04a65` · Codex | Reviewed and corrected the non-binding [transfer reason proposal](phase3-transfer-reason-policy-proposal.md); integrated commit `1cc7147`. | Orchestrator validation and allowlisted scope passed. Exact Owner choices remain open; the proposal is not binding policy. |
+| `aa79d279-df83-4507-a4a0-ef97af6c5250` · Antigravity | Created the non-binding [remaining packaged-JAR configuration proposal](phase0-db-config-remaining-decisions-proposal.md); integrated commit `56e5f4d`. | Orchestrator validation and allowlisted scope passed. All listed Owner choices remain pending; the proposal does not approve configuration behavior. |
+
+Neither task changed Java, schema, or runtime behavior, and neither completes a phase. `SEC-01` remains open/default-deny.
