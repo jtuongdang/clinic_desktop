@@ -19,6 +19,111 @@ Tài liệu này kế thừa hợp đồng `PHASE0-PHASE3-REVIEW-AND-TRACKING-DO
 
 ---
 
+## 1A. Addendum — 2026-11-06: Hồ sơ vận hành tối thiểu trình Owner
+
+**Trạng thái: NON-BINDING; chưa có quyết định Owner mới.** Addendum này là đề xuất hiện hành, thay thế các khuyến nghị khác nhau ở mục 3 và bộ câu hỏi cũ ở mục 4; không thay đổi bằng chứng lịch sử hay contract đã duyệt. Căn cứ: [resolution contract](phase0-db-config-resolution-contract.md), [deployment/TLS decisions](phase0-deployment-config-tls-decision-proposal.md), [DB config review](phase0-db-config-review.md), retrieved excerpts được cung cấp và đối chiếu source hiện tại. Các câu trong hồ sơ dưới đây mô tả **hành vi tương lai cần Owner chọn và task riêng hiện thực**, không phải tính năng đang có.
+
+### Chính sách đã duyệt — RESOLVED, không xin duyệt lại
+
+- `PHASE0-DB-DEPLOY-DECISION-RECON-02` (2026-11-06): hỗ trợ cả environment/secret injection và external properties qua đường dẫn/giao diện tường minh. Không phê duyệt tự dò CWD hay thư mục JAR.
+- `PHASE0-DB-CONFIG-SOURCE-PRECEDENCE-OWNER-DECISION-01`: **environment thắng theo từng khóa; file chỉ cấp khóa vắng mặt trong environment**. Đây là quyết định đã giải quyết, không phải lựa chọn trong bảng dưới. Quy tắc này chưa quyết định hai biểu diễn combined/split hoặc nghĩa của blank.
+- SQL Server bắt buộc mã hóa, xác thực chuỗi chứng chỉ, thời hạn và danh tính/hostname; lỗi phải fail-closed. Không có phương án dùng `trustServerCertificate=true`, tắt mã hóa, driver-default fallback hay bypass theo môi trường. JDBC options và trust-anchor cụ thể còn cần đặc tả/kiểm chứng; không mở lại chính sách này.
+
+### A1. Giao diện chọn file — Owner cần chọn
+
+| Lựa chọn tường minh | Lợi ích và chi phí | Khuyến nghị hiện hành |
+|---|---|---|
+| `CLINIC_DB_CONFIG_FILE=<absolute-path>` | Dùng cùng cách trong IntelliJ Environment variables và launcher JAR; chỉ một selector nên không cần precedence giữa selector. Cần quản lý environment kế thừa. | **Chọn cho hồ sơ tối thiểu.** Không đặt biến thì chạy env-only; biến đã đặt nhưng rỗng/khoảng trắng hoặc đường dẫn tương đối thì lỗi. Không trim đường dẫn; khoảng trắng hợp lệ trong tên file được giữ nguyên. |
+| JVM `-Dclinic.config.file=<absolute-path>` | Dễ cố định trong IntelliJ VM options hoặc launcher; phải đặt trước `-jar`. | Thay thế env selector nếu Owner ưu tiên JVM. Nếu hỗ trợ đồng thời, đề xuất từ chối hai selector có giá trị khác nhau, thay vì âm thầm chọn một. |
+| CLI `--db-config-file=<absolute-path>` | Dễ nhìn trong Program arguments; cần parser ứng dụng, đặt sau tên JAR. | Chưa cần cho bản tối thiểu; phải định nghĩa lỗi argument và xung đột selector nếu chọn. |
+| UI selector tường minh trước kết nối | Thuận tiện cho người dùng desktop; cần luồng browse/cancel/validation, lưu lựa chọn và quyền truy cập. | Hoãn; cancel thì không kết nối, không tự chọn file khác. Việc lưu path và cấp secret cần quyết định riêng. |
+
+Mọi lựa chọn chỉ đọc đúng file đã chỉ định; không suy ra `./db.properties`, file cạnh JAR, đường dẫn mặc định hay file vừa dùng. Hồ sơ tối thiểu đề xuất dùng cùng resolver/env/path trong IDE và JAR, không thêm classpath fallback ngầm trong hồ sơ mới. Classpath dev hiện hữu là bằng chứng tương thích, không phải external-file interface đã duyệt. Chưa có interface A1 nào được hiện thực.
+
+### A2. Combined và split — không suy ra precedence từ per-key
+
+**Bằng chứng:** hiện chỉ `DB_CONNECTION_STRING` có kênh combined; `db.connectionString` trong file chưa được resolver đọc. Các ví dụ file combined ở mục 3.2 là phương án tương lai, không phải tính năng hiện tại.
+
+| Lựa chọn Owner | Hệ quả vận hành |
+|---|---|
+| Giữ combined luôn thắng như runtime hiện tại | Dễ tương thích, nhưng split secret có thể bị bỏ qua. Không được mô tả đây là quyết định Owner hay hệ quả của env-over-file. |
+| Source-aware: env combined > env split > file combined > file split | Cần đặc tả việc parse/merge URL và credentials. Chỉ có env password không đủ để dựng URL từ file combined; không được ngầm trích/chắp secret. Chưa có khóa file combined được duyệt. |
+| **Từ chối combined/split đồng thời — khuyến nghị** | Giải quyết từng split key theo env-over-file, sau đó nếu có `DB_CONNECTION_STRING` cùng bất kỳ split key nào từ env/file thì báo lỗi trước JDBC. Không chọn chuỗi thắng ngầm và không merge credentials vào URL. |
+
+Hồ sơ tối thiểu dùng split `DB_URL`/`db.url`, `DB_USERNAME`/`db.username`, `DB_PASSWORD`/`db.password`. Để giữ một đường tương thích rõ ràng, đề xuất cho phép `DB_CONNECTION_STRING` **đứng riêng**, với URL và xác thực hoàn chỉnh, cùng kiểm tra TLS và redaction; không có split key ở bất kỳ nguồn nào. `db.connectionString` chưa được bổ sung: đề xuất báo khóa không hỗ trợ, thay vì bỏ qua. Nếu Owner muốn file combined, cần duyệt tên khóa và ma trận xung đột riêng. Các khóa khác nhau không tự ghi đè nhau; môi trường luôn thắng đúng khóa tương ứng theo chính sách đã duyệt.
+
+### A3–A8. Những ngữ nghĩa còn lại — lựa chọn và khuyến nghị
+
+| ID / Owner cần quyết định | Đề xuất cho hồ sơ tối thiểu | Lựa chọn khác và đánh đổi |
+|---|---|---|
+| **A3 — absent, empty, whitespace** | Absent là không có key. Env có key rỗng hoặc whitespace-only là invalid, không fallback xuống file. Giá trị file được chọn sau per-key resolution cũng theo quy tắc này. URL/username không được có khoảng trắng bao quanh; báo lỗi thay vì tự trim. Password không rỗng/whitespace-only được giữ nguyên ký tự, kể cả khoảng trắng đầu/cuối; không trim secret. | Giữ blank-as-absent như hiện tại thuận tiện cho template, nhưng có thể che lỗi injection; hoặc cho empty password có chủ đích với chế độ xác thực riêng. Cả hai chưa được duyệt. |
+| **A4 — partial credentials / integrated auth** | Profile split chỉ dùng SQL username/password, cả hai đều bắt buộc sau per-key merge. Username từ file + password từ env là hợp lệ; chỉ có một hoặc cả hai vắng mặt đều lỗi trong profile này. Không suy ra integrated auth từ thiếu credentials hoặc username rỗng. Combined đứng riêng cũng cần xác thực SQL đầy đủ. | Hỗ trợ integrated auth như profile tường minh riêng, không username/password, với điều kiện JDK/driver/OS/identity và kiểm chứng riêng. Không áp một quy tắc credentials chung cho mọi cơ chế auth; chưa duyệt integrated/managed identity. |
+| **A5 — file được chọn không tồn tại, không đọc được, malformed** | Fail-closed trước JDBC, kể cả env đã đủ; không dùng nội dung đọc dở, không bỏ file để fallback env/classpath. Phân biệt không chọn file (env-only được xét) với đã chọn file lỗi. Đề xuất Java properties theo `Properties.load(InputStream)` hiện hữu, quy tắc escape rõ ràng; lỗi parse, duplicate key và khóa ngoài schema được báo lỗi an toàn. | Cho fallback env có cảnh báo giảm gián đoạn nhưng che lỗi chọn file; không khuyến nghị. Định nghĩa malformed phải gồm lỗi cú pháp và validation schema, không giả định mọi dòng sai đều bị Java Properties từ chối. |
+| **A6 — `DB_DRIVER` / `db.driver` đang accepted nhưng unused** | Đề xuất deprecate rồi remove trong task riêng; hồ sơ mới không quảng bá setting này, key còn tồn tại phải báo migration error, không âm thầm bỏ qua. Xác minh driver SQL Server đã đóng gói/đăng ký, driver không có thì lỗi an toàn. | Nếu có nhu cầu driver class cụ thể, định nghĩa `Class.forName` trước handoff, kiểm tra class phù hợp, lỗi load phải dừng và redacted. Không cho cấu hình tải JAR/code từ xa. Không coi accepted hiện tại là explicit loading đã hỗ trợ. |
+| **A7 — dựng URL / database mặc định** | Yêu cầu URL SQL Server hoàn chỉnh, host/port và `databaseName` tường minh; không tự dựng từ host, không tự chọn `clinicDb`, `master` hay database mặc định của login. Không credentials trong split URL; không tự nối thêm password/TLS options hoặc cho duplicate/conflicting options. Kiểm tra TLS options/identity theo policy đã duyệt; cú pháp cần validator đặc thù được đặc tả riêng. | Dựng URL từ host/port/database có thể thân thiện hơn nhưng thêm schema, escaping và precedence; dùng database mặc định của tài khoản ít cấu hình hơn nhưng dễ sai đích. Chưa chọn mặc định nào. |
+| **A8 — secret split, redaction, permissions** | File chủ yếu chứa URL/username, password do secret injection vào `DB_PASSWORD`; file được phép cấp password khi env không có nếu Owner chọn biến thể đó. Không log full URL/connection string, username, password, truststore secret, file contents hoặc raw JDBC/parse exception. Chỉ báo mã lỗi, key và loại nguồn, không giá trị/path đầy đủ. | File chứa secret giúp vận hành offline nhưng tăng trách nhiệm ACL/rotation/backup. Managed secret service cần scope riêng; env không tự bảo đảm bí mật. Secret split và quy tắc file cụ thể vẫn chờ Owner. |
+
+Schema file tối thiểu đề xuất là `db.url`, `db.username`, `db.password`; không đưa `db.driver`, `db.pool.maxSize` hay khóa combined chưa có consumer vào ví dụ mới. Giá trị properties được decode theo parser đã chọn trước validation; nếu file chứa secret với dấu cách/backslash/ký tự escape, phải có hướng dẫn encode và test bảo toàn giá trị, không sao chép quy tắc shell sang properties. Chỉ kiểm tra completeness/schema không chứng minh URL hay handshake hợp lệ.
+
+**Hướng dẫn quyền file đề xuất, chưa phải chính sách đã duyệt:** đặt file ngoài repo/artifact tại thư mục do quản trị kiểm soát; runtime user chỉ cần read, quyền write thuộc người quản trị phù hợp. Unix có thể dùng file mode `0600` cho file thuộc runtime user hoặc `0640` với nhóm riêng có kiểm soát; bảo vệ cả thư mục cha khỏi người không được phép sửa. Windows dùng ACL giới hạn tài khoản ứng dụng và quản trị, bỏ quyền đọc/ghi rộng. Không coi `.gitignore` là kiểm soát truy cập; không đồng bộ file secret vào repo, ảnh chụp, backup/chia sẻ rộng. Không sửa permission trong task này.
+
+Trust-anchor đề xuất được quản trị trong truststore của runtime Java đã xác minh, cùng hostname khớp chứng chỉ. Truststore riêng là lựa chọn kỹ thuật thay thế cần kiểm chứng; không mặc định OS trust store đồng nhất Java truststore. Không đặt secret thật trong JVM/CLI arguments. Bất kỳ profile nào cũng phải đáp ứng TLS đã duyệt; không biến trust-anchor provisioning thành câu hỏi có cho bypass hay không.
+
+### Ví dụ IntelliJ và JAR — chỉ placeholder tổng hợp, không chạy trong task này
+
+Các ví dụ mô tả hồ sơ đề xuất sau khi được duyệt/hiện thực. **Loader hiện tại không đọc `CLINIC_DB_CONFIG_FILE`, JVM property hay CLI selector; các lệnh file dưới đây chưa hoạt động với JAR hiện tại.** Các đường dẫn là giả định tuyệt đối do operator chọn, không phải default hoặc discovery rule. URL minh họa `encrypt=true;trustServerCertificate=false` chưa chứng minh chain/identity validation; cần trust-anchor đúng và kiểm chứng độc lập.
+
+File giả định `/opt/clinic-synthetic/config/db.properties`:
+
+```properties
+db.url=jdbc:sqlserver://db.synthetic.invalid:1433;databaseName=synthetic_clinic;encrypt=true;trustServerCertificate=false
+db.username=synthetic_user
+```
+
+- **IntelliJ, hồ sơ file + injected password:** Main class `vn.clinicmanagement.desktop.Main`, JDK 17; Environment variables: `CLINIC_DB_CONFIG_FILE=/opt/clinic-synthetic/config/db.properties`, `DB_PASSWORD=<synthetic-password-marker>`. Bỏ `DB_CONNECTION_STRING`, `DB_URL`, `DB_USERNAME` kế thừa ngoài ý muốn để ví dụ dùng URL/user trong file. VM options và Program arguments không chứa secret. Working directory không tham gia chọn file.
+- **IntelliJ, env-only:** không đặt selector; Environment variables chứa `DB_URL` như URL mẫu, `DB_USERNAME=synthetic_user`, `DB_PASSWORD=<synthetic-password-marker>`; không đặt `DB_CONNECTION_STRING`. Không dùng classpath `db.properties` làm fallback trong hồ sơ đề xuất.
+- **IntelliJ, các alternative chưa chọn:** nếu Owner chọn JVM interface, đặt `-Dclinic.config.file=/opt/clinic-synthetic/config/db.properties` trong VM options; nếu chọn CLI interface, đặt `--db-config-file=/opt/clinic-synthetic/config/db.properties` trong Program arguments. Chọn đúng một selector, không tự cộng cả ba.
+
+JAR, file + environment (sau task hiện thực riêng):
+
+```bash
+# Chỉ là marker tổng hợp; secret thật do launcher/secret injector cấp, không gõ vào history.
+CLINIC_DB_CONFIG_FILE='/opt/clinic-synthetic/config/db.properties' \
+DB_PASSWORD='<synthetic-password-marker>' \
+java -jar '/opt/clinic-synthetic/clinic-desktop.jar'
+```
+
+JAR, env-only (cú pháp env hiện có; không phải bằng chứng release/TLS readiness):
+
+```bash
+# Không đặt selector hoặc DB_CONNECTION_STRING; không dựa vào config kế thừa.
+DB_URL='jdbc:sqlserver://db.synthetic.invalid:1433;databaseName=synthetic_clinic;encrypt=true;trustServerCertificate=false' \
+DB_USERNAME='synthetic_user' \
+DB_PASSWORD='<synthetic-password-marker>' \
+java -jar '/opt/clinic-synthetic/clinic-desktop.jar'
+```
+
+Alternative selector, chỉ nếu được Owner chọn và hiện thực, với password đã được inject vào environment:
+
+```bash
+java '-Dclinic.config.file=/opt/clinic-synthetic/config/db.properties' \
+  -jar '/opt/clinic-synthetic/clinic-desktop.jar'
+java -jar '/opt/clinic-synthetic/clinic-desktop.jar' \
+  '--db-config-file=/opt/clinic-synthetic/config/db.properties'
+```
+
+Không đặt selector khác đồng thời trong các ví dụ alternative. Ví dụ không cấp mật khẩu trên command-line arguments, không chạy migration hay kết nối DB. Environment cũng có thể bị lộ qua process diagnostics/IDE configuration: hạn chế tài khoản truy cập, không bật shell tracing hoặc dump env, không chia sẻ Run Configuration chứa secret thật. Không lưu credentials qua UI selector theo mặc định.
+
+### Quyết định Owner và evidence còn thiếu
+
+Owner cần ghi lựa chọn **A1–A8**, ngoại lệ và phạm vi profile, cùng task triển khai riêng; chưa mục nào trong addendum này là approval. Khuyến nghị nhất quán là env selector duy nhất + split SQL credentials + password injection + không database mặc định + reject ambiguity/blank/partial/file errors + remove unused driver setting + diagnostics redacted. File-only secret là biến thể chờ chọn, không phải secret behavior ngầm được duyệt.
+
+Sau phê duyệt, acceptance tương lai cần kiểm tra bằng synthetic/fake JDBC: từng key env thắng/file bù thiếu; mixed combined/split; empty/whitespace và bảo toàn secret; partial/integrated tách biệt; file missing/unreadable/malformed/duplicate/unknown key không handoff; selector absolute/no discovery; database rõ ràng; driver và redaction ở mọi đường lỗi. Artifact/launch và TLS handshake với chain/expiry/hostname sai cần bằng chứng riêng trong môi trường được ủy quyền. Không thực hiện hay tuyên bố các kiểm thử này trong task tài liệu.
+
+**Phase 0 release readiness vẫn OPEN; `SEC-01` OPEN; downstream DEFAULT-DENY.** Không đổi code, packaging, runtime, launch scripts, tests hoặc database. Chính sách đã duyệt ở trên được giữ nguyên; hoàn thành proposal không đóng gate.
+
+---
+
 ## 2. Bằng chứng Mã nguồn và Hiện trạng Kiến trúc (Source Evidence & Proven Facts)
 
 Dựa trên kiểm tra mã nguồn tại repository:
@@ -45,6 +150,8 @@ Dựa trên kiểm tra mã nguồn tại repository:
 ---
 
 ## 3. Phân tích So sánh Các Quyết định Kỹ thuật Còn lại (Options, Tradeoffs & Recommendations)
+
+**Snapshot các phương án trước addendum 2026-11-06:** giữ để truy vết, không phải bộ khuyến nghị hiện hành. Khi khác mục 1A (dual selector, source-aware combined/split, blank credentials hay auth), dùng mục 1A làm đề xuất trình Owner; tất cả vẫn non-binding. Không đọc các lựa chọn cũ như approval.
 
 Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Facts)**, **Suy luận kỹ thuật (Inferences)**, **Các phương án (Options)**, **Đánh đổi (Tradeoffs)**, và **Đề xuất khuyến nghị phi ràng buộc (Non-binding Recommendation)**.
 
@@ -313,34 +420,26 @@ Các ví dụ dưới đây chỉ dùng placeholder; chưa phải lệnh triển
 
 ---
 
-## 4. Danh mục Câu hỏi Trực tiếp Xin Ý kiến Chỉ đạo của Owner (Exact Owner Questions)
+## 4. Danh mục quyết định Owner còn lại (hiện hành)
 
-Giữ nguyên bảy câu hỏi gốc dưới đây để Owner xem xét các chi tiết còn lại. Các câu hỏi không mở lại kết quả TLS hay env-over-file per-key đã duyệt. Riêng câu 7, truststore, URL và tham số JDBC cụ thể vẫn là ví dụ chờ chọn cách triển khai; chữ “bắt buộc” trong câu hỏi không có nghĩa chuỗi tùy chọn đó đã được phê duyệt làm cú pháp duy nhất.
+Bộ câu hỏi cũ được thay bằng A1–A8 ở addendum để không trộn chính sách đã duyệt với lựa chọn triển khai:
 
-### Câu hỏi 1: Về Giao diện Chỉ định File Cấu hình Ngoài
-> *"Owner có đồng ý phê duyệt việc sử dụng đồng thời cả System Property `-Dclinic.config.file=<path>` và Biến môi trường `CLINIC_DB_CONFIG_FILE=<path>` để chỉ định file properties ngoài cho packaged JAR, với cam kết tuyệt đối không tự động dò tìm ngầm định tại thư mục làm việc (CWD) hay thư mục chứa JAR hay không?"*
+1. **A1:** Chọn env selector duy nhất, JVM property, CLI hay UI; nếu nhiều selector, chọn quy tắc conflict tường minh.
+2. **A2:** Chọn rejection combined/split được khuyến nghị hoặc đặc tả precedence/merge khác; quyết định có thêm file combined key hay không.
+3. **A3:** Chọn nghĩa absent/empty/whitespace trong env và file, cùng việc bảo toàn password.
+4. **A4:** Chọn SQL-only profile và credential pair, hoặc phạm vi integrated auth tường minh riêng; không suy ra auth từ credentials thiếu.
+5. **A5:** Chọn fail-closed cho file được chọn lỗi, schema/parser và lỗi duplicate/unknown key, hoặc fallback tường minh khác.
+6. **A6:** Chọn deprecate/remove setting driver unused hoặc explicit JDBC class loading có kiểm soát lỗi.
+7. **A7:** Chọn URL hoàn chỉnh/database tường minh hoặc schema dựng URL có quy tắc escaping/default rõ ràng.
+8. **A8:** Chọn secret split, redaction/file permissions; kỹ thuật trust-anchor/hostname phải chứng minh TLS đã duyệt, không xin duyệt lại mã hóa hay certificate validation.
 
-### Câu hỏi 2: Về Thứ tự Ưu tiên giữa `DB_CONNECTION_STRING` và Biến Môi trường Phân tách
-> *"Khi xảy ra xung đột cấu hình, Owner có đồng ý áp dụng quy tắc phân tầng: Biến môi trường phân tách (`DB_URL`, `DB_PASSWORD`) có quyền ghi đè lên chuỗi kết nối đầy đủ `db.connectionString` được khai báo trong file properties nền hay không?"*
-
-### Câu hỏi 3: Về Ngữ nghĩa của Biến Môi trường Rỗng (Blank Semantics)
-> *"Owner có đồng ý nguyên tắc an toàn: Biến môi trường `DB_URL` hoặc `DB_CONNECTION_STRING` nếu được khai báo nhưng để trống/chỉ có khoảng trắng thì phải bị coi là Không hợp lệ (Invalid - Fail Closed) và chặn khởi động ngay lập tức, thay vì âm thầm bỏ qua để lấy giá trị trong file hay không?"*
-
-### Câu hỏi 4: Về Ràng buộc Cặp đôi Tài khoản / Mật khẩu (Credential Pairs)
-> *"Owner có đồng ý quy định chặt chẽ: Đối với xác thực CSDL dạng phân tách, bắt buộc cả `username` và `password` phải cùng có mặt (hoặc cùng vắng mặt đối với Windows Integrated Authentication), việc chỉ cung cấp một trong hai trường sẽ bị coi là lỗi cấu hình thiếu sót và từ chối kết nối hay không?"*
-
-### Câu hỏi 5: Về Hành vi khi File Chỉ định Bị Lỗi (File Load Failures)
-> *"Owner có phê duyệt nguyên tắc Đóng khi Lỗi (Fail-Closed): Nếu người dùng/quản trị viên đã chỉ định rõ đường dẫn file cấu hình qua `-Dclinic.config.file` hoặc `CLINIC_DB_CONFIG_FILE`, nhưng file đó không tồn tại, không đọc được hoặc sai cú pháp, ứng dụng PHẢI dừng khởi động ngay lập tức, tuyệt đối không âm thầm chạy tiếp bằng giá trị môi trường hay không?"*
-
-### Câu hỏi 6: Về Định hướng Xử lý `DB_DRIVER`
-> *"Owner có đồng ý loại bỏ hoàn toàn biến `DB_DRIVER` và khóa `db.driver` khỏi tài liệu hướng dẫn, file mẫu và bộ giải quyết cấu hình để đơn giản hóa hệ thống và dựa hoàn toàn vào cơ chế nạp tự động JDBC 4+ SPI của `mssql-jdbc` hay không?"*
-
-### Câu hỏi 7: Về Phương án Cung cấp Điểm neo Tin cậy TLS (Trust-Anchor Provisioning)
-> *"Owner có phê duyệt định hướng hạ tầng: Máy trạm triển khai sẽ sử dụng chứng chỉ CA được cài đặt sẵn vào Java Truststore chuẩn (`cacerts` hoặc `-Djavax.net.ssl.trustStore`), kết hợp tham số bắt buộc `encrypt=true;trustServerCertificate=false` trong chuỗi kết nối, và từ chối mọi cấu hình chấp nhận chứng chỉ không kiểm tra hay không?"*
+Không câu nào mở lại support hai nguồn, env-over-file per-key hoặc yêu cầu TLS/certificate identity. Không có quyết định Owner mới trong lần sửa này.
 
 ---
 
 ## 5. Nhật ký Thực thi và Đối soát Hướng dẫn (Guidance & Verification Record)
+
+Mục 5.1–5.3 là nhật ký vòng sửa trước; kết quả đó không phải kiểm định lần addendum này. Xem mục 6 cho lần chạy hiện tại.
 
 ### 5.1. RAG-first — Vòng sửa tài liệu 2026-11-06
 
@@ -368,3 +467,27 @@ Lệnh thoát **1**, `sqlite3.OperationalError: unable to open database file`, t
 - Không chạy build/application tests hay SQL; đây là sửa tài liệu. Chỉ đọc source/tests mẫu với dữ liệu tổng hợp, không mở config bí mật hoặc truy cập dữ liệu bệnh nhân.
 - Kiểm định tài liệu: `git diff --check`; Python read-only kiểm tra local Markdown targets và line-anchor bounds trong feature checkout, không có file URI/worker path, đối chiếu nguyên văn bảy câu hỏi Owner với `HEAD`, và kiểm tra `git status --short` chỉ có file allowlist.
 - Kết quả: `git diff --check` exit 0, không có diagnostic; Python exit 0 — 45 liên kết tương đối đều có target tồn tại, 26 line anchors hợp lệ, bảy câu hỏi Owner không đổi, không có file URI/worker path hay nhãn CWE bị loại bỏ. Scope chỉ có file allowlist; chính sách TLS, env-over-file per-key, trạng thái non-binding và `SEC-01` OPEN/default-deny được giữ. Đây là kiểm định tài liệu, không phải nghiệm thu runtime/TLS handshake.
+
+## 6. Nhật ký addendum — 2026-11-06 (lần chạy hiện tại)
+
+### Guidance và kiểm tra hiện trạng
+
+- Đọc Mandatory guidance được cung cấp trước khi sửa: `docs/PROJECT_CONVENTIONS.md` (baseline được cung cấp, không có bản checkout), `README.md`, phần trích đã bị cắt của `DOMAIN_ANALYSIS.md` và `ERD_DIAGRAM.md`.
+- Đọc supplied retrieved excerpts: `phase0-deployment-config-tls-decision-proposal.md`, `phase0-db-config-resolution-contract.md`, proposal này, `phase3-visit-transfer-contract-review.md`, `phase3-transfer-linked-work-eligibility-review.md` (đều dưới `docs/ke-hoach-trien-khai/`). Excerpts Phase 3 chỉ cung cấp bối cảnh guidance/retrieval, không quyết định DB policy.
+- Đọc trực tiếp `README.md`, `docs/ke-hoach-trien-khai/README.md`, proposal này, `phase0-db-config-resolution-contract.md`, `phase0-deployment-config-tls-decision-proposal.md` và `phase0-db-config-review.md`. Các nhận định TLS/nguồn chưa chốt trong review/contract cũ là lịch sử, đã được Owner decisions mới supersede đúng phạm vi; không mở lại.
+- Kiểm tra đường dẫn cha và thư mục scope: không tìm thấy `AGENTS.md`. Inventory không có `CONTRIBUTING.md`, `docs/PROJECT_CONVENTIONS.md`, `docs/DEVELOPMENT_CONVENTIONS.md` hoặc `ARCHITECTURE.md`; không suy ra guidance chưa đọc.
+- Read-only implementation inspection: `DatabaseConfiguration.java`, `DatabaseConnection.java`, `DatabaseConfigurationTest.java`, `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/Main.java`, phần Shade của `clinic-desktop/pom.xml`. Resolver hiện hữu xác nhận blank fallback, trim split env, combined thắng, driver unused và diagnostic presence-only; Main chưa có CLI/file selector. Không mở file secret, không đọc process environment, không gọi JDBC/DB.
+
+### RAG-first và kết quả kiểm định
+
+Lệnh đầu tiên, trước repository reads/searches:
+
+```bash
+/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 8 'phase0-db-config remaining decisions resolution contract deployment TLS DB_CONNECTION_STRING DB_DRIVER explicit file environment precedence'
+```
+
+Exit **1**, `sqlite3.OperationalError: unable to open database file` tại `PRAGMA journal_mode=WAL`; không trả excerpt mới. Thứ tự RAG-first **PASS**; live RAG retrieval **BLOCKED**, không thể báo tiêu chí RAG thành công hoàn toàn. Dùng supplied retrieved excerpts và targeted local reads làm fallback; không sửa/copy/move/delete shared cache/index hoặc né sandbox.
+
+- `git diff --check`: **PASS**, exit 0, không output.
+- Inline Python read-only assertions: **PASS**, exit 0; `git diff --name-only HEAD` chỉ có file proposal allowlist, không untracked files; kiểm tra coverage A1–A8/policy/gates, local Markdown targets/line-anchor bounds và balanced fences. Cả 3 shell blocks mới trong addendum được kiểm tra bằng `zsh -n` (syntax-only), không thực thi lệnh launch. Không chạy build/application tests: task chỉ sửa tài liệu và cấm đổi runtime/tests.
+- Acceptance: **PASS** cho scope một file + dated addendum, policy đã resolved, lựa chọn còn lại/khuyến nghị/ví dụ synthetic, không approval ngầm và không thay code/package/runtime/tests. **PASS** cho diff check và thứ tự RAG-first; **BLOCKED** cho live RAG retrieval như trên. Phase 0 readiness vẫn OPEN, `SEC-01` OPEN và downstream DEFAULT-DENY; chưa có acceptance runtime/TLS mới.
