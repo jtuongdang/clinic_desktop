@@ -10,12 +10,12 @@
 
 ## 1. Bối cảnh và Các Tiền đề đã được Owner phê duyệt (Baseline & Approved Facts)
 
-Tài liệu này kế thừa và tuân thủ tuyệt đối các nguyên tắc nền tảng đã được phê duyệt trong hợp đồng `PHASE0-PHASE3-REVIEW-AND-TRACKING-DOCS-01` và các báo cáo đối soát trước đó ([`phase0-db-config-review.md`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/docs/ke-hoach-trien-khai/phase0-db-config-review.md), [`phase0-db-config-resolution-contract.md`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/docs/ke-hoach-trien-khai/phase0-db-config-resolution-contract.md)):
+Tài liệu này kế thừa hợp đồng `PHASE0-PHASE3-REVIEW-AND-TRACKING-DOCS-01` và các báo cáo đối soát trước đó ([`phase0-db-config-review.md`](phase0-db-config-review.md), [`phase0-db-config-resolution-contract.md`](phase0-db-config-resolution-contract.md)). Các quyết định Owner hiện hành được ghi tại [`phase0-deployment-config-tls-decision-proposal.md`](phase0-deployment-config-tls-decision-proposal.md), theo `PHASE0-DB-DEPLOY-DECISION-RECON-02` và `PHASE0-DB-CONFIG-SOURCE-PRECEDENCE-OWNER-DECISION-01`:
 
 1. **Bắt buộc hỗ trợ song song hai kênh nạp cấu hình:** Triển khai desktop dạng packaged-JAR bắt buộc phải hỗ trợ cả hai nguồn: file properties bên ngoài (`external properties file`) và biến môi trường/secret injection (`environment variables`).
 2. **Quy tắc ưu tiên cấp trường (Per-key Environment Precedence):** Biến môi trường có quyền ưu tiên cao hơn trên từng trường đơn lẻ (`per-key environment wins`); file properties đóng vai trò là giá trị nền và bù đắp các trường còn thiếu (`file fills keys absent from environment`).
-3. **Chính sách TLS bắt buộc mã hóa và xác thực chứng chỉ (Mandatory Certificate-Validating TLS):** Kết nối CSDL bắt buộc phải mã hóa và bắt buộc phải kiểm tra tính hợp lệ của chứng chỉ số cùng danh tính máy chủ (`encrypt=true; trustServerCertificate=false`), áp dụng nguyên tắc đóng khi lỗi (fail-closed, không fallback về kết nối không mã hóa hoặc tự tin cậy chứng chỉ).
-4. **Không thay đổi hành vi runtime / An toàn tuyệt đối:** Cổng an ninh `SEC-01` và toàn bộ các cổng hạ nguồn tiếp tục ở trạng thái ĐÓNG / Mặc định từ chối (`OPEN / DEFAULT-DENY`). Không thực hiện bất kỳ thay đổi nào đối với mã nguồn Java, bộ kiểm thử, schema migration, phân quyền hoặc runtime. Giữ nguyên script `run-app.sh`.
+3. **Chính sách TLS bắt buộc mã hóa và xác thực chứng chỉ (Mandatory Certificate-Validating TLS):** Kết nối CSDL bắt buộc mã hóa và xác thực cả chứng chỉ lẫn danh tính máy chủ. Chứng chỉ không hợp lệ, không được tin cậy, hết hạn hoặc không khớp danh tính máy chủ phải làm kết nối thất bại (fail-closed); không fallback hoặc bypass theo môi trường. `encrypt=true;trustServerCertificate=false` là một cách biểu đạt JDBC SQL Server có thể dùng để hiện thực kết quả đã duyệt, không phải URL hay phương án truststore đã chốt; vẫn cần chứng minh đáp ứng đầy đủ chính sách.
+4. **Phạm vi tài liệu:** `SEC-01` tiếp tục OPEN; các workflow hạ nguồn còn bị chặn tiếp tục DEFAULT-DENY. Không thực hiện thay đổi mã nguồn Java, bộ kiểm thử, schema migration, phân quyền hoặc runtime. Giữ nguyên script `run-app.sh`.
 
 ---
 
@@ -24,29 +24,31 @@ Tài liệu này kế thừa và tuân thủ tuyệt đối các nguyên tắc n
 Dựa trên kiểm tra mã nguồn tại repository:
 
 ### 2.1. Đóng gói Artifact và Loại trừ Bí mật (Packaging Evidence)
-- Trong [`clinic-desktop/pom.xml:46-56`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-desktop/pom.xml#L46-L56), cấu hình `maven-shade-plugin` thiết lập bộ lọc loại trừ tệp có tên `db.properties` khỏi tệp JAR phân phối (`<exclude>db.properties</exclude>`), đồng thời loại bỏ chữ ký `META-INF/*.SF`.
-- Tệp mẫu [`clinic-infrastructure/src/main/resources/db.properties.example:1-7`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/resources/db.properties.example#L1-L7) vẫn được đóng gói trong JAR, nhưng chỉ chứa placeholder và tham số mẫu cục bộ (`encrypt=true;trustServerCertificate=true`).
+- Trong [`clinic-desktop/pom.xml:46-56`](../../clinic-desktop/pom.xml#L46-L56), cấu hình `maven-shade-plugin` thiết lập bộ lọc loại trừ tệp có tên `db.properties` khỏi tệp JAR phân phối (`<exclude>db.properties</exclude>`), đồng thời loại bỏ chữ ký `META-INF/*.SF`.
+- Tệp mẫu [`clinic-infrastructure/src/main/resources/db.properties.example:1-7`](../../clinic-infrastructure/src/main/resources/db.properties.example#L1-L7) vẫn được đóng gói trong JAR, nhưng chỉ chứa placeholder và tham số mẫu cục bộ (`encrypt=true;trustServerCertificate=true`).
 
 ### 2.2. Trình nạp Cấu hình Hiện tại (Loader & Resolver Implementation)
-- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java:29-41`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L29-L41), phương thức `loadProperties()` chỉ thực hiện nạp tệp tài nguyên từ classpath thông qua `DatabaseConnection.class.getClassLoader().getResourceAsStream("db.properties")`. Lớp này hoàn toàn không có tham số hay cơ chế nạp file từ hệ thống tệp bên ngoài (`filesystem path`). Mọi lỗi đọc hoặc định dạng tệp đều bị nuốt lặng lẽ (`catch (Exception ignored) { properties.clear(); }`).
-- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java:22-35`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L22-L35), phương thức `resolve()` xử lý ưu tiên giữa `Properties` và `Map<String, String> environment`:
-  - `override()` ([dòng 80-82](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L80-L82)): nếu biến môi trường không rỗng (`nonblank`), giá trị môi trường sau khi cắt khoảng trắng thừa (`trim()`) sẽ ghi đè giá trị trong property.
-  - `nonblank()` ([dòng 84-86](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L84-L86)): kiểm tra `value != null && !value.isBlank()`. Các biến môi trường rỗng hoặc chỉ có khoảng trắng được coi là vắng mặt (`absent`) và bị bỏ qua, để lộ giá trị trong properties.
-  - Biến môi trường `DB_CONNECTION_STRING` ([dòng 26, 32-34](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L26-L34)) được giữ nguyên vẹn và giành quyền ưu tiên tuyệt đối khi xác định `ConnectionTarget` ([dòng 103-106](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L103-L106)).
+- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java:29-41`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L29-L41), phương thức `loadProperties()` chỉ thực hiện nạp tệp tài nguyên từ classpath thông qua `DatabaseConnection.class.getClassLoader().getResourceAsStream("db.properties")`. Lớp này hoàn toàn không có tham số hay cơ chế nạp file từ hệ thống tệp bên ngoài (`filesystem path`). Mọi lỗi đọc hoặc định dạng tệp đều bị nuốt lặng lẽ (`catch (Exception ignored) { properties.clear(); }`).
+- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java:22-35`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L22-L35), phương thức `resolve()` xử lý ưu tiên giữa `Properties` và `Map<String, String> environment`:
+  - `override()` ([dòng 80-82](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L80-L82)): nếu biến môi trường không rỗng (`nonblank`), giá trị môi trường sau khi cắt khoảng trắng thừa (`trim()`) sẽ ghi đè giá trị trong property.
+  - `nonblank()` ([dòng 84-86](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L84-L86)): kiểm tra `value != null && !value.isBlank()`. Các biến môi trường rỗng hoặc chỉ có khoảng trắng được coi là vắng mặt (`absent`) và bị bỏ qua, để lộ giá trị trong properties.
+  - Biến môi trường `DB_CONNECTION_STRING` ([dòng 26, 32-34](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L26-L34)) được giữ nguyên vẹn và giành quyền ưu tiên tuyệt đối khi xác định `ConnectionTarget` ([dòng 103-106](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L103-L106)).
 
 ### 2.3. Trạng thái Trường `DB_DRIVER` và Đăng ký Driver
-- Trường `DB_DRIVER` và khóa `db.driver` được đọc và gán vào `ResolvedConfiguration.driver()` ([`DatabaseConfiguration.java:31`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L31)), nhưng không hề được tham chiếu hay sử dụng trong luồng mở kết nối ([`DatabaseConnection.java:76-98`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L76-L98)).
-- Trình quản lý kết nối tự suy luận driver thông qua tiền tố chuỗi URL bằng phương thức `autoRegisterDriver(url)` ([`DatabaseConnection.java:115-129`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L115-L129)) hoặc cơ chế `ServiceLoader` chuẩn của JDBC 4.0+.
+- Trường `DB_DRIVER` và khóa `db.driver` được đọc và gán vào `ResolvedConfiguration.driver()` ([`DatabaseConfiguration.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L31)), nhưng không hề được tham chiếu hay sử dụng trong luồng mở kết nối ([`DatabaseConnection.java:76-98`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L76-L98)).
+- Trình quản lý kết nối tự suy luận driver thông qua tiền tố chuỗi URL bằng phương thức `autoRegisterDriver(url)` ([`DatabaseConnection.java:115-129`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L115-L129)) hoặc cơ chế `ServiceLoader` chuẩn của JDBC 4.0+.
 
 ### 2.4. Khử vết Dữ liệu Nhạy cảm (Redaction)
-- Các record nội bộ `ResolvedConfiguration` và `ConnectionTarget` đã cài đè phương thức `toString()` ([`DatabaseConfiguration.java:94-101, 118-125`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L94-L125)) để chỉ in các cờ boolean (`hasUrl=true`, `hasPassword=true`), ngăn chặn việc lộ chuỗi kết nối và mật khẩu trong log hệ thống.
-- Các bài kiểm thử [`DatabaseConnectionTest.java:76-94`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnectionTest.java#L76-L94) và [`DatabaseConfigurationTest.java:87-101`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L87-L101) đã sử dụng chuỗi sentinel giả lập (`synthetic-password-marker`, `synthetic-secret-marker`) để chứng minh tính an toàn khi in lỗi hoặc chẩn đoán.
+- Các record nội bộ `ResolvedConfiguration` và `ConnectionTarget` đã cài đè phương thức `toString()` ([`DatabaseConfiguration.java:94-101, 118-125`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L94-L125)) để chỉ in trạng thái hiện diện của giá trị và chế độ kết nối, không in URL hay mật khẩu trong hai biểu diễn này. Điều đó không chứng minh mọi log hoặc ngoại lệ ở các caller đều đã được khử vết.
+- Các bài kiểm thử [`DatabaseConnectionTest.java:76-114`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnectionTest.java#L76-L114) và [`DatabaseConfigurationTest.java:87-101`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L87-L101) kiểm tra diagnostic của `testConnection` và hai biểu diễn record bằng dữ liệu tổng hợp, gồm `synthetic-password-marker`, `synthetic-secret-marker`. Phạm vi kiểm tra này không bảo đảm an toàn cho mọi đường log/lỗi.
 
 ---
 
 ## 3. Phân tích So sánh Các Quyết định Kỹ thuật Còn lại (Options, Tradeoffs & Recommendations)
 
 Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Facts)**, **Suy luận kỹ thuật (Inferences)**, **Các phương án (Options)**, **Đánh đổi (Tradeoffs)**, và **Đề xuất khuyến nghị phi ràng buộc (Non-binding Recommendation)**.
+
+Các lựa chọn và khuyến nghị dưới đây đều chờ quyết định triển khai; từ ngữ yêu cầu bên trong một phương án chỉ mô tả hành vi được đề xuất. Chúng không bổ sung chính sách đã duyệt ở mục 1. Quy tắc env-over-file theo từng khóa đã được chấp thuận; thứ tự combined/split, ngữ nghĩa blank/partial, giao diện file, lỗi đọc file, driver và cách hiện thực TLS vẫn chưa chốt.
 
 ```
 +---------------------------------------------------------------------------------------------------+
@@ -67,14 +69,14 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.1. Quyết định 1: Giao diện Chỉ định File Cấu hình Ngoài (Explicit External-File Selection)
 
 #### a. Sự thật (Facts)
-- Mã nguồn hiện hành chỉ nạp `db.properties` từ classpath ([`DatabaseConnection.java:31`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L31)).
-- Tệp JAR đóng gói loại trừ `db.properties` ([`clinic-desktop/pom.xml:49`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-desktop/pom.xml#L49)). Do đó, khi chạy packaged JAR ngoài môi trường phát triển, ứng dụng hoàn toàn không thể nạp file properties nếu không có cơ chế chỉ định tường minh.
+- Mã nguồn hiện hành chỉ nạp `db.properties` từ classpath ([`DatabaseConnection.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L31)).
+- Tệp JAR đóng gói loại trừ `db.properties` ([`clinic-desktop/pom.xml:49`](../../clinic-desktop/pom.xml#L49)). Do đó, khi chạy packaged JAR ngoài môi trường phát triển, loader hiện tại không đọc file properties ngoài classpath; đây chưa phải bằng chứng về mọi cách thiết lập classpath khi triển khai.
 
 #### b. Suy luận kỹ thuật (Inferences)
-- Việc tự động dò tìm file ngầm định ở thư mục làm việc hiện tại (`Current Working Directory - CWD`) hoặc thư mục cùng cấp với file JAR (`Adjacent-JAR discovery`) tiềm ẩn nguy cơ bảo mật nghiêm trọng (CWE-426: Untrusted Search Path):
+- Việc tự động dò tìm file ở thư mục làm việc hiện tại (`Current Working Directory - CWD`) hoặc cùng thư mục với JAR (`Adjacent-JAR discovery`) có thể chọn nhầm cấu hình nếu nội dung hay quyền ghi tại đó không được kiểm soát:
   - Người dùng mở ứng dụng từ shortcut, desktop hoặc terminal khác nhau có thể vô tình nạp một file cấu hình lạ nằm tại CWD.
-  - Kẻ tấn công trên máy dùng chung có thể đặt file `db.properties` độc hại tại thư mục khởi chạy để đánh lừa ứng dụng kết nối tới CSDL mạo danh.
-  - Do đó, quy tắc an toàn bắt buộc: **Không hỗ trợ tự dò tìm ngầm định (No implicit adjacent-JAR/CWD discovery)**; đường dẫn file properties phải được chỉ định **tường minh (explicit)**.
+  - Nếu người khác có quyền ghi vào thư mục được dò, họ có thể thay nội dung file được chọn. Đây là tình huống giả định cần xét theo quyền truy cập thực tế, không phải kết luận đã xác minh về lỗ hổng hay phân loại CWE của ứng dụng hiện tại.
+  - [Quyết định Owner hiện hành](phase0-deployment-config-tls-decision-proposal.md) yêu cầu giao diện/đường dẫn tường minh và không phê duyệt implicit adjacent-JAR/CWD discovery; giao diện cụ thể vẫn chưa chốt.
 
 #### c. Các phương án so sánh (Options)
 - **Phương án 1A — Chỉ định qua Thuộc tính Hệ thống JVM (Explicit JVM System Property):**  
@@ -95,14 +97,14 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
   1. Kiểm tra System Property `-Dclinic.config.file` (ưu tiên cao nhất nếu được chỉ định).
   2. Nếu không có, kiểm tra Environment Variable `CLINIC_DB_CONFIG_FILE`.
   3. Nếu cả hai đều không được đặt: coi như không sử dụng file ngoài; chỉ nạp cấu hình từ các biến môi trường trực tiếp (`DB_URL`, `DB_USERNAME`, v.v.) hoặc classpath (nếu đang chạy dev trong IDE).
-  4. **CẤM TUYỆT ĐỐI:** Không quét `./db.properties` tại CWD và không quét `db.properties` nằm cùng thư mục với JAR.
+  4. Giữ ranh giới đã duyệt: không tự dò `./db.properties` tại CWD hay cùng thư mục với JAR; tên và thứ tự hai giao diện trên vẫn chỉ là đề xuất.
 
 ---
 
 ### 3.2. Quyết định 2: Thứ tự Ưu tiên giữa `DB_CONNECTION_STRING` và Bộ Ba Trường Phân tách (Combined vs Split Precedence)
 
 #### a. Sự thật (Facts)
-- Hiện tại, `DatabaseConfiguration.java:26-34, 103-106` cho phép `DB_CONNECTION_STRING` (khi khác rỗng) giành quyền ưu tiên tuyệt đối trước bộ ba trường `url`, `username`, `password`.
+- Hiện tại, [`DatabaseConfiguration.java:26-34, 103-106`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L26-L34) (xem thêm [103-106](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L103-L106)) cho phép `DB_CONNECTION_STRING` (khi khác rỗng) giành quyền ưu tiên tuyệt đối trước bộ ba trường `url`, `username`, `password`.
 - Phương thức `DatabaseConfiguration.override()` chỉ áp dụng cho từng trường phân tách (`db.url` vs `DB_URL`, v.v.), không trộn lẫn chuỗi kết nối gộp với các trường phân tách.
 
 #### b. Suy luận kỹ thuật (Inferences)
@@ -133,7 +135,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.3. Quyết định 3: Ngữ nghĩa của Biến Môi trường Rỗng hoặc Khoảng trắng (Blank Environment Semantics: Absent vs Invalid)
 
 #### a. Sự thật (Facts)
-- Trong [`DatabaseConfiguration.java:80-86`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L80-L86), hàm `override` sử dụng `nonblank(environmentValue)`:
+- Trong [`DatabaseConfiguration.java:80-86`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L80-L86), hàm `override` sử dụng `nonblank(environmentValue)`:
   ```java
   private static String override(String propertyValue, String environmentValue) {
       return nonblank(environmentValue) ? environmentValue.trim() : propertyValue;
@@ -153,11 +155,11 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 #### c. Các phương án so sánh (Options)
 - **Phương án 3A — Duy trì Hành vi Hiện tại (Permissive: Blank == Absent):**  
   Chuỗi rỗng hoặc chỉ có khoảng trắng được coi như không tồn tại, cho phép giá trị trong file hiển thị.  
-  *Ưu điểm:* Linh hoạt với các script shell khởi chạy có định nghĩa sẵn biến nhưng chưa gán giá trị; không làm thay đổi các test hiện có ([`DatabaseConfigurationTest.java:45-60`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L45-L60)).  
+  *Ưu điểm:* Linh hoạt với các script shell khởi chạy có định nghĩa sẵn biến nhưng chưa gán giá trị; không làm thay đổi các test hiện có ([`DatabaseConfigurationTest.java:45-60`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L45-L60)).\
   *Nhược điểm:* Nguy cơ âm thầm dùng giá trị fallback của file khi secret injection bị hỏng; không có cách nào dùng biến môi trường để "xóa" (clear) một giá trị đã lỡ đặt trong file properties.
 - **Phương án 3B — Kiểm soát Nghiêm ngặt (Fail-Closed: Blank == Invalid / Error):**  
   Nếu một biến môi trường cấu hình DB quan trọng (`DB_URL`, `DB_CONNECTION_STRING`, `DB_USERNAME`) được cung cấp nhưng có giá trị rỗng/khoảng trắng, coi đó là cấu hình sai và ném lỗi khởi động ngay lập tức.  
-  *Ưu điểm:* Phát hiện ngay các lỗi tiêm bí mật của hệ thống CI/CD/CDKT; an toàn tối đa.  
+  *Ưu điểm:* Phát hiện giá trị rỗng ở các khóa được kiểm tra; cần xác định rõ khóa và trường hợp hợp lệ.\
   *Nhược điểm:* Chặn đứng các trường hợp cố ý truyền chuỗi rỗng; có thể gây lỗi nếu công cụ deploy tự động gắn biến rỗng.
 - **Phương án 3C — Phân tách theo Bản chất Trường (Key-Specific Semantics):**  
   - Đối với `DB_URL` và `DB_CONNECTION_STRING`: Giá trị rỗng/khoảng trắng là **Không hợp lệ (Invalid - Fail Closed)** vì URL không thể rỗng.  
@@ -172,7 +174,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.4. Quyết định 4: Các Tổ hợp Xác thực JDBC và Thông tin Xác thực Một phần (Valid Partial Credential / JDBC Auth Combinations)
 
 #### a. Sự thật (Facts)
-- Trong [`DatabaseConfiguration.java:107-113`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L107-L113):
+- Trong [`DatabaseConfiguration.java:107-113`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L107-L113):
   ```java
   if (url != null && !url.isEmpty()) {
       if (username != null && !username.isEmpty()) {
@@ -186,32 +188,32 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 
 #### b. Suy luận kỹ thuật (Inferences)
 - Trình điều khiển SQL Server (`mssql-jdbc`) hỗ trợ nhiều chế độ xác thực khác nhau:
-  1. **SQL Server Authentication:** Bắt buộc phải có cặp đôi hoàn chỉnh: Cả `username` và `password` đều phải có giá trị.
-  2. **Integrated Security (Windows Authentication):** URL chứa `integratedSecurity=true`. Không được truyền `username` và `password` qua JDBC overloads vì driver sẽ sử dụng Kerberos/NTLM của tiến trình hệ điều hành.
+  1. **SQL Server Authentication:** Cần xác định các tổ hợp username/password được hỗ trợ trước khi áp dụng quy tắc cặp đôi.
+  2. **Integrated Security (Windows Authentication):** `integratedSecurity=true` là ví dụ tùy chọn cần đối chiếu với driver/runtime và cơ chế xác thực được chọn; không suy ra quy tắc credentials chỉ từ tên tùy chọn.
   3. **Azure Active Directory / Managed Identity:** URL chứa `authentication=ActiveDirectoryIntegrated` hoặc `authentication=ActiveDirectoryMSI`.
-- Việc cho phép cấu hình "nửa vời" (chỉ có username mà không có password, hoặc chỉ có password mà không có username) hầu hết là do lỗi của người vận hành (quên copy một biến). Việc âm thầm nuốt mất password hoặc truyền password null xuống JDBC là hành vi nguy hiểm.
+- Cấu hình chỉ có username hoặc chỉ có password có thể do thiếu một biến hoặc là có chủ đích. Cần xác định tổ hợp hợp lệ và cách báo lỗi cho từng chế độ xác thực; nguồn hiện tại không chứng minh ý định của người vận hành.
 
 #### c. Các phương án so sánh (Options)
 - **Phương án 4A — Nguyên tắc Cặp Đôi Bắt buộc (Strict Credential Pair Requirement):**  
   Đối với cấu hình phân tách (`split configuration`): `username` và `password` bắt buộc phải cùng xuất hiện (cả hai đều có giá trị) HOẶC cùng vắng mặt (cả hai đều `null`/rỗng). Nếu chỉ có một trong hai trường có giá trị, bộ giải quyết lập tức từ chối và báo lỗi `IncompleteCredentialsException`.  
-  *Ưu điểm:* Cực kỳ an toàn; ngăn chặn triệt để lỗi đánh máy hoặc mất cấu hình từng phần. Phù hợp 100% với chế độ SQL Authentication.  
-  *Nhược điểm:* Chặn trường hợp hy hữu khi người dùng cố tình tạo tài khoản SQL Server không có mật khẩu (tuy nhiên thực tiễn an ninh y tế không bao giờ cho phép tài khoản DB không mật khẩu).
+  *Ưu điểm:* Có thể phát hiện cặp credentials bị thiếu một trường theo quy tắc đã chọn.\
+  *Nhược điểm:* Có thể từ chối tổ hợp credentials có chủ đích; cần đối chiếu với các chế độ xác thực được hỗ trợ. Tài liệu này không xác lập quy định về tài khoản không mật khẩu.
 - **Phương án 4B — Nhận diện theo Chế độ Xác thực của URL (Authentication-Mode-Aware Validation):**  
   Kiểm tra chuỗi URL:
   - Nếu URL chứa `integratedSecurity=true` hoặc `authentication=ActiveDirectory...`: Bắt buộc cả username và password phải vắng mặt. Nếu có truyền credentials, báo lỗi cấu hình thừa.
   - Nếu URL không chứa các tham số trên: Áp dụng quy tắc cặp đôi bắt buộc như Phương án 4A.  
-  *Ưu điểm:* Hoàn hảo về mặt kỹ thuật; kiểm soát chính xác theo từng cơ chế xác thực của Microsoft SQL Server.  
+  *Ưu điểm:* Có thể diễn đạt validation theo chế độ xác thực; quy tắc nhận diện và tổ hợp credentials cần được kiểm chứng với driver được chọn.\
   *Nhược điểm:* Bộ giải quyết cần phân tích cú pháp chuỗi URL (URL parsing), làm tăng độ phức tạp của resolver.
 
 #### d. Đánh đổi và Đề xuất khuyến nghị (Tradeoffs & Recommendation)
-- **Đề xuất (Recommendation):** Áp dụng **Phương án 4A (Strict Credential Pair Requirement)** ở mức tầng cấu hình cơ sở (resolver). Đây là giải pháp đơn giản, không phụ thuộc vào phương ngữ URL của từng loại CSDL, bảo vệ phòng khám khỏi các lỗi mất mát cấu hình nhạy cảm.
+- **Đề xuất (Recommendation):** Áp dụng **Phương án 4A (Strict Credential Pair Requirement)** ở mức tầng cấu hình cơ sở (resolver). Quy tắc này đơn giản ở tầng resolver; cần xác nhận tương thích với các chế độ xác thực trước khi triển khai.
 
 ---
 
 ### 3.5. Quyết định 5: Ứng xử khi File Cấu hình Chỉ định Bị Lỗi hoặc Không Đọc được (Unreadable/Malformed File Behavior)
 
 #### a. Sự thật (Facts)
-- Trong [`DatabaseConnection.java:35-39`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L35-L39), mọi ngoại lệ khi nạp tệp properties (như không tìm thấy tệp, lỗi quyền đọc `AccessDeniedException`, lỗi cú pháp properties) đều bị bỏ qua:
+- Trong [`DatabaseConnection.java:29-41`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L29-L41), resource classpath vắng mặt được bỏ qua và ngoại lệ khi đọc/parse được catch. Đây chưa phải cơ chế đọc file ngoài hay bằng chứng về lỗi quyền trên một đường dẫn ngoài:
   ```java
   try {
       properties.load(input);
@@ -222,7 +224,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 
 #### b. Suy luận kỹ thuật (Inferences)
 - Khi nhà vận hành đã chủ động chỉ định một đường dẫn tệp thông qua `-Dclinic.config.file=/path/to/db.properties` hoặc biến `CLINIC_DB_CONFIG_FILE`, điều đó thể hiện **ý đồ rõ ràng** rằng ứng dụng phải sử dụng cấu hình từ tệp này.
-- Nếu tệp đó không tồn tại, bị sai quyền hạn hệ thống tệp (permissions), hoặc bị hỏng cú pháp mà ứng dụng vẫn lặng lẽ bỏ qua và khởi động tiếp bằng các giá trị ngầm định, ứng dụng có thể rơi vào trạng thái hoạt động sai lệch nghiêm trọng hoặc kết nối nhầm CSDL, vi phạm trực tiếp nguyên tắc phòng thủ theo chiều sâu và `fail-closed`.
+- Nếu tệp đó không tồn tại, không đọc được hoặc hỏng cú pháp mà ứng dụng vẫn bỏ qua và dùng cấu hình khác, ứng dụng có thể kết nối nhầm CSDL. Đây là rủi ro vận hành giả định; fail-closed khi đọc file được chọn vẫn là phương án chờ quyết định, khác với kết quả fail-closed TLS đã duyệt.
 
 #### c. Các phương án so sánh (Options)
 - **Phương án 5A — Đóng khi Lỗi Tuyệt đối (Strict Fail-Closed for Explicit File):**  
@@ -230,24 +232,24 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
   - Nếu file không tồn tại: Ném lỗi `ConfigurationException("Tệp cấu hình chỉ định không tồn tại: [REDACTED_PATH_INFO]")` và dừng khởi động ngay.
   - Nếu không có quyền đọc (I/O error): Ném lỗi và dừng ngay.
   - Nếu file bị sai cú pháp (malformed): Ném lỗi và dừng ngay.  
-  *Ưu điểm:* Tuân thủ nguyên tắc fail-closed; không bao giờ để ứng dụng chạy trong tình trạng cấu hình không như mong đợi.  
+  *Ưu điểm:* Dừng khi phát hiện lỗi đọc/parse file được chọn; không bảo đảm phát hiện mọi cấu hình sai.\
   *Nhược điểm:* Đòi hỏi phải quản lý quyền truy cập file cẩn thận trên máy trạm người dùng.
 - **Phương án 5B — Cho phép Bỏ qua nếu có Biến Môi trường Thay thế (Permissive Fallback with Warning):**  
   Nếu đọc file lỗi nhưng các biến môi trường `DB_URL` và `DB_USERNAME` vẫn đầy đủ, ghi cảnh báo ra log và tiếp tục chạy.  
   *Ưu điểm:* Giúp ứng dụng bền bỉ hơn khi triển khai trên các môi trường hỗn hợp.  
-  *Nhược điểm:* Tiềm ẩn rủi ro che giấu lỗi cấu hình; vi phạm nguyên tắc chỉ định tường minh.
+  *Nhược điểm:* Có thể che giấu lỗi file đã được chỉ định; cần Owner quyết định có cho phép fallback này hay không.
 
 #### d. Đánh đổi và Đề xuất khuyến nghị (Tradeoffs & Recommendation)
-- **Đề xuất (Recommendation):** Áp dụng **Phương án 5A (Strict Fail-Closed)**: Khi một đường dẫn file cấu hình được chỉ định rõ ràng, mọi lỗi liên quan đến việc định vị, phân quyền đọc và giải mã file đó PHẢI làm ứng dụng dừng lại ngay lập tức (fail-closed), tuyệt đối không tự ý fallback.
+- **Đề xuất chờ quyết định (Recommendation):** Chọn **Phương án 5A (Strict Fail-Closed)** để dừng khi không tìm thấy, không đọc được hoặc không parse được file đã chỉ định. Đây chưa phải hành vi runtime hay chính sách lỗi file được phê duyệt.
 
 ---
 
 ### 3.6. Quyết định 6: Định hướng đối với Biến `DB_DRIVER` và Khóa `db.driver` (Unused Driver Configuration)
 
 #### a. Sự thật (Facts)
-- Hiện tại `DB_DRIVER` và `db.driver` được nạp vào bộ nhớ nhưng không được bất kỳ dòng mã nào sử dụng ([`DatabaseConnection.java:23-28, 76-86`](file:///Users/jtuong/Documents/ClinicOrchestrator/data/worktrees/clinic-desktop/aa79d279-df83-4507-a4a0-ef97af6c5250/clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L23-L28)).
+- Hiện tại `DB_DRIVER` và `db.driver` được nạp vào cấu hình ([`DatabaseConfiguration.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L31)) nhưng không được luồng mở kết nối sử dụng ([`DatabaseConnection.java:76-98`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L76-L98)).
 - Trình điều khiển JDBC hiện đại (từ chuẩn JDBC 4.0 trở đi) tự động đăng ký với `DriverManager` thông qua cơ chế `META-INF/services/java.sql.Driver` nằm trong chính file JAR của driver (chẳng hạn `mssql-jdbc-12.6.1.jre11.jar`).
-- Phương thức `autoRegisterDriver(url)` trong `DatabaseConnection.java:115-129` cũng đã tự động gọi `Class.forName()` cho 4 loại CSDL phổ biến (SQL Server, Postgres, MySQL, Oracle).
+- Phương thức `autoRegisterDriver(url)` trong [`DatabaseConnection.java:115-129`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L115-L129) cũng đã tự động gọi `Class.forName()` cho 4 loại CSDL phổ biến (SQL Server, Postgres, MySQL, Oracle).
 
 #### b. Suy luận kỹ thuật (Inferences)
 - Việc duy trì biến `DB_DRIVER` trong tài liệu hướng dẫn và file mẫu `db.properties.example` tạo ra sự hiểu lầm cho người vận hành rằng biến này có tác dụng điều khiển driver, trong khi thực tế nó hoàn toàn vô dụng.
@@ -268,54 +270,52 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 
 ---
 
-### 3.7. Quyết định 7: Cung cấp Trust-Anchor TLS Hợp chuẩn và Khử vết Bí mật (Compliant TLS Trust-Anchor Provisioning & Secret Redaction)
+### 3.7. Quyết định 7: Cung cấp Trust-Anchor TLS và Khử vết Bí mật (TLS Trust-Anchor Provisioning & Secret Redaction)
 
 #### a. Sự thật (Facts)
-- Tệp mẫu `db.properties.example:3` đang cấu hình:
+- [Tệp mẫu `db.properties.example:3`](../../clinic-infrastructure/src/main/resources/db.properties.example#L3) đang cấu hình:
   `db.url=jdbc:sqlserver://localhost:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=true`
-- Tham số `trustServerCertificate=true` ra lệnh cho JDBC driver **tin tưởng mù quáng mọi chứng chỉ SSL/TLS** do SQL Server gửi về, hoàn toàn không kiểm tra chuỗi CA (Certificate Authority) và không kiểm tra tên miền máy chủ (`hostNameInCertificate`), khiến kết nối đối mặt với nguy cơ tấn công Xen giữa (Man-in-the-Middle - MitM).
-- Yêu cầu bắt buộc của Owner: **TLS phải mã hóa và bắt buộc phải kiểm tra tính hợp lệ của chứng chỉ cùng định danh máy chủ (`encrypt=true; trustServerCertificate=false`), theo nguyên tắc fail-closed.**
+- [Quyết định Owner hiện hành](phase0-deployment-config-tls-decision-proposal.md) không phê duyệt `trustServerCertificate=true`, tắt mã hóa, fallback theo mặc định driver hoặc bypass theo môi trường. Tệp mẫu không phải chính sách triển khai.
+- **Kết quả bắt buộc đã duyệt:** Mã hóa truyền tải; xác thực chứng chỉ và danh tính máy chủ; fail-closed với chứng chỉ không hợp lệ, không được tin cậy, hết hạn hoặc không khớp danh tính. **Cách hiện thực chưa chốt:** `encrypt=true;trustServerCertificate=false` là một cách biểu đạt có thể dùng với SQL Server JDBC; riêng chuỗi tùy chọn này chưa chứng minh kết quả TLS đã được đáp ứng. Cách dựng URL, truststore và xác thực hostname cần được chọn và kiểm chứng riêng.
 
 #### b. Suy luận kỹ thuật (Inferences)
-- Trong môi trường bệnh viện/phòng khám thực tế:
-  - Máy chủ CSDL SQL Server thường sử dụng chứng chỉ số do PKI nội bộ (Enterprise Private CA) cấp phát, hoặc chứng chỉ số tự ký (Self-signed).
-  - Để máy trạm Java Swing (`clinic-desktop.jar`) có thể xác thực được chứng chỉ này khi `trustServerCertificate=false`, JVM trên máy trạm bắt buộc phải được cung cấp **Điểm neo tin cậy (Trust-Anchor)**, tức là chứng chỉ Root CA / Intermediate CA của bệnh viện.
-  - Nếu không có cơ chế cung cấp trust-anchor chuẩn hóa, ứng dụng sẽ bị từ chối kết nối ngay lập tức với lỗi `PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException`.
+- Nếu triển khai chọn CA nội bộ, cần xác định cách cung cấp trust-anchor phù hợp cho runtime/driver được chọn. Không mặc định mọi phòng khám đều dùng CA nội bộ hay chứng chỉ tự ký.
+- Thiếu trust-anchor phù hợp có thể làm xác thực thất bại. Không khẳng định một thông báo lỗi cụ thể sẽ xuất hiện trong mọi runtime; chưa có kiểm thử handshake trong phạm vi tài liệu này.
 
 #### c. Các phương án cung cấp Trust-Anchor (Options for Trust-Anchor Provisioning)
-- **Phương án 7A — Sử dụng JVM System Truststore Mặc định (`cacerts` của Hệ điều hành / Java):**  
-  Quản trị viên hạ tầng cài đặt chứng chỉ Root CA của bệnh viện trực tiếp vào tệp `cacerts` chuẩn của JDK/JRE (`$JAVA_HOME/lib/security/cacerts`) trên từng máy trạm. Chuỗi JDBC URL chỉ cần đặt:  
-  `encrypt=true;trustServerCertificate=false;hostNameInCertificate=db.clinic.local;`  
-  *Ưu điểm:* Chuẩn mực cao nhất của môi trường doanh nghiệp; không cần nhúng đường dẫn hay mật khẩu truststore vào cấu hình ứng dụng; an toàn tuyệt đối.  
-  *Nhược điểm:* Đòi hỏi quyền quản trị viên (Admin/Root) trên máy trạm khi cài đặt môi trường Java ban đầu.
-- **Phương án 7B — Chỉ định Truststore Riêng qua Tham số Tiêu chuẩn của JVM:**  
-  Khởi chạy ứng dụng với các tham số SSL chuẩn của Java:  
-  `java -Djavax.net.ssl.trustStore=/etc/clinic/certs/clinic-truststore.p12 -Djavax.net.ssl.trustStorePassword=... -jar clinic-desktop.jar`  
-  *Ưu điểm:* Không can thiệp vào `cacerts` chung của hệ điều hành; linh hoạt theo từng ứng dụng.  
-  *Nhược điểm:* Mật khẩu truststore có thể hiển thị trong danh sách tiến trình (`ps aux`) trừ khi được bảo vệ.
-- **Phương án 7C — Sử dụng Thuộc tính Cấu hình Riêng của Microsoft SQL Server JDBC Driver:**  
-  Khai báo trực tiếp đường dẫn truststore trong chuỗi kết nối hoặc file properties:  
-  `db.url=jdbc:sqlserver://db.clinic.local:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=false;trustStore=/etc/clinic/certs/clinic-truststore.p12;trustStorePassword=...`  
-  *Ưu điểm:* Cô lập hoàn toàn trong lớp kết nối JDBC của SQL Server, không ảnh hưởng tới các kết nối TLS khác của JVM (ví dụ gọi REST API ngoài nếu có sau này).  
-  *Nhược điểm:* Tham số `trustStorePassword` trở thành một bí mật cấu hình cần phải khử vết (`redact`) trong toàn bộ log, exception và toString của resolver.
+Các ví dụ dưới đây chỉ dùng placeholder; chưa phải lệnh triển khai đã duyệt. Cần kiểm chứng với phiên bản JDK/JDBC, loại truststore và cách cấp bí mật được chọn.
 
-#### d. Yêu cầu Khử vết Bí mật (Secret Redaction Safeguards)
-Bất kể chọn phương án nào, để đảm bảo an ninh thông tin bệnh viện:
-1. **Khử vết chuỗi kết nối và tham số TLS:** Mọi log lỗi, chẩn đoán khởi động và ngoại lệ JDBC ném ra EDT tuyệt đối không được chứa mật khẩu CSDL hoặc `trustStorePassword`.
-2. **Cấm dùng dữ liệu thật trong kiểm thử:** Toàn bộ test tự động chỉ sử dụng các chuỗi giả lập danh định (`synthetic-truststore-marker`, `synthetic-password-marker`).
-3. **Cơ chế chốt chặn (Enforcement Gate) trong Resolver:** Đề xuất bổ sung một validator trong `DatabaseConfigurationResolver`: Nếu phát hiện URL chứa `trustServerCertificate=true` ở profile sản xuất (`production`), resolver lập tức từ chối và cảnh báo vi phạm chính sách an ninh SEC-01.
+- **Phương án 7A — Truststore mặc định của Java/JVM (`cacerts`):**\
+  Quản trị trust-anchor trong truststore của bản phân phối JDK/JRE đang dùng, ví dụ `cacerts` tại `$JAVA_HOME/lib/security/cacerts`. `cacerts` ở đây là truststore của Java/JVM; không đồng nhất nó với OS trust store hoặc giả định cập nhật OS trust store sẽ tự cập nhật Java. Cần kiểm tra cấu hình runtime thực tế. Ví dụ tùy chọn JDBC có thể xem xét:\
+  `encrypt=true;trustServerCertificate=false;hostNameInCertificate=db.clinic.local;`  
+  *Ưu điểm:* Có thể quản trị trust-anchor cùng môi trường Java mà không đặt đường dẫn truststore trong URL ứng dụng.\
+  *Nhược điểm:* Cần quản lý quyền sửa, cập nhật JDK và vòng đời chứng chỉ trên từng máy; không bảo đảm an toàn chỉ nhờ chọn `cacerts`.
+- **Phương án 7B — Truststore riêng qua tham số JVM:**\
+  Ví dụ:\
+  `java -Djavax.net.ssl.trustStore=/etc/clinic/certs/clinic-truststore.p12 -Djavax.net.ssl.trustStorePassword=<synthetic-truststore-marker> -jar clinic-desktop.jar`\
+  *Ưu điểm:* Có thể dùng truststore riêng mà không sửa `cacerts` chung của Java.\
+  *Nhược điểm:* Cần xác định phạm vi ảnh hưởng trong JVM và cách cấp mật khẩu tránh lộ qua dòng lệnh/diagnostic; ví dụ này không phải hướng dẫn cấp secret cho triển khai thực tế.
+- **Phương án 7C — Thuộc tính truststore của SQL Server JDBC:**\
+  Ví dụ URL cần kiểm chứng trước khi triển khai:\
+  `db.url=jdbc:sqlserver://db.clinic.local:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=false;trustStore=/etc/clinic/certs/clinic-truststore.p12;trustStorePassword=<synthetic-truststore-marker>`\
+  *Ưu điểm:* Có thể chỉ định truststore tại cấu hình JDBC thay vì cấu hình JVM chung.\
+  *Nhược điểm:* Cần kiểm chứng phạm vi áp dụng của driver và bảo vệ/khử vết `trustStorePassword` khi URL đi qua resolver, log và exception; không suy ra mức cô lập tuyệt đối.
+
+#### d. Khử vết Bí mật và Đề xuất Kiểm chứng (Secret Redaction & Proposed Verification)
+1. Không đưa mật khẩu CSDL hoặc `trustStorePassword` vào log/chẩn đoán. Bằng chứng hiện có ở mục 2.4 chỉ bao phủ các đường đã nêu; cần kiểm chứng riêng các đường lỗi sau khi chọn cách triển khai.
+2. Kiểm thử tương lai chỉ dùng marker tổng hợp như `synthetic-truststore-marker`, `synthetic-password-marker`; không dùng dữ liệu thật.
+3. Có thể xem xét validation cấu hình trước JDBC handoff; vị trí validator, cách parse và thông báo lỗi chưa chốt. Bất kỳ cách hiện thực nào cũng phải giữ kết quả TLS đã duyệt cho mọi nguồn cấu hình và môi trường được hỗ trợ; không giới hạn chính sách vào một profile `production` tự đặt, không coi validation URL là bằng chứng handshake.
 
 #### e. Đánh đổi và Đề xuất khuyến nghị (Tradeoffs & Recommendation)
-- **Đề xuất (Recommendation):** 
-  - Khuyến nghị **Phương án 7A (Standard JVM Truststore)** làm kênh chính sách tiêu chuẩn cho triển khai phòng khám, kết hợp hỗ trợ **Phương án 7B** qua script khởi chạy.
-  - Trong chuỗi JDBC, bắt buộc chuẩn hóa: `encrypt=true;trustServerCertificate=false;hostNameInCertificate=<FQDN_CUA_MAY_CHU_DB>`.
-  - Nghiêm cấm đưa `trustServerCertificate=true` vào môi trường vận hành thực tế.
+- Đề xuất xem xét **7A**, kết hợp **7B** khi cần truststore riêng; **7C** vẫn là lựa chọn để đánh giá. Chưa chọn phương án nào làm chính sách tiêu chuẩn.
+- `encrypt=true;trustServerCertificate=false` và `hostNameInCertificate=<FQDN_CUA_MAY_CHU_DB>` là ví dụ JDBC để đánh giá; URL, cách xác thực hostname và truststore cụ thể vẫn non-binding. Chọn và kiểm thử riêng để chứng minh mã hóa, xác thực chứng chỉ/danh tính và fail-closed.
+- Không phương án nào được nới lỏng chính sách TLS đã duyệt hoặc sử dụng `trustServerCertificate=true` làm bypass.
 
 ---
 
 ## 4. Danh mục Câu hỏi Trực tiếp Xin Ý kiến Chỉ đạo của Owner (Exact Owner Questions)
 
-Để không tự ý biến các suy luận và khuyến nghị thành chính sách dự án khi chưa có phê duyệt, dưới đây là danh sách **các câu hỏi quyết định cụ thể** kính trình Owner xem xét và phê duyệt chính thức:
+Giữ nguyên bảy câu hỏi gốc dưới đây để Owner xem xét các chi tiết còn lại. Các câu hỏi không mở lại kết quả TLS hay env-over-file per-key đã duyệt. Riêng câu 7, truststore, URL và tham số JDBC cụ thể vẫn là ví dụ chờ chọn cách triển khai; chữ “bắt buộc” trong câu hỏi không có nghĩa chuỗi tùy chọn đó đã được phê duyệt làm cú pháp duy nhất.
 
 ### Câu hỏi 1: Về Giao diện Chỉ định File Cấu hình Ngoài
 > *"Owner có đồng ý phê duyệt việc sử dụng đồng thời cả System Property `-Dclinic.config.file=<path>` và Biến môi trường `CLINIC_DB_CONFIG_FILE=<path>` để chỉ định file properties ngoài cho packaged JAR, với cam kết tuyệt đối không tự động dò tìm ngầm định tại thư mục làm việc (CWD) hay thư mục chứa JAR hay không?"*
@@ -342,30 +342,29 @@ Bất kể chọn phương án nào, để đảm bảo an ninh thông tin bện
 
 ## 5. Nhật ký Thực thi và Đối soát Hướng dẫn (Guidance & Verification Record)
 
-### 5.1. Báo cáo Thực thi RAG (RAG Execution Attempt)
-- **Lệnh thực thi ban đầu:**
-  ```bash
-  /Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'database configuration db.properties DB_URL DB_CONNECTION_STRING TLS truststore packaged jar'
-  ```
-- **Kết quả thực tế / Trạng thái:** Lệnh bị chặn bởi chính sách sandbox của môi trường (`Permission denied for command ... Matches user-configured deny rule`).
-- **Xử lý bù đắp:** Tương tự như các tác vụ đã thực hiện thành công trước đó trong dự án, toàn bộ ngữ cảnh RAG cốt lõi, hợp đồng đã duyệt `PHASE0-PHASE3-REVIEW-AND-TRACKING-DOCS-01`, và các trích đoạn tài liệu nền tảng đã được Orchestrator cung cấp đầy đủ trong task package. Mọi trích dẫn mã nguồn và số dòng đã được xác minh trực tiếp bằng công cụ đọc tệp độc lập trên hệ thống tệp worktree.
+### 5.1. RAG-first — Vòng sửa tài liệu 2026-11-06
 
-### 5.2. Danh sách Tài liệu Hướng dẫn Bắt buộc Đã đọc (Guidance Files Read)
-1. Orchestrator baseline: `docs/PROJECT_CONVENTIONS.md` (cung cấp trong ngữ cảnh task).
-2. `README.md` (ngữ cảnh task và dòng 1-19 tại worktree).
-3. `DOMAIN_ANALYSIS.md` (ngữ cảnh task).
-4. `ERD_DIAGRAM.md` (ngữ cảnh task).
-5. `docs/ke-hoach-trien-khai/phase3-transfer-linked-work-eligibility-review.md` (retrieved passage).
-6. `docs/ke-hoach-trien-khai/phase3-transfer-reason-policy-proposal.md` (retrieved passage).
-7. `docs/ke-hoach-trien-khai/phase3-transfer-domain-invariant-design.md` (retrieved passage).
-8. `docs/ke-hoach-trien-khai/phase3-transfer-queue-allocation-proposal.md` (retrieved passage).
-9. `docs/ke-hoach-trien-khai/phase3-transfer-queue-history-persistence-proposal.md` (retrieved passage).
-10. `docs/ke-hoach-trien-khai/phase0-domain-events-review.md` (retrieved passage).
-11. `docs/ke-hoach-trien-khai/03-model-task-board.md` (đọc trực tiếp worktree).
-12. `docs/ke-hoach-trien-khai/phase0-db-config-resolution-contract.md` (đọc trực tiếp worktree).
-13. `docs/ke-hoach-trien-khai/phase0-db-config-review.md` (đọc trực tiếp worktree).
+Trước khi mở tài liệu repository hoặc chạy `rg`/`grep`, đã thực thi:
 
-### 5.3. Tuân thủ Ranh giới và Phạm vi Tệp (Scope & Boundary Compliance)
-- **Tệp duy nhất được tạo mới:** `docs/ke-hoach-trien-khai/phase0-db-config-remaining-decisions-proposal.md`.
-- **Không chỉnh sửa:** Không có bất kỳ tệp mã nguồn Java, test, file cấu hình, POM, script hay migration nào bị thay đổi. Script `run-app.sh` được bảo toàn nguyên vẹn.
-- **An toàn dữ liệu:** Không truy cập cơ sở dữ liệu thật; không sử dụng thông tin bệnh nhân hay thông tin định danh thật. Mọi ví dụ và kiểm thử tham chiếu đều sử dụng dữ liệu giả lập danh định (`synthetic`).
+```bash
+/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py "Phase 0 cấu hình DB TLS JDBC truststore cacerts env-over-file remaining decisions proposal portable citations" --limit 5
+```
+
+Lệnh thoát **1**, `sqlite3.OperationalError: unable to open database file`, tại bước mở index/configuration của Orchestrator (`PRAGMA journal_mode=WAL`); không trả về excerpt mới. Dùng các retrieved excerpts được cung cấp trong task làm hướng dẫn chính, sau đó đối chiếu quyết định Owner và source hiện tại. Không thay đổi index/cache, không né sandbox hoặc kết nối clinic DB.
+
+### 5.2. Tài liệu Hướng dẫn Đã đọc trong Vòng sửa này
+
+- Orchestrator baseline `docs/PROJECT_CONVENTIONS.md` (nội dung được cung cấp; không có bản trong checkout).
+- [README.md](../../README.md); [DOMAIN_ANALYSIS.md](../../DOMAIN_ANALYSIS.md) và [ERD_DIAGRAM.md](../../ERD_DIAGRAM.md) (hai tài liệu sau: phần hướng dẫn được cung cấp, đã bị cắt theo giới hạn task).
+- Các retrieved passages được cung cấp: [proposal hiện tại](phase0-db-config-remaining-decisions-proposal.md), [linked-work eligibility](phase3-transfer-linked-work-eligibility-review.md), [transfer-reason proposal](phase3-transfer-reason-policy-proposal.md), [domain-invariant design](phase3-transfer-domain-invariant-design.md), [queue-allocation proposal](phase3-transfer-queue-allocation-proposal.md).
+- Đọc trực tiếp: [index kế hoạch](README.md) (phần đầu), [DB config review](phase0-db-config-review.md), [resolution contract](phase0-db-config-resolution-contract.md), [Owner deployment/TLS decisions](phase0-deployment-config-tls-decision-proposal.md), [model task board](03-model-task-board.md) (các đoạn quyết định/gate liên quan).
+- Đã kiểm tra hướng dẫn tại các thư mục cha và thư mục chứa file: không tìm thấy `AGENTS.md`; không có `CONTRIBUTING.md`, `docs/DEVELOPMENT_CONVENTIONS.md` hay `ARCHITECTURE.md` trong danh sách file hướng dẫn checkout.
+
+Áp dụng contract `PHASE0-PHASE3-DOC-REVIEW-CORRECTIONS-02`: chỉ sửa proposal này; giữ các quyết định triển khai non-binding, env-over-file per-key đã duyệt, `SEC-01` OPEN và downstream DEFAULT-DENY.
+
+### 5.3. Phạm vi và Kiểm định
+
+- Chỉ sửa [proposal này](phase0-db-config-remaining-decisions-proposal.md). Không tạo file; không đổi source, tests, schema, permission, audit, runtime, task board hay `run-app.sh`. Không push, PR hoặc merge.
+- Không chạy build/application tests hay SQL; đây là sửa tài liệu. Chỉ đọc source/tests mẫu với dữ liệu tổng hợp, không mở config bí mật hoặc truy cập dữ liệu bệnh nhân.
+- Kiểm định tài liệu: `git diff --check`; Python read-only kiểm tra local Markdown targets và line-anchor bounds trong feature checkout, không có file URI/worker path, đối chiếu nguyên văn bảy câu hỏi Owner với `HEAD`, và kiểm tra `git status --short` chỉ có file allowlist.
+- Kết quả: `git diff --check` exit 0, không có diagnostic; Python exit 0 — 45 liên kết tương đối đều có target tồn tại, 26 line anchors hợp lệ, bảy câu hỏi Owner không đổi, không có file URI/worker path hay nhãn CWE bị loại bỏ. Scope chỉ có file allowlist; chính sách TLS, env-over-file per-key, trạng thái non-binding và `SEC-01` OPEN/default-deny được giữ. Đây là kiểm định tài liệu, không phải nghiệm thu runtime/TLS handshake.
