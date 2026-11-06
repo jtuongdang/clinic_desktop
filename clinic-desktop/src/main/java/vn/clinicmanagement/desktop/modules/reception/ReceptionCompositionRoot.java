@@ -1,7 +1,10 @@
 package vn.clinicmanagement.desktop.modules.reception;
 
 import vn.clinicmanagement.application.authorization.AuthorizationService;
+import vn.clinicmanagement.application.common.CommandHandler;
+import vn.clinicmanagement.application.common.QueryHandler;
 import vn.clinicmanagement.application.reception.*;
+import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.infrastructure.persistence.*;
 import vn.clinicmanagement.infrastructure.persistence.facility.PhongKhamRepositoryImpl;
@@ -37,7 +40,9 @@ final class ReceptionCompositionRoot {
                 new GetActiveReceptionRoomsHandler(rooms, authorization, audit));
     }
 
-    record Services(PhongKhamRepositoryImpl rooms, RegisterPatientHandler registerPatient,
-                    SearchPatientsHandler searchPatients, GetReceptionQueueHandler getQueue,
-                    GetActiveReceptionRoomsHandler getActiveRooms) {}
+    record Services(PhongKhamRepositoryImpl rooms,
+                    CommandHandler<RegisterPatientCommand, RegistrationReceipt> registerPatient,
+                    QueryHandler<SearchPatientsQuery, java.util.List<PatientSearchItem>> searchPatients,
+                    QueryHandler<GetReceptionQueueQuery, ReceptionQueueSnapshot> getQueue,
+                    QueryHandler<GetActiveReceptionRoomsQuery, java.util.List<PhongKham>> getActiveRooms) {}
 }
