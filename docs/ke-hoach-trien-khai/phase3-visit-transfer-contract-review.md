@@ -1,6 +1,70 @@
 # VIS-TRANSFER-REVIEW-01 — Visit transfer workflow contract review
 
-**Status:** Report-only source review. Snapshot: 06/11/2026. No application code, tests, schema, grants, policy, database, or patient data changed or accessed.
+**Status:** Documentation-only RECON-05 contract addendum, 2026-11-06; prior source-review snapshot retained below. No application code, tests, schema, grants, runtime configuration, database or patient data changed or accessed.
+
+## RECON-05 addendum — 2026-11-06 (current approved contract)
+
+**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06, following RAG-grounded proposals. This addendum controls over the historical snapshots below and carries forward `VIS-TRANSFER-OWNER-DECISION-RECON-04` without reopening its approved rules.
+
+### Approved business reasons and unchanged authorization boundaries
+
+A transfer requires exactly one of these six business reason codes; the short note remains optional:
+
+| Business reason code | Permitted actor roles |
+|---|---|
+| `RECEPTION_TRIAGE_CORRECTION` | `RECEPTIONIST` |
+| `PATIENT_SPECIALTY_PREFERENCE` | `RECEPTIONIST`, `DOCTOR` |
+| `CLINIC_LOAD_BALANCING` | `RECEPTIONIST`, `DOCTOR` |
+| `CLINICAL_SPECIALTY_REFERRAL` | `DOCTOR` |
+| `DIAGNOSTIC_EQUIPMENT_NEED` | `DOCTOR` |
+| `CLINICIAN_EMERGENCY_HANDOFF` | `DOCTOR` |
+
+These codes are business fields, never `AuditReasonCode` or `NhatKyHeThong.maLyDo`. Neither the business reason nor the free-text note may be placed in those auth/authorization reason fields. Do not reuse clinical `lyDoKham`.
+
+The reason-role mapping is an additional restriction, not a grant or scope exception. For every reason, source and destination facility must equal the session facility. Only `RECEPTIONIST` may change department within that facility; `DOCTOR` must keep source and destination department equal to the selected session department. This includes `PATIENT_SPECIALTY_PREFERENCE`, load balancing, clinical referral and emergency handoff; their labels do not permit a DOCTOR cross-department transfer. All other roles remain denied. Transfer grants no destination patient, history or queue reads.
+
+### RECON-04 safeguards retained
+
+- `RECEPTIONIST`: only `CHO_KHAM`; `DOCTOR`: only `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`. Deny final/completed, cancelled, soft-deleted and EMR-locked visits.
+- Require an active destination room belonging to the destination department. Allocate a new destination queue number; preserve priority without auto-promotion.
+- Preserve visit status, clinical `ngayKham` and existing examination timestamps; queue allocation must not reset or rewrite the clinical timeline.
+- Retain linked service orders, prescriptions, results, invoices and financial records. Do not automatically mutate/cancel them, change billing or create duplicate charges. Outstanding work may follow only when safety, performing unit and responsibility remain intact; otherwise block until completion or explicit safe handoff. Issued prescriptions, confirmed results and posted financial transactions remain immutable; adjustments require their separately authorized, reconciled and audited workflows.
+- Retain transaction consistency, optimistic concurrency, domain invariants and exception-path acceptance. Cancellation and DOCTOR-only vitals-write boundaries remain unchanged.
+
+### Queue allocation decisions
+
+`queueDate` is separate from clinical `ngayKham`. Registration and transfer share one number stream per `(roomId, queueDate)`. Never reuse any committed number; visible gaps are allowed. Capture one SQL Server DB UTC instant at transaction start and convert that same instant to an `Asia/Ho_Chi_Minh` date for `queueDate`. Derive `queueDate` only from that captured instant, including transactions crossing clinic-local midnight. Technical/audit time remains UTC.
+
+These decisions do not select a schema, persistence shape, counter/ledger mechanism, migration/cutover or legacy-data behavior.
+
+### Immutable history, audit and retry outcomes
+
+- Require a dedicated immutable transfer-history record **and** a successful security audit event in the same DB transaction as the transfer mutation and queue allocation. All required writes commit together or fail/roll back together; audit-only is no longer an option.
+- A future audit action value may be `VISIT_TRANSFERRED`; adding an enum value alone does not wire or emit an event. Business reason/note storage remains separate from auth/authorization reason codes.
+- Same key + same canonical payload after commit: reauthorize the actor before returning only the stored operation receipt. Do not repeat mutation, allocation, history, success audit or other side effects.
+- Same key + different payload: return a conflict without writes.
+- On timeout, retry with the same key and resolve whether the original transaction committed or rolled back before proceeding. Timeout alone never proves rollback; do not treat it as permission for a new operation.
+
+### Remaining decisions and evidence — no answers inferred
+
+1. **Optional note:** length, normalization, privacy safeguards and exact storage field.
+2. **Persistence and cutover:** shape/DDL for `queueDate`, the shared allocator, retained allocations, immutable history and idempotency receipts; counter/ledger implementation, migration, cutover and legacy semantics.
+3. **Idempotency details:** key scope/lifetime; canonical payload field list and normalization; exact receipt data; concurrent duplicate waiting, wait deadline, commit-resolution mechanism and indeterminate response; reservation of failed/denied attempts. Approved replay/conflict/timeout outcomes above are fixed.
+4. **Linked work and acceptance:** trustworthy eligibility readers, linked-work/handoff evidence and workflow acceptance; transfer-specific security acceptance. Reason codes do not prove linked-work safety.
+
+**SEC-01 remains OPEN; runtime transfer remains default-deny.** No runtime enablement, permissions/grants, destination reads, history-reader grant, billing changes, note policy or migration is authorized. Every required guard, persistence, audit, concurrency, rollback and workflow acceptance must pass before a separately authorized runtime implementation can be enabled. Future acceptance uses synthetic data and must cover the six-code role matrix, unchanged status/scope/room and linked-work invariants, shared registration/transfer allocation, local-date boundary, committed-number non-reuse, atomic rollback, authorized stored-receipt replay, write-free payload conflict and timeout/duplicate commit resolution.
+
+### RECON-05 guidance, retrieval and validation record — 2026-11-06
+
+- Read the task-supplied guidance before editing: `docs/PROJECT_CONVENTIONS.md` (Orchestrator baseline), `README.md`, and supplied excerpts of `DOMAIN_ANALYSIS.md` and `ERD_DIAGRAM.md`.
+- Read supplied retrieved excerpts under `docs/ke-hoach-trien-khai/`: `phase3-transfer-linked-work-eligibility-review.md`, `phase3-transfer-reason-policy-proposal.md`, `phase3-transfer-queue-allocation-proposal.md`, `phase3-transfer-queue-history-persistence-proposal.md`, and `phase3-visit-transfer-contract-review.md`. Read the supplied approved RECON-05 contract, retaining RECON-04.
+- **RAG first:** before any local repository file reads, executed `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'VIS-TRANSFER-OWNER-DECISION-RECON-05 RECON-04 transfer reason queueDate immutable history audit idempotency receipt'`. Exit 1: `sqlite3.OperationalError: unable to open database file` at `PRAGMA journal_mode=WAL`; no new excerpts returned. Used the task-supplied RAG excerpts and Owner contract as fallback. No index/cache workaround or clinic DB access.
+- Current local content was read only from this review, [decision-gap memo](phase3-visit-transfer-decision-gaps.md) and [lifecycle owner decisions](phase3-visit-lifecycle-owner-decisions.md). Existing implementation patterns were reviewed through their retained evidence maps, not by opening non-allowlisted source files. Prior validation claims below are historical, not current test results.
+- Validation: `git diff --check` passed (exit 0, no output). A read-only inline `python3` check passed for the exact six-code role matrix, RECON-04/05 fact/open-decision/gate coverage, identical current addenda, preservation of all original snapshot bodies against `git show HEAD:<allowlisted path>`, exactly three allowlisted changed paths and no untracked files. No runtime tests are added or run because this task changes documentation only. Remaining implementation acceptance above is not claimed as passed.
+
+## Historical transfer reconciliation and prior review record — through RECON-04
+
+The transfer reconciliation below is a historical snapshot superseded by RECON-05 on 2026-11-06. Its source inventory, guidance/validation claims and acceptance proposals are preserved. Transfer references below to “current”, “still open” or choices awaiting approval describe that dated snapshot only; the RECON-05 addendum above controls. Unrelated lifecycle decisions/proposals remain unchanged and are not settled by RECON-05. The old source findings have not been revalidated against implementation files for this documentation-only task.
 
 **Prior reconciliation snapshot — 06/11/2026:** `VIS-TRANSFER-OWNER-DECISION-RECON-03` superseded the pending-choice language in the original review snapshot. Its six open choices are retained as a dated historical snapshot; the source inventory remains a review snapshot.
 
