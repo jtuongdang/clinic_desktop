@@ -7,7 +7,7 @@
 
 ## Tóm tắt
 
-Ba Value Object hiện có unit test nhưng chưa được consumer production nào dùng. Báo cáo source audit xác nhận các lớp hiện dùng `LocalDate`, `String` và `BigDecimal` trực tiếp; do đó đổi model sang Value Object sẽ tác động Application validation, JDBC mapping, form và tìm kiếm, chứ không chỉ thay kiểu trong Domain. Cần chốt quy tắc nghiệp vụ trước khi tích hợp.
+Source audit ban đầu ghi nhận ba Value Object chưa có consumer production. Trạng thái hiện tại đã đổi: `DateRange` được dùng để kiểm tra interval BHYT ở handler tiếp đón; `PhoneNumber` kiểm tra input tiếp đón, còn việc lưu giá trị đã làm sạch đang được hoàn thiện trong `PLAT-VO-PHONE-CANONICAL-01`. `Money` chưa có consumer production vì điểm làm tròn và field scope của invoice chưa chốt. Chi tiết source snapshot và validation evidence được tách tại [`phase0-value-object-domain-review.md`](phase0-value-object-domain-review.md).
 
 **Nguyên tắc triển khai:** quyết định và kiểm thử theo từng loại dữ liệu; không chuyển đổi hàng loạt model trong một task. Owner đã chốt các quy tắc bên dưới. Chưa tích hợp consumer mới, thay schema hoặc mở workflow tài chính; các thay đổi đó vẫn cần task và acceptance riêng.
 
