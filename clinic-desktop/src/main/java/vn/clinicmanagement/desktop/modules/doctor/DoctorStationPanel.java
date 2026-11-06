@@ -42,6 +42,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
     private DoctorClinicalForm clinicalForm;
     private DoctorHistoryPanel historyPanel;
     private AuthorizationContext observedSession;
+    private volatile AuthorizationContext queueAuthorization;
     private ReceptionQueueItem selectedItem;
     private long requestGeneration;
     private SwingWorker<List<ReceptionQueueItem>, Void> activeQueueWorker;
@@ -193,6 +194,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
                 }
                 try {
                     queueSidebar.setQueue(get(), businessDate);
+                    queueAuthorization = authorization;
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     queueSidebar.showUnavailable();
@@ -232,6 +234,16 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
             SwingUtilities.invokeLater(() -> onPatientChanged(item));
             return;
         }
+        AuthorizationContext authorization = currentAuthorizationContext();
+        AuditActorContext auditActor = currentAuditActorContext();
+        if (item != null && (authorization == null
+                || !authorization.isValid()
+                || !authorization.equals(queueAuthorization)
+                || !matchesActor(authorization, auditActor))) {
+            handleSessionChange();
+            return;
+        }
+
         cancelActiveHistoryWorker();
         long generation = ++requestGeneration;
         selectedItem = item;
@@ -239,14 +251,6 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
         actionBar.updatePatient(item);
         clinicalForm.updatePatient(item);
         if (item == null) return;
-
-        AuthorizationContext authorization = currentAuthorizationContext();
-        AuditActorContext auditActor = currentAuditActorContext();
-        observedSession = authorization;
-        if (authorization == null || !matchesActor(authorization, auditActor)) {
-            handleSessionChange();
-            return;
-        }
 
         historyPanel.showLoading();
         GetPatientHistoryQuery query = new GetPatientHistoryQuery(item.patientId(), authorization, auditActor);
@@ -331,6 +335,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
     }
 
     private synchronized void cancelActiveWorkers() {
+        queueAuthorization = null;
         requestGeneration++;
         if (activeQueueWorker != null) {
             if (!activeQueueWorker.isDone()) {

@@ -2,6 +2,7 @@ package vn.clinicmanagement.desktop.modules.doctor;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.patienthistory.GetPatientHistoryQuery;
 import vn.clinicmanagement.application.reception.GetDoctorQueueQuery;
@@ -15,6 +16,7 @@ import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.Clock;
 import java.time.Duration;
@@ -78,12 +80,142 @@ class DoctorStationPanelTest {
         SwingUtilities.invokeAndWait(() -> queueTable.setRowSelectionInterval(0, 0));
         await(() -> historyRowCount() == 1);
         assertEquals(501, historyQuery.get().patientId());
+        assertEquals(loadedQuery.authorizationContext(), historyQuery.get().authorizationContext());
+        assertTrue(containsText(panel, "SYN-501"));
+        assertNotNull(statusLabel("101"));
         assertTrue(historyRanOffEdt.get());
         assertEquals("Synthetic approved history", historyTable().getValueAt(0, 1));
         assertFalse(historyTable().getModel().isCellEditable(0, 1));
 
         SwingUtilities.invokeAndWait(queueTable::clearSelection);
         await(() -> historyRowCount() == 0);
+    }
+
+    @Test
+    void staleRowSelectionBeforeSessionCleanupClearsProtectedDataAndReloadsCurrentScope() throws Exception {
+        assertStaleSelectionRejected(702, 12, 22);
+    }
+
+    @Test
+    void staleRowSelectionWithSameActorRoleAndScopeButNewSessionUuidIsRejected() throws Exception {
+        assertStaleSelectionRejected(701, 11, 21);
+    }
+
+    private void assertStaleSelectionRejected(int employeeId, int facilityId, int departmentId) throws Exception {
+        lifecycle = activeLifecycle();
+        AuthorizationContext original = lifecycle.currentAuthorizationContext().orElseThrow();
+        CountDownLatch reloadStarted = new CountDownLatch(1);
+        CountDownLatch releaseReload = new CountDownLatch(1);
+        AtomicReference<GetDoctorQueueQuery> reloadQuery = new AtomicReference<>();
+        AtomicReference<GetPatientHistoryQuery> historyQuery = new AtomicReference<>();
+        AtomicInteger historyReads = new AtomicInteger();
+        panel = new DoctorStationPanel(lifecycle, query -> {
+            if (query.authorizationContext().equals(original)) {
+                return Result.success(List.of(queueItem(101, 501, "SYN-501"),
+                        queueItem(102, 502, "SYN-502")));
+            }
+            reloadQuery.set(query);
+            reloadStarted.countDown();
+            awaitLatch(releaseReload);
+            return Result.success(List.of(queueItem(201, 601, "SYN-601")));
+        }, query -> {
+            historyQuery.set(query);
+            historyReads.incrementAndGet();
+            return Result.success(query.patientId() == 501
+                    ? List.of(history(501, "Previously displayed synthetic history")) : List.of());
+        });
+        SwingUtilities.invokeAndWait(panel::onShow);
+        await(() -> queueTable().getRowCount() == 2);
+        SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
+        await(() -> historyRowCount() == 1);
+        AtomicBoolean staleSummaryShown = new AtomicBoolean();
+        AtomicReference<AuthorizationContext> replacement = new AtomicReference<>();
+
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                watchForPatientSummary(panel, "SYN-502", staleSummaryShown);
+                // Hold listener cleanup until after selection, in one EDT turn so the timer cannot intervene.
+                lifecycle.removeSessionListener(panel);
+                try {
+                    lifecycle.startSession(employeeId, "synthetic-replacement", "Synthetic Replacement",
+                            new RoleChoice(42, "DOCTOR", "Synthetic Doctor"),
+                            new WorkScopeChoice(facilityId, "Synthetic Facility", departmentId, "Synthetic Department"),
+                            "00000000-0000-0000-0000-000000000002");
+                    replacement.set(lifecycle.currentAuthorizationContext().orElseThrow());
+                    assertNotEquals(original.sessionId(), replacement.get().sessionId());
+                    if (employeeId == original.employeeId()) {
+                        assertEquals(new AuthorizationContext(original.employeeId(), original.roleId(),
+                                original.roleCode(), original.facilityId(), original.departmentId(),
+                                replacement.get().sessionId()), replacement.get());
+                    }
+                    queueTable().setRowSelectionInterval(1, 1);
+                    assertEquals(0, queueTable().getRowCount());
+                    assertEquals(0, historyRowCount());
+                    assertNotNull(statusLabel("Chưa chọn người bệnh."));
+                    assertFalse(containsText(panel, "SYN-501"));
+                    assertFalse(containsText(panel, "SYN-502"));
+                    assertFalse(containsText(panel, "Lượt khám 102"));
+                    assertNull(statusLabel("101"));
+                    assertNull(statusLabel("102"));
+                } finally {
+                    lifecycle.addSessionListener(panel);
+                }
+            });
+            assertTrue(reloadStarted.await(2, TimeUnit.SECONDS));
+            assertFalse(staleSummaryShown.get(), "Stale patient details must never be assigned to a summary");
+            assertEquals(1, historyReads.get(), "Rejected selection must not invoke historyReader");
+            assertEquals(replacement.get(), reloadQuery.get().authorizationContext());
+            assertEquals(employeeId, reloadQuery.get().auditActorContext().employeeId());
+            assertEquals(facilityId, reloadQuery.get().auditActorContext().facilityId());
+            assertEquals(departmentId, reloadQuery.get().auditActorContext().departmentId());
+        } finally {
+            releaseReload.countDown();
+        }
+
+        await(() -> queueTable().getRowCount() == 1);
+        SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
+        await(() -> historyReads.get() == 2);
+        assertEquals(601, historyQuery.get().patientId());
+        assertEquals(replacement.get(), historyQuery.get().authorizationContext());
+    }
+
+    @Test
+    void staleSelectionDuringRefreshHasNoProvenanceAndCannotDisplayOrQueryPatient() throws Exception {
+        lifecycle = activeLifecycle();
+        ReceptionQueueItem staleItem = queueItem(102, 502, "SYN-502");
+        AtomicInteger queueReads = new AtomicInteger();
+        AtomicInteger historyReads = new AtomicInteger();
+        CountDownLatch releaseReload = new CountDownLatch(1);
+        panel = new DoctorStationPanel(lifecycle, query -> {
+            if (queueReads.incrementAndGet() > 1) awaitLatch(releaseReload);
+            return Result.success(List.of(staleItem));
+        }, query -> {
+            historyReads.incrementAndGet();
+            return Result.success(List.of());
+        });
+        SwingUtilities.invokeAndWait(panel::onShow);
+        await(() -> queueTable().getRowCount() == 1);
+        AtomicBoolean staleSummaryShown = new AtomicBoolean();
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                watchForPatientSummary(panel, "SYN-502", staleSummaryShown);
+                panel.refreshData();
+                // Replay an old synthetic row event while the replacement queue is still loading.
+                ((DefaultTableModel) queueTable().getModel()).addRow(new Object[]{staleItem, "Q-102", "CHO_KHAM"});
+                queueTable().setRowSelectionInterval(0, 0);
+                assertEquals(0, queueTable().getRowCount());
+                assertEquals(0, historyRowCount());
+                assertNotNull(statusLabel("Chưa chọn người bệnh."));
+                assertNull(statusLabel("102"));
+            });
+            assertFalse(staleSummaryShown.get());
+            assertEquals(0, historyReads.get());
+        } finally {
+            releaseReload.countDown();
+        }
+        await(() -> queueTable().getRowCount() == 1);
+        SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
+        await(() -> historyReads.get() == 1);
     }
 
     @Test
@@ -391,5 +523,16 @@ class DoctorStationPanelTest {
             if (component instanceof Container child && containsText(child, text)) return true;
         }
         return false;
+    }
+
+    private static void watchForPatientSummary(Container container, String patientCode, AtomicBoolean shown) {
+        for (Component component : container.getComponents()) {
+            if (component instanceof JLabel label) {
+                label.addPropertyChangeListener("text", event -> {
+                    if (event.getNewValue() instanceof String text && text.contains(patientCode)) shown.set(true);
+                });
+            }
+            if (component instanceof Container child) watchForPatientSummary(child, patientCode, shown);
+        }
     }
 }
