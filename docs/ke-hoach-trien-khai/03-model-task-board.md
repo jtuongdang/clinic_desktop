@@ -16,6 +16,14 @@ Owner đã xác nhận phone optional/validate-when-entered/canonicalize separat
 
 Owner đã phê duyệt hợp đồng `a43850af-4577-4ce7-9fc8-48f0f4f8497c` ("Owner-approved PLAT-EVENT-01 deferral until a concrete consumer"), chọn Phương án A: hoãn generic wiring của domain event foundation cho tới khi có consumer/use case cụ thể được phê duyệt. `PLAT-EVENT-01` được chuyển sang trạng thái `[D] Deferred by Owner` (không complete, không generically blocked). Các quyết định về commit timing (pre- vs post-commit), retry, outbox, privacy/minimization và idempotency theo từng consumer vẫn chưa quyết định cho tới khi có consumer thật. Bằng chứng kiểm thử nền tảng hiện có (UTC metadata trong `PLAT-EVENT-UTC-01` và synchronous publisher trong `PLAT-EVENT-PUBLISHER-01`) được giữ nguyên trung thực; không bổ sung implementation, consumer mới, retry, outbox, audit mapping, grant hay runtime enablement; `SEC-01` giữ nguyên OPEN/default-deny.
 
+## Owner-approved clinicDb and worker test boundary — 06/11/2026
+
+Theo contract được Owner phê duyệt `18847587-233a-4f02-99cd-13e1eaf0736a`, `clinicDb` chỉ dành cho chạy desktop bằng `run-app.sh`, manual visual smoke và experiential entry. Tất cả automated tests/CI của mọi worker agent tuyệt đối không kết nối hoặc ghi vào `clinicDb`; default Maven tests/verify tiếp tục chỉ dùng in-memory/synthetic data. Giữ nguyên negative assertion/target guard từ chối `clinicDb` trong SQL fixture `NhanVienRepositorySqlServerTest`.
+
+SQL Server opt-in acceptance chỉ được dùng database được chọn tường minh có tên `clinic_test_*` hoặc `clinic_orchestrator_review_*` và synthetic fixtures. Sau test chỉ xóa rows/temp objects do chính lần chạy đó tạo; chỉ drop database nếu test run đó tự tạo riêng làm disposable target. Không drop/truncate `clinicDb` hoặc database test shared đã tồn tại trước đó. Các SQL acceptance entries bên dưới là evidence riêng trên synthetic catalogs, không thuộc default Maven baseline và không nhắm `clinicDb`. Owner báo `clinicDb` đã có V1–V11; đây là thông tin do Owner cung cấp, chưa được xác minh độc lập. Quy tắc này không đổi evidence lịch sử hoặc trạng thái gate: `SEC-01` vẫn `[~] In progress` như đã ghi trong task tương ứng.
+
+Các task visual smoke kiểm tra trên thiết kế Desktop hiện có. Thay đổi bố cục, màu sắc hoặc thành phần giao diện cần yêu cầu cụ thể từ Owner. [Hướng dẫn chạy Desktop trên clinicDb](phase1-doctor-ui-visual-smoke-runbook.md#3-launch-and-authentication-smoke-procedure)
+
 ## Board
 
 | Task ID | Phase · model family | Task cụ thể | Dependency | Status | Evidence / blocker |

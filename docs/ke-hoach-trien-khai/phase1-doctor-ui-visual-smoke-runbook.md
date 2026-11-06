@@ -1,10 +1,15 @@
 # Phase 1 — Doctor UI Visual Smoke Runbook (Synthetic Data)
 
-**Document Status:** Manual visual smoke verification runbook for synthetic test data only.
+**Document Status:** Manual visual smoke verification runbook for synthetic test data on Owner-designated local `clinicDb`.
 
-**Execution Disclaimer:** This document provides operational verification instructions for an operator. It does not claim that the smoke test has been executed in this environment. Headless verification (`mvn -Djava.awt.headless=true clean verify`) runs off-screen and does not constitute visual Swing UI observation ([`docs/OPERATIONS_RUNBOOK.md#L27,L89-91`](../OPERATIONS_RUNBOOK.md#L27), [`docs/ke-hoach-trien-khai/phase1-tiensuben-scope-contract.md#L5-L6,L30,L53`](phase1-tiensuben-scope-contract.md#L5)).
+**Execution Disclaimer:** This document provides operational verification instructions for an operator. It does not claim that the smoke test has been executed in this environment. Headless verification (`mvn -Djava.awt.headless=true clean verify`) runs off-screen and does not constitute visual Swing UI observation ([`docs/OPERATIONS_RUNBOOK.md#L27,L89-91`](../OPERATIONS_RUNBOOK.md#L27), [`docs/ke-hoach-trien-khai/phase1-tiensuben-scope-contract.md#L5-L6,L30,L53`](phase1-tiensuben-scope-contract.md#L5)). Record actual observations in the [SEC-01 baseline checklist](phase2-sec01-baseline-acceptance.md) when checking security behavior.
 
-**Safety & Data Boundaries:** Synthetic data only. Never inspect, expose, or record real credentials or secrets ([`docs/PROJECT_CONVENTIONS.md#L112-L115`](../PROJECT_CONVENTIONS.md#L112)). Never connect to production databases or `clinicDb` ([`docs/OPERATIONS_RUNBOOK.md#L16,L57-58`](../OPERATIONS_RUNBOOK.md#L16)). Do not create or drop databases as part of this runbook ([`docs/ke-hoach-trien-khai/phase1-tiensuben-scope-contract.md#L35,L53`](phase1-tiensuben-scope-contract.md#L35)).
+**Safety & Data Boundaries:**
+- **Manual Visual Smoke Target:** Under approved Owner contract `18847587-233a-4f02-99cd-13e1eaf0736a`, manual visual smoke testing is authorized to use the Owner-designated local database `clinicDb` at `localhost:1433`.
+- **Automated Test Prohibition:** Automated unit/integration tests and CI/CD pipelines (codex-local, copilot-cli, antigravity-cli) are STRICTLY PROHIBITED from connecting to or modifying `clinicDb`. Automated tests remain in-memory or restricted to opt-in `clinic_test_*` / `clinic_orchestrator_review_*` synthetic databases with explicit `clinicDb` denial guards ([`phase0-employee-sqlserver-local-test-path-review.md#L256-L265`](phase0-employee-sqlserver-local-test-path-review.md#L256)).
+- **Synthetic Fixtures Only:** Synthetic data only. Never use real patient data or production databases ([Operations runbook](../OPERATIONS_RUNBOOK.md#3-database-configuration-and-secret-handling)).
+- **Database Immutability:** Do not create, drop, or truncate `clinicDb` or pre-existing databases. Do not run migrations during smoke testing ([`docs/ke-hoach-trien-khai/phase1-tiensuben-scope-contract.md#L35,L53`](phase1-tiensuben-scope-contract.md#L35)).
+- **Credential Protection:** Never inspect, expose, or commit real credentials or secrets ([Operations runbook](../OPERATIONS_RUNBOOK.md#3-database-configuration-and-secret-handling)).
 
 ---
 
@@ -12,8 +17,8 @@
 
 This runbook defines the step-by-step manual smoke verification procedure for the Doctor Station user interface ([`DoctorStationPanel`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java)) within the Clinic Desktop application.
 
-### Verified Capabilities in Scope
-1. **Launch & Authentication Prerequisites:** Starting the packaged desktop application with externalized environment configuration and establishing an authenticated `DOCTOR` session bound to an exact synthetic facility and department pair.
+### Capabilities to verify
+1. **Launch & Authentication Prerequisites:** Building the desktop classes, configuring `DB_URL` pointing explicitly to `clinicDb` on `localhost:1433`, launching via `run-app.sh`, and establishing an authenticated `DOCTOR` session bound to an exact synthetic facility and department pair.
 2. **Today's Scoped Team Queue:** Verifying the department-level team queue displays only active encounters for the current business date and exact session scope, constrained strictly to the three approved active statuses: `CHO_KHAM`, `DANG_KHAM`, and `CHO_CLS`.
 3. **Queue Invariant & Ordering Checks:** Verifying exclusion of cancelled visits (`DA_HUY`), completed visits (`DA_KHAM`, `KET_LUAN`, `HOAN_THANH`), visits from other dates/departments, and soft-deleted records.
 4. **Patient Selection & Bound ID Handling:** Selecting queue rows to bind persisted IDs (`patientId`, `visitId`) without text parsing or DTO inference.
@@ -24,6 +29,7 @@ This runbook defines the step-by-step manual smoke verification procedure for th
 9. **Session Lock & Logout Clearing:** Validating synchronous clearing of protected queue and history data on session lock (idle/absolute) and complete disposal on logout.
 
 ### Governing Documents & References
+- **Owner Separation Contract:** Approved contract `18847587-233a-4f02-99cd-13e1eaf0736a` (Owner-approved clinicDb runtime and synthetic-only worker test separation; [`docs/ke-hoach-trien-khai/phase0-employee-sqlserver-local-test-path-review.md#L256-L265`](phase0-employee-sqlserver-local-test-path-review.md#L256))
 - **Task Contract:** `Approved contract v1: PAT-DOCTOR-UI-SMOKE-RUNBOOK-01 Contract`
 - **UI Integration Contract:** [`docs/ke-hoach-trien-khai/phase1-doctor-history-ui-contract.md`](phase1-doctor-history-ui-contract.md)
 - **Scope Contract:** [`docs/ke-hoach-trien-khai/phase1-tiensuben-scope-contract.md`](phase1-tiensuben-scope-contract.md)
@@ -35,31 +41,50 @@ This runbook defines the step-by-step manual smoke verification procedure for th
 
 ## 2. Prerequisites and Unverified Environmental Assumptions
 
-### 2.1 Tracked and Verified Repository Prerequisites
+### 2.1 Build and launcher prerequisites
 - **Java Development Kit:** JDK 17 ([`pom.xml#L27-L35`](../../pom.xml#L27)).
 - **Build Artifact:** Packaged desktop shaded JAR built using:
   ```bash
-  mvn -pl clinic-desktop -am package
+  mvn -pl clinic-desktop -am -DskipTests package
   ```
   Expected output artifact: `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` ([`README.md#L16,L26`](../../README.md#L16), [`clinic-desktop/pom.xml#L80-L100`](../../clinic-desktop/pom.xml#L80)).
-- **Database Schema Level:** SQL Server migrations applied up to version V10 ([`V10__TienSuBenh_Scope.sql`](../../clinic-infrastructure/src/main/resources/migrations/V10__TienSuBenh_Scope.sql), [`FreshDatabaseMigrationSqlServerTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/FreshDatabaseMigrationSqlServerTest.java)).
+- **Application Launcher:** `run-app.sh` starts the desktop JVM with the compiled module classes and inherits the launch shell configuration.
 - **Permission Grants:** Default seed includes grants `DOCTOR:RECEPTION:XEM` and `DOCTOR:PATIENT:XEM` ([`V8__Seed_Approved_Permission_Grants.sql#L19-L28`](../../clinic-infrastructure/src/main/resources/migrations/V8__Seed_Approved_Permission_Grants.sql#L19)).
 
 ### 2.2 Unverified Environmental Prerequisites (Must Be Provided Out-of-Band)
-The following prerequisites cannot be verified from tracked files and must be confirmed by the test environment operator before executing this runbook. **Never invent credentials or inspect local secrets.**
+The operator confirms the database, credentials and synthetic records locally before starting.
 
-1. **Target Synthetic Test Database:**
-   - Must be an isolated, non-production SQL Server test database whose name matches `clinic_test_*` ([`docs/OPERATIONS_RUNBOOK.md#L15,L43-51`](../OPERATIONS_RUNBOOK.md#L15)).
-   - Do NOT run migrations against, modify, or connect to `clinicDb` or any clinic operational environment.
-   - Database connection parameters must be exported into environment variables (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD` or `DB_CONNECTION_STRING`) via a secure local secret store or terminal session without committing or echoing values ([`README.md#L28-L41`](../../README.md#L28), [`docs/OPERATIONS_RUNBOOK.md#L39-51`](../OPERATIONS_RUNBOOK.md#L39)).
-2. **Authorized Synthetic DOCTOR Account:**
-   - A dedicated synthetic staff account (`NhanVien`) with:
+1. **Target Local Database (`clinicDb` @ `localhost:1433`):**
+   - Under approved Owner contract `18847587-233a-4f02-99cd-13e1eaf0736a`, manual visual smoke testing uses the Owner-designated local database `clinicDb` at `localhost:1433`.
+   - **Automated tests and CI/CD remain strictly prohibited from accessing `clinicDb`.** Use in-memory tests by default. Select an explicit `clinic_test_*` or `clinic_orchestrator_review_*` catalog for SQL opt-in fixtures, subject to each fixture’s target guard.
+   - Database connection parameters must be explicitly configured by the operator via environment variables (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD` or `DB_CONNECTION_STRING`) using a protected local secret store or terminal session without committing or echoing values ([`README.md#L28-L41`](../../README.md#L28), [`docs/OPERATIONS_RUNBOOK.md#L39-51`](../OPERATIONS_RUNBOOK.md#L39)).
+   - **One-off Local TLS Exception Notice:**
+     > [!WARNING]
+     > If using `TrustServerCertificate=true` for local development connections, this is strictly a **one-off local development/manual test Owner exception** authorized under contract `18847587-233a-4f02-99cd-13e1eaf0736a`.
+     > It is **NEVER** an approved committed configuration, worker test profile setting, or deployment configuration.
+     > Strict deployment TLS validation requirements (encrypted transport with validated certificate and server identity under Owner Decision `PHASE0-DB-DEPLOY-DECISION-RECON-02`) remain in full force.
+
+2. **Read-Only V1–V11 Migration Metadata Preflight (DO NOT RUN MIGRATIONS):**
+   - The Owner reports that migrations V1 through V11 are already applied on `clinicDb`. This is an **external assertion** and must be treated as unverified until checked.
+   - Prior to launching the UI, the operator must execute a **read-only** check against the migration history table:
+     ```sql
+     SELECT DB_NAME() AS database_name;
+     SELECT script_name, success
+     FROM dbo.__schema_migrations
+     ORDER BY id;
+     ```
+   - **Mismatched Migration Stop Rule:** Proceed only if the catalog is `clinicDb` and every script registered by the current runner for V1 through V11 is recorded with `success = 1`. [Migration runner](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseMigrationRunner.java)
+   - **DO NOT RUN MIGRATIONS:** Do not run `DatabaseMigrationRunner` or apply migration scripts during this smoke procedure. Any required migration must be executed through a separately authorized migration procedure.
+
+3. **Authorized Synthetic DOCTOR Account:**
+   - A dedicated synthetic staff account (`NhanVien`) in `clinicDb` with:
      - Active status (`trangThai = 'HOAT_DONG'`, `isDeleted = 0`).
      - Assigned role `DOCTOR` (`vaiTro = 'DOCTOR'`).
      - Explicit work assignment (`NhanVienCoSo` / `NhanVienKhoa`) to a designated synthetic facility (e.g. `maCoSo = 1` or test `11`) and department (e.g. `maKhoa = 1` or test `21`).
-   - Credentials must be verified out-of-band by the operator.
-3. **Synthetic Test Data Fixtures in Database:**
-   To thoroughly execute all verification steps, the synthetic database must contain:
+   - Credentials must be verified out-of-band by the operator without recording secrets.
+
+4. **Synthetic Test Data Fixtures in `clinicDb`:**
+   Use the following synthetic records for the verification steps:
    - **Queue Records for Today (`ngayKham = CURRENT_DATE` in Asia/Ho_Chi_Minh):**
      - Visit A: Status `CHO_KHAM`, registered in target facility/department.
      - Visit B: Status `DANG_KHAM`, registered in target facility/department.
@@ -80,23 +105,24 @@ The following prerequisites cannot be verified from tracked files and must be co
 
 ## 3. Launch and Authentication Smoke Procedure
 
-### Step 3.1: Configure Process Environment
-Set database connectivity parameters in the active shell using out-of-band synthetic values ([`docs/OPERATIONS_RUNBOOK.md#L45-51`](../OPERATIONS_RUNBOOK.md#L45)). Do not echo or log secrets.
+### Step 3.1: Configure the app shell
+
+Use the compiled classes from section 2.1. Configure the following split settings in a shell reserved for this app session:
 
 ```bash
-# Illustrative template only — replace placeholders with verified test values
-export DB_URL='jdbc:sqlserver://<approved-test-host>:1433;databaseName=clinic_test_<unique_suffix>;encrypt=true;<approved-options>'
-export DB_USERNAME='<test-doctor-login>'
-export DB_PASSWORD='<test-doctor-secret>'
+unset DB_CONNECTION_STRING
+export DB_URL='jdbc:sqlserver://localhost:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=false'
 ```
 
-### Step 3.2: Launch Packaged Desktop Application
-Execute the desktop shaded JAR from the repository root:
+Inject the SQL login through `DB_USERNAME` and `DB_PASSWORD` from your protected local settings. Enter the separate desktop DOCTOR account on the login screen. A full `DB_CONNECTION_STRING` takes precedence when present. Use a trusted server certificate for the URL above. The Owner-authorized one-off connection to the local Docker instance can use `trustServerCertificate=true` in that shell for that session. [Operations runbook](../OPERATIONS_RUNBOOK.md#3-database-configuration-and-secret-handling)
+
+### Step 3.2: Launch the desktop
+
+From the repository root, start the existing launcher:
 
 ```bash
-java -jar clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar
+./run-app.sh
 ```
-*(Reference: [`README.md#L24-L26`](../../README.md#L24), [`docs/OPERATIONS_RUNBOOK.md#L82`](../OPERATIONS_RUNBOOK.md#L82), [`vn.clinicmanagement.desktop.Main#L14-L24`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/Main.java#L14)).*
 
 **Expected Visual Result:**
 - The Swing application initializes on the Event Dispatch Thread (EDT).
@@ -196,9 +222,9 @@ java -jar clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar
    - **Crucial Invariant Check:** No diagnosis from the current visit (`LuotKham`), admission date, or placeholder DTO text is synthesized or fabricated into the history area ([`DoctorHistoryPanelTest.java#L35-L42`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanelTest.java#L35), [`phase1-doctor-history-ui-contract.md#L10,L37`](phase1-doctor-history-ui-contract.md#L10)).
 
 ### Step 6.2: Verify Query Failure / Authorization Denial Handling
-1. In a simulated failure scenario (e.g. simulated network interruption, revoking permission, or database audit failure):
-2. Select a patient row.
-3. **Expected Visual Result:**
+Use an existing authorized denial scenario on `clinicDb` if one is available. Perform network fault injection, permission mutations or database audit failure simulation only in a separately isolated environment. Mark an unavailable scenario as not run.
+
+**Expected Visual Result:**
    - History table is cleared immediately; no stale history from the previous patient remains visible ([`DoctorStationPanel.java#L243-L248`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L243), [`DoctorStationPanelTest.java#L112-L122`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanelTest.java#L112)).
    - History status label displays generic message: `"Không thể tải tiền sử bệnh."` ([`DoctorHistoryPanel.java#L72-L75`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L72)).
    - No sensitive database exception messages, stack traces, or raw error codes are displayed to the user ([`DoctorStationPanelTest.java#L120-L121`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanelTest.java#L120)).
@@ -254,8 +280,7 @@ java -jar clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar
 
 ### Step 8.1: Verify Immediate Clearing on Session Lock
 1. With Visit A selected (queue and history rows displayed on screen), trigger a session lock condition:
-   - Allow idle timeout to elapse (e.g. configured idle threshold or test lock trigger).
-   - Alternatively, invoke session lock in test mode.
+   - Allow the configured idle timeout to elapse.
 2. When `SessionLifecycleService` transitions to `LOCKED_IDLE` or `LOCKED_ABSOLUTE` ([`SessionLifecycleService.java#L254-L270`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/session/SessionLifecycleService.java#L254)):
    - `MainDashboardFrame.showSessionLock()` is invoked on the EDT ([`MainDashboardFrame.java#L204-L209`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L204)).
    - It synchronously calls `doctorStation.clearSensitiveData()` ([`MainDashboardFrame.java#L211-L215`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L211), [`DoctorStationPanel.java#L183-L190`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L183)).
@@ -265,7 +290,7 @@ java -jar clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar
      - Queue rows are completely cleared (`queueSidebar.clearQueue()`; [`DoctorStationPanel.java#L280`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L280)).
      - History rows are completely cleared (`historyPanel.clearHistory()`; [`DoctorStationPanel.java#L279`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L279)).
      - Clinical form and action bar are reset to unselected state ([`DoctorStationPanel.java#L277-L278`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L277)).
-     - No patient data or clinical history remains in memory or on components.
+     - No patient details or history are visible on the locked screen.
 
 ### Step 8.2: Re-authenticate from Lock
 1. In the `SessionLockOverlay`, enter the doctor account password and submit ([`MainDashboardFrame.java#L223-L257`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L223)).
@@ -287,50 +312,9 @@ java -jar clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar
 
 ---
 
-## 9. Opt-In Database Audit Read-Back Verification (Synthetic Test DB Only)
+## 9. Optional audit metadata read-back
 
-After completing the visual steps in a controlled test environment, an operator with database read permissions may verify the written audit log in the synthetic database `clinic_test_*`. **This step is strictly opt-in and must NEVER be run against production or live patient databases.**
-
-### Step 9.1: Verify Queue Read Audit Event
-Execute query on `NhatKyHeThong`:
-
-```sql
-SELECT TOP 5
-    id, hanhDong, tenBang, khoaChinh, maNhanVien, maCoSo, maKhoa, thoiDiem, chiTiet
-FROM NhatKyHeThong
-WHERE hanhDong = 'PATIENT_VIEW'
-  AND tenBang IS NULL
-ORDER BY id DESC;
-```
-*(Reference: [`ReceptionReadAudit.java#L34-L55`](../../clinic-application/src/main/java/vn/clinicmanagement/application/reception/ReceptionReadAudit.java#L34), [`phase2-reception-read-authorization-contract.md#L16,L26`](phase2-reception-read-authorization-contract.md#L16)).*
-
-**Expected Audit Evidence:**
-- `hanhDong`: `'PATIENT_VIEW'`
-- `tenBang`: `NULL` (queue reads audit the operation without enumerating individual patient IDs)
-- `maNhanVien`: matches the synthetic doctor ID.
-- `maCoSo` & `maKhoa`: match the exact synthetic session scope.
-- `thoiDiem`: UTC timestamp of the queue load.
-
-### Step 9.2: Verify Patient History Read Audit Event
-Execute query on `NhatKyHeThong`:
-
-```sql
-SELECT TOP 5
-    id, hanhDong, tenBang, khoaChinh, maNhanVien, maCoSo, maKhoa, thoiDiem, chiTiet
-FROM NhatKyHeThong
-WHERE hanhDong = 'PATIENT_VIEW'
-  AND tenBang = 'PATIENT'
-ORDER BY id DESC;
-```
-*(Reference: [`GetPatientHistoryHandler.java#L69-L78`](../../clinic-application/src/main/java/vn/clinicmanagement/application/patienthistory/GetPatientHistoryHandler.java#L69), [`phase1-tiensuben-scope-contract.md#L11,L44`](phase1-tiensuben-scope-contract.md#L11)).*
-
-**Expected Audit Evidence:**
-- `hanhDong`: `'PATIENT_VIEW'`
-- `tenBang`: `'PATIENT'`
-- `khoaChinh`: `<patientId>` matching the selected synthetic patient.
-- `maNhanVien`: matches the synthetic doctor ID.
-- `maCoSo` & `maKhoa`: match the exact session scope.
-- `chiTiet`: contains actor/correlation metadata; **MUST NOT contain clinical narrative (`moTa`), diagnosis, or PII** ([`phase1-tiensuben-scope-contract.md#L11,L44`](phase1-tiensuben-scope-contract.md#L11)).
+An authorized operator may use read-only access to `NhatKyHeThong` in local `clinicDb` to confirm audit metadata for the synthetic actor, exact facility and department, and the time window of the manual session. Check the queue-read event and the `PATIENT_VIEW` event for the synthetic patient. Record only whether the expected audit metadata was present. Keep audit payloads and patient identifiers out of the smoke report.
 
 ---
 
@@ -340,17 +324,17 @@ The operator records pass/fail observations against this matrix during test exec
 
 | Step # | Smoke Verification Item | Expected Observation / Invariant | Exact Source Citation | Pass / Fail |
 |---|---|---|---|---|
-| **1** | Application Launch | `LoginForm` displays on EDT; database connects via environment variables without hardcoded secrets | [`Main.java#L14-L24`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/Main.java#L14); [`LoginForm.java#L54`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L54) | [ ] |
+| **1** | Application Launch | `LoginForm` displays on EDT; database connects to local `clinicDb` via explicit environment variables without hardcoded secrets | [`Main.java#L14-L24`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/Main.java#L14); [`LoginForm.java#L54`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L54) | [ ] |
 | **2** | Doctor Authentication | Authenticates synthetic DOCTOR with exact `(maCoSo, maKhoa)` scope; opens `MainDashboardFrame` | [`LoginForm.java#L157-L200`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L157) | [ ] |
 | **3** | Station Navigation | Ribbon button `"Điều Trị"` opens `DoctorStationPanel` with queue sidebar, action bar, and tabs | [`MainDashboardFrame.java#L162-L163`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L162); [`DoctorStationPanel.java#L60-L102`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L60) | [ ] |
 | **4** | Queue Scope & Date | Header shows today's date (`dd/MM/yyyy`); queue loads department team encounters off EDT | [`DoctorQueueSidebar.java#L36,L150`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java#L36); [`DoctorStationPanel.java#L149-L160`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L149) | [ ] |
 | **5** | Three Active Statuses | Queue contains strictly `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`; excludes `DA_HUY`, completed, other dates/departments | [`ReceptionQueueRepositoryImpl.java#L163-L165`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/ReceptionQueueRepositoryImpl.java#L163) | [ ] |
 | **6** | Patient Selection | Selecting row extracts bound `patientId`/`visitId`; updates action bar and clinical form | [`DoctorQueueSidebar.java#L100-L103`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java#L100); [`DoctorClinicalForm.java#L36-L47`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java#L36) | [ ] |
-| **7** | History Clear on Switch | Previous history is immediately cleared before asynchronous query starts | [`DoctorStationPanel.java#L199`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L199); [`DoctorHistoryPanelTest.java#L32-L34`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanelTest.java#L32) | [ ] |
+| **7** | History Clear on Switch | Previous history clears as the next request starts. The panel shows `Đang tải tiền sử bệnh...` while the request is pending | [`DoctorStationPanel.java#L199`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L199); [`DoctorHistoryPanelTest.java#L32-L34`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanelTest.java#L32) | [ ] |
 | **8** | Audited History Read | Query runs under `PATIENT:XEM`; independent audit `PATIENT_VIEW` commits before rendering | [`GetPatientHistoryHandler.java#L41-L78`](../../clinic-application/src/main/java/vn/clinicmanagement/application/patienthistory/GetPatientHistoryHandler.java#L41); [`phase1-tiensuben-scope-contract.md#L11`](phase1-tiensuben-scope-contract.md#L11) | [ ] |
 | **9** | Approved Categories | Table displays only `BENH_NEN`, `DI_UNG`, `PHAU_THUAT` matching exact session scope | [`DoctorStationPanel.java#L305-L319`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L305); [`DoctorHistoryPanel.java#L60-L67`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L60) | [ ] |
-| **10** | Empty History State | Patient without history shows `"Chưa có dữ liệu tiền sử bệnh đã xác thực."`; no synthesized visit data | [`DoctorHistoryPanel.java#L14,L57`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L14); [`DoctorHistoryPanelTest.java#L35-L42`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanelTest.java#L35) | [ ] |
-| **11** | Failure / Error State | On query/audit denial or DB drop: history clears; shows generic `"Không thể tải tiền sử bệnh."` | [`DoctorHistoryPanel.java#L72-L75`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L72); [`DoctorStationPanelTest.java#L113-L122`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanelTest.java#L113) | [ ] |
+| **10** | Empty History State | After a successful empty response, the panel shows `"Chưa có dữ liệu tiền sử bệnh đã xác thực."`; no synthesized visit data | [`DoctorHistoryPanel.java#L14,L57`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L14); [`DoctorHistoryPanelTest.java#L35-L42`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanelTest.java#L35) | [ ] |
+| **11** | Failure / Error State | On query or audit denial in an authorized scenario: history clears; shows generic `"Không thể tải tiền sử bệnh."` | [`DoctorHistoryPanel.java#L72-L75`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L72); [`DoctorStationPanelTest.java#L113-L122`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanelTest.java#L113) | [ ] |
 | **12** | Rapid Selection Switch | Rapidly switching patient selection discards stale async worker responses via generation counter | [`DoctorStationPanel.java#L225-L229`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L225); [`DoctorStationPanelTest.java#L125-L154`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanelTest.java#L125) | [ ] |
 | **13** | Read-Only Controls | Queue and history table cells are non-editable; no create, edit, delete, or save buttons exist | [`DoctorHistoryPanel.java#L20-L22`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L20); [`DoctorHistoryPanelTest.java#L85-L93`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanelTest.java#L85) | [ ] |
 | **14** | Sub-Tabs Placeholders | Tabs "Công khám", "Thuốc", "Xử trí", "Phản hồi" display explicit placeholder messages | [`DoctorStationPanel.java#L89-L96,L321-L327`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L89) | [ ] |
@@ -358,6 +342,31 @@ The operator records pass/fail observations against this matrix during test exec
 | **16** | Re-authentication | Unlocking session automatically refreshes today's queue; selection remains clear | [`MainDashboardFrame.java#L223-L257`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L223); [`DoctorStationPanel.java#L253-L263`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L253) | [ ] |
 | **17** | Logout Disposal | Logging out stops monitor, clears all protected data, disposes frame, returns to `LoginForm` | [`MainDashboardFrame.java#L260-L271`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L260); [`DoctorStationPanel.java#L116-L124`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L116) | [ ] |
 | **18** | Post-Logout Leak Guard | Late worker responses arriving after logout are discarded by `isCurrentSession()` check | [`DoctorStationPanel.java#L165-L168,L230-L233`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L165); [`DoctorStationPanelTest.java#L156-L182`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanelTest.java#L156) | [ ] |
+
+### Operator Verification Log & Reporting Guidelines
+
+When executing manual visual smoke testing, the operator records observation results in the following format:
+
+```text
+================================================================================
+MANUAL VISUAL SMOKE OBSERVATION RECORD
+================================================================================
+Contract Reference : Owner Contract 18847587-233a-4f02-99cd-13e1eaf0736a
+Target Database    : clinicDb @ localhost:1433
+Build / Revision   : <commit-sha-or-build-timestamp>
+Execution Date/Time: <YYYY-MM-DD HH:mm:ss Asia/Ho_Chi_Minh>
+Operator Role/Scope: DOCTOR @ (maCoSo = <id>, maKhoa = <id>)
+Preflight V1-V11   : [ ] PASS (V1-V11 verified read-only) / [ ] FAIL (Mismatched)
+Matrix Evaluation  : Steps 1-18 Pass/Fail recorded
+Summary / Outcome  : <Pass / Fail description without PII or secrets>
+================================================================================
+```
+
+> [!IMPORTANT]
+> **No-PII and Security Gate Enforcement Rules:**
+> 1. **Zero Real Patient Data / PII:** Use synthetic fixtures only. Never record or transcribe patient names, CCCD numbers, phone numbers, addresses, clinical narrative (`moTa`), or diagnosis text.
+> 2. **Zero Credentials:** Never log or record database passwords, connection string credentials, or user account passwords.
+> 3. **No Premature Visual Acceptance Claim:** Do not claim visual acceptance or mark gate `SEC-01` complete/closed in runbooks, reports, or task boards based solely on documentation updates or off-screen headless test execution (`mvn clean verify`). Gate `SEC-01` remains OPEN / default-deny until the operator completes and records the baseline checklist.
 
 ---
 
@@ -368,5 +377,11 @@ The operator records pass/fail observations against this matrix during test exec
    ```bash
    unset DB_URL DB_USERNAME DB_PASSWORD DB_CONNECTION_STRING
    ```
-3. **Synthetic Database Retention:** Do not drop or truncate the synthetic test database. Test fixtures created for manual smoke testing should be maintained or reset according to the operator's synthetic fixture policy.
-4. **No Git / Remote Side Effects:** Do not commit local environment files, test logs, or connection strings. Never push, merge, or force-push branches as part of smoke testing.
+3. **Database Integrity Preservation:**
+   - Under Owner contract `18847587-233a-4f02-99cd-13e1eaf0736a`, `clinicDb` is the Owner-designated local development database.
+   - Do NOT drop, truncate, or re-initialize `clinicDb`.
+   - Handle synthetic records created for the session through the approved application workflow.
+4. **Automated Test / CI Boundary:**
+   - Automated unit/integration tests and CI workers MUST NOT connect to or write to `clinicDb`.
+   - Automated tests must continue using synthetic-only fixtures and target guards (`assertFalse("clinicDb".equalsIgnoreCase(databaseName.trim()), …)`).
+5. **No Git / Remote Side Effects:** Do not commit local environment files, test logs, or connection strings. Never push, merge, or force-push branches as part of smoke testing.
