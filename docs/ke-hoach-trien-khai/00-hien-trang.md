@@ -52,3 +52,10 @@
 ## Evidence addendum — patient history SQL Server acceptance (2026-11-06)
 
 `PAT-HISTORY-SQL-01` is complete locally. On newly created disposable `clinic_test_patient_history_20261106`, V1–V10 migration passed 1/1 and `PatientHistorySqlServerPersistenceTest` passed 1/1, covering V10 trigger-safe insert, exact scope/category filtering, update/version, read audit `PATIENT_VIEW`/`PATIENT`, and mutation/audit rollback. Only synthetic fixture rows and its temporary trigger were cleaned; the database remains. The current root default `mvn -Djava.awt.headless=true clean verify` baseline is 305 tests, 0 failures/errors, 5 opt-in skips (65 Surefire reports). The Doctor history UI is still not wired because the station has mock DTOs without real patient/session context; Phase 1 remains open. No push or PR.
+
+
+## Evidence addendum — login throttle implementation (2026-11-06)
+
+`SEC-LOCKOUT-IMPLEMENT-01` is complete locally on `feature/patient-reception-workflow`, commit `96257b3`. Implementation adds migration V11 and per-account SQL Server throttling with transaction-scoped row locking and failure/throttle audit atomicity. The Owner-approved semantics remain: fixed 15-minute window; after five wrong passwords the next attempt waits before password verification; active-wait attempts are audited without escalation; an incorrect password after the wait advances delay; a correct password for an active account resets state before role/scope selection; SQL Server UTC is authoritative.
+
+Root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed **321 tests, 0 failures, 0 errors, 6 expected SQL Server opt-in skips**. On synthetic database `clinic_test_lockout_fresh_20261106`, fresh V1–V11 migration acceptance passed 1/1 and throttle concurrency/audit-rollback acceptance passed 1/1. Test-created employee fixtures were soft-deleted; the synthetic database remains and was not dropped. No real patient data was used. No push, PR, or merge occurred. Desktop visual smoke remains unperformed, so `SEC-01` remains in progress.

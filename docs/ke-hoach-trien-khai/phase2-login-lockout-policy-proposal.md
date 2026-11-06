@@ -1,7 +1,7 @@
 # Đề xuất chính sách giới hạn đăng nhập sai
 
 **Task:** `SEC-LOCKOUT-POLICY-01`  
-**Trạng thái:** Owner duyệt phương án B ngày 06/11/2026; triển khai theo task riêng, chưa đổi code/schema.
+**Trạng thái:** Chính sách B đã được Owner duyệt; implementation `SEC-LOCKOUT-IMPLEMENT-01` hoàn tất cục bộ ngày 06/11/2026. `SEC-01` vẫn mở.
 **Ngày:** 06/11/2026
 
 ## Hiện trạng đã kiểm tra
@@ -32,11 +32,13 @@ Owner chọn **B — trì hoãn tăng dần**. Policy được duyệt: sau 5 l�
 
 **Chi tiết triển khai Owner duyệt:** Cửa sổ 15 phút là fixed window bắt đầu tại lần sai đầu; tại đúng mốc 15 phút, cửa sổ trước hết hạn và bộ đếm trước ngưỡng bắt đầu mới. Sau 5 lỗi trong cửa sổ, yêu cầu kế tiếp bị delay trước khi kiểm tra mật khẩu. Yêu cầu đến trong lúc delay còn hiệu lực chỉ ghi audit throttle và không tăng cấp delay. Sau khi delay hết, nếu mật khẩu sai thì áp dụng mức delay tiếp theo. Mật khẩu đúng của tài khoản còn hoạt động reset throttle ngay sau xác minh, trước kiểm tra role/scope; tài khoản inactive/deleted không được reset trạng thái hay đăng nhập. SQL Server `SYSUTCDATETIME()` là nguồn thời gian chuẩn cho mọi so sánh/thời điểm lưu giữa nhiều máy. Sequence/delay hết sau 24 giờ kể từ lỗi gần nhất; success reset ngay.
 
-**Triển khai:** Contract Orchestrator đầu `a2c4ea7f-db14-4933-b8fc-a658972af395` được thay bằng contract chi tiết đã Owner duyệt `c67f6998-c9d4-402a-9fd0-008f2616c9eb`. Các lượt task trước bị dừng/thất bại trước khi tích hợp để mở rộng đúng file scope/lưu vết audit và làm rõ semantics. Task hiện tại `30d87478-4db8-4d0a-8a5d-a4677f0d22a3` đang chạy bằng Copilot CLI; xem task board để theo dõi validation. Chưa có code/migration được tích hợp; runtime acceptance còn chờ review.
+**Triển khai và nghiệm thu cục bộ (06/11/2026):** Contract Orchestrator chi tiết `c67f6998-c9d4-402a-9fd0-008f2616c9eb` là căn cứ triển khai. Copilot implementation task `30d87478-4db8-4d0a-8a5d-a4677f0d22a3` kết thúc exit 1 sau khi để lại diff một phần; Codex attempt `731756f1-ef5c-48dc-ab17-5442625e07e8` lỗi patch context. Root review/fix và tích hợp code vào nhánh `feature/patient-reception-workflow`, local commit `96257b3` (`feat: throttle repeated login failures`). Code thêm V11, transaction/row locking theo tài khoản và audit nguyên tử; blocked login dùng `AUTH_LOGIN_FAILED` với reason `AUTH_THROTTLED` và vẫn trả thông báo chung. Active account có password đúng reset throttle trước kiểm tra role/scope; inactive/deleted account không được reset hoặc đăng nhập.
+
+**Bằng chứng kiểm thử:** root JDK 17 `mvn -Djava.awt.headless=true clean verify` **BUILD SUCCESS**, 321 tests, 0 failures, 0 errors, 6 SQL Server opt-in skips. SQL Server acceptance riêng trên database tổng hợp `clinic_test_lockout_fresh_20261106`: V1–V11 fresh migration pass 1/1; concurrency/throttle/audit rollback pass 1/1. Fixture nhân viên do test tạo được soft-delete; database tổng hợp được giữ lại, không drop. `git diff --check` pass. Không push, mở PR hay merge. Visual smoke của ứng dụng desktop chưa được thực hiện; do đó đây không phải nghiệm thu đóng `SEC-01`.
 
 ## Quy tắc chung đề nghị áp dụng
 
-1. Đếm theo tài khoản trong SQL Server, không theo tiến trình desktop; phép tăng bộ đếm và tính thời điểm thử tiếp theo phải nguyên tử khi nhiều máy đăng nhập đồng thời.
+1. Đếm theo tài khoản trong SQL Server, không theo tiến trình desktop; phép tăng bộ đếm và tính thời điểm thử tiếp theo phải nguyên tử khi nhiều máy đăng nhập đồng thời. Implementation dùng `UPDLOCK,HOLDLOCK` trong transaction của mỗi lần xác thực.
 2. Không phân biệt username không tồn tại, mật khẩu sai, tài khoản đang bị trì hoãn hoặc tài khoản không hoạt động qua thông báo đăng nhập. Giữ phản hồi xác thực chung; không trả thời điểm khóa hay trạng thái tài khoản cho client.
 3. Ghi audit `AUTH_LOGIN_FAILED` cho lỗi thông tin xác thực và một reason code riêng khi bị throttle. Audit lỗi phải fail closed như chính sách login hiện tại; không ghi password, hash hoặc raw exception.
 4. Timestamp dùng UTC. Đăng nhập thành công xóa trạng thái thất bại; hết hạn chính sách không tự kích hoạt tài khoản đã bị quản trị viên vô hiệu hóa.
@@ -49,4 +51,4 @@ Owner chọn **B — trì hoãn tăng dần**. Policy được duyệt: sau 5 l�
 - Nếu chọn A: xác nhận ngưỡng `5 lần / 15 phút`, khóa `15 phút`, tự mở khóa khi hết hạn, không có mở khóa thủ công trong task này.
 - Nếu chọn B: xác nhận bắt đầu throttle sau `5 lần / 15 phút`, chờ đầu `30 giây`, tăng gấp đôi tới tối đa `15 phút`, reset khi đăng nhập thành công, hết chuỗi sau `24 giờ` không có lần sai.
 
-Khi được duyệt, task triển khai sẽ bao gồm migration, domain/repository, transaction chống race, audit reason/action, generic UI message, unit test với `Clock` giả và SQL Server opt-in test trên database synthetic; không dùng dữ liệu bệnh nhân hay database thật.
+Task policy đã được duyệt và implementation trên đã hoàn tất trong phạm vi nêu trên. Các quyết định về retention, workflow quyền khác và acceptance UI vẫn theo gate riêng của `SEC-01`.
