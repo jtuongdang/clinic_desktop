@@ -1,8 +1,122 @@
 # VIS-TRANSFER-PERSISTENCE-01 — Queue allocation, transfer history and transaction proposal
 
-**Status:** Source-grounded proposal only, reconciled under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-04` (superseding `VIS-TRANSFER-OWNER-DECISION-RECON-03` and `VIS-TRANSFER-SOURCE-RECON-01`). Snapshot: 2026-11-06. No Java, tests, migration, permission, policy or database changes. Transfer remains default-deny pending its separately approved implementation and acceptance. SEC-01 Definition A does not itself accept future workflows ([baseline acceptance:4–9,23–32][sec01]).
+**Status:** Source-grounded proposal only, updated under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-05` (carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04`, superseding earlier reviews). Snapshot: 2026-11-06. No Java, tests, migration, permission, policy or database changes. Transfer remains default-deny pending its separately approved implementation and acceptance. SEC-01 remains OPEN and runtime transfer remains default-deny ([baseline acceptance:4–9,23–32][sec01]).
 
-**Contract:** Task-supplied approved contract v1 `VIS-TRANSFER-OWNER-DECISION-RECON-04` (carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-03`). The recommendations below are proposed technical implementation choices, not additional owner approvals. Only this Markdown deliverable is in scope.
+**Contract:** Task-supplied approved contract v1 `VIS-TRANSFER-OWNER-DECISION-RECON-05` (carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04`). The recommendations below are proposed technical implementation choices, not additional owner approvals. Only allowlisted proposal Markdown files are in scope.
+
+## RECON-05 addendum — 2026-11-06 (current approved contract)
+
+**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06, following RAG-grounded proposals. This addendum controls over historical snapshots and prior proposals below, carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04` without reopening its approved rules.
+
+### 1. Binding facts and settled policies under RECON-05
+
+The following decisions are approved and binding; they must not be treated as open options:
+
+1. **Queue allocation policy and date separation:** `queueDate` is strictly separate from clinical `ngayKham`. Destination queue allocation derives its date from transfer execution and never mutates clinical `ngayKham`. Visit status, clinical `ngayKham`, reception time, and existing examination timestamps (`thoiGianBatDauKham`, `thoiGianKetThucKham`) remain preserved and intact. Priority (`dnVnTien`) is preserved unchanged without auto-promotion.
+2. **Shared room/day sequence namespace:** Exactly one number stream per `(roomId, queueDate)` is shared by patient registration and visit transfer. Registration and transfer allocate from the same sequence. No partition by priority, status, or issuer role is permitted.
+3. **No-reuse of committed numbers and gap allowance:** Committed sequence numbers are **never reused** within a room/day, even if a visit is subsequently transferred out, cancelled, completed, or soft-deleted. A visit returning A → B → A consumes a fresh allocation in A. Visible gaps in the queue sequence are explicitly allowed. Numbers in confirmed rolled-back transactions were never committed and may be allocated by subsequent attempts; no uncommitted number may be exposed via receipt, printing, or event.
+4. **Transaction clock authority and midnight sampling:** Exactly **one SQL Server DB UTC instant** is captured on the transaction connection at transaction start (before acquiring destination queue locks) and converted to a clinic-local calendar date using `Asia/Ho_Chi_Minh` for `queueDate`. That single derived date governs the entire transaction attempt, even if lock contention or transaction execution crosses clinic-local midnight. Technical/audit metadata remains UTC.
+5. **Atomic transfer mutation, allocation, history, and security audit:** A dedicated immutable transfer-history record (`LichSuDieuChuyenLuotKham`) and a successful security audit event (`NhatKyHeThong`, action `VISIT_TRANSFERRED`) are mandatory in the **same database transaction** as the visit mutation and queue allocation. All required writes commit together or roll back together. Audit-only logging is no longer permitted.
+6. **Transfer reason taxonomy:** Exactly one of the six approved role-partitioned business reason codes is mandatory (`RECEPTION_TRIAGE_CORRECTION` for RECEPTIONIST only; `PATIENT_SPECIALTY_PREFERENCE` and `CLINIC_LOAD_BALANCING` for RECEPTIONIST or DOCTOR within scope; `CLINICAL_SPECIALTY_REFERRAL`, `DIAGNOSTIC_EQUIPMENT_NEED`, `CLINICIAN_EMERGENCY_HANDOFF` for DOCTOR only). The transfer reason is a business field and must never be placed into auth/authorization `AuditReasonCode` or `NhatKyHeThong.maLyDo`.
+7. **Idempotency outcomes:** Same request key + same canonical payload after commit returns the stored operation receipt after reauthorizing the actor, without repeating allocation, mutation, history, or success audit. Same key + different payload returns a conflict without writes. On timeout or lost connection, retry with the same key and determine whether the transaction committed or rolled back before proceeding; timeout alone never proves rollback.
+
+### 2. Concrete recommended persistence, allocator, transaction, and cutover design
+
+The following recommendations provide a concrete technical architecture for a future authorized implementation, distinguishing recommendations from settled policies:
+
+#### 2.1. Recommended persistence shape: P1 (Inline visit `queueDate` + retained allocation ledger link)
+- **Recommendation:** Store current `queueDate DATE NULL` directly on `LuotKham` alongside current `maPhongKham`, `soThuTu`, and `soThuTuDisplay`, accompanied by `maCapSoHienTai BIGINT NULL` referencing an immutable `QueueAllocation` record.
+- **Rationale:** Desktop queue readers ([`ReceptionQueueRepositoryImpl.getQueueList`][queue-reads] and [`GetDoctorQueueHandler`][doctor-date]) query active room queues with high frequency. Storing `queueDate` inline allows immediate indexing on `(queueDate, maPhongKham, trangThai)` without introducing mandatory multi-table joins on every queue refresh.
+- **Integrity safeguard:** The current visit fields (`maPhongKham`, `queueDate`, `soThuTu`, `soThuTuDisplay`) are a synchronized projection of the authoritative `QueueAllocation` ledger. Both must be updated atomically in the same transaction, protected by database foreign key and transactional checks ensuring the allocation belongs to the visit.
+- **Alternatives analyzed:**
+  * *P2 (One current queue-assignment side table):* Cleanly isolates queue fields from clinical `LuotKham`, but requires an additional join on all desktop queue screens and complicates existing queries.
+  * *P3 (Retained allocations with pointer only):* Stores `queueDate` exclusively in `QueueAllocation` with only an FK on `LuotKham`. Avoids duplicate date storage, but makes every queue reader join `QueueAllocation`, impacting query performance.
+  * *P4 (Deriving date from history/audit):* Fragile, unindexable, requires scanning history for current state; rejected as unsuitable for high-frequency desktop UI.
+
+#### 2.2. Recommended allocator mechanism: M3 (Transactional room/day counter + immutable allocation ledger)
+- **Recommendation:** Deploy a mutable coordination table `QueueDayCounter` paired with an immutable ledger table `QueueAllocation`.
+  * `QueueDayCounter`: PK `(maPhongKham INT, queueDate DATE)`, `lastNumber INT NOT NULL`, `version BIGINT NOT NULL`, `updatedAt DATETIME2 NOT NULL`. Tracks the durable high-water mark for each room/day stream.
+  * `QueueAllocation`: PK `id BIGINT IDENTITY`, `maLuotKham INT NOT NULL`, `maPhongKham INT NOT NULL`, `queueDate DATE NOT NULL`, `soThuTu INT NOT NULL`, `soThuTuDisplay VARCHAR(10) NOT NULL`, `loaiPhanBo VARCHAR(20) NOT NULL` (`TIEP_NHAN` or `DIEU_CHUYEN`), `maThaoTac NVARCHAR(100) NOT NULL`, `thoiGianCapUTC DATETIME2 NOT NULL`.
+  * Unique constraint: `UNIQUE (maPhongKham, queueDate, soThuTu)` across all issued allocations, ensuring collision prevention at the engine level.
+- **Allocation sequence:**
+  1. On the active transaction connection, query `QueueDayCounter` with `SELECT lastNumber FROM QueueDayCounter WITH (UPDLOCK, HOLDLOCK) WHERE maPhongKham = @targetRoom AND queueDate = @queueDate`.
+  2. If missing (first allocation of that room/day), insert initial coordination row with `lastNumber = 0` using range-protected insertion.
+  3. Atomically increment: `UPDATE QueueDayCounter SET lastNumber = lastNumber + 1, updatedAt = @nowUtc OUTPUT INSERTED.lastNumber WHERE maPhongKham = @targetRoom AND queueDate = @queueDate`.
+  4. Format display string (minimum 2 digits, e.g. `%02d`, preserving larger numbers like `100` without truncation).
+  5. Insert the immutable row into `QueueAllocation`.
+- **Alternatives analyzed:**
+  * *M1 (Current MAX over LuotKham):* Rejected by RECON-05. Moving or deleting visits lowers the maximum and reuses numbers.
+  * *M2 (MAX over QueueAllocation ledger):* Feasible, but scanning/locking the ledger index under high concurrency creates range locks and potential lock escalation.
+  * *M4 (SQL Server native SEQUENCE):* SQL Server sequences cannot be dynamically keyed by `(roomId, queueDate)` without dynamic DDL per room/day or cyclical resets; sequence rollbacks discard numbers unpredictably.
+
+#### 2.3. Concurrency, locking, and atomic execution order
+To prevent deadlocks (especially during concurrent bidirectional transfers A → B and B → A, or concurrent registration and transfer targeting the same room), operations must follow a strict, deterministic resource locking hierarchy:
+1. **Replay key check:** Check the idempotency request key with `UPDLOCK, HOLDLOCK`. If already committed, return the stored receipt.
+2. **Visit CAS and row lock:** Execute conditional CAS update on `LuotKham` matching ID, `expectedVersion`, source facility, source department, null-safe source room, and eligible status. This locks the visit row and increments `version = version + 1`. If 0 rows are affected, abort immediately with a concurrency conflict.
+3. **Target hierarchy verification:** Verify destination room, department, and facility are active and non-deleted via join on `PhongKham`, `Khoa`, `CoSo`.
+4. **Counter acquisition:** Acquire `UPDLOCK, HOLDLOCK` on `QueueDayCounter` for `(destinationRoomId, queueDate)`.
+5. **Allocation insert:** Insert new `QueueAllocation` record.
+6. **Visit projection update:** Update `LuotKham` destination room, department, `queueDate`, `soThuTu`, `soThuTuDisplay`, `maCapSoHienTai`, and UTC timestamp.
+7. **Transfer history insert:** Insert immutable record into `LichSuDieuChuyenLuotKham`.
+8. **Security audit insert:** Insert `NhatKyHeThong` row with action `VISIT_TRANSFERRED`, correlation UUID, and actor context via `appendInCurrentTransaction`.
+9. **Outermost commit:** The transaction commits all changes atomically. Only after outermost commit succeeds is the operation receipt exposed to the client.
+
+#### 2.4. Rollback and failure recovery strategy
+- **Statement/constraint failure:** If any statement fails (e.g. CAS version mismatch, unique constraint violation on `QueueAllocation`, target hierarchy inactive, or audit failure), `JdbcTransactionManager` issues `connection.rollback()`.
+- **Complete undo:** Rollback restores visit fields, version, leaves no row in `QueueAllocation`, `LichSuDieuChuyenLuotKham`, or `NhatKyHeThong`, and rolls back the counter increment in `QueueDayCounter`. The unissued number is never exposed and remains available for subsequent transactions.
+- **Indeterminate commit outcome:** If a network disconnect, client crash, or timeout occurs during commit, the client must treat the outcome as indeterminate. The client must retry using the **same request key**. The server checks the key; if committed, it returns the existing receipt; if absent and the previous transaction rolled back, it safely allows execution. Speculative compensating transfers are strictly prohibited.
+
+#### 2.5. Migration, cutover sequence, and legacy data backfill
+1. **Runner integration:** Migration must be written as a forward versioned script (e.g. `V12__Queue_Allocation_And_Transfer_History.sql`) and registered in [`DatabaseMigrationRunner.MIGRATION_SCRIPTS`][migration-runner].
+2. **Preflight data validation:** The migration script must perform preflight checks refusing to proceed if legacy active data contains invalid duplicate `(maPhongKham, ngayKham, soThuTu)` tuples, orphaned room references, or corrupted versions.
+3. **Controlled writer pause:** Schedule a maintenance window or administrative writer pause where registration is briefly serialized.
+4. **Counter seeding:** Seed `QueueDayCounter` for all active rooms using `ISNULL(MAX(soThuTu), 0)` from existing active/historical nondeleted visits for the cutover date.
+5. **Synchronized allocator cutover:** Deploy the updated registration adapter ([`ReceptionQueueRepositoryImpl`][queue-register]) and the transfer handler simultaneously. Both must allocate numbers via the new `QueueDayCounter` + `QueueAllocation` mechanism.
+6. **Queue query cutover:** Update queue queries ([`ReceptionQueueRepositoryImpl.getQueueList`][queue-reads] and [`GetDoctorQueueHandler`][doctor-date]) to query by `queueDate` (with fallback to `ngayKham` only for historical visits predating cutover).
+7. **Legacy transfers:** When a legacy visit created before cutover is transferred for the first time, its source allocation link is stored as `NULL` and old queue number is preserved as informational data without fabricating historical allocation records.
+
+### 3. Grounding in actual SQL Server schema and domain constraints
+
+- **SQL Server schema facts:**
+  * [`LuotKham` table (V1:329–380)][visit-schema] defines `ngayKham DATE NOT NULL`, `soThuTu INT`, `soThuTuDisplay VARCHAR(10)`, `maPhongKham INT`, `trangThai VARCHAR(20) NOT NULL`, and `version BIGINT NOT NULL DEFAULT 0`.
+  * Index [`IX_LuotKham_HangDoi` (V1:1140–1144)][queue-index] indexes `(ngayKham, maPhongKham, trangThai)` with filter `isDeleted = 0`. This index is non-unique and currently uses `ngayKham`.
+  * Migration runner [`DatabaseMigrationRunner`][migration-runner] executes and commits each migration script in an independent transaction ([lines 176–200][migration-runner]). Multi-script transactions or runner rollbacks do not exist.
+- **Domain and application constraints:**
+  * [`clinic-domain`][visit-domain] adheres strictly to DDD Onion Architecture with zero external dependencies (no JDBC, Spring, or UI imports). Entities like `LuotKham` and `BaseEntity` manage domain state and invariants; persistence adapters live in `clinic-infrastructure`.
+  * Transaction management in [`JdbcTransactionManager`][transaction-manager] uses thread-local connections. Nested calls participate in the outer transaction; any failure marks the transaction rollback-only. There is no automated transaction retry or deadlock resolution loop in the infrastructure layer.
+  * Audit logging via [`JdbcAuditRepositoryImpl`][audit-writer] and [`SystemAuditEntry`][system-entry] mandates that mutation audit records participate in the current transaction via `appendInCurrentTransaction`. Audit timestamps are strictly UTC `Instant`.
+
+### 4. Synthetic SQL Server validation matrix
+
+The following validation matrix specifies test scenarios using synthetic data only. These test cases represent future verification requirements and are not passing tests in this task:
+
+| Test ID | Scenario | Execution conditions | Expected invariant & SQL Server assertion |
+|---|---|---|---|
+| **VAL-PERSIST-01** | Concurrent registration and transfer to same room/day | 2 concurrent transactions (1 registration, 1 transfer) target room 101 on synthetic date `2026-11-10`. | Both transactions serialize via `UPDLOCK, HOLDLOCK` on `QueueDayCounter`. `lastNumber` increments from 0 to 2. `QueueAllocation` contains numbers 1 and 2 with distinct `loaiPhanBo`. Zero duplicate numbers. |
+| **VAL-PERSIST-02** | Concurrent transfers of different visits to same room/day | 5 concurrent transfer threads target room 102 on synthetic date `2026-11-10`. | All 5 succeed with sequential numbers 1..5. `QueueDayCounter.lastNumber = 5`. `UNIQUE(maPhongKham, queueDate, soThuTu)` is satisfied. |
+| **VAL-PERSIST-03** | Visit CAS race on same visit | 2 concurrent transfers attempt to move visit 5001 (version 3) to room 101 and room 102 simultaneously. | Exactly 1 transaction updates `LuotKham` (affected rows = 1, version becomes 4). Losing transaction gets affected rows = 0, rolls back completely, and leaves no reservation in destination counter or ledger. |
+| **VAL-PERSIST-04** | Vacate highest ticket and verify no-reuse | Visit with number 8 in room 101 transfers to room 102. Subsequent registration occurs in room 101. | Next number allocated in room 101 is 9, NOT 8. `QueueDayCounter.lastNumber = 9`. Visible gap at 8 in room 101 queue display. |
+| **VAL-PERSIST-05** | Transaction rollback on audit failure | Transfer transaction updates visit, increments counter, inserts allocation, but security audit insertion fails (simulated error). | Complete transaction rollback. `LuotKham` version and room remain unchanged. `QueueDayCounter` increment rolls back. `QueueAllocation` row is discarded. |
+| **VAL-PERSIST-06** | Midnight crossing transaction | Transaction samples DB UTC clock at `16:59:59.999Z` (23:59:59.999 clinic time, Nov 10). Lock wait delays commit until `17:00:02Z` (00:00:02 clinic time, Nov 11). | Stored `queueDate` is `2026-11-10`. Allocation, counter key, visit `queueDate`, and receipt consistently record Nov 10. Clinical `ngayKham` is preserved. |
+| **VAL-PERSIST-07** | Idempotent replay with same key and payload | Transfer commits successfully. Client resubmits identical request key and canonical payload. | Reauthorization succeeds. Original stored receipt returned immediately. `QueueDayCounter.lastNumber` unchanged. No new row in `QueueAllocation`, `LichSuDieuChuyenLuotKham`, or `NhatKyHeThong`. |
+| **VAL-PERSIST-08** | Key reuse with different payload | Client submits previously used request key with a different destination room. | Request rejected with HTTP 409 / stable conflict error. Zero database mutations. |
+| **VAL-PERSIST-09** | First-transfer of legacy visit | Legacy visit with `queueDate = NULL` and `soThuTu = 3` transfers to room 105. | Destination allocation receives new number from room 105 counter. Source allocation recorded as `NULL`. Clinical `ngayKham` preserved. |
+| **VAL-PERSIST-10** | Integer counter exhaustion guard | Counter reaches `Integer.MAX_VALUE`. Subsequent allocation attempted. | Allocation fails with explicit overflow exception. Transaction rolls back cleanly without integer wrap-around to negative values. |
+
+### 5. Remaining open implementation choices
+
+The following choices remain explicitly open for Owner decision; no implementation or schema is authorized:
+1. **Physical storage shape:** Formal approval of P1 (inline visit `queueDate` + allocation pointer) vs P3 (pointer only) vs P2 (side table).
+2. **Allocator coordination implementation:** Formal approval of M3 (table counter + ledger) vs M2 (ledger MAX).
+3. **Lock ordering & timeout policy:** Detailed configuration of lock timeouts, deadlock retry limits, and isolation parameters in infrastructure.
+4. **Cutover baseline & legacy reconciliation:** Acceptance of the preflight legacy verification baseline and coordinated cutover window.
+5. **Transfer note policy:** Maximum character length, normalization regex, and privacy redaction for the optional short note.
+6. **Idempotency details:** Request key expiration/cleanup retention period, canonical fingerprinting algorithm, and concurrent duplicate wait timeout.
+7. **Linked-work readers & workflow acceptance:** Implementation of readers to verify pending orders/results safety before transfer can be permitted in runtime.
+
+**Gate status: SEC-01 remains OPEN; runtime transfer remains default-deny.** No permissions, grants, destination reads, or migrations are authorized.
+
+---
 
 ## 1. Fixed decisions and reconciliation
 
@@ -144,24 +258,24 @@ Once committed, a “rollback” requested by an operator is a **new** authorize
 
 UTC technical/audit metadata and `Asia/Ho_Chi_Minh` business time are fixed owner policies under `VIS-TRANSFER-OWNER-DECISION-RECON-04` (carrying forward `RECON-03`). `DATETIME2` has no timezone; [DEC-TIME-01][time-policy] prohibits guessing a legacy timezone. Registration currently uses JVM defaults, V1 uses `GETDATE()` defaults, whereas [history CAS][history-cas] uses `SYSUTCDATETIME()` and the [audit writer:164][audit-writer] explicitly encodes UTC. Do not describe all legacy timestamps as UTC or silently reinterpret them.
 
-Under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-04`, key transfer policies are now settled:
-- **Preserved visit status and timestamps:** visit status (`CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`), clinical visit date `ngayKham`, and existing examination timestamps (`thoiGianBatDauKham`, `thoiGianKetThucKham`) are preserved during transfer. A destination queue allocation must not rewrite the clinical visit date or examination timeline.
-- **Transfer reason:** a transfer reason is mandatory as a fixed reason code; a short note is optional. Clinical reason fields (`lyDoKham`) must not be reused.
-- **Separate queue date:** transfer date is used as a separate queue date (`queueDate`) in `Asia/Ho_Chi_Minh`, distinct from `ngayKham`. No silent mutation of clinical `ngayKham` is permitted.
+Under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-05` (carrying forward `RECON-04`), key transfer policies are settled and binding:
+- **Preserved visit status, clinical date and timestamps:** visit status (`CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`), clinical visit date `ngayKham`, and existing examination timestamps (`thoiGianBatDauKham`, `thoiGianKetThucKham`) are preserved during transfer. A destination queue allocation must not rewrite the clinical visit date or examination timeline.
+- **Transfer reason taxonomy:** exactly one of the six approved role-partitioned business reason codes is mandatory (`RECEPTION_TRIAGE_CORRECTION`, `PATIENT_SPECIALTY_PREFERENCE`, `CLINIC_LOAD_BALANCING`, `CLINICAL_SPECIALTY_REFERRAL`, `DIAGNOSTIC_EQUIPMENT_NEED`, `CLINICIAN_EMERGENCY_HANDOFF`). Clinical reason fields (`lyDoKham`) and auth/security reason fields (`AuditReasonCode`, `NhatKyHeThong.maLyDo`) must not be reused.
+- **Separate queue date, shared namespace and no-reuse policy:** transfer date is used as a separate queue date (`queueDate`) in `Asia/Ho_Chi_Minh`, distinct from `ngayKham`. Registration and transfer share one `(roomId, queueDate)` sequence. Committed sequence numbers are never reused; visible gaps are permitted. Exactly one SQL Server DB UTC instant is captured at transaction start and converted to `Asia/Ho_Chi_Minh` calendar date.
+- **Dedicated immutable transfer history and atomic security audit:** dedicated immutable transfer-history record (`LichSuDieuChuyenLuotKham`) and successful security audit (`NhatKyHeThong`, `VISIT_TRANSFERRED`) must commit or roll back together with mutation and allocation.
+- **Idempotency outcomes:** same key + same payload after commit returns stored receipt; same key + different payload returns conflict without writes; timeout requires determining commit vs rollback before proceeding.
 
-Recommend one authoritative UTC sample per new operation, deriving the local effective time and destination `queueDate` from it with the explicit `Asia/Ho_Chi_Minh` zone. A SQL Server UTC sample on the transaction connection is a candidate; selecting the authority and precision is still an implementation-contract choice. Explicitly populate new metadata/history timestamps and bind the separate `queueDate`; do not depend on host timezone, SQL `GETDATE()` or a client's clock. Preserve original `ngayKham` and reception metadata intact.
+Under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-05`, the following implementation decisions remain explicitly open proposals awaiting separate Owner choice:
 
-Under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-04`, the following decisions remain explicitly open and unresolved; do not infer answers or treat them as approved:
+| Topic | Status under RECON-05 | Remaining decision needed before implementation |
+|---|---|---|
+| **1. Transfer reason note validation rules** | Taxonomy approved (6 codes); note details **OPEN** | Optional-note length/normalization, character limits, and privacy redaction rules. |
+| **2. Physical persistence shape for `queueDate` & allocator** | Namespace, reuse, and sampling approved; storage shape **OPEN** | Recommendation P1 (inline visit `queueDate` + `QueueAllocation` pointer) and M3 (table counter + ledger) remain technical proposals; physical DDL is unapproved. |
+| **3. Transfer history storage schema** | Policy approved (history + audit mandatory); DDL **OPEN** | Formal table DDL, index tuning, and immutable triggers for `LichSuDieuChuyenLuotKham` and `QueueAllocation`. |
+| **4. Idempotency request lifetime & scope** | Outcomes approved; details **OPEN** | Client request key namespace/scope, retention duration/cleanup, canonical payload field list, and concurrent duplicate wait timeout. |
+| **5. Migration authorization & cutover baseline** | **OPEN** | Formal acceptance of preflight legacy verification baseline and coordinated all-writer cutover window. No executable migration is authorized. |
 
-| Still unspecified decision | Decision needed before implementation; proposal does not approve it |
-|---|---|
-| **1. Transfer reason taxonomy and validation rules** | While a fixed reason code is mandatory and a short note is optional under `VIS-TRANSFER-OWNER-DECISION-RECON-04`, the allowed reason-code taxonomy, bounded-note validation/length/normalization rules, and privacy/audit storage requirements remain open implementation decisions. Clinical reason fields must not be reused. |
-| **2. Queue sequence namespace, allocation reuse/gap policy, and exact transaction sampling semantics for `queueDate`** | While `queueDate` is approved as the transfer date in `Asia/Ho_Chi_Minh` distinct from `ngayKham` (no silent mutation of `ngayKham`), the queue sequence namespace (strictly room/day vs alternative namespaces), sequence number reuse/gap policy for cancelled/deleted allocations, and exact transaction sampling semantics (such as handling transactions that cross midnight during execution) remain open. |
-| **3. Dedicated immutable transfer history versus audit-only (or both)** | Architectural choice between a dedicated immutable transfer history ledger table, audit-only logging, or both. |
-| **4. Idempotent replay semantics** | Client request key namespace, retention duration, recovery across restarts/sessions, payload equality fingerprinting, and exact failure response codes (including handling a key reused with a different payload). |
-| **5. Persistence schema shape and migration authorization** | Detailed persistence schema and DDL remain unapproved proposals; no executable migration is authorized. |
-
-Visit status, `ngayKham`, and examination timestamps are settled as preserved; they are not an open decision. All unresolved items above remain explicitly open without inferred answers. Transfer remains default-deny and SEC-01 remains OPEN.
+Visit status, `ngayKham`, examination timestamps, shared namespace, committed no-reuse, DB UTC sampling, and mandatory dedicated history + audit are settled policies. All unresolved items above remain explicitly open without inferred answers. Transfer remains default-deny and SEC-01 remains OPEN.
 
 Note that user-approved linked-work preservation, safe pending handoff, no automatic mutation/billing, immutability of issued/confirmed/posted records, transaction consistency/concurrency, and timezone rules are settled policies, not unresolved recommendations. What prevents transfer enablement is the implementation gap: the absence of readers and adapters to prove safe transfer, which requires fail-closed denial.
 
@@ -192,31 +306,36 @@ The current change is documentation-only, so no test source was added outside th
 
 ### Guidance and retrieval read before editing
 
-- Orchestrator-supplied `docs/PROJECT_CONVENTIONS.md` baseline, plus task-supplied approved contract/restrictions (`VIS-TRANSFER-OWNER-DECISION-RECON-04`, carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-03`). The repository-local conventions file is absent; the supplied baseline was used. `docs/DEVELOPMENT_CONVENTIONS.md`, `CONTRIBUTING.md`, `docs/README.md` and `ARCHITECTURE.md` are also absent. No applicable `AGENTS.md` was found in checkout guidance inventory, target ancestors or filesystem ancestors checked.
+- Orchestrator baseline: `docs/PROJECT_CONVENTIONS.md`.
 - Repository `README.md`; relevant architecture/model/schema/UI sections of `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `UI_CODING_STANDARDS.md`; `docs/OPERATIONS_RUNBOOK.md`; `docs/ke-hoach-trien-khai/README.md`.
-- `docs/ke-hoach-trien-khai/phase3-transfer-linked-work-eligibility-review.md`, `docs/ke-hoach-trien-khai/phase0-repository-contract-review.md`, `docs/ke-hoach-trien-khai/phase3-visit-transfer-contract-review.md`, `phase3-visit-lifecycle-owner-decisions.md`, `phase3-visit-transfer-decision-gaps.md`, `phase3-visit-lifecycle-review.md`, and relevant sections of `phase1-doctor-history-ui-contract.md`, `phase2-implementation-contract.md`, `phase2-role-permission-matrix-approval.md`, `phase2-sec01-baseline-acceptance.md`.
-- **RAG first:** before opening repository docs or running `rg`, discovered ClinicOrchestrator's local `scripts/rag_search.py` and `backend/app/rag.py`. Invoked the existing `app.rag.search('clinic-desktop', query, limit=5)` against the indexed 1,076 chunks, using a read-only immutable SQLite connection override to avoid the helper's automatic reindex/WAL writes outside scope. Queries: `visit transfer queue allocation transaction history idempotency`; `queue ngayKham UTC business date version CAS migration audit`; `visit lifecycle owner decisions transfer priority room`. Returned transfer contract/review, decision gaps, owner decisions and doctor-history passages; then verified current repository source. Initial plain read-only access was blocked by SQLite sidecar access; it was not treated as a successful empty search. No index/cache was copied, moved, deleted or refreshed.
+- `docs/ke-hoach-trien-khai/phase3-visit-transfer-contract-review.md`, `docs/ke-hoach-trien-khai/phase3-transfer-linked-work-eligibility-review.md`, `docs/ke-hoach-trien-khai/phase3-visit-lifecycle-owner-decisions.md`, `docs/ke-hoach-trien-khai/phase0-db-config-remaining-decisions-proposal.md`, `docs/ke-hoach-trien-khai/phase3-transfer-reason-policy-proposal.md`, `docs/ke-hoach-trien-khai/phase3-visit-transfer-decision-gaps.md`, `docs/ke-hoach-trien-khai/phase3-transfer-queue-allocation-proposal.md`, `docs/ke-hoach-trien-khai/phase3-transfer-queue-history-persistence-proposal.md`, `docs/ke-hoach-trien-khai/phase3-transfer-domain-invariant-design.md`, and `docs/ke-hoach-trien-khai/phase0-repository-contract-review.md`.
+- Approved contracts: `VIS-TRANSFER-OWNER-DECISION-RECON-05` (carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04`).
+
+No applicable `AGENTS.md` was found in checkout inventory, target ancestors, or filesystem ancestors checked. Repository-local `docs/DEVELOPMENT_CONVENTIONS.md`, `CONTRIBUTING.md`, `docs/README.md`, and `ARCHITECTURE.md` were absent; the supplied baseline was used.
+
+**RAG first execution record (2026-11-06):**
+Executed `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'queue history persistence cutover queueDate ngayKham RECON-05'`.
+- *Result:* Command execution was blocked by the user-configured terminal sandbox deny rule (`permission check failed for command ...: Permission denied for command ... Matches user-configured deny rule`).
+- *Primary guidance:* Used task-supplied retrieved excerpts, approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-05`, and direct inspection of allowlisted files. No sandbox circumvention, privilege escalation, clinic DB connection, or patient data access.
 
 ### Commands/checks and actual results
 
 - Guidance and source inventory checked. Inspection of checked-in sources and schemas performed without live database access.
 - Sandboxed command execution: `run_command` attempts for shell and `git` commands are denied by user-configured sandbox deny rules (`permission check failed for command ...: Permission denied for command ... Matches user-configured deny rule`). File inspection and modification were conducted directly via file system tools (`read_file`, `edit_file`).
-- File allowlist respected: only `docs/ke-hoach-trien-khai/phase3-transfer-linked-work-eligibility-review.md` and `docs/ke-hoach-trien-khai/phase3-transfer-queue-history-persistence-proposal.md` were edited.
-- Formatting checks: clean markdown format, all 38 link reference targets and line anchors preserved, no trailing whitespace.
+- File allowlist respected: only `docs/ke-hoach-trien-khai/phase3-transfer-queue-allocation-proposal.md` and `docs/ke-hoach-trien-khai/phase3-transfer-queue-history-persistence-proposal.md` were edited.
+- Formatting checks: clean markdown format, all link reference targets and line anchors preserved, no trailing whitespace.
 - Inspected tests: `ReceptionQueueRepositoryImplTest`, `JdbcTransactionManagerTest`, `JdbcAuditRepositoryImplTest`, `AuditEntityImmutabilityTest`, `AuditSqlServerPersistenceTest`, `PatientHistorySqlServerPersistenceTest`. Existing patterns do not establish transfer concurrency or replay acceptance.
 
 ### Acceptance assessment
 
 | Criterion | Assessment / evidence |
 |---|---|
-| Only named Markdown deliverable | **PASS:** edits restricted strictly to allowed files. |
-| Source-backed numbering/transaction/collision analysis | **PASS (proposal):** sections 2–4 distinguish actual MAX+lock SQL, standalone hazard, missing uniqueness, mutable-location reuse and proposed shared allocator. SQL Server transfer concurrency is a future gate, not a test result. |
-| Preserved visit status, `ngayKham`, and examination timestamps | **PASS (approved policy):** settled under `VIS-TRANSFER-OWNER-DECISION-RECON-04`; destination queue allocation must not rewrite clinical visit date or examination timeline. |
-| Mandatory fixed reason code with optional short note | **PASS (approved policy):** settled under `VIS-TRANSFER-OWNER-DECISION-RECON-04`; clinical reason fields (`lyDoKham`) are not reused. Taxonomy, length, and privacy rules remain open implementation decisions. |
-| Separate `queueDate` in `Asia/Ho_Chi_Minh` | **PASS (approved policy):** settled under `VIS-TRANSFER-OWNER-DECISION-RECON-04`; transfer date used as separate `queueDate` distinct from clinical `ngayKham` (no silent mutation). Sampling semantics and persistence shape remain unresolved. |
-| New destination number, retained priority, UTC/local policy | **PASS (approved policy):** fixed in section 1 and protocol; original priority (`dnVnTien`) persisted unchanged. UTC for technical/audit metadata, `Asia/Ho_Chi_Minh` for clinic business time. |
-| Linked-work preservation, safe handoff, immutability, fail-closed gaps | **PASS (approved policy & evidence):** linked work preserved attached to visit; safe pending handoff required; issued/confirmed/posted records immutable; application lacks readers so transfer fails closed. |
-| Unresolved decisions separated from approval; RAG/guidance/anchors/diff | **PASS:** open decisions (taxonomy, queue sequence namespace/reuse, sampling semantics, history vs audit-only, replay, persistence schema) separated in sections 1 and 7; guidance listed, citation/scope/whitespace checks passed. SEC-01 remains OPEN and transfer default-deny. |
+| Only allowlisted proposal docs change | **PASS:** edits restricted strictly to allowed files (`phase3-transfer-queue-allocation-proposal.md` and `phase3-transfer-queue-history-persistence-proposal.md`). |
+| Dated addenda and historical alternatives clearly labeled | **PASS:** RECON-05 addendum dated 2026-11-06 prefixed; historical proposals clearly reconciled and labeled. |
+| All approved queue/history/audit facts carried forward exactly | **PASS:** `queueDate` separation, shared `(roomId, queueDate)` stream, committed no-reuse/gaps allowed, single DB UTC instant, and atomic history+audit carried forward. |
+| Unresolved physical storage and legacy semantics remain proposals | **PASS:** Concrete recommendations P1, M3, coordinated cutover distinguished from open Owner choices (QA-01, QA-03, QA-07, QA-08). |
+| Concrete recommended storage/transaction/cutover approach & validation matrix | **PASS:** Comprehensive design in Section 2, synthetic SQL Server validation matrix in Section 4. |
+| No Java, SQL migration, runtime behavior, grants or gate changes | **PASS:** Pure documentation analysis; SEC-01 remains OPEN/default-deny. |
 
 [sec01]: phase2-sec01-baseline-acceptance.md#L4-L32
 [scope-policy]: phase2-role-permission-matrix-approval.md#L9-L18
