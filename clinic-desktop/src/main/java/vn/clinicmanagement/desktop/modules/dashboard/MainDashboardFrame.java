@@ -4,6 +4,17 @@ import vn.clinicmanagement.desktop.core.components.RibbonButton;
 import vn.clinicmanagement.desktop.core.components.StatusBarPanel;
 import vn.clinicmanagement.desktop.core.config.UIConstants;
 import vn.clinicmanagement.desktop.core.session.UserSession;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.SessionLockOverlay;
+import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
+import vn.clinicmanagement.desktop.modules.auth.AuthenticationCompositionRoot;
+import vn.clinicmanagement.desktop.modules.auth.LoginForm;
+import vn.clinicmanagement.desktop.core.diagnostics.DesktopWorkerDiagnostics;
+import vn.clinicmanagement.application.auth.AuthenticateUserCommand;
+import vn.clinicmanagement.application.auth.CompletedLoginSession;
+import java.awt.event.*;
+import java.util.Set;
+import java.util.Objects;
 import vn.clinicmanagement.desktop.modules.billing.BillingInvoicePanel;
 import vn.clinicmanagement.desktop.modules.catalog.CatalogPanel;
 import vn.clinicmanagement.desktop.modules.doctor.DoctorStationPanel;
@@ -32,12 +43,31 @@ public class MainDashboardFrame extends JFrame {
     private final Map<String, RibbonButton> ribbonButtons = new HashMap<>();
     private final boolean isDoctor;
 
-    public MainDashboardFrame() {
-        this("admin", "Bác sĩ điều trị");
-    }
+    private final SessionLifecycleService sessionLifecycle;
+    private final DashboardNavigationPolicy navigation;
+    private final SessionLockOverlay lockOverlay;
+    private final Timer sessionMonitor;
+    private final AWTEventListener activityMonitor;
+    private final KeyEventDispatcher lockKeys;
+    private SwingWorker<Boolean, Void> reauthenticationWorker;
+    private boolean closing;
+    private boolean closingPrompt;
 
-    public MainDashboardFrame(String username, String role) {
-        this.isDoctor = role != null && (role.contains("Bác sĩ") || role.contains("Doctor"));
+    public MainDashboardFrame(CompletedLoginSession completed, Set<String> grants,
+                              SessionLifecycleService lifecycle) {
+        Objects.requireNonNull(completed, "completed");
+        this.sessionLifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
+        var context = lifecycle.currentAuthorizationContext().orElseThrow(
+                () -> new IllegalStateException("An active completed session is required."));
+        if (context.employeeId() != completed.userId() || context.roleId() != completed.role().id()
+                || !context.roleCode().equals(completed.role().code())
+                || context.facilityId() != completed.workScope().facilityId()
+                || context.departmentId() != completed.workScope().departmentId()
+                || !context.sessionId().equals(completed.correlationId())) {
+            throw new IllegalArgumentException("Dashboard context must match session completion.");
+        }
+        this.navigation = new DashboardNavigationPolicy(grants);
+        this.isDoctor = "DOCTOR".equals(completed.role().code());
 
         if (isDoctor) {
             setTitle("PHẦN MỀM QUẢN LÝ BỆNH VIỆN - 2018.10.5.1 - BUILD: 10/2018");
@@ -45,7 +75,7 @@ public class MainDashboardFrame extends JFrame {
             setTitle("PHẦN MỀM QUẢN LÝ BỆNH VIỆN - 2021.1.15.1 - 2021 - PC : DESKTOP-E64DCHT");
         }
 
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         setExtendedState(Frame.MAXIMIZED_BOTH);
         setMinimumSize(new Dimension(1200, 750));
         setLocationRelativeTo(null);
@@ -75,7 +105,8 @@ public class MainDashboardFrame extends JFrame {
         rootPanel.add(bottomContainer, BorderLayout.SOUTH);
 
         // Khởi tạo WorkspaceManager
-        this.workspaceManager = new WorkspaceManager(centerContainer, cardLayout, tabStripPanel);
+        this.workspaceManager = new GuardedWorkspace(centerContainer, cardLayout, tabStripPanel,
+                sessionLifecycle, navigation);
 
         // Top Ribbon: Xây dựng menu tương ứng theo vai trò Bác sĩ hoặc Admin
         JPanel ribbonBar = isDoctor ? buildDoctorRibbonBar() : buildAdminRibbonBar();
@@ -89,12 +120,32 @@ public class MainDashboardFrame extends JFrame {
         });
 
         // 1. Mặc định mở Trang Chủ
-        this.workspaceManager.openView(new HomeWelcomePanel());
+        openGuarded("home", HomeWelcomePanel::new);
 
-        // 2. KHI ĐĂNG NHẬP VỚI QUYỀN BÁC SĨ: Tự động kích hoạt ngay màn hình Điều Trị / Bàn Khám Bác Sĩ
-        if (isDoctor) {
-            this.workspaceManager.openView(new DoctorStationPanel());
-        }
+        lockOverlay = new SessionLockOverlay(this::reauthenticate, () -> requestClose(false));
+        setGlassPane(lockOverlay);
+        lockOverlay.setVisible(false);
+        sessionMonitor = new Timer(1000, e -> updateSessionLock());
+        activityMonitor = event -> {
+            if (!(event.getSource() instanceof Component component) || !belongsToDashboard(component)) return;
+            if (sessionLifecycle.recordActivity() != SessionLifecycleService.State.ACTIVE) updateSessionLock();
+        };
+        lockKeys = event -> {
+            if (closingPrompt) return false;
+            if (closing || sessionLifecycle.evaluate() != SessionLifecycleService.State.ACTIVE) {
+                updateSessionLock();
+                return !SwingUtilities.isDescendingFrom(event.getComponent(), lockOverlay);
+            }
+            return false;
+        };
+        Toolkit.getDefaultToolkit().addAWTEventListener(activityMonitor,
+                AWTEvent.KEY_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(lockKeys);
+        addWindowListener(new WindowAdapter() {
+            @Override public void windowClosing(WindowEvent e) { requestClose(true); }
+        });
+        sessionMonitor.start();
+        updateSessionLock();
     }
 
     /**
@@ -105,30 +156,30 @@ public class MainDashboardFrame extends JFrame {
         ribbon.setBackground(UIConstants.COLOR_MENU_BG);
         ribbon.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UIConstants.COLOR_BORDER));
 
-        RibbonButton btnHome = new RibbonButton("Trang Chủ", "🏠", "home",
-                k -> workspaceManager.openView(new HomeWelcomePanel()));
+        RibbonButton btnHome = guardedButton("Trang Chủ", "🏠", "home",
+                k -> openGuarded("home", HomeWelcomePanel::new));
         ribbonButtons.put("home", btnHome);
 
         // Nút "Đón Tiếp" có Dropdown Menu 6 mục chuẩn theo ảnh chụp
-        RibbonButton btnReception = new RibbonButton("Đón Tiếp", "📋", "reception", null);
+        RibbonButton btnReception = guardedButton("Đón Tiếp", "📋", "reception", null);
         btnReception.setPopupMenu(buildReceptionPopupMenu());
         ribbonButtons.put("reception", btnReception);
 
         // Nút "Điều Trị" (Mặc định chọn nổi bật viền cam cho Bác sĩ)
-        RibbonButton btnTreatment = new RibbonButton("Điều Trị", "👨‍⚕️", "treatment",
-                k -> workspaceManager.openView(new DoctorStationPanel()));
+        RibbonButton btnTreatment = guardedButton("Điều Trị", "👨‍⚕️", "treatment",
+                k -> openGuarded("treatment", DoctorStationPanel::new));
         btnTreatment.setSelected(true);
         ribbonButtons.put("treatment", btnTreatment);
 
-        RibbonButton btnSystem = new RibbonButton("Hệ Thống", "⚙️", "system",
-                k -> workspaceManager.openView(new SystemConfigPanel()));
+        RibbonButton btnSystem = guardedButton("Hệ Thống", "⚙️", "system",
+                k -> openGuarded("system", SystemConfigPanel::new));
         ribbonButtons.put("system", btnSystem);
 
-        RibbonButton btnCatalog = new RibbonButton("Danh Mục", "📑", "catalog",
-                k -> workspaceManager.openView(new CatalogPanel()));
+        RibbonButton btnCatalog = guardedButton("Danh Mục", "📑", "catalog",
+                k -> openGuarded("catalog", CatalogPanel::new));
         ribbonButtons.put("catalog", btnCatalog);
 
-        RibbonButton btnUser = new RibbonButton("Người Dùng", "👥", "user", k -> {
+        RibbonButton btnUser = guardedButton("Người Dùng", "👥", "user", k -> {
             JOptionPane.showMessageDialog(this,
                     "Bác sĩ đang khám: " + UserSession.getInstance().getFullName() + "\n" +
                     "Khoa phòng: " + UserSession.getInstance().getDepartmentName() + "\n" +
@@ -136,7 +187,7 @@ public class MainDashboardFrame extends JFrame {
                     "Thông Tin Bác Sĩ Điều Trị", JOptionPane.INFORMATION_MESSAGE);
         });
 
-        RibbonButton btnHelp = new RibbonButton("Trợ Giúp", "❓", "help", k -> {
+        RibbonButton btnHelp = guardedButton("Trợ Giúp", "❓", "help", k -> {
             JOptionPane.showMessageDialog(this,
                     "Hướng dẫn sử dụng bàn khám Bác sĩ EHC:\n" +
                     "- Chọn bệnh nhân từ hàng đợi bên trái để nạp bệnh án\n" +
@@ -145,11 +196,8 @@ public class MainDashboardFrame extends JFrame {
                     "Trợ Giúp Khám Bệnh", JOptionPane.INFORMATION_MESSAGE);
         });
 
-        RibbonButton btnExit = new RibbonButton("Kết Thúc", "❌", "exit", k -> {
-            int ret = JOptionPane.showConfirmDialog(this, "Bạn có chắc chắn muốn thoát ứng dụng?", "Xác nhận", JOptionPane.YES_NO_OPTION);
-            if (ret == JOptionPane.YES_OPTION) {
-                System.exit(0);
-            }
+        RibbonButton btnExit = guardedButton("Kết Thúc", "❌", "exit", k -> {
+            requestClose(true);
         });
 
         ribbon.add(btnHome);
@@ -174,7 +222,11 @@ public class MainDashboardFrame extends JFrame {
      * 6. Kiosk Đánh Giá Chất Lượng
      */
     private JPopupMenu buildReceptionPopupMenu() {
-        JPopupMenu menu = new JPopupMenu();
+        JPopupMenu menu = new JPopupMenu() {
+            @Override public void show(Component invoker, int x, int y) {
+                if (canNavigate("reception")) super.show(invoker, x, y);
+            }
+        };
         menu.setBackground(Color.WHITE);
         menu.setBorder(BorderFactory.createLineBorder(new Color(145, 155, 170), 1));
 
@@ -196,17 +248,19 @@ public class MainDashboardFrame extends JFrame {
             mi.setBorder(BorderFactory.createEmptyBorder(2, 14, 2, 8));
             mi.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
+            mi.setEnabled(false);
             mi.addActionListener(e -> {
+                if (!canNavigate("reception")) return;
                 switch (title) {
                     case "Đăng Ký Khám Bệnh":
                     case "Danh Sách Đón Tiếp":
-                        workspaceManager.openView(new ReceptionPanel());
+                        openGuarded("reception", ReceptionPanel::new);
                         break;
                     case "Danh Sách Bệnh Nhân":
-                        workspaceManager.openView(new ExaminationPanel());
+                        openGuarded("examination", ExaminationPanel::new);
                         break;
                     case "Màn Hình Chờ Tổng Hợp":
-                        workspaceManager.openView(new ReceptionPanel());
+                        openGuarded("reception", ReceptionPanel::new);
                         break;
                     case "Kiosk Đăng Ký Khám":
                         JOptionPane.showMessageDialog(this,
@@ -239,47 +293,47 @@ public class MainDashboardFrame extends JFrame {
         ribbon.setBackground(UIConstants.COLOR_MENU_BG);
         ribbon.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UIConstants.COLOR_BORDER));
 
-        RibbonButton btnHome = new RibbonButton("Trang Chủ", "🏠", "home",
-                k -> workspaceManager.openView(new HomeWelcomePanel()));
+        RibbonButton btnHome = guardedButton("Trang Chủ", "🏠", "home",
+                k -> openGuarded("home", HomeWelcomePanel::new));
         ribbonButtons.put("home", btnHome);
 
-        RibbonButton btnAdmin = new RibbonButton("Quản Lý", "🏛️", "admin",
-                k -> workspaceManager.openView(new SystemConfigPanel()));
+        RibbonButton btnAdmin = guardedButton("Quản Lý", "🏛️", "admin",
+                k -> openGuarded("system", SystemConfigPanel::new));
         ribbonButtons.put("admin", btnAdmin);
 
-        RibbonButton btnReception = new RibbonButton("Đón Tiếp", "📋", "reception", null);
+        RibbonButton btnReception = guardedButton("Đón Tiếp", "📋", "reception", null);
         btnReception.setPopupMenu(buildReceptionPopupMenu());
         ribbonButtons.put("reception", btnReception);
 
-        RibbonButton btnExam = new RibbonButton("Khám Bệnh", "🩺", "examination",
-                k -> workspaceManager.openView(new ExaminationPanel()));
+        RibbonButton btnExam = guardedButton("Khám Bệnh", "🩺", "examination",
+                k -> openGuarded("examination", ExaminationPanel::new));
         ribbonButtons.put("examination", btnExam);
 
-        RibbonButton btnBilling = new RibbonButton("Viện Phí", "💳", "billing",
-                k -> workspaceManager.openView(new BillingInvoicePanel()));
+        RibbonButton btnBilling = guardedButton("Viện Phí", "💳", "billing",
+                k -> openGuarded("billing", BillingInvoicePanel::new));
         ribbonButtons.put("billing", btnBilling);
 
-        RibbonButton btnLab = new RibbonButton("CĐHA Và Thăm Dò", "🩻", "paraclinical",
-                k -> workspaceManager.openView(new ParaclinicalOrderPanel()));
+        RibbonButton btnLab = guardedButton("CĐHA Và Thăm Dò", "🩻", "paraclinical",
+                k -> openGuarded("paraclinical", ParaclinicalOrderPanel::new));
         ribbonButtons.put("paraclinical", btnLab);
 
-        RibbonButton btnPharmacy = new RibbonButton("Nhà Thuốc", "💊", "pharmacy",
-                k -> workspaceManager.openView(new PharmacyDispensePanel()));
+        RibbonButton btnPharmacy = guardedButton("Nhà Thuốc", "💊", "pharmacy",
+                k -> openGuarded("pharmacy", PharmacyDispensePanel::new));
         ribbonButtons.put("pharmacy", btnPharmacy);
 
-        RibbonButton btnReport = new RibbonButton("Báo Cáo", "📊", "reports",
-                k -> workspaceManager.openView(new ClinicReportPanel()));
+        RibbonButton btnReport = guardedButton("Báo Cáo", "📊", "reports",
+                k -> openGuarded("reports", ClinicReportPanel::new));
         ribbonButtons.put("reports", btnReport);
 
-        RibbonButton btnSystem = new RibbonButton("Hệ Thống", "⚙️", "system",
-                k -> workspaceManager.openView(new SystemConfigPanel()));
+        RibbonButton btnSystem = guardedButton("Hệ Thống", "⚙️", "system",
+                k -> openGuarded("system", SystemConfigPanel::new));
         ribbonButtons.put("system", btnSystem);
 
-        RibbonButton btnCatalog = new RibbonButton("Danh Mục", "📑", "catalog",
-                k -> workspaceManager.openView(new CatalogPanel()));
+        RibbonButton btnCatalog = guardedButton("Danh Mục", "📑", "catalog",
+                k -> openGuarded("catalog", CatalogPanel::new));
         ribbonButtons.put("catalog", btnCatalog);
 
-        RibbonButton btnUser = new RibbonButton("Người Dùng", "👤", "user", k -> {
+        RibbonButton btnUser = guardedButton("Người Dùng", "👤", "user", k -> {
             JOptionPane.showMessageDialog(this,
                     "Thông tin người dùng: " + UserSession.getInstance().getFullName() + "\n" +
                     "Khoa phòng: " + UserSession.getInstance().getDepartmentName() + "\n" +
@@ -287,11 +341,8 @@ public class MainDashboardFrame extends JFrame {
                     "Tài Khoản Đang Đăng Nhập", JOptionPane.INFORMATION_MESSAGE);
         });
 
-        RibbonButton btnExit = new RibbonButton("Kết Thúc", "🚪", "exit", k -> {
-            int ret = JOptionPane.showConfirmDialog(this, "Bạn có chắc chắn muốn thoát ứng dụng?", "Xác nhận", JOptionPane.YES_NO_OPTION);
-            if (ret == JOptionPane.YES_OPTION) {
-                System.exit(0);
-            }
+        RibbonButton btnExit = guardedButton("Kết Thúc", "🚪", "exit", k -> {
+            requestClose(true);
         });
 
         ribbon.add(btnHome);
@@ -310,7 +361,166 @@ public class MainDashboardFrame extends JFrame {
         return ribbon;
     }
 
-    public WorkspaceManager getWorkspaceManager() {
-        return workspaceManager;
+    private boolean canNavigate(String key) {
+        return !closing && sessionLifecycle.evaluate() == SessionLifecycleService.State.ACTIVE
+                && navigation.canOpen(key);
     }
+
+    private RibbonButton guardedButton(String title, String icon, String key,
+                                        java.util.function.Consumer<String> action) {
+        RibbonButton button = new RibbonButton(title, icon, key, action == null ? null : selected -> {
+            if ("exit".equals(key) || canNavigate(key)) action.accept(selected);
+        });
+        button.setEnabled("exit".equals(key) || canNavigate(key));
+        ribbonButtons.putIfAbsent(key, button);
+        return button;
+    }
+
+    private void openGuarded(String key, java.util.function.Supplier<BaseViewPanel> factory) {
+        if (canNavigate(key)) workspaceManager.openView(factory.get());
+    }
+
+    private boolean belongsToDashboard(Component component) {
+        Window window = component instanceof Window w ? w : SwingUtilities.getWindowAncestor(component);
+        while (window != null) {
+            if (window == this) return true;
+            window = window.getOwner();
+        }
+        return false;
+    }
+
+    private void updateSessionLock() {
+        if (closing) return;
+        SessionLifecycleService.State state = sessionLifecycle.evaluate();
+        if (state == SessionLifecycleService.State.ACTIVE) {
+            lockOverlay.setVisible(false);
+            return;
+        }
+        MenuSelectionManager.defaultManager().clearSelectedPath();
+        // No clinical child route is enabled; dismiss any shell dialog before shielding input.
+        if (!closingPrompt) for (Window owned : getOwnedWindows()) if (owned.isShowing()) owned.dispose();
+        lockOverlay.setAbsoluteExpiry(state == SessionLifecycleService.State.LOCKED_ABSOLUTE);
+        boolean newlyLocked = !lockOverlay.isVisible();
+        lockOverlay.setVisible(true);
+        if (newlyLocked) lockOverlay.focusCredentials();
+        for (var entry : ribbonButtons.entrySet()) {
+            entry.getValue().setEnabled("exit".equals(entry.getKey()));
+        }
+    }
+
+    private void reauthenticate(SessionLockOverlay.Credentials credentials) {
+        if (closing || reauthenticationWorker != null) { credentials.clear(); return; }
+        lockOverlay.setBusy(true);
+        char[] secret = credentials.password();
+        AuthenticateUserCommand command = new AuthenticateUserCommand(credentials.username(), secret);
+        java.util.Arrays.fill(secret, '\0');
+        credentials.clear();
+        reauthenticationWorker = new SwingWorker<>() {
+            @Override protected Boolean doInBackground() {
+                var result = AuthenticationCompositionRoot.createHandler().handle(command);
+                return sessionLifecycle.reauthenticate(result.isSuccess() ? result.valueOrThrow() : null);
+            }
+            @Override protected void done() {
+                if (closing) return;
+                try {
+                    if (!get()) lockOverlay.setMessage("Không thể tiếp tục: xác thực, phạm vi hoặc nhật ký phiên chưa hợp lệ.");
+                    updateSessionLock();
+                    if (sessionLifecycle.evaluate() == SessionLifecycleService.State.ACTIVE) {
+                        for (var entry : ribbonButtons.entrySet()) {
+                            entry.getValue().setEnabled("exit".equals(entry.getKey()) || canNavigate(entry.getKey()));
+                        }
+                    }
+                } catch (InterruptedException ex) {
+                    DesktopWorkerDiagnostics.restoreInterruptStatus();
+                } catch (java.util.concurrent.ExecutionException | RuntimeException ex) {
+                    DesktopWorkerDiagnostics.logDashboardReauthenticationFailure(ex);
+                    lockOverlay.setMessage("Không thể xác thực lúc này. Hãy thử lại.");
+                } finally {
+                    reauthenticationWorker = null;
+                    lockOverlay.setBusy(false);
+                }
+            }
+        };
+        reauthenticationWorker.execute();
+    }
+
+    private void requestClose(boolean exit) {
+        if (closing) return;
+        closingPrompt = true;
+        int answer;
+        try { answer = JOptionPane.showConfirmDialog(this,
+                "Đóng không gian làm việc sẽ bỏ các bản nháp chưa lưu. Tiếp tục?",
+                "Xác nhận", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        } finally { closingPrompt = false; }
+        if (answer == JOptionPane.YES_OPTION) closeWorkspace(exit);
+    }
+
+    private void closeWorkspace(boolean exit) {
+        if (closing) return;
+        closing = true;
+        sessionMonitor.stop();
+        Toolkit.getDefaultToolkit().removeAWTEventListener(activityMonitor);
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(lockKeys);
+        sessionLifecycle.clear();
+        if (reauthenticationWorker != null) reauthenticationWorker.cancel(true);
+        ((GuardedWorkspace) workspaceManager).disposeViews();
+        for (Window owned : getOwnedWindows()) owned.dispose();
+        getContentPane().removeAll();
+        setContentPane(new JPanel());
+        super.dispose();
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() {
+                sessionLifecycle.awaitPendingAudits(java.time.Duration.ofSeconds(3));
+                return null;
+            }
+            @Override protected void done() {
+                if (exit) System.exit(0);
+                else new LoginForm().setVisible(true);
+            }
+        }.execute();
+    }
+
+    @Override public void dispose() {
+        if (sessionMonitor == null) { super.dispose(); return; }
+        closeWorkspace(false);
+    }
+
+    /** Guard direct openers and retained-tab callbacks without changing the original workspace layout. */
+    static final class GuardedWorkspace extends WorkspaceManager {
+        private final SessionLifecycleService lifecycle;
+        private final DashboardNavigationPolicy navigation;
+        private final JPanel center;
+        private final JPanel tabs;
+        private boolean disposed;
+        GuardedWorkspace(JPanel center, CardLayout cards, JPanel tabs,
+                         SessionLifecycleService lifecycle, DashboardNavigationPolicy navigation) {
+            super(center, cards, tabs);
+            this.center = center;
+            this.tabs = tabs;
+            this.lifecycle = lifecycle;
+            this.navigation = navigation;
+        }
+        private boolean allowed(String key) {
+            return !disposed && lifecycle.evaluate() == SessionLifecycleService.State.ACTIVE && navigation.canOpen(key);
+        }
+        @Override public void openView(BaseViewPanel view) {
+            if (view != null && view.getClass() == HomeWelcomePanel.class && allowed(view.getViewKey())) super.openView(view);
+        }
+        @Override public void activateView(String key) {
+            if (allowed(key)) super.activateView(key);
+        }
+        @Override public void closeView(String key) {
+            if (allowed(key)) super.closeView(key);
+        }
+        void disposeViews() {
+            disposed = true;
+            for (Component component : center.getComponents()) {
+                if (component instanceof BaseViewPanel view) view.onHide();
+            }
+            center.removeAll();
+            tabs.removeAll();
+        }
+    }
+
+    public WorkspaceManager getWorkspaceManager() { return workspaceManager; }
 }
