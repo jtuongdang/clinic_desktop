@@ -30,6 +30,7 @@ import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
 import vn.clinicmanagement.infrastructure.persistence.JdbcTransactionManager;
 import vn.clinicmanagement.infrastructure.persistence.JdbcUnitOfWork;
 import vn.clinicmanagement.infrastructure.persistence.identity.NhanVienRepositoryImpl;
+import vn.clinicmanagement.infrastructure.persistence.reception.ReceptionQueueRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.system.SystemRepositoryImpl;
 
 import java.io.InputStream;
@@ -43,11 +44,14 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
@@ -321,6 +325,9 @@ class ReceptionSqlServerPersistenceTest {
                             lifecycle.currentAuditActorContext().orElseThrow())).valueOrThrow().queue();
             assertQueueContains(reloadedQueue, receipt.visitId(), registeredPatientId);
             assertQueueContains(reloadedQueue, updateReceipt.visitId(), registeredPatientId);
+
+            assertActiveDoctorQueueFilters(receipt.visitId(), registeredPatientId, generatedVisitIds,
+                    authorizationContext.facilityId(), authorizationContext.departmentId());
         } finally {
             try {
                 softDeleteGeneratedRecords(registeredPatientId, generatedCardId, generatedVisitIds);
@@ -328,6 +335,134 @@ class ReceptionSqlServerPersistenceTest {
                 softDeleteGeneratedEmployee(generatedEmployeeId);
             }
         }
+    }
+
+    private static void assertActiveDoctorQueueFilters(int sourceVisitId, int patientId,
+                                                       List<Integer> generatedVisitIds,
+                                                       int facilityId, int departmentId) throws SQLException {
+        for (int generatedVisitId : List.copyOf(generatedVisitIds)) {
+            if (generatedVisitId != sourceVisitId) softDeleteGeneratedVisit(generatedVisitId, patientId);
+        }
+        LocalDate businessDate = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        updateGeneratedVisit(sourceVisitId, patientId, "CHO_KHAM", businessDate);
+        int examiningVisitId = cloneGeneratedVisit(sourceVisitId, patientId, "DANG_KHAM", businessDate,
+                generatedVisitIds);
+        int awaitingLabsVisitId = cloneGeneratedVisit(sourceVisitId, patientId, "CHO_CLS", businessDate,
+                generatedVisitIds);
+        int cancelledVisitId = cloneGeneratedVisit(sourceVisitId, patientId, "DA_HUY", businessDate,
+                generatedVisitIds);
+        int completedVisitId = cloneGeneratedVisit(sourceVisitId, patientId, "HOAN_THANH", businessDate,
+                generatedVisitIds);
+        int deletedVisitId = cloneGeneratedVisit(sourceVisitId, patientId, "DANG_KHAM", businessDate,
+                generatedVisitIds);
+
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcConnectionProvider connections = new JdbcConnectionProvider(new JdbcTransactionManager(unitOfWork));
+        ReceptionQueueRepositoryImpl repository = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
+        Set<Integer> expectedActiveVisitIds = Set.of(sourceVisitId, examiningVisitId, awaitingLabsVisitId,
+                deletedVisitId);
+
+        List<ReceptionQueueItem> exactScopeQueue = repository.getActiveDoctorQueue(businessDate, facilityId,
+                departmentId);
+        assertEquals(expectedActiveVisitIds, visitIds(exactScopeQueue),
+                "Doctor queue must include only CHO_KHAM, DANG_KHAM, and CHO_CLS for the current business date and exact scope");
+        assertQueueHasStatus(exactScopeQueue, sourceVisitId, "CHO_KHAM");
+        assertQueueHasStatus(exactScopeQueue, examiningVisitId, "DANG_KHAM");
+        assertQueueHasStatus(exactScopeQueue, awaitingLabsVisitId, "CHO_CLS");
+        assertTrue(!visitIds(exactScopeQueue).contains(cancelledVisitId), "Doctor queue must exclude DA_HUY visits");
+        assertTrue(!visitIds(exactScopeQueue).contains(completedVisitId),
+                "Doctor queue must exclude HOAN_THANH visits");
+        assertTrue(exactScopeQueue.stream().allMatch(item -> item.patientId() == patientId),
+                "Exact-scope queue results must retain the generated patient identifier");
+        assertTrue(repository.getActiveDoctorQueue(businessDate.minusDays(1), facilityId, departmentId).isEmpty(),
+                "Doctor queue must exclude visits outside the current Ho Chi Minh business date");
+        assertTrue(repository.getActiveDoctorQueue(businessDate, differentPositiveId(facilityId), departmentId).isEmpty(),
+                "Doctor queue must exclude visits outside the exact facility");
+        assertTrue(repository.getActiveDoctorQueue(businessDate, facilityId, differentPositiveId(departmentId)).isEmpty(),
+                "Doctor queue must exclude visits outside the exact department");
+
+        softDeleteGeneratedVisit(deletedVisitId, patientId);
+        assertEquals(Set.of(sourceVisitId, examiningVisitId, awaitingLabsVisitId),
+                visitIds(repository.getActiveDoctorQueue(businessDate, facilityId, departmentId)),
+                "Doctor queue must exclude soft-deleted visits");
+
+        softDeleteGeneratedPatient(patientId);
+        assertTrue(repository.getActiveDoctorQueue(businessDate, facilityId, departmentId).isEmpty(),
+                "Doctor queue must exclude visits whose generated patient is soft-deleted");
+    }
+
+    private static int cloneGeneratedVisit(int sourceVisitId, int patientId, String status, LocalDate date,
+                                           List<Integer> generatedVisitIds)
+            throws SQLException {
+        String sql = "INSERT INTO LuotKham (maBenhNhan, maCoSo, maKhoa, maPhongKham, trangThai, soThuTu, "
+                + "soThuTuDisplay, ngayKham, thoiGianTiepNhan, lyDoKham, doiTuongKham, loaiDangKyKham, "
+                + "dnVnTien, createdBy) OUTPUT INSERTED.id SELECT maBenhNhan, maCoSo, maKhoa, maPhongKham, ?, "
+                + "ISNULL(soThuTu,0)+1000, CONCAT(ISNULL(soThuTuDisplay,''), '-SYN'), ?, thoiGianTiepNhan, "
+                + "lyDoKham, doiTuongKham, loaiDangKyKham, dnVnTien, createdBy FROM LuotKham "
+                + "WHERE id=? AND maBenhNhan=? AND isDeleted=0";
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, status);
+            statement.setObject(2, date);
+            statement.setInt(3, sourceVisitId);
+            statement.setInt(4, patientId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) throw new SQLException("Synthetic source visit was not available for queue fixture");
+                int generatedVisitId = result.getInt(1);
+                generatedVisitIds.add(generatedVisitId);
+                return generatedVisitId;
+            }
+        }
+    }
+
+    private static void updateGeneratedVisit(int visitId, int patientId, String status, LocalDate date)
+            throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "UPDATE LuotKham SET trangThai=?, ngayKham=? WHERE id=? AND maBenhNhan=? AND isDeleted=0")) {
+            statement.setString(1, status);
+            statement.setObject(2, date);
+            statement.setInt(3, visitId);
+            statement.setInt(4, patientId);
+            assertEquals(1, statement.executeUpdate(), "Expected to update exactly one generated visit fixture");
+        }
+    }
+
+    private static void softDeleteGeneratedVisit(int visitId, int patientId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "UPDATE LuotKham SET isDeleted=1, deletedAt=SYSDATETIME(), deletedBy=NULL, version=version+1 "
+                             + "WHERE id=? AND maBenhNhan=? AND isDeleted=0")) {
+            statement.setInt(1, visitId);
+            statement.setInt(2, patientId);
+            assertEquals(1, statement.executeUpdate(), "Expected to soft-delete exactly one generated visit fixture");
+        }
+    }
+
+    private static void softDeleteGeneratedPatient(int patientId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "UPDATE BenhNhan SET isDeleted=1, deletedAt=SYSDATETIME(), deletedBy=NULL, version=version+1 "
+                             + "WHERE id=? AND isDeleted=0")) {
+            statement.setInt(1, patientId);
+            assertEquals(1, statement.executeUpdate(), "Expected to soft-delete exactly the generated patient");
+        }
+    }
+
+    private static Set<Integer> visitIds(List<ReceptionQueueItem> queue) {
+        Set<Integer> ids = new HashSet<>();
+        for (ReceptionQueueItem item : queue) ids.add(item.visitId());
+        return ids;
+    }
+
+    private static void assertQueueHasStatus(List<ReceptionQueueItem> queue, int visitId, String expectedStatus) {
+        assertTrue(queue.stream().anyMatch(item -> item.visitId() == visitId
+                        && expectedStatus.equals(item.status())),
+                "Expected generated visit " + visitId + " with status " + expectedStatus + " in the doctor queue");
+    }
+
+    private static int differentPositiveId(int id) {
+        return id == Integer.MAX_VALUE ? id - 1 : id + 1;
     }
 
     private static void configureSyntheticDatabase(String databaseName) throws Exception {
