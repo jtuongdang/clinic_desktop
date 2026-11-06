@@ -26,7 +26,7 @@
 - `ReceptionCompositionRoot` nối các handler Tiếp đón với JDBC; task board ghi nhận các kiểm tra SQL Server tổng hợp riêng trên `clinic_test_v9_20261106`, `clinic_test_v9_preflight_20261106` và `clinic_test_audit_20261105`. Test source giới hạn database và dùng fixture tổng hợp; lần cập nhật tài liệu này không kết nối database. Không đưa credentials hay dữ liệu cá nhân vào tài liệu.
 - Nhánh dự án `feature/patient-reception-workflow` chứa các commit task được tích hợp cục bộ; không có bằng chứng push, release hoặc GitHub-hosted CI run. Kết quả build/test không đồng nghĩa Phase 0, Phase 1 hoặc Phase 2 hoàn tất.
 - **UI chưa được xác minh trực tiếp:** cửa sổ Swing chưa được quan sát; headless form-to-persistence evidence không chứng minh hiển thị/layout, tương tác đầy đủ `ReceptionPanel`, hay toàn bộ UI-to-database acceptance.
-- Task board vẫn để `PAT-01`, `PAT-02`, `REC-01` và `SEC-01` ở trạng thái `[~]`. Các gate còn mở gồm visual/interaction acceptance, queue lifecycle/transfer, workflow tiền sử có guard/audit và các quyết định/policy security chưa triển khai; vì vậy Phase 0, Phase 1, Phase 2 và project tổng thể chưa được xác nhận hoàn tất. Phase 3–9 vẫn theo roadmap, không được đóng chỉ vì build hoặc migration pass.
+- Task board vẫn để `PAT-01`, `PAT-02`, `REC-01` và `SEC-01` ở trạng thái `[~]`. Các gate còn mở gồm visual/interaction acceptance, queue lifecycle/transfer, Doctor UI tiền sử và các quyết định/policy security chưa triển khai; vì vậy Phase 0, Phase 1, Phase 2 và project tổng thể chưa được xác nhận hoàn tất. Phase 3–9 vẫn theo roadmap, không được đóng chỉ vì build hoặc migration pass.
 - Các giới hạn khác vẫn gồm nghiệm thu nghiệp vụ toàn diện và xác minh authorization/privacy/audit theo từng luồng; không suy ra hoàn tất phase từ source, test hoặc một lượt tích hợp có phạm vi giới hạn.
 
 ## Nguyên tắc đánh giá hoàn thiện
@@ -47,3 +47,8 @@
 - `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseMigrationRunner.java`, `clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/{FreshDatabaseMigrationSqlServerTest,AuditSqlServerPersistenceTest,DatabaseMigrationRunnerTest}.java`, và `clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/reception/{ReceptionSqlServerPersistenceTest,ReceptionSqlServerProcessRestartTest}.java`
 - `docs/ke-hoach-trien-khai/02-cac-dot-trien-khai.md` và `docs/ke-hoach-trien-khai/03-model-task-board.md`
 - `README.md`, `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `UI_CODING_STANDARDS.md`
+
+
+## Evidence addendum — patient history SQL Server acceptance (2026-11-06)
+
+`PAT-HISTORY-SQL-01` is complete locally. On newly created disposable `clinic_test_patient_history_20261106`, V1–V10 migration passed 1/1 and `PatientHistorySqlServerPersistenceTest` passed 1/1, covering V10 trigger-safe insert, exact scope/category filtering, update/version, read audit `PATIENT_VIEW`/`PATIENT`, and mutation/audit rollback. Only synthetic fixture rows and its temporary trigger were cleaned; the database remains. The current root default `mvn -Djava.awt.headless=true clean verify` baseline is 305 tests, 0 failures/errors, 5 opt-in skips (65 Surefire reports). The Doctor history UI is still not wired because the station has mock DTOs without real patient/session context; Phase 1 remains open. No push or PR.
