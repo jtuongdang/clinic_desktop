@@ -1,8 +1,8 @@
 # Phase 1 — `TienSuBenh` row scope contract
 
 **Decision date:** 2026-11-06  
-**Status:** Owner-approved policy; V10 storage foundation accepted; read/write workflow pending
-**Related tasks:** `PAT-02`, `PAT-HISTORY-REVIEW-01`, `PAT-HISTORY-SCOPE-01`
+**Status:** Owner-approved policy; V10 storage and guarded/audited application read foundation accepted locally; write workflow and UI acceptance pending
+**Related tasks:** `PAT-02`, `PAT-HISTORY-REVIEW-01`, `PAT-HISTORY-SCOPE-01`, `PAT-HISTORY-READ-01`, `PAT-HISTORY-WRITE-01`
 
 ## Approved policy
 
@@ -27,12 +27,16 @@ Before V10, `TienSuBenh` had patient ID, category and narrative only, with no hi
 
 ## Interim behavior
 
-Until each required step is implemented and accepted, all history reads and writes remain default-deny. The Doctor UI may show unavailable state; it must not synthesize history from the current encounter DTO.
+`PAT-HISTORY-READ-01` implements a guarded application query and JDBC read path; it requires DOCTOR, active exact-scope authorization and `PATIENT:XEM`, and it writes `PATIENT_VIEW` audit before returning data. The query is not wired to the Doctor UI because the current station still lacks real patient IDs and injected session context. Create/edit remains unavailable until `PAT-HISTORY-WRITE-01` and its tests are accepted. The Doctor UI must continue to show unavailable state and must not synthesize history from the current encounter DTO. No history read/write screen workflow is enabled yet.
 
 
 ## Storage foundation evidence — 2026-11-06
 
-V10 is integrated on `feature/patient-reception-workflow`. SQL Server opt-in `FreshDatabaseMigrationSqlServerTest` passed 1/1 on disposable `clinic_test_v10_history_scope_final_20261106`: V1–V10 applied; a legacy row inserted before V10 retained null scope; new unscoped inserts were rejected; a mismatched department/facility pair was rejected; a matching pair was accepted. No legacy backfill was performed. Root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed 283 tests, 0 failures/errors, 4 SQL Server opt-in skips (61 reports). These results accept storage only; no history query, repository, guard, audit or UI workflow is enabled, so read/write remain default-deny. Two earlier disposable DBs from failed assertion iterations were left untouched and were not dropped.
+V10 is integrated on `feature/patient-reception-workflow`. SQL Server opt-in `FreshDatabaseMigrationSqlServerTest` passed 1/1 on disposable `clinic_test_v10_history_scope_final_20261106`: V1–V10 applied; a legacy row inserted before V10 retained null scope; new unscoped inserts were rejected; a mismatched department/facility pair was rejected; a matching pair was accepted. No legacy backfill was performed. Root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed 283 tests at the storage-task snapshot, 0 failures/errors, 4 SQL Server opt-in skips (61 reports). Subsequent `PAT-HISTORY-READ-01` added a read port/adapter and guarded query; full root baseline is now 295 tests, 0 failures/errors, 4 opt-in skips (63 reports). The read path is not UI-enabled; writes remain pending. Two earlier disposable DBs from failed assertion iterations were left untouched and were not dropped.
+
+## Read foundation evidence — 2026-11-06
+
+`PAT-HISTORY-READ-01` (Copilot CLI; agent commit `98c1409`, local integration `ba69e1e`) added the read port/JDBC adapter and `GetPatientHistoryQuery` handler. Application tests cover exact DOCTOR/session/grant gates, actor mismatch, query-before-audit and fail-closed audit errors; repository tests cover active rows, exact pair, approved categories and mapping. Audit uses `PATIENT_VIEW`/`PATIENT`, patient ID as resource ID, exact scope and correlation metadata, without clinical narrative. Root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed 295 tests, 0 failures/errors, 4 opt-in skips (63 reports). The read foundation does not connect the Doctor UI or accept the full history workflow.
 
 
 ## Audit event mapping — Owner-approved 2026-11-06
