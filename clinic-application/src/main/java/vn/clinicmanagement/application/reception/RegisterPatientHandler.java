@@ -16,6 +16,7 @@ import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
+import vn.clinicmanagement.domain.common.valueobjects.DateRange;
 import vn.clinicmanagement.domain.common.valueobjects.PhoneNumber;
 import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
@@ -198,8 +199,12 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
             BaoHiem card = command.insurance();
             if (card.getNgayHetHan() == null) return "Vui lòng nhập hạn thẻ BHYT.";
             if (card.getMucHuong() < 0 || card.getMucHuong() > 100) return "Mức hưởng BHYT phải từ 0 đến 100%.";
-            if (card.getNgayBatDau() != null && card.getNgayBatDau().isAfter(card.getNgayHetHan()))
+            try {
+                // Reception records the card's interval; coverage is adjudicated separately.
+                new DateRange(card.getNgayBatDau(), card.getNgayHetHan());
+            } catch (IllegalArgumentException ignored) {
                 return "Ngày bắt đầu thẻ BHYT phải trước hoặc bằng ngày hết hạn.";
+            }
         } else if (command.payerType() == DoiTuongKham.BHYT) {
             return "Đối tượng BHYT cần có số thẻ và hạn thẻ.";
         }

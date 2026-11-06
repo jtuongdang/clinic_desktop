@@ -121,6 +121,136 @@ class RegisterPatientHandlerTest {
     }
 
     @Test
+    void insuranceWithUnknownStartAndValidExpiryIsAcceptedWithoutInventingStart() {
+        Fixture fixture = new Fixture();
+        BaoHiem insurance = validInsurance();
+        LocalDate expiry = LocalDate.now().plusYears(1);
+        insurance.setNgayBatDau(null);
+        insurance.setNgayHetHan(expiry);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance));
+
+        assertCardRegistrationSucceeded(fixture, result);
+        assertNull(insurance.getNgayBatDau());
+        assertEquals(expiry, insurance.getNgayHetHan());
+    }
+
+    @Test
+    void expiredInsuranceIsAcceptedWithoutAdjudicatingCoverage() {
+        Fixture fixture = new Fixture();
+        BaoHiem insurance = validInsurance();
+        LocalDate expiry = LocalDate.now().minusDays(1);
+        LocalDate start = expiry.minusYears(1);
+        insurance.setNgayBatDau(start);
+        insurance.setNgayHetHan(expiry);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance));
+
+        assertCardRegistrationSucceeded(fixture, result);
+        assertEquals(start, insurance.getNgayBatDau());
+        assertEquals(expiry, insurance.getNgayHetHan());
+    }
+
+    @Test
+    void insuranceStartingInFutureIsAcceptedWithoutAdjudicatingCoverage() {
+        Fixture fixture = new Fixture();
+        BaoHiem insurance = validInsurance();
+        LocalDate start = LocalDate.now().plusDays(1);
+        LocalDate expiry = start.plusYears(1);
+        insurance.setNgayBatDau(start);
+        insurance.setNgayHetHan(expiry);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance));
+
+        assertCardRegistrationSucceeded(fixture, result);
+        assertEquals(start, insurance.getNgayBatDau());
+        assertEquals(expiry, insurance.getNgayHetHan());
+    }
+
+    @Test
+    void insuranceStartingAndExpiringTodayIsAcceptedWithInclusiveBoundary() {
+        Fixture fixture = new Fixture();
+        BaoHiem insurance = validInsurance();
+        LocalDate today = LocalDate.now();
+        insurance.setNgayBatDau(today);
+        insurance.setNgayHetHan(today);
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance));
+
+        assertCardRegistrationSucceeded(fixture, result);
+        assertEquals(today, insurance.getNgayBatDau());
+        assertEquals(today, insurance.getNgayHetHan());
+    }
+
+    @Test
+    void invertedKnownInsuranceDatesAreRejectedBeforeTransactionForAnyPayerWithCardNumber() {
+        for (DoiTuongKham payer : List.of(DoiTuongKham.BHYT, DoiTuongKham.THU_PHI)) {
+            Fixture fixture = new Fixture();
+            BaoHiem insurance = validInsurance();
+            insurance.setNgayBatDau(LocalDate.of(2025, 1, 2));
+            insurance.setNgayHetHan(LocalDate.of(2025, 1, 1));
+
+            Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance, payer));
+
+            assertValidationBeforeTransaction(fixture, result,
+                    "Ngày bắt đầu thẻ BHYT phải trước hoặc bằng ngày hết hạn.");
+        }
+    }
+
+    @Test
+    void missingInsuranceExpiryIsRejectedBeforeTransactionForKnownOrUnknownStart() {
+        for (DoiTuongKham payer : List.of(DoiTuongKham.BHYT, DoiTuongKham.THU_PHI)) {
+            for (boolean knownStart : List.of(false, true)) {
+                Fixture fixture = new Fixture();
+                BaoHiem insurance = validInsurance();
+                insurance.setNgayBatDau(knownStart ? LocalDate.of(2025, 1, 1) : null);
+                insurance.setNgayHetHan(null);
+
+                Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance, payer));
+
+                assertValidationBeforeTransaction(fixture, result, "Vui lòng nhập hạn thẻ BHYT.");
+            }
+        }
+    }
+
+    @Test
+    void bhytPayerWithoutInsuranceOrCardNumberIsRejectedBeforeTransaction() {
+        List<BaoHiem> cards = new ArrayList<>();
+        cards.add(null);
+        for (String number : new String[]{null, "", "  "}) {
+            BaoHiem insurance = validInsurance();
+            insurance.setSoBaoHiem(number);
+            cards.add(insurance);
+        }
+        for (BaoHiem insurance : cards) {
+            Fixture fixture = new Fixture();
+
+            Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance));
+
+            assertValidationBeforeTransaction(fixture, result, "Đối tượng BHYT cần có số thẻ và hạn thẻ.");
+        }
+    }
+
+    @Test
+    void insuranceDatesWithoutCardNumberDoNotBlockSelfPayReceptionOrPersistCard() {
+        Fixture fixture = new Fixture();
+        BaoHiem insurance = validInsurance();
+        insurance.setSoBaoHiem("  ");
+        insurance.setNgayBatDau(LocalDate.of(2025, 1, 2));
+        insurance.setNgayHetHan(LocalDate.of(2025, 1, 1));
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), insurance,
+                DoiTuongKham.THU_PHI));
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, fixture.patientAdds.get());
+        assertEquals(1, fixture.visitCalls.get());
+        assertEquals(0, fixture.insuranceAdds.get());
+        assertEquals(0, fixture.insuranceUpdates.get());
+        assertFalse(fixture.transactions.committedWrites.contains("insurance"));
+    }
+
+    @Test
     void newPatientRegistrationPersistsPatientInsuranceAndVisitReceipt() {
         Fixture fixture = new Fixture();
         LocalDateTime patientCreatedAt = LocalDateTime.of(2026, 5, 1, 8, 0);
@@ -542,6 +672,30 @@ class RegisterPatientHandlerTest {
         assertEquals(List.of(), fixture.transactions.committedWrites);
         assertEquals(List.of(), fixture.transactions.stagedWrites);
         assertEquals(1, fixture.transactions.failures);
+    }
+
+    private static void assertCardRegistrationSucceeded(Fixture fixture, Result<RegistrationReceipt> result) {
+        assertTrue(result.isSuccess());
+        assertEquals(1, fixture.transactions.calls);
+        assertEquals(0, fixture.transactions.failures);
+        assertEquals(1, fixture.patientAdds.get());
+        assertEquals(1, fixture.insuranceAdds.get());
+        assertEquals(1, fixture.visitCalls.get());
+        assertEquals(1, fixture.patientFacilityCalls.get());
+        assertTrue(fixture.transactions.committedWrites.contains("insurance"));
+    }
+
+    private static void assertValidationBeforeTransaction(Fixture fixture, Result<RegistrationReceipt> result,
+                                                         String message) {
+        assertFailure(result, "PATIENT_VALIDATION");
+        assertEquals(message, result.getError().orElseThrow().message());
+        assertEquals(0, fixture.transactions.calls);
+        assertNoWritesOrVisit(fixture);
+        assertEquals(0, fixture.patientFacilityCalls.get());
+        assertTrue(fixture.auditEntries.isEmpty());
+        assertTrue(fixture.independentAuditEntries.isEmpty());
+        assertTrue(fixture.transactions.stagedWrites.isEmpty());
+        assertTrue(fixture.transactions.committedWrites.isEmpty());
     }
 
     private static void assertSafePersistenceFailure(Result<RegistrationReceipt> result) {
