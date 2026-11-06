@@ -130,10 +130,10 @@ public class DoctorStationPanel extends BaseViewPanel {
     }
 
     private void onPatientChanged(PatientExamDto p) {
+        historyPanel.updateHistory(p);
         if (p == null) return;
         actionBar.updatePatient(p);
         clinicalForm.updatePatient(p);
-        historyPanel.updateHistory(p);
     }
 
     private JPanel createPlaceholderTab(String desc) {
