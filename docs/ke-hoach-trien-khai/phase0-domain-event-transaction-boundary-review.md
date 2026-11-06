@@ -167,3 +167,15 @@ Final local checks: `git diff --check` exit 0; the new-file `git diff --no-index
 [cleanup-tests]: ../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/JdbcTransactionManagerTest.java#L144-L203
 [audit-test]: ../../clinic-application/src/test/java/vn/clinicmanagement/application/reception/RegisterPatientHandlerTest.java#L703-L718
 [transaction-probe]: ../../clinic-application/src/test/java/vn/clinicmanagement/application/reception/RegisterPatientHandlerTest.java#L1029-L1053
+
+## Owner decision addendum — 2026-11-06
+
+**Approved Orchestrator contract:** `a43850af-4577-4ce7-9fc8-48f0f4f8497c`.
+
+**Decision basis:** Mandatory RAG was completed successfully in the Tech Lead checkout immediately before dispatch. The retrieved review decision matrix confirms there is no production collector or consumer; it lists isolated/in-memory dispatch, pre-commit DB-only effects, post-commit best effort with a crash/loss window, and a same-transaction outbox as alternatives that are not approved by default.
+
+**Owner choice A:** Keep event buffers and the in-process publisher isolated until a concrete consumer/use case is approved.
+
+The existing event foundation therefore remains isolated primitives; this decision does not wire collection or delivery, and `PLAT-EVENT-01` remains **not complete**. No events are claimed delivered, audited, or durable, and no workflow is enabled. The alternatives in the historical decision matrix remain unselected; this addendum does not approve any other option.
+
+Consumer-specific decisions are deferred until such a consumer exists: the effect it performs, applicable privacy constraints, whether its effects participate in commit/rollback, and its failure, retry, and idempotency behavior. No collector, transaction/Unit of Work wiring, handler, retry, or outbox is authorized by this decision.
