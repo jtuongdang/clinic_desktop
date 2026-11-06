@@ -424,12 +424,17 @@ class FreshDatabaseMigrationSqlServerTest {
                 "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TienSuBenh') "
                         + "AND name = 'IX_TienSuBenh_Facility_Department_Patient'"),
                 "V10 must add a history scope lookup index");
+        assertEquals(1, queryInt(connection,
+                "SELECT COUNT(*) FROM sys.triggers WHERE parent_id = OBJECT_ID('dbo.TienSuBenh') "
+                        + "AND name = 'TR_TienSuBenh_Require_Scope_On_Insert' AND is_disabled = 0"),
+                "V10 must require an ownership pair on newly inserted history rows");
     }
 
     private static void assertV10RejectsMismatchedFacilityDepartment(
             Connection connection, int patientId, int firstFacilityId) throws SQLException {
         int secondFacilityId = -1;
         int secondDepartmentId = -1;
+        int scopedHistoryId = -1;
         try {
             try (PreparedStatement statement = connection.prepareStatement(
                     "INSERT INTO CoSo (tenCoSo) OUTPUT INSERTED.id VALUES ('Synthetic PAT-V10 pair fixture')")) {
@@ -446,6 +451,32 @@ class FreshDatabaseMigrationSqlServerTest {
                     secondDepartmentId = resultSet.getInt(1);
                 }
             }
+            SQLException missingScope = assertThrows(SQLException.class, () -> {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO TienSuBenh (maBenhNhan, loaiTienSu, moTa) "
+                                + "VALUES (?, 'BENH_NEN', 'Synthetic new history without scope')")) {
+                    statement.setInt(1, patientId);
+                    statement.executeUpdate();
+                }
+            }, "V10 must reject new history rows without an ownership pair");
+            assertEquals(51010, missingScope.getErrorCode(),
+                    "Missing scope must fail specifically at the V10 insert guard");
+
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "DECLARE @newHistory TABLE (id INT); "
+                            + "INSERT INTO TienSuBenh (maBenhNhan, loaiTienSu, moTa, maCoSo, maKhoa) "
+                            + "OUTPUT INSERTED.id INTO @newHistory(id) "
+                            + "VALUES (?, 'BENH_NEN', 'Synthetic scoped history', ?, ?); "
+                            + "SELECT id FROM @newHistory")) {
+                statement.setInt(1, patientId);
+                statement.setInt(2, secondFacilityId);
+                statement.setInt(3, secondDepartmentId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (!resultSet.next()) throw new SQLException("Synthetic scoped history insert returned no identity.");
+                    scopedHistoryId = resultSet.getInt(1);
+                }
+            }
+
             int mismatchingDepartmentId = secondDepartmentId;
             SQLException mismatch = assertThrows(SQLException.class, () -> {
                 try (PreparedStatement statement = connection.prepareStatement(
@@ -460,6 +491,12 @@ class FreshDatabaseMigrationSqlServerTest {
             assertTrue(mismatch.getErrorCode() == 547 || mismatch.getErrorCode() == 23000,
                     "The mismatch must fail as a SQL Server integrity violation");
         } finally {
+            if (scopedHistoryId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM TienSuBenh WHERE id = ?")) {
+                    statement.setInt(1, scopedHistoryId);
+                    statement.executeUpdate();
+                }
+            }
             if (secondDepartmentId > 0) {
                 try (PreparedStatement statement = connection.prepareStatement("DELETE FROM Khoa WHERE id = ?")) {
                     statement.setInt(1, secondDepartmentId);
@@ -686,7 +723,8 @@ class FreshDatabaseMigrationSqlServerTest {
         List<String> scriptNames = new ArrayList<>();
         try (Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(
-                     "SELECT script_name FROM __schema_migrations WHERE success = 1 ORDER BY script_name"
+                     "SELECT script_name FROM __schema_migrations WHERE success = 1 "
+                             + "ORDER BY TRY_CONVERT(int, SUBSTRING(script_name, 2, CHARINDEX('__', script_name) - 2))"
              )) {
             while (resultSet.next()) {
                 scriptNames.add(resultSet.getString(1));

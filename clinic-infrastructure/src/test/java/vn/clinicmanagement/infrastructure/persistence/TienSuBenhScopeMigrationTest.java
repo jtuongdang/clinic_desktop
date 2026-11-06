@@ -27,6 +27,9 @@ class TienSuBenhScopeMigrationTest {
                 .matcher(upper).find());
         assertTrue(upper.contains("FOREIGN KEY (MAKHOA, MACOSO) REFERENCES DBO.KHOA(ID, MACOSO)"));
         assertTrue(upper.contains("IX_TIENSUBENH_FACILITY_DEPARTMENT_PATIENT"));
+        assertTrue(upper.contains("TR_TIENSUBENH_REQUIRE_SCOPE_ON_INSERT"));
+        assertTrue(upper.contains("AFTER INSERT"));
+        assertTrue(upper.contains("THROW 51010"));
         assertFalse(Pattern.compile("(?im)^\\s*UPDATE\\s+(?:DBO\\.)?TIENSUBENH\\b").matcher(script).find(),
                 "V10 must preserve legacy rows without inferred scope");
         assertFalse(Pattern.compile("(?im)^\\s*INSERT\\s+INTO\\s+(?:DBO\\.)?TIENSUBENH\\b")

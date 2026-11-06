@@ -54,3 +54,20 @@ BEGIN
     CREATE NONCLUSTERED INDEX IX_TienSuBenh_Facility_Department_Patient
         ON dbo.TienSuBenh(maCoSo, maKhoa, maBenhNhan);
 END;
+GO
+
+-- Existing rows remain NULL/NULL, but new rows must provide a verified owner pair.
+IF OBJECT_ID(N'dbo.TR_TienSuBenh_Require_Scope_On_Insert', N'TR') IS NULL
+BEGIN
+    EXEC(N'
+        CREATE TRIGGER dbo.TR_TienSuBenh_Require_Scope_On_Insert
+        ON dbo.TienSuBenh
+        AFTER INSERT
+        AS
+        BEGIN
+            SET NOCOUNT ON;
+            IF EXISTS (SELECT 1 FROM inserted WHERE maCoSo IS NULL OR maKhoa IS NULL)
+                THROW 51010, ''New TienSuBenh rows require facility and department ownership.'', 1;
+        END
+    ');
+END;
