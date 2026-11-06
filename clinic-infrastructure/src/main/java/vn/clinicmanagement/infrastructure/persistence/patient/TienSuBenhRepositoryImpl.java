@@ -7,7 +7,6 @@ import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -74,18 +73,24 @@ public final class TienSuBenhRepositoryImpl implements ITienSuBenhRepository {
     @Override
     public TienSuBenh add(TienSuBenh history) {
         requireWritable(history);
-        String sql = "INSERT INTO TienSuBenh (maBenhNhan, loaiTienSu, moTa, maCoSo, maKhoa, createdAt, createdBy) "
-                + "VALUES (?, ?, ?, ?, ?, SYSUTCDATETIME(), ?)";
+        String sql = "SET NOCOUNT ON; DECLARE @GeneratedKeys TABLE (id INT); "
+                + "INSERT INTO TienSuBenh (maBenhNhan, loaiTienSu, moTa, maCoSo, maKhoa, createdAt, createdBy) "
+                + "OUTPUT INSERTED.id INTO @GeneratedKeys (id) "
+                + "VALUES (?, ?, ?, ?, ?, SYSUTCDATETIME(), ?); SELECT id FROM @GeneratedKeys;";
         try (JdbcConnectionProvider.Lease lease = connections.acquire();
-             PreparedStatement statement = lease.connection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement statement = lease.connection().prepareStatement(sql)) {
             statement.setInt(1, history.getMaBenhNhan());
             statement.setString(2, history.getLoaiTienSu().name());
             statement.setString(3, history.getMoTa().trim());
             statement.setInt(4, history.getMaCoSo());
             statement.setInt(5, history.getMaKhoa());
             statement.setInt(6, history.getCreatedBy());
-            if (statement.executeUpdate() != 1) throw new SQLException("History insert did not affect one row.");
-            try (ResultSet keys = statement.getGeneratedKeys()) {
+            boolean hasResultSet = statement.execute();
+            while (!hasResultSet && statement.getUpdateCount() != -1) {
+                hasResultSet = statement.getMoreResults();
+            }
+            if (!hasResultSet) throw new SQLException("History insert returned no identity result set.");
+            try (ResultSet keys = statement.getResultSet()) {
                 if (!keys.next()) throw new SQLException("History insert returned no identity.");
                 history.setId(keys.getInt(1));
                 history.setVersion(0L);

@@ -122,6 +122,7 @@ class TienSuBenhRepositoryImplTest {
         RecordedStatement insert = jdbc.statements.get(0);
         assertTrue(insert.sql.contains("maCoSo, maKhoa, createdAt, createdBy"));
         assertTrue(insert.sql.contains("SYSUTCDATETIME()"));
+        assertTrue(insert.sql.contains("OUTPUT INSERTED.id INTO @GeneratedKeys"));
         assertEquals(FACILITY_ID, insert.bindings.get(4));
         assertEquals(DEPARTMENT_ID, insert.bindings.get(5));
 
@@ -236,8 +237,11 @@ class TienSuBenhRepositoryImplTest {
                         }
                         case "setString", "setLong" -> { bindings.put((Integer) args[0], args[1]); yield null; }
                         case "executeQuery" -> resultSet();
+                        case "execute" -> true;
                         case "executeUpdate" -> 1;
-                        case "getGeneratedKeys" -> generatedKeyResultSet();
+                        case "getResultSet" -> generatedKeyResultSet();
+                        case "getUpdateCount" -> -1;
+                        case "getMoreResults" -> false;
                         case "close" -> null;
                         case "toString" -> "SyntheticPatientHistoryStatement";
                         case "hashCode" -> System.identityHashCode(proxy);
