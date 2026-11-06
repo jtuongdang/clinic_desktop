@@ -2,14 +2,16 @@
 
 **Tài liệu:** Bản ghi nhận khoảng trống quyết định nghiệp vụ cho luồng điều chuyển lượt khám (Visit Transfer Decision-Gap Memo)<br>
 **Mã task:** `VIS-TRANSFER-DECISION-GAP-01`<br>
-**Trạng thái:** Báo cáo phân tích kỹ thuật và đề xuất lựa chọn tác nghiệp cho Owner duyệt. Không thay đổi source code, schema migration, ma trận phân quyền, hoặc kích hoạt runtime workflow.<br>
+**Trạng thái:** Báo cáo phân tích kỹ thuật; các lựa chọn điều chuyển dưới đây đã được đối soát theo quyết định Owner ngày 06/11/2026. Không thay đổi source code, schema migration, ma trận phân quyền, hoặc kích hoạt runtime workflow.<br>
 **Gate an ninh:** Mọi workflow điều chuyển tiếp tục bị từ chối (`DENY`) trong runtime theo cổng an ninh SEC-01 ([`phase2-implementation-contract.md:32-50`](phase2-implementation-contract.md#L32-L50)).
+
+> **Supersession — 06/11/2026:** Owner approved `VIS-TRANSFER-OWNER-DECISION-RECON-03`. Section 4 below is the current transfer decision ledger: the approved rules are closed, and only its six enumerated choices remain open. The pre-approval options retained in the historical appendix are not current proposals or implementation authority. No resulting visit status or replay behavior is inferred.
 
 ---
 
 ## 1. Tóm tắt điều hành & Mục tiêu tài liệu
 
-Tài liệu này đối soát hiện trạng mã nguồn, tài liệu Phase 3 và các chính sách đã được Chủ dự án (Owner) phê duyệt nhằm xác định chính xác các **khoảng trống quyết định tác nghiệp (operational decision gaps)** cần Owner chốt trước khi thiết kế contract triển khai cho tính năng điều chuyển lượt khám (`LuotKham`).
+Tài liệu này đối soát hiện trạng mã nguồn và tài liệu Phase 3 với quyết định Owner đã phê duyệt theo contract `VIS-TRANSFER-OWNER-DECISION-RECON-03`, nhằm tách chính sách cố định khỏi đúng các lựa chọn triển khai còn mở cho điều chuyển lượt khám (`LuotKham`).
 
 Tài liệu tuân thủ nghiêm ngặt 3 nguyên tắc:
 1. **Không mở lại các chính sách đã duyệt (settled policies):** Giữ nguyên vai trò, phạm vi (role/scope), ranh giới hủy lượt và ranh giới ghi sinh hiệu làm biên cố định.
@@ -27,6 +29,9 @@ Các ranh giới sau đây đã được Owner phê duyệt chính thức tại 
   - `DOCTOR` (Bác sĩ): Chỉ được phép điều chuyển lượt khám **trong nội bộ khoa** mà phiên làm việc đã chọn (`source.facilityId == destination.facilityId == session.facilityId` và `source.departmentId == destination.departmentId == session.departmentId`, ví dụ: chuyển giữa các phòng khám trong cùng khoa).
   - Các vai trò khác (`ADMIN`, `PHARMACIST`, `CASHIER`, `LAB_TECH`): Hoàn toàn bị cấm (`DENY`) thực hiện điều chuyển.
   - **Ranh giới cô lập dữ liệu (`DEC-AUTHZ-03`):** Thao tác điều chuyển là một tác vụ cập nhật vị trí/trạng thái có guard chuyên biệt; thao tác này **tuyệt đối không cấp quyền đọc** hồ sơ bệnh nhân, lịch sử khám hay hàng đợi của khoa/phòng đích cho người thực hiện.
+* Các quy tắc điều chuyển bổ sung được Owner duyệt ngày 06/11/2026 theo `VIS-TRANSFER-OWNER-DECISION-RECON-03`: RECEPTIONIST chỉ chuyển `CHO_KHAM`; DOCTOR chuyển `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`; final/completed, hủy, soft-deleted hoặc EMR-locked đều bị từ chối. Phòng đích bắt buộc, active và thuộc khoa đích. Cấp số queue mới tại đích, giữ nguyên priority, không auto-promote.
+* Giữ nguyên các liên kết dịch vụ, đơn thuốc, kết quả, hóa đơn và tài chính; không tự hủy/sửa liên kết, đổi billing hay tạo khoản thu trùng. Pending work chỉ được theo lượt nếu an toàn và đơn vị thực hiện/trách nhiệm vẫn nguyên vẹn; nếu không thì cần hoàn tất/handoff hoặc từ chối. Đơn thuốc đã phát hành, kết quả đã xác nhận và giao dịch tài chính đã post là bất biến; điều chỉnh thuộc workflow riêng được cấp quyền, đối soát và audit.
+* Bắt buộc nhất quán transaction, optimistic concurrency, domain invariants và exception-path tests. Metadata kỹ thuật/audit dùng UTC; thời gian nghiệp vụ dùng `Asia/Ho_Chi_Minh`.
 * **Ranh giới hủy lượt khám (`DEC-AUTHZ-04a`):**
   - Chỉ duy nhất `RECEPTIONIST` được hủy lượt khám.
   - Lượt khám chỉ hợp lệ để hủy khi đang ở trạng thái `CHO_KHAM` và **chưa có bất kỳ chỉ định cận lâm sàng/dịch vụ nào cũng như chưa phát sinh bất kỳ khoản thu phí/hóa đơn nào**. Bắt buộc xác nhận, nhập lý do và ghi audit. Ranh giới này độc lập và không bị nới lỏng bởi luồng điều chuyển.
@@ -53,21 +58,41 @@ Các ranh giới sau đây đã được Owner phê duyệt chính thức tại 
 
 ### 3.2. Chính sách đã phê duyệt (Policy)
 
-* Quyết định `DEC-AUTHZ-04b`: Cho phép `RECEPTIONIST` chuyển liên khoa cùng cơ sở; `DOCTOR` chỉ chuyển trong khoa; cấm chuyển xuyên cơ sở; không mở quyền đọc dữ liệu khoa đích ([`phase2-role-permission-matrix-approval.md:8-18`](phase2-role-permission-matrix-approval.md#L8-L18)).
-* Quyết định `DEC-TIME-01`: Chuẩn hóa thời gian kỹ thuật/audit bằng UTC, thời gian nghiệp vụ phòng khám bằng múi giờ `Asia/Ho_Chi_Minh` ([`phase2-implementation-contract.md:8-12`](phase2-implementation-contract.md#L8-L12)).
+* `DEC-AUTHZ-04b`: `RECEPTIONIST` chỉ chuyển cùng cơ sở; `DOCTOR` chỉ trong khoa đã chọn; không chuyển xuyên cơ sở, không cấp quyền đọc dữ liệu khoa đích ([`phase2-role-permission-matrix-approval.md:8-18`](phase2-role-permission-matrix-approval.md#L8-L18)).
+* `VIS-TRANSFER-OWNER-DECISION-RECON-03`, Owner approved 06/11/2026: source status, required active destination room, new destination queue number with preserved priority/no auto-promotion, linked-work preservation/safe handoff, immutability, transaction consistency, optimistic concurrency, invariants, and exception-path tests are approved; see [`phase3-visit-transfer-contract-review.md`](phase3-visit-transfer-contract-review.md).
+* `DEC-TIME-01`: Technical/audit metadata uses UTC and clinic business time uses `Asia/Ho_Chi_Minh` ([`phase2-implementation-contract.md:8-12`](phase2-implementation-contract.md#L8-L12)); transfer effective-date boundary and queue business date remain open under the approved contract.
 * Cổng an ninh `SEC-01`: Giữ trạng thái từ chối mặc định (`DENY`) ở tầng runtime cho tới khi implementation contract, guard, audit và bộ kiểm thử đạt chuẩn ([`phase2-implementation-contract.md:32-50`](phase2-implementation-contract.md#L32-L50)).
 
 ### 3.3. Suy luận kỹ thuật (Inference)
 
 * Để thực hiện điều chuyển mà không phá vỡ tính đóng băng của `AuthorizationService.evaluate()` (vốn bảo vệ toàn bộ các thao tác thông thường), cần một **Transfer Authorization Guard chuyên biệt** trong tầng Application để kiểm tra đồng thời cặp nguồn và cặp đích theo ma trận `DEC-AUTHZ-04b`.
-* Thao tác điều chuyển trả về một biên nhận kết quả (Receipt DTO) tối giản (chỉ chứa `visitId`, `sourceDepartmentId`, `targetDepartmentId`, `transferredAt`); **tuyệt đối không trả về thông tin danh sách bệnh nhân hoặc chi tiết hàng đợi của khoa đích** nhằm tuân thủ triệt để nguyên tắc không cấp quyền đọc liên khoa.
-* Luồng điều chuyển phải chạy trong một `TransactionBoundary` duy nhất: cập nhật thực thể `LuotKham`, ghi nhận lịch sử điều chuyển, và phát sinh bản ghi audit `VISIT_TRANSFERRED`. Nếu audit thất bại, toàn bộ giao tác phải bị rollback (fail-closed).
+* Luồng điều chuyển cần giữ kết quả tối thiểu và **không trả về thông tin danh sách bệnh nhân hoặc chi tiết hàng đợi của khoa đích**, phù hợp nguyên tắc không cấp quyền đọc liên khoa.
+* Luồng điều chuyển phải bảo đảm transaction consistency trong `TransactionBoundary`. Cách lưu trữ lịch sử (bản ghi riêng, audit-only, hay cả hai) vẫn là lựa chọn mở; chỉ ghi các artifact theo contract Owner sẽ chốt sau, và lỗi ở bất kỳ write bắt buộc nào phải fail-closed/rollback.
 
 ---
 
-## 4. Danh mục các khoảng trống quyết định tác nghiệp cần Owner phê duyệt
+## 4. Đối soát quyết định Owner — chính sách cố định và lựa chọn còn mở
 
-Dưới đây là 7 vấn đề nghiệp vụ chưa được giải quyết trong các tài liệu hiện hành. Mỗi vấn đề đi kèm các phương án và phân tích tác động triển khai cụ thể để Owner cân nhắc lựa chọn:
+Provenance: approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-03`, 06/11/2026; cross-reference [`phase3-visit-transfer-contract-review.md`](phase3-visit-transfer-contract-review.md) and [`phase3-visit-lifecycle-owner-decisions.md`](phase3-visit-lifecycle-owner-decisions.md).
+
+**Đã duyệt — không còn là khoảng trống:** actor-specific source statuses and scope; no destination patient/history/queue reads; final/completed, cancelled, soft-deleted, and EMR-locked visits are denied; required active destination room belonging to the target department; new destination queue number with existing priority preserved and no auto-promotion; linked-record preservation, no automatic mutation/cancellation/billing change/duplicate charges; safe pending-work handoff or completion/denial; immutability of issued prescriptions, confirmed results, and posted financial transactions; transaction consistency, optimistic concurrency, domain invariants, exception-path tests; UTC technical/audit metadata and `Asia/Ho_Chi_Minh` business time. These policies do not establish the resulting visit status or replay result.
+
+**Chỉ còn sáu lựa chọn triển khai mở:**
+
+1. **Transfer reason:** Whether required, allowed reason-code set, and free-text rules.
+2. **Effective-date boundary:** Effective-date boundary and business date for the destination queue.
+3. **Queue sequence namespace/reuse:** Sequence namespace and number-reuse guarantees.
+4. **Visit status/timestamps:** Preserve or transition status/timestamps; do not infer a resulting status from source eligibility.
+5. **Transfer history:** Dedicated immutable transfer history, audit-only, or both.
+6. **Idempotent replay:** Replay outcome semantics, including a key reused with a different payload; do not infer replay behavior.
+
+The implementation evidence for safely resolving linked-work state and handoff is not yet complete. Keep transfer fail-closed until it can prove the approved requirements. This document does not authorize code, migration, grants, or runtime enablement.
+
+## Historical pre-approval options (superseded 06/11/2026)
+
+The option analysis below records the report snapshot before Owner approval. It is retained for provenance only: no old option or recommendation remains a current unresolved decision or implementation instruction. The approved section 4 above controls.
+
+Historical snapshot: the original report presented seven candidate gap areas and options before the contract was approved. The options and recommendation language below are superseded; only the six open choices in current section 4 remain unresolved.
 
 ### Khoảng trống 1: Trạng thái lượt khám đủ điều kiện điều chuyển (Transfer-Eligible Statuses)
 * **Hiện trạng nguồn:** `TrangThaiLuotKham` có các giá trị: `CHO_KHAM`, `DANG_KHAM`, `DA_KHAM`, `KET_LUAN`, `HOAN_THANH`, `DA_HUY`, `CHO_CLS` ([`TrangThaiLuotKham.java:3-10`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/enums/TrangThaiLuotKham.java#L3-L10)). `LuotKham.java:43` có cờ `emrLocked`. Chính sách `DEC-AUTHZ-04b` chỉ nêu quyền của actor, chưa quy định lượt khám ở trạng thái nào thì được phép chuyển.
@@ -169,7 +194,7 @@ Dưới đây là 7 vấn đề nghiệp vụ chưa được giải quyết tron
 
 ---
 
-## 5. Tổng hợp bảng đối chiếu khoảng trống và tác động kỹ thuật
+### Historical option summary (superseded 06/11/2026)
 
 | Khoảng trống quyết định | Tùy chọn A | Tùy chọn B | Tùy chọn C | Tác động kỹ thuật chính |
 |---|---|---|---|---|
@@ -183,9 +208,9 @@ Dưới đây là 7 vấn đề nghiệp vụ chưa được giải quyết tron
 
 ---
 
-## 6. Tiêu chí kiểm định nghiệm thu khi triển khai (Acceptance Gates)
+### Historical proposed acceptance gates (superseded 06/11/2026)
 
-Khi các quyết định trên được Owner thông qua và cổng SEC-01 được giải phóng, nhiệm vụ triển khai code thực tế bắt buộc phải thỏa mãn các tiêu chí kiểm định sau:
+The following criteria were drafted against the pre-approval options; they are retained as a historical snapshot, not an active implementation contract. Any implementation task must use the approved policy and open-choice list in current section 4, must not assume a resulting visit status or replay behavior, and must remain gated/default-deny.
 
 1. **Phân quyền và bảo mật (Authorization):**
    - Bộ kiểm thử độc lập chứng minh: `RECEPTIONIST` chuyển khác cơ sở -> `DENIED`; `DOCTOR` chuyển khác khoa -> `DENIED`; vai trò khác -> `DENIED`.
