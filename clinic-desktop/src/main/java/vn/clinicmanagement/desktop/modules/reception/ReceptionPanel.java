@@ -14,6 +14,9 @@ import vn.clinicmanagement.desktop.modules.reception.components.ReceptionTopTool
 
 import javax.swing.*;
 import java.awt.*;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -43,6 +46,7 @@ public class ReceptionPanel extends BaseViewPanel implements SessionLifecycleSer
     private final ReceptionFooterBar footerBar;
     private final ReceptionCompositionRoot.Services services;
     private final SessionLifecycleService sessionLifecycle;
+    private final Clock businessClock;
     private final AtomicLong sessionGeneration = new AtomicLong();
     private final AtomicLong loadGeneration = new AtomicLong();
     private final AtomicLong searchGeneration = new AtomicLong();
@@ -62,9 +66,15 @@ public class ReceptionPanel extends BaseViewPanel implements SessionLifecycleSer
     }
 
     ReceptionPanel(SessionLifecycleService sessionLifecycle, ReceptionCompositionRoot.Services services) {
+        this(sessionLifecycle, services, Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")));
+    }
+
+    ReceptionPanel(SessionLifecycleService sessionLifecycle, ReceptionCompositionRoot.Services services,
+                   Clock businessClock) {
         super("reception", "Đăng Ký Khám Bệnh", "📋");
         this.sessionLifecycle = Objects.requireNonNull(sessionLifecycle, "sessionLifecycle");
         this.services = Objects.requireNonNull(services, "services");
+        this.businessClock = Objects.requireNonNull(businessClock, "businessClock");
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -239,7 +249,7 @@ public class ReceptionPanel extends BaseViewPanel implements SessionLifecycleSer
         statusPanel.setQueue(List.of());
         statusPanel.setRoomSummaries(List.of());
         topToolbar.setNextQueueNumber(null);
-        var date = java.time.LocalDate.now();
+        var date = LocalDate.now(businessClock);
         SwingWorker<ReceptionLoad, Void> worker = new SwingWorker<>() {
             @Override protected ReceptionLoad doInBackground() {
                 if (isCancelled()) return null;
