@@ -315,64 +315,200 @@ class DoctorStationPanelTest {
 
     @Test
     void immediateSessionClearWithoutTimerTickCancelsWorkersAndClearsProtectedData() throws Exception {
+        assertLogoutCancelsBeforeEdtCleanup(true);
+    }
+
+    @Test
+    void logoutCancelsQueueWorkerBeforeEdtCanProcessCleanup() throws Exception {
+        assertLogoutCancelsBeforeEdtCleanup(false);
+    }
+
+    private void assertLogoutCancelsBeforeEdtCleanup(boolean loadHistory) throws Exception {
         lifecycle = activeLifecycle();
-        CountDownLatch historyStarted = new CountDownLatch(1);
-        CountDownLatch releaseHistory = new CountDownLatch(1);
+        CountDownLatch readStarted = new CountDownLatch(1);
+        CountDownLatch releaseRead = new CountDownLatch(1);
+        CountDownLatch readFinished = new CountDownLatch(1);
         panel = new DoctorStationPanel(lifecycle,
-                query -> Result.success(List.of(queueItem(101, 501, "SYN-501"))),
                 query -> {
-                    historyStarted.countDown();
-                    awaitLatch(releaseHistory);
+                    if (!loadHistory) {
+                        readStarted.countDown();
+                        awaitIgnoringInterrupts(releaseRead);
+                        readFinished.countDown();
+                    }
+                    return Result.success(List.of(queueItem(101, 501, "SYN-501")));
+                }, query -> {
+                    readStarted.countDown();
+                    awaitIgnoringInterrupts(releaseRead);
+                    readFinished.countDown();
                     return Result.success(List.of(history(501, "Protected history detail")));
                 });
         SwingUtilities.invokeAndWait(panel::onShow);
+        if (loadHistory) {
+            await(() -> queueTable().getRowCount() == 1);
+            SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
+        }
+        assertTrue(readStarted.await(2, TimeUnit.SECONDS));
+
+        SwingWorker<?, ?> worker = loadHistory ? panel.activeHistoryWorker() : panel.activeQueueWorker();
+        assertNotNull(worker);
+        AtomicBoolean offEdtMutation = new AtomicBoolean();
+        SwingUtilities.invokeAndWait(() -> watchForOffEdtMutation(panel, offEdtMutation));
+        CountDownLatch edtBlocked = new CountDownLatch(1);
+        CountDownLatch releaseEdt = new CountDownLatch(1);
+        SwingUtilities.invokeLater(() -> {
+            edtBlocked.countDown();
+            awaitLatch(releaseEdt);
+        });
+        try {
+            assertTrue(edtBlocked.await(2, TimeUnit.SECONDS));
+            lifecycle.logout();
+            // Neither the visual cleanup nor the periodic monitor can execute while the EDT is blocked.
+            assertTrue(worker.isCancelled(), "Listener must cancel before returning on the event thread");
+            assertNull(panel.activeQueueWorker());
+            assertNull(panel.activeHistoryWorker());
+        } finally {
+            releaseEdt.countDown();
+            releaseRead.countDown();
+        }
+
+        assertTrue(readFinished.await(2, TimeUnit.SECONDS), "Synthetic read must return despite cancellation");
+        await(() -> statusLabel("Không thể tải hàng đợi.") != null);
+        SwingUtilities.invokeAndWait(() -> {});
+        SwingUtilities.invokeAndWait(() -> {
+            assertProtectedDataCleared();
+            assertNotNull(statusLabel("Không thể tải tiền sử bệnh."));
+            assertFalse(containsText(panel, "Protected history detail"));
+        });
+        assertFalse(offEdtMutation.get(), "Listener must marshal all visual clearing to the EDT");
+    }
+
+    @Test
+    void sessionEventBeforeQueueWorkerRegistrationPreventsProtectedRead() throws Exception {
+        assertSessionEventBeforeWorkerRegistrationPreventsRead(false);
+    }
+
+    @Test
+    void sessionEventBeforeHistoryWorkerRegistrationPreventsProtectedRead() throws Exception {
+        assertSessionEventBeforeWorkerRegistrationPreventsRead(true);
+    }
+
+    private void assertSessionEventBeforeWorkerRegistrationPreventsRead(boolean loadHistory) throws Exception {
+        lifecycle = activeLifecycle();
+        AtomicInteger queueReads = new AtomicInteger();
+        AtomicInteger historyReads = new AtomicInteger();
+        panel = new DoctorStationPanel(lifecycle, query -> {
+            queueReads.incrementAndGet();
+            return Result.success(List.of(queueItem(101, 501, "SYN-501")));
+        }, query -> {
+            historyReads.incrementAndGet();
+            return Result.success(List.of());
+        });
+        if (loadHistory) {
+            SwingUtilities.invokeAndWait(panel::onShow);
+            await(() -> queueTable().getRowCount() == 1);
+        }
+        CountDownLatch beforeRegistration = new CountDownLatch(1);
+        CountDownLatch releaseRegistration = new CountDownLatch(1);
+        AtomicBoolean workerPublished = new AtomicBoolean();
+        SwingUtilities.invokeAndWait(() -> {
+            JLabel label = statusLabel(loadHistory ? "Chưa chọn người bệnh." : "Chưa tải hàng đợi.");
+            assertNotNull(label);
+            label.addPropertyChangeListener("text", event -> {
+                String text = String.valueOf(event.getNewValue());
+                if (loadHistory ? text.contains("SYN-501") : text.equals("Đang tải hàng đợi...")) {
+                    beforeRegistration.countDown();
+                    awaitLatch(releaseRegistration);
+                }
+            });
+        });
+        SwingUtilities.invokeLater(() -> {
+            if (loadHistory) queueTable().setRowSelectionInterval(0, 0);
+            else panel.onShow();
+            workerPublished.set((loadHistory ? panel.activeHistoryWorker() : panel.activeQueueWorker()) != null);
+        });
+        try {
+            assertTrue(beforeRegistration.await(2, TimeUnit.SECONDS));
+            lifecycle.clear();
+        } finally {
+            releaseRegistration.countDown();
+        }
+        SwingUtilities.invokeAndWait(() -> {});
+        assertFalse(workerPublished.get(), "A session event must invalidate a worker not yet registered");
+        assertEquals(loadHistory ? 1 : 0, queueReads.get());
+        assertEquals(0, historyReads.get());
+        SwingUtilities.invokeAndWait(this::assertProtectedDataCleared);
+    }
+
+    @Test
+    void edtLogoutClearsDisplayedPatientAndHistorySynchronouslyAndInvalidSessionsDoNotReload() throws Exception {
+        lifecycle = activeLifecycle();
+        AtomicInteger queueReads = new AtomicInteger();
+        panel = new DoctorStationPanel(lifecycle, query -> {
+            queueReads.incrementAndGet();
+            return Result.success(List.of(queueItem(101, 501, "SYN-501")));
+        }, query -> Result.success(List.of(history(501, "Synthetic displayed history"))));
+        SwingUtilities.invokeAndWait(panel::onShow);
         await(() -> queueTable().getRowCount() == 1);
         SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
-        assertTrue(historyStarted.await(2, TimeUnit.SECONDS));
-
-        SwingWorker<?, ?> activeWorker = panel.activeHistoryWorker();
-        assertNotNull(activeWorker, "History worker must be active during background read");
-
-        // Clear session: listener must immediately notify without waiting for monitorSession or 500ms timer
-        lifecycle.clear();
-        SwingUtilities.invokeAndWait(() -> {});
-
-        assertTrue(activeWorker.isCancelled(), "Active history worker must be cancelled immediately");
-        assertNull(panel.activeHistoryWorker());
-        assertEquals(0, queueTable().getRowCount(), "Queue rows must be cleared immediately");
-        assertEquals(0, historyRowCount(), "History rows must be cleared immediately");
-        assertNotNull(statusLabel("Không thể tải hàng đợi."));
-        assertNotNull(statusLabel("Không thể tải tiền sử bệnh."));
-
-        // When the background read finishes, its done() must not repopulate UI
-        releaseHistory.countDown();
-        Thread.sleep(150);
-        SwingUtilities.invokeAndWait(() -> {});
-        assertEquals(0, historyRowCount());
-        assertFalse(containsText(panel, "Protected history detail"));
+        await(() -> historyRowCount() == 1);
+        AtomicBoolean offEdtMutation = new AtomicBoolean();
+        SwingUtilities.invokeAndWait(() -> {
+            JTable displayedHistory = historyTable();
+            watchForOffEdtMutation(panel, offEdtMutation);
+            lifecycle.logout();
+            assertProtectedDataCleared();
+            assertEquals(0, displayedHistory.getRowCount(), "Detached history model must also be cleared");
+            panel.refreshData();
+            lifecycle.startSession(701, "synthetic-doctor", "Synthetic Doctor",
+                    new RoleChoice(42, "DOCTOR", "Synthetic Doctor"),
+                    new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+                    "invalid-synthetic-session-id");
+            assertProtectedDataCleared();
+            panel.refreshData();
+            assertNull(panel.activeQueueWorker());
+            assertNull(panel.activeHistoryWorker());
+        });
+        assertEquals(1, queueReads.get(), "Missing and invalid sessions must not start another protected read");
+        assertFalse(offEdtMutation.get());
     }
 
     @Test
     void replacementValidSessionSafelyReloadsThroughAuthorizedQueuePath() throws Exception {
         lifecycle = activeLifecycle();
+        CountDownLatch releaseReplacement = new CountDownLatch(1);
         AtomicReference<GetDoctorQueueQuery> lastQueueQuery = new AtomicReference<>();
         panel = new DoctorStationPanel(lifecycle,
                 query -> {
                     lastQueueQuery.set(query);
                     int doctorId = query.authorizationContext().employeeId();
+                    if (doctorId == 702) awaitLatch(releaseReplacement);
                     return Result.success(List.of(queueItem(200 + doctorId, 600 + doctorId, "DOC-" + doctorId)));
                 },
-                query -> Result.success(List.of()));
+                query -> Result.success(List.of(history(query.patientId(), "Synthetic prior-session history"))));
         SwingUtilities.invokeAndWait(panel::onShow);
         await(() -> queueTable().getRowCount() == 1);
         assertEquals(701, lastQueueQuery.get().authorizationContext().employeeId());
+        SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
+        await(() -> historyRowCount() == 1);
 
-        // Replace session with Doctor 702
-        lifecycle.startSession(
-                702, "synthetic-doctor-2", "Synthetic Doctor 2",
-                new RoleChoice(42, "DOCTOR", "Synthetic Doctor"),
-                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
-                UUID.randomUUID().toString());
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                lifecycle.startSession(
+                        702, "synthetic-doctor-2", "Synthetic Doctor 2",
+                        new RoleChoice(42, "DOCTOR", "Synthetic Doctor"),
+                        new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+                        UUID.randomUUID().toString());
+                // These assertions run in the listener's EDT turn, before any timer can fire.
+                assertProtectedDataCleared();
+                assertFalse(containsText(panel, "DOC-701"));
+                assertFalse(containsText(panel, "Synthetic Patient 1301"));
+                assertNull(statusLabel("901"));
+            });
+            await(() -> lastQueueQuery.get().authorizationContext().employeeId() == 702);
+            assertEquals(702, lastQueueQuery.get().auditActorContext().employeeId());
+        } finally {
+            releaseReplacement.countDown();
+        }
 
         // Must reload immediately through listener without waiting for monitorSession timer
         await(() -> lastQueueQuery.get() != null
@@ -391,6 +527,7 @@ class DoctorStationPanelTest {
         CountDownLatch historyStarted = new CountDownLatch(1);
         CountDownLatch releaseHistory = new CountDownLatch(1);
         AtomicInteger queueLoads = new AtomicInteger();
+        AtomicInteger sessionEvents = new AtomicInteger();
         panel = new DoctorStationPanel(lifecycle,
                 query -> {
                     queueLoads.incrementAndGet();
@@ -400,7 +537,13 @@ class DoctorStationPanelTest {
                     historyStarted.countDown();
                     awaitLatch(releaseHistory);
                     return Result.success(List.of(history(501, "Protected history")));
-                });
+                }) {
+            @Override
+            public void onSessionChanged() {
+                sessionEvents.incrementAndGet();
+                super.onSessionChanged();
+            }
+        };
         SwingUtilities.invokeAndWait(panel::onShow);
         await(() -> queueTable().getRowCount() == 1);
         SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
@@ -426,8 +569,57 @@ class DoctorStationPanelTest {
         Thread.sleep(150);
         SwingUtilities.invokeAndWait(() -> {});
         assertEquals(loadsBeforeReplacement, queueLoads.get(), "Hidden panel must not reload after unsubscribing");
+        assertEquals(0, sessionEvents.get(), "Hidden panel must remove its listener");
 
         releaseHistory.countDown();
+        SwingUtilities.invokeAndWait(() -> {
+            panel.onShow();
+            panel.onShow();
+        });
+        await(() -> queueTable().getRowCount() == 1);
+        SwingUtilities.invokeAndWait(() -> {
+            lifecycle.clear();
+            assertProtectedDataCleared();
+        });
+        assertEquals(1, sessionEvents.get(), "Showing again must register exactly one listener");
+        SwingUtilities.invokeAndWait(panel::onHide);
+        lifecycle.startSession(703, "synthetic-doctor-3", "Synthetic Doctor 3",
+                new RoleChoice(42, "DOCTOR", "Synthetic Doctor"),
+                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+                UUID.randomUUID().toString());
+        assertEquals(1, sessionEvents.get(), "Hiding again must remove the listener");
+    }
+
+    private void assertProtectedDataCleared() {
+        assertEquals(0, queueTable().getRowCount());
+        assertEquals(-1, queueTable().getSelectedRow());
+        assertEquals(0, historyRowCount());
+        assertNotNull(statusLabel("Chưa chọn người bệnh."));
+        assertFalse(containsText(panel, "SYN-501"));
+        assertFalse(containsText(panel, "Synthetic Patient 501"));
+        assertNull(statusLabel("101"));
+        assertNull(statusLabel("Q-101"));
+        assertNull(statusLabel("Synthetic Room"));
+        assertNull(statusLabel("CHO_KHAM"));
+    }
+
+    private static void watchForOffEdtMutation(Container container, AtomicBoolean detected) {
+        for (Component component : container.getComponents()) {
+            if (component instanceof JLabel label) {
+                label.addPropertyChangeListener("text", event -> {
+                    if (!SwingUtilities.isEventDispatchThread()) detected.set(true);
+                });
+            }
+            if (component instanceof JTable table) {
+                table.getModel().addTableModelListener(event -> {
+                    if (!SwingUtilities.isEventDispatchThread()) detected.set(true);
+                });
+                table.getSelectionModel().addListSelectionListener(event -> {
+                    if (!SwingUtilities.isEventDispatchThread()) detected.set(true);
+                });
+            }
+            if (component instanceof Container child) watchForOffEdtMutation(child, detected);
+        }
     }
 
     private JTable queueTable() {
@@ -492,6 +684,18 @@ class DoctorStationPanelTest {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while waiting for test release.", exception);
         }
+    }
+
+    private static void awaitIgnoringInterrupts(CountDownLatch latch) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (System.nanoTime() < deadline) {
+            try {
+                if (latch.await(Math.max(1, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)) return;
+            } catch (InterruptedException ignored) {
+                // Simulate a reader that still returns protected data after its worker is cancelled.
+            }
+        }
+        throw new IllegalStateException("Timed out waiting for synthetic read release.");
     }
 
     private static JTable findTable(Container container, int columns) {

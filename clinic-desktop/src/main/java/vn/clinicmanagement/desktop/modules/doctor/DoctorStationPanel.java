@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 /** Doctor station read workflow for the scoped team queue and patient history. */
@@ -44,7 +45,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
     private AuthorizationContext observedSession;
     private volatile AuthorizationContext queueAuthorization;
     private ReceptionQueueItem selectedItem;
-    private long requestGeneration;
+    private final AtomicLong requestGeneration = new AtomicLong();
     private SwingWorker<List<ReceptionQueueItem>, Void> activeQueueWorker;
     private SwingWorker<List<TienSuBenh>, Void> activeHistoryWorker;
     private boolean active;
@@ -134,6 +135,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
 
     @Override
     public void onSessionChanged() {
+        // Lifecycle events may arrive off the EDT; invalidate and interrupt before posting UI cleanup.
         cancelActiveWorkers();
         if (!SwingUtilities.isEventDispatchThread()) {
             SwingUtilities.invokeLater(this::handleSessionChange);
@@ -150,7 +152,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
         }
 
         cancelActiveWorkers();
-        long generation = ++requestGeneration;
+        long generation = requestGeneration.incrementAndGet();
         selectedItem = null;
         actionBar.updatePatient(null);
         clinicalForm.updatePatient(null);
@@ -160,7 +162,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
         AuthorizationContext authorization = currentAuthorizationContext();
         observedSession = authorization;
         AuditActorContext auditActor = currentAuditActorContext();
-        if (authorization == null || !matchesActor(authorization, auditActor)) {
+        if (authorization == null || !authorization.isValid() || !matchesActor(authorization, auditActor)) {
             queueSidebar.showUnavailable();
             historyPanel.showUnavailable();
             return;
@@ -187,7 +189,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
 
             @Override
             protected void done() {
-                if (isCancelled() || generation != requestGeneration) return;
+                if (isCancelled() || generation != requestGeneration.get()) return;
                 if (!isCurrentSession(authorization)) {
                     handleSessionChange();
                     return;
@@ -212,6 +214,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
             }
         };
         synchronized (this) {
+            if (generation != requestGeneration.get()) return;
             activeQueueWorker = worker;
         }
         worker.execute();
@@ -234,6 +237,8 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
             SwingUtilities.invokeLater(() -> onPatientChanged(item));
             return;
         }
+        cancelActiveHistoryWorker();
+        long generation = requestGeneration.incrementAndGet();
         AuthorizationContext authorization = currentAuthorizationContext();
         AuditActorContext auditActor = currentAuditActorContext();
         if (item != null && (authorization == null
@@ -244,8 +249,6 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
             return;
         }
 
-        cancelActiveHistoryWorker();
-        long generation = ++requestGeneration;
         selectedItem = item;
         historyPanel.clearHistory();
         actionBar.updatePatient(item);
@@ -273,7 +276,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
             @Override
             protected void done() {
                 if (isCancelled()
-                        || generation != requestGeneration
+                        || generation != requestGeneration.get()
                         || selectedItem == null
                         || selectedItem.patientId() != item.patientId()) {
                     return;
@@ -306,6 +309,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
             }
         };
         synchronized (this) {
+            if (generation != requestGeneration.get()) return;
             activeHistoryWorker = worker;
         }
         worker.execute();
@@ -336,7 +340,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
 
     private synchronized void cancelActiveWorkers() {
         queueAuthorization = null;
-        requestGeneration++;
+        requestGeneration.incrementAndGet();
         if (activeQueueWorker != null) {
             if (!activeQueueWorker.isDone()) {
                 activeQueueWorker.cancel(true);
@@ -352,7 +356,7 @@ public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycl
     }
 
     private synchronized void cancelActiveHistoryWorker() {
-        requestGeneration++;
+        requestGeneration.incrementAndGet();
         if (activeHistoryWorker != null) {
             if (!activeHistoryWorker.isDone()) {
                 activeHistoryWorker.cancel(true);
