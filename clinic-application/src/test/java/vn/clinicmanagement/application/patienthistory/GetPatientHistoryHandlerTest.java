@@ -191,14 +191,27 @@ class GetPatientHistoryHandlerTest {
         int departmentId;
         RuntimeException repositoryFailure;
         List<TienSuBenh> histories = List.of();
-        final ITienSuBenhRepository repository = (patientId, facilityId, departmentId) -> {
-            order.add("query");
-            repositoryCalls++;
-            this.patientId = patientId;
-            this.facilityId = facilityId;
-            this.departmentId = departmentId;
-            if (repositoryFailure != null) throw repositoryFailure;
-            return histories;
+        final ITienSuBenhRepository repository = new ITienSuBenhRepository() {
+            @Override public List<TienSuBenh> getHistoryByPatientAndScope(
+                    int patientId, int facilityId, int departmentId) {
+                order.add("query");
+                repositoryCalls++;
+                Fixture.this.patientId = patientId;
+                Fixture.this.facilityId = facilityId;
+                Fixture.this.departmentId = departmentId;
+                if (repositoryFailure != null) throw repositoryFailure;
+                return histories;
+            }
+            @Override public Optional<TienSuBenh> getActiveByIdPatientAndScope(
+                    int historyId, int patientId, int facilityId, int departmentId) {
+                throw new UnsupportedOperationException("Read test does not update history.");
+            }
+            @Override public TienSuBenh add(TienSuBenh history) {
+                throw new UnsupportedOperationException("Read test does not add history.");
+            }
+            @Override public boolean update(TienSuBenh history, long expectedVersion) {
+                throw new UnsupportedOperationException("Read test does not update history.");
+            }
         };
         final AuthorizationService authorization;
 

@@ -94,6 +94,56 @@ class TienSuBenhRepositoryImplTest {
         assertTrue(jdbc.statements.isEmpty());
     }
 
+    @Test
+    void activeUpdateLookupIncludesHistoryPatientExactPairAndActiveFilters() {
+        SyntheticJdbc jdbc = new SyntheticJdbc(List.of(historyRow()));
+        Persistence persistence = persistence(jdbc);
+        persistence.transactions.inTransaction(() -> Result.success(persistence.repository
+                .getActiveByIdPatientAndScope(91, PATIENT_ID, FACILITY_ID, DEPARTMENT_ID)));
+        RecordedStatement statement = jdbc.statements.get(0);
+        assertEquals(Map.of(1, 91, 2, PATIENT_ID, 3, FACILITY_ID, 4, DEPARTMENT_ID), statement.bindings);
+        assertTrue(statement.sql.contains("WHERE id=? AND maBenhNhan=? AND maCoSo=? AND maKhoa=?"));
+        assertTrue(statement.sql.contains("isDeleted=0"));
+        assertTrue(statement.sql.contains("maCoSo IS NOT NULL AND maKhoa IS NOT NULL"));
+    }
+
+    @Test
+    void insertAndUpdateUseTrustedOwnershipAndOptimisticActiveScopePredicates() {
+        SyntheticJdbc jdbc = new SyntheticJdbc(List.of());
+        Persistence persistence = persistence(jdbc);
+        TienSuBenh created = new TienSuBenh();
+        created.setMaBenhNhan(PATIENT_ID);
+        created.setLoaiTienSu(LoaiTienSu.DI_UNG);
+        created.setMoTa("synthetic allergy narrative");
+        created.setOwnershipScope(FACILITY_ID, DEPARTMENT_ID);
+        created.setCreatedBy(EMPLOYEE_ID);
+        assertTrue(persistence.transactions.inTransaction(() ->
+                Result.success(persistence.repository.add(created))).isSuccess());
+        RecordedStatement insert = jdbc.statements.get(0);
+        assertTrue(insert.sql.contains("maCoSo, maKhoa, createdAt, createdBy"));
+        assertTrue(insert.sql.contains("SYSUTCDATETIME()"));
+        assertEquals(FACILITY_ID, insert.bindings.get(4));
+        assertEquals(DEPARTMENT_ID, insert.bindings.get(5));
+
+        TienSuBenh changed = new TienSuBenh();
+        changed.setId(91);
+        changed.setMaBenhNhan(PATIENT_ID);
+        changed.setLoaiTienSu(LoaiTienSu.BENH_NEN);
+        changed.setMoTa("synthetic updated narrative");
+        changed.setOwnershipScope(FACILITY_ID, DEPARTMENT_ID);
+        changed.setUpdatedBy(EMPLOYEE_ID);
+        assertTrue(persistence.transactions.inTransaction(() ->
+                Result.success(persistence.repository.update(changed, 2L))).valueOrThrow());
+        RecordedStatement update = jdbc.statements.get(1);
+        assertTrue(update.sql.contains("WHERE id=? AND maBenhNhan=? AND maCoSo=? AND maKhoa=?"));
+        assertTrue(update.sql.contains("maCoSo IS NOT NULL AND maKhoa IS NOT NULL AND isDeleted=0 AND version=?"));
+        assertEquals(91, update.bindings.get(4));
+        assertEquals(PATIENT_ID, update.bindings.get(5));
+        assertEquals(FACILITY_ID, update.bindings.get(6));
+        assertEquals(DEPARTMENT_ID, update.bindings.get(7));
+        assertEquals(2L, update.bindings.get(8));
+    }
+
     private static Map<String, Object> historyRow() {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", 91);
@@ -184,7 +234,10 @@ class TienSuBenhRepositoryImplTest {
                             bindings.put((Integer) args[0], args[1]);
                             yield null;
                         }
+                        case "setString", "setLong" -> { bindings.put((Integer) args[0], args[1]); yield null; }
                         case "executeQuery" -> resultSet();
+                        case "executeUpdate" -> 1;
+                        case "getGeneratedKeys" -> generatedKeyResultSet();
                         case "close" -> null;
                         case "toString" -> "SyntheticPatientHistoryStatement";
                         case "hashCode" -> System.identityHashCode(proxy);
@@ -209,6 +262,17 @@ class TienSuBenhRepositoryImplTest {
                         case "toString" -> "SyntheticPatientHistoryResultSet";
                         case "hashCode" -> System.identityHashCode(proxy);
                         case "equals" -> proxy == args[0];
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    });
+        }
+
+        private ResultSet generatedKeyResultSet() {
+            int[] cursor = {-1};
+            return (ResultSet) Proxy.newProxyInstance(ResultSet.class.getClassLoader(), new Class<?>[]{ResultSet.class},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "next" -> ++cursor[0] == 0;
+                        case "getInt" -> 101;
+                        case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     });
         }
