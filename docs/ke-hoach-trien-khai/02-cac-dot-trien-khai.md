@@ -12,6 +12,8 @@ Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây
 **Tài liệu bằng chứng:** [`00-hien-trang.md`](00-hien-trang.md), [`PROJECT_COMPLETENESS_REPORT.md`](../../PROJECT_COMPLETENESS_REPORT.md), [`phase0-db-config-review.md`](phase0-db-config-review.md), [`phase0-db-config-resolution-contract.md`](phase0-db-config-resolution-contract.md), [`phase0-domain-events-review.md`](phase0-domain-events-review.md), [`phase0-repository-contract-review.md`](phase0-repository-contract-review.md).
 **Gate:** build/migrations/repository transaction có thể tái lập trong môi trường thử nghiệm.
 
+**Quyết định Value Object cập nhật (06/11/2026):** Owner xác nhận số chính/khẩn cấp tùy chọn, validate khi nhập, bỏ separator được hỗ trợ và giữ nguyên prefix `0`/`+84`; BHYT có thể chưa biết ngày bắt đầu, hết hạn inclusive đến hết ngày địa phương và không chặn tiếp đón/adjudicate coverage; `Money` chỉ VND. Không dùng `Money` cho invoice/billing hoặc áp dụng rounding ở bất kỳ invoice boundary nào trước quyết định Owner riêng về rounding point và field scope. `PLAT-VO-01` vẫn `[~]`; các acceptance hẹp không hoàn tất Phase 0, Phase 1 hay visual acceptance. Xem [`03-model-task-board.md`](03-model-task-board.md) và [`phase0-value-object-owner-decisions.md`](phase0-value-object-owner-decisions.md).
+
 ## Phase 1 — Bệnh nhân và tiếp đón
 
 **Trạng thái:** `[~]` Persistence E2E và headless form-to-SQL acceptance có bằng chứng trên SQL Server synthetic; Doctor queue/history đã nối với desktop và có test headless. Full `ReceptionPanel`/Doctor station interaction/visual acceptance và các luồng nghiệp vụ còn lại chưa nghiệm thu.
