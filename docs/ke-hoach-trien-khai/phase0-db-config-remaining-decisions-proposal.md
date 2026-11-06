@@ -72,7 +72,7 @@ Tài liệu này kế thừa hợp đồng `PHASE0-PHASE3-REVIEW-AND-TRACKING-DO
 
 **Bảng lịch sử:** chỉ env selector absolute-path được chọn theo addendum Owner-approved; JVM/CLI/UI là SUPERSEDED / NOT SELECTED. Các quy tắc blank/relative/trim/fallback trong cột khuyến nghị cũ chưa được duyệt.
 
-| Lựa chọn tường minh | Lợi ích và chi phí | Khuyến nghị hiện hành |
+| Lựa chọn tường minh (snapshot) | Lợi ích và chi phí | Khuyến nghị trong snapshot, không phải approval ngữ nghĩa |
 |---|---|---|
 | `CLINIC_DB_CONFIG_FILE=<absolute-path>` | Dùng cùng cách trong IntelliJ Environment variables và launcher JAR; chỉ một selector nên không cần precedence giữa selector. Cần quản lý environment kế thừa. | **Chọn cho hồ sơ tối thiểu.** Không đặt biến thì chạy env-only; biến đã đặt nhưng rỗng/khoảng trắng hoặc đường dẫn tương đối thì lỗi. Không trim đường dẫn; khoảng trắng hợp lệ trong tên file được giữ nguyên. |
 | JVM `-Dclinic.config.file=<absolute-path>` | Dễ cố định trong IntelliJ VM options hoặc launcher; phải đặt trước `-jar`. | Thay thế env selector nếu Owner ưu tiên JVM. Nếu hỗ trợ đồng thời, đề xuất từ chối hai selector có giá trị khác nhau, thay vì âm thầm chọn một. |
@@ -125,7 +125,7 @@ db.username=synthetic_user
 
 - **IntelliJ, hồ sơ file + injected password:** Main class `vn.clinicmanagement.desktop.Main`, JDK 17; Environment variables: `CLINIC_DB_CONFIG_FILE=/opt/clinic-synthetic/config/db.properties`, `DB_PASSWORD=<synthetic-password-marker>`. Bỏ `DB_CONNECTION_STRING`, `DB_URL`, `DB_USERNAME` kế thừa ngoài ý muốn để ví dụ dùng URL/user trong file. VM options và Program arguments không chứa secret. Working directory không tham gia chọn file.
 - **IntelliJ, env-only:** không đặt selector; Environment variables chứa `DB_URL` như URL mẫu, `DB_USERNAME=synthetic_user`, `DB_PASSWORD=<synthetic-password-marker>`; không đặt `DB_CONNECTION_STRING`. Không dùng classpath `db.properties` làm fallback trong hồ sơ đề xuất.
-- **IntelliJ, các alternative chưa chọn:** nếu Owner chọn JVM interface, đặt `-Dclinic.config.file=/opt/clinic-synthetic/config/db.properties` trong VM options; nếu chọn CLI interface, đặt `--db-config-file=/opt/clinic-synthetic/config/db.properties` trong Program arguments. Chọn đúng một selector, không tự cộng cả ba.
+- **IntelliJ, các alternative lịch sử — SUPERSEDED / NOT SELECTED:** snapshot từng đề xuất nếu Owner chọn JVM interface, đặt `-Dclinic.config.file=/opt/clinic-synthetic/config/db.properties` trong VM options; nếu chọn CLI interface, đặt `--db-config-file=/opt/clinic-synthetic/config/db.properties` trong Program arguments. Chọn đúng một selector, không tự cộng cả ba.
 
 JAR, file + environment (sau task hiện thực riêng):
 
@@ -146,7 +146,7 @@ DB_PASSWORD='<synthetic-password-marker>' \
 java -jar '/opt/clinic-synthetic/clinic-desktop.jar'
 ```
 
-Alternative selector, chỉ nếu được Owner chọn và hiện thực, với password đã được inject vào environment:
+Alternative selector lịch sử — SUPERSEDED / NOT SELECTED; snapshot từng xét trường hợp được Owner chọn và hiện thực, với password đã được inject vào environment:
 
 ```bash
 java '-Dclinic.config.file=/opt/clinic-synthetic/config/db.properties' \
@@ -159,7 +159,7 @@ Không đặt selector khác đồng thời trong các ví dụ alternative. Ví
 
 ### Quyết định Owner và evidence còn thiếu
 
-Owner cần ghi lựa chọn **A1–A8**, ngoại lệ và phạm vi profile, cùng task triển khai riêng; chưa mục nào trong addendum này là approval. Khuyến nghị nhất quán là env selector duy nhất + split SQL credentials + password injection + không database mặc định + reject ambiguity/blank/partial/file errors + remove unused driver setting + diagnostics redacted. File-only secret là biến thể chờ chọn, không phải secret behavior ngầm được duyệt.
+Snapshot từng yêu cầu Owner ghi lựa chọn **A1–A8**; nay A1 interface đã RESOLVED theo addendum Owner-approved đầu tài liệu. **A2–A8 và ngữ nghĩa lỗi selector vẫn OPEN**, cần quyết định và task triển khai riêng; hồ sơ đề xuất này không phê duyệt các ngữ nghĩa đó. Khuyến nghị trong snapshot là env selector duy nhất + split SQL credentials + password injection + không database mặc định + reject ambiguity/blank/partial/file errors + remove unused driver setting + diagnostics redacted. File-only secret là biến thể chờ chọn, không phải secret behavior ngầm được duyệt.
 
 Sau phê duyệt, acceptance tương lai cần kiểm tra bằng synthetic/fake JDBC: từng key env thắng/file bù thiếu; mixed combined/split; empty/whitespace và bảo toàn secret; partial/integrated tách biệt; file missing/unreadable/malformed/duplicate/unknown key không handoff; selector absolute/no discovery; database rõ ràng; driver và redaction ở mọi đường lỗi. Artifact/launch và TLS handshake với chain/expiry/hostname sai cần bằng chứng riêng trong môi trường được ủy quyền. Không thực hiện hay tuyên bố các kiểm thử này trong task tài liệu.
 
@@ -194,17 +194,17 @@ Dựa trên kiểm tra mã nguồn tại repository:
 
 ## 3. Phân tích So sánh Các Quyết định Kỹ thuật Còn lại (Options, Tradeoffs & Recommendations)
 
-**Snapshot các phương án trước addendum 2026-11-06:** giữ để truy vết, không phải bộ khuyến nghị hiện hành. Riêng giao diện A1 ở mục 3.1 đã RESOLVED bởi addendum Owner-approved đầu tài liệu: env selector được chọn; JVM/dual/CLI/UI alternatives SUPERSEDED / NOT SELECTED. Các nội dung khác vẫn là phương án non-binding; mục 1A giữ hồ sơ đề xuất ngữ nghĩa chưa duyệt. Không đọc các lựa chọn cũ như approval.
+**Snapshot các phương án trước addendum 2026-11-06:** giữ để truy vết, không phải bộ khuyến nghị hiện hành. Ngôn ngữ bên dưới coi A1 interface, source coverage/precedence hoặc kết quả TLS là lựa chọn chưa chốt đã **SUPERSEDED** trong phạm vi các quyết định đã duyệt; không mở lại các lựa chọn đó. Mục 1A giữ hồ sơ đề xuất ngữ nghĩa chưa duyệt. Không đọc các lựa chọn cũ như approval.
 
 Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Facts)**, **Suy luận kỹ thuật (Inferences)**, **Các phương án (Options)**, **Đánh đổi (Tradeoffs)**, và **Đề xuất khuyến nghị phi ràng buộc (Non-binding Recommendation)**.
 
-Các lựa chọn và khuyến nghị dưới đây đều chờ quyết định triển khai; từ ngữ yêu cầu bên trong một phương án chỉ mô tả hành vi được đề xuất. Chúng không bổ sung chính sách đã duyệt ở mục 1. Quy tắc env-over-file theo từng khóa đã được chấp thuận; thứ tự combined/split, ngữ nghĩa blank/partial, giao diện file, lỗi đọc file, driver và cách hiện thực TLS vẫn chưa chốt.
+**Baseline hiện hành cho bảng lịch sử (theo addendum Owner-approved):** A1 dùng `CLINIC_DB_CONFIG_FILE` chọn absolute path tường minh cho IntelliJ/JAR, không implicit discovery; absent khác present-but-blank. Cả environment/secret injection và external properties file đều phải được hỗ trợ; environment thắng từng key, file chỉ cấp key vắng mặt trong environment. SQL Server bắt buộc mã hóa, xác thực chứng chỉ và danh tính máy chủ, fail-closed; không `trustServerCertificate` bypass hay driver-default TLS fallback. JVM/dual/CLI/UI alternatives là SUPERSEDED / NOT SELECTED. A2–A8, blank/relative selector, lỗi/fallback selected-file, cú pháp/duplicate/unknown keys và chi tiết hiện thực/acceptance TLS vẫn OPEN / NON-BINDING; từ ngữ yêu cầu trong các phương án còn mở chỉ mô tả đề xuất, không cấp phép hiện thực.
 
 ```
 +---------------------------------------------------------------------------------------------------+
-|                                CÁC QUYẾT ĐỊNH CẤU HÌNH CẦN THỐNG NHẤT                              |
+|                         SNAPSHOT LỊCH SỬ — KHÔNG PHẢI DANH SÁCH QUYẾT ĐỊNH HIỆN HÀNH              |
 +---------------------------------------------------------------------------------------------------+
-| 1. Giao diện chỉ định file cấu hình ngoài (JVM System Property vs Dedicated Env vs CLI arg)       |
+| 1. A1 interface: RESOLVED; so sánh JVM / Env / CLI dưới đây là lịch sử, đã SUPERSEDED              |
 | 2. Thứ tự ưu tiên DB_CONNECTION_STRING và bộ 3 trường phân tách (Split URL/User/Password)          |
 | 3. Ngữ nghĩa của biến môi trường rỗng/khoảng trắng (Vắng mặt / Absent vs Không hợp lệ / Invalid)  |
 | 4. Các tổ hợp xác thực JDBC và thông tin xác thực một phần hợp lệ (Partial Credentials)           |
@@ -216,7 +216,7 @@ Các lựa chọn và khuyến nghị dưới đây đều chờ quyết định
 
 ---
 
-### 3.1. Quyết định 1: Giao diện Chỉ định File Cấu hình Ngoài (Explicit External-File Selection)
+### 3.1. Snapshot Quyết định 1: Giao diện File Ngoài — RESOLVED; alternatives SUPERSEDED
 
 #### a. Sự thật (Facts)
 - Mã nguồn hiện hành chỉ nạp `db.properties` từ classpath ([`DatabaseConnection.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L31)).
@@ -226,7 +226,7 @@ Các lựa chọn và khuyến nghị dưới đây đều chờ quyết định
 - Việc tự động dò tìm file ở thư mục làm việc hiện tại (`Current Working Directory - CWD`) hoặc cùng thư mục với JAR (`Adjacent-JAR discovery`) có thể chọn nhầm cấu hình nếu nội dung hay quyền ghi tại đó không được kiểm soát:
   - Người dùng mở ứng dụng từ shortcut, desktop hoặc terminal khác nhau có thể vô tình nạp một file cấu hình lạ nằm tại CWD.
   - Nếu người khác có quyền ghi vào thư mục được dò, họ có thể thay nội dung file được chọn. Đây là tình huống giả định cần xét theo quyền truy cập thực tế, không phải kết luận đã xác minh về lỗ hổng hay phân loại CWE của ứng dụng hiện tại.
-  - [Quyết định Owner hiện hành](phase0-deployment-config-tls-decision-proposal.md) yêu cầu giao diện/đường dẫn tường minh và không phê duyệt implicit adjacent-JAR/CWD discovery; giao diện cụ thể vẫn chưa chốt.
+  - Snapshot từng ghi giao diện cụ thể chưa chốt; nhận định này đã **SUPERSEDED** bởi addendum Owner-approved đầu tài liệu và [quyết định Owner hiện hành](phase0-deployment-config-tls-decision-proposal.md).
 
 #### c. Các phương án so sánh (Options)
 - **Phương án 1A — Chỉ định qua Thuộc tính Hệ thống JVM (Explicit JVM System Property):**  
@@ -243,11 +243,11 @@ Các lựa chọn và khuyến nghị dưới đây đều chờ quyết định
   *Nhược điểm:* Cần tài liệu hóa thứ tự ưu tiên giữa hai giao diện để tránh nhầm lẫn.
 
 #### d. Đánh đổi và Đề xuất khuyến nghị (Tradeoffs & Recommendation)
-- **Đề xuất (Recommendation):** Áp dụng **Phương án 1C (Dual Explicit Interface)** với quy tắc ưu tiên:
+- **Đề xuất lịch sử — SUPERSEDED / NOT SELECTED:** Snapshot từng khuyến nghị **Phương án 1C (Dual Explicit Interface)** với quy tắc ưu tiên:
   1. Kiểm tra System Property `-Dclinic.config.file` (ưu tiên cao nhất nếu được chỉ định).
   2. Nếu không có, kiểm tra Environment Variable `CLINIC_DB_CONFIG_FILE`.
   3. Nếu cả hai đều không được đặt: coi như không sử dụng file ngoài; chỉ nạp cấu hình từ các biến môi trường trực tiếp (`DB_URL`, `DB_USERNAME`, v.v.) hoặc classpath (nếu đang chạy dev trong IDE).
-  4. Giữ ranh giới đã duyệt: không tự dò `./db.properties` tại CWD hay cùng thư mục với JAR; tên và thứ tự hai giao diện trên vẫn chỉ là đề xuất.
+  4. Giữ ranh giới đã duyệt: không tự dò `./db.properties` tại CWD hay cùng thư mục với JAR; tên và thứ tự hai giao diện trên là đề xuất lịch sử đã SUPERSEDED, không phải lựa chọn hiện hành.
 
 ---
 
@@ -278,7 +278,7 @@ Các lựa chọn và khuyến nghị dưới đây đều chờ quyết định
   *Nhược điểm:* Quá cứng nhắc, có thể làm gãy các template triển khai tự động (nơi một số biến rác mặc định được inject sẵn).
 
 #### d. Đánh đổi và Đề xuất khuyến nghị (Tradeoffs & Recommendation)
-- **Đề xuất (Recommendation):** Áp dụng **Phương án 2B (Source-Aware Precedence)**. Đây là phương án dung hòa tối ưu, bảo toàn nguyên tắc nền tảng *"Per-key environment wins and file fills keys absent from environment"*: Môi trường luôn có quyền tối thượng; cấu hình trong file chỉ đóng vai trò nền dự phòng.
+- **Đề xuất trong snapshot (NON-BINDING):** Áp dụng **Phương án 2B (Source-Aware Precedence)**. Snapshot đánh giá đây là phương án dung hòa, nhưng per-key env-over-file đã duyệt **không quyết định** precedence giữa combined/split khác key. Phương án 2B và các lựa chọn 2A/2C vẫn chờ quyết định A2; không mở lại source coverage hay per-key precedence.
 
 ---
 
@@ -373,7 +373,7 @@ Các lựa chọn và khuyến nghị dưới đây đều chờ quyết định
   ```
 
 #### b. Suy luận kỹ thuật (Inferences)
-- Khi nhà vận hành đã chủ động chỉ định một đường dẫn tệp thông qua `-Dclinic.config.file=/path/to/db.properties` hoặc biến `CLINIC_DB_CONFIG_FILE`, điều đó thể hiện **ý đồ rõ ràng** rằng ứng dụng phải sử dụng cấu hình từ tệp này.
+- Khi nhà vận hành đã chủ động chỉ định một đường dẫn tệp (snapshot từng xét `-Dclinic.config.file=/path/to/db.properties` hoặc `CLINIC_DB_CONFIG_FILE`; JVM alternative nay SUPERSEDED / NOT SELECTED), điều đó thể hiện **ý đồ rõ ràng** rằng ứng dụng phải sử dụng cấu hình từ tệp này.
 - Nếu tệp đó không tồn tại, không đọc được hoặc hỏng cú pháp mà ứng dụng vẫn bỏ qua và dùng cấu hình khác, ứng dụng có thể kết nối nhầm CSDL. Đây là rủi ro vận hành giả định; fail-closed khi đọc file được chọn vẫn là phương án chờ quyết định, khác với kết quả fail-closed TLS đã duyệt.
 
 #### c. Các phương án so sánh (Options)
