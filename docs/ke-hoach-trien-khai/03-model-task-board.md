@@ -24,6 +24,12 @@ SQL Server opt-in acceptance chỉ được dùng database được chọn tư�
 
 Các task visual smoke kiểm tra trên thiết kế Desktop hiện có. Thay đổi bố cục, màu sắc hoặc thành phần giao diện cần yêu cầu cụ thể từ Owner. [Hướng dẫn chạy Desktop trên clinicDb](phase1-doctor-ui-visual-smoke-runbook.md#3-launch-and-authentication-smoke-procedure)
 
+## Mốc khôi phục Desktop từ main
+
+`982c1f6` đưa nguyên thư mục `clinic-desktop` về `main` (`6aabb85`). Build headless của mốc này qua Domain, Application và Infrastructure, rồi dừng ở ba lỗi biên dịch xác thực Desktop. Kết quả Desktop và số test toàn reactor trước mốc này là bằng chứng lịch sử. `SEC-01` còn mở và cần tái kiểm tra các đường nối xác thực, phân quyền, phiên làm việc và tiếp đón trên bản ứng viên, sau đó thực hiện visual smoke.
+
+Review tìm số điện thoại của Copilot (`3f1fe675`) đối chiếu luồng trước khi khôi phục Desktop. Các lựa chọn về tìm đủ số, tiền tố và dữ liệu cũ vẫn chờ chốt. [Báo cáo tìm bệnh nhân theo số điện thoại](phase0-value-object-phone-search-review.md)
+
 ## Board
 
 | Task ID | Phase · model family | Task cụ thể | Dependency | Status | Evidence / blocker |
