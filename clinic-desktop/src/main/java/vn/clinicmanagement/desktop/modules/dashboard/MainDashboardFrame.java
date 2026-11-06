@@ -119,6 +119,7 @@ public class MainDashboardFrame extends JFrame {
             @Override public void windowClosing(WindowEvent e) {
                 sessionMonitor.stop();
                 Toolkit.getDefaultToolkit().removeAWTEventListener(activityMonitor);
+                stopDoctorSessionMonitoring();
                 sessionLifecycle.clear();
             }
 
@@ -146,7 +147,7 @@ public class MainDashboardFrame extends JFrame {
             centerContainer.add(new JLabel("Không có phân hệ được phép truy cập.", SwingConstants.CENTER));
         }
         if (visibleNavigationKeys.contains("treatment")) {
-            this.workspaceManager.openView(new DoctorStationPanel());
+            this.workspaceManager.openView(new DoctorStationPanel(sessionLifecycle));
         }
     }
 
@@ -159,7 +160,7 @@ public class MainDashboardFrame extends JFrame {
         addModuleButton(ribbon, "reception", "Đón Tiếp", "📋",
                 () -> workspaceManager.openView(new ReceptionPanel(sessionLifecycle)));
         addModuleButton(ribbon, "treatment", "Điều Trị", "👨‍⚕️",
-                () -> workspaceManager.openView(new DoctorStationPanel()));
+                () -> workspaceManager.openView(new DoctorStationPanel(sessionLifecycle)));
         addModuleButton(ribbon, "system", "Hệ Thống", "⚙️",
                 () -> workspaceManager.openView(new SystemConfigPanel()));
         addModuleButton(ribbon, "catalog", "Danh Mục", "📑",
@@ -201,9 +202,22 @@ public class MainDashboardFrame extends JFrame {
     }
 
     private void showSessionLock(SessionLifecycleService.State state) {
+        clearDoctorSensitiveData();
         lockOverlay.setAbsoluteExpiry(state == SessionLifecycleService.State.LOCKED_ABSOLUTE);
         lockOverlay.setVisible(true);
         lockOverlay.requestFocusInWindow();
+    }
+
+    private void clearDoctorSensitiveData() {
+        if (workspaceManager.getActiveView() instanceof DoctorStationPanel doctorStation) {
+            doctorStation.clearSensitiveData();
+        }
+    }
+
+    private void stopDoctorSessionMonitoring() {
+        if (workspaceManager.getActiveView() instanceof DoctorStationPanel doctorStation) {
+            doctorStation.onHide();
+        }
     }
 
     private void reauthenticate(SessionLockOverlay.Credentials credentials) {
@@ -250,6 +264,7 @@ public class MainDashboardFrame extends JFrame {
         if (answer != JOptionPane.YES_OPTION) return;
         sessionMonitor.stop();
         Toolkit.getDefaultToolkit().removeAWTEventListener(activityMonitor);
+        stopDoctorSessionMonitoring();
         sessionLifecycle.clear();
         dispose();
         SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
