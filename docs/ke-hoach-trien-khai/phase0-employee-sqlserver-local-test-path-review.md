@@ -1,8 +1,8 @@
 # Phase 0: Independent Review of Employee SQL Server Fixture and Safe Local Test Path
 
-**Date:** 2026-11-06  
-**Document:** `docs/ke-hoach-trien-khai/phase0-employee-sqlserver-local-test-path-review.md`  
-**Target:** [`NhanVienRepositorySqlServerTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java) and companion guard suite [`NhanVienSqlServerTargetGuardTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L540-L705)  
+**Date:** 2026-11-06
+**Document:** `docs/ke-hoach-trien-khai/phase0-employee-sqlserver-local-test-path-review.md`
+**Target:** [`NhanVienRepositorySqlServerTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java) and companion guard suite [`NhanVienSqlServerTargetGuardTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L540-L705)
 **Status:** Report-only review complete. No production code, test code, database schema, migration, or runtime configuration was modified; no database connection was opened; no credentials were read or generated; employee SQL Server persistence remains unverified.
 
 ---
@@ -12,7 +12,7 @@
 This independent review evaluates the test-only connection and security guards in [`NhanVienRepositorySqlServerTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java) following direct local SQL Server test attempts that requested `TrustServerCertificate=True`.
 
 ### Key Conclusions:
-1. **Root Cause of Local Container Rejection:** The fixture's preflight URL guard (`syntheticDatabaseUrl`) enforces `encrypt=true` and `trustServerCertificate=false` ([lines 499–502, 519–521](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L499-L502)). Attempting to supply `trustServerCertificate=true` fails closed before any socket connection is opened. Conversely, pointing `trustServerCertificate=false` to an out-of-the-box local SQL Server container causes the Microsoft JDBC Driver to fail the TLS handshake (`PKIX path building failed: SunCertPathBuilderException`), because container self-signed certificates lack a trusted CA root in the Java runtime TrustStore and exhibit hostname mismatches.
+1. **Root Cause of Local Container Rejection:** The fixture's preflight URL guard (`syntheticDatabaseUrl`) enforces `encrypt=true` and `trustServerCertificate=false` ([lines 499–502, 519–521](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L499-L502)). Attempting to supply `trustServerCertificate=true` fails closed before any socket connection is opened. Conversely, strict TLS validation against this local SQL Server container was rejected by `sqlcmd` because the presented certificate was self-signed and untrusted. The employee JDBC fixture was not run against the server with `trustServerCertificate=false`; its exact JDBC exception and any certificate hostname mismatch remain unverified.
 2. **Current Code Can Run Without Weakening Policy:** Current repository code **does not need to be modified** to execute against local SQL Server. The existing guard explicitly permits `hostNameInCertificate` ([lines 547–556](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L547-L556)). Operators can test locally with full TLS validation by mounting a development certificate issued by a local development CA into the container and supplying a local Java truststore via JVM arguments (`-Djavax.net.ssl.trustStore=...`).
 3. **Strict Separation of Demo/Public Data and Transport Security:** The presence of demo accounts or synthetic test data does **not** grant permission to relax TLS encryption or certificate validation. Owner decision `PHASE0-DB-DEPLOY-DECISION-RECON-02` strictly mandates encrypted transport and certificate/identity validation across all environments.
 4. **Demonstrable Immunity to `clinicDb` Targeting:** The multi-layered guard (`assertSyntheticDatabaseName`, `syntheticDatabaseUrl`, and pre-migration `SELECT DB_NAME()` identity check) structurally eliminates any path to connect, migrate, or write to `clinicDb` or any database not prefixed with `clinic_test_` or `clinic_orchestrator_review_`.
@@ -251,3 +251,15 @@ In accordance with project conventions and the task checklist, the following gui
 8. `docs/ke-hoach-trien-khai/phase0-db-config-resolution-contract.md` (Database configuration and TLS resolution contract)
 9. `docs/ke-hoach-trien-khai/03-model-task-board.md` (Task `PLAT-DB-TEST-SAFE-01` status and evidence)
 10. `docs/ke-hoach-trien-khai/phase0-repository-contract-review.md` (Repository contracts and persistence evidence)
+
+
+## 9. Owner policy addendum — local app/test database separation (2026-11-06)
+
+The Owner subsequently approved a local development exception and a database separation policy under Orchestrator contract `18847587-233a-4f02-99cd-13e1eaf0736a`:
+
+- `clinicDb` is reserved for launching the desktop app via `run-app.sh`, manual visual smoke, and experiential entry. Owner reports schema V1–V11 are already applied; this report does not independently verify that database's migration state.
+- Automated unit/integration tests and worker/CI tasks must never connect to or write to `clinicDb`. SQL Server opt-in tests may use only explicit `clinic_test_*` or `clinic_orchestrator_review_*` catalogs and synthetic fixtures. Preserve the fixture's explicit `clinicDb` denial guard.
+- The Owner-authorized `TrustServerCertificate=true` workaround is limited to one-off local development/manual test connections. It does not make that connection certificate-validation evidence, authorize committing the bypass, or change the strict TLS rule for deployment. The employee repository fixture still rejects the bypass and therefore remains unverified against live SQL Server.
+- No migration or data test was run on `clinicDb`; the migration, patient-history, and reception integration results in the dated addendum above use synthetic catalogs only.
+
+This addendum supersedes earlier wording in this report that treated the absence of any local development exception as the current policy. It does not change the fixture's guard or close `FINDING-TEST-02`.

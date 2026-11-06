@@ -286,11 +286,11 @@ Owner-approved contract `a43850af-4577-4ce7-9fc8-48f0f4f8497c` ("Owner-approved 
 
 ## Verified SQL Server acceptance and TLS exception scope — 06/11/2026
 
-The Tech Lead reported the current-root `mvn -Djava.awt.headless=true clean verify` passed. Separate owner-directed SQL Server opt-in runs used synthetic fixtures only:
+The current-root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed **443 tests, 0 failures, 0 errors, and 6 SQL Server opt-in skips across 77 Surefire reports**. Separate owner-directed SQL Server opt-in runs used synthetic fixtures only:
 
 | Test | Result and target |
 |---|---|
-| `FreshDatabaseMigrationSqlServerTest` | Passed **1/1** against newly created `clinic_test_orchestrator_migration_20261106`; applied migrations V1–V11. SQLCMD confirmed successful migration rows V1–V11. |
+| `FreshDatabaseMigrationSqlServerTest` | Passed **1/1** against newly created `clinic_test_orchestrator_migration_20261106`; applied migrations V1–V11. SQLCMD confirmed successful migration rows V1–V11. The newly created disposable database was dropped after acceptance under the Owner cleanup policy. |
 | `PatientHistorySqlServerPersistenceTest` | Passed **1/1** against existing synthetic `clinic_test_patient_history_20261106`. |
 | `ReceptionSqlServerPersistenceTest` | Passed **1/1** against the same existing synthetic `clinic_test_patient_history_20261106`. |
 

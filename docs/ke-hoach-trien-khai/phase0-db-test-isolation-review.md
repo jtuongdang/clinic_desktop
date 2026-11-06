@@ -162,11 +162,11 @@ No database, local properties, or credentials were accessed for this documentati
 
 ## 8. Dated addendum — SQL Server acceptance and TLS exception scope (2026-11-06)
 
-This addendum supplements the dated snapshots above; it does not revise the employee adapter finding or the deployment TLS policy. The Tech Lead reported that current-root `mvn -Djava.awt.headless=true clean verify` passed, and these separate opt-in SQL Server tests passed using synthetic fixtures only:
+This addendum supplements the dated snapshots above; it does not revise the employee adapter finding or the deployment TLS policy. The current-root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed **443 tests, 0 failures, 0 errors, and 6 SQL Server opt-in skips across 77 Surefire reports**. These separate opt-in SQL Server tests passed using synthetic fixtures only:
 
 | Test | Result and target |
 |---|---|
-| `FreshDatabaseMigrationSqlServerTest` | **1/1 passed** against newly created `clinic_test_orchestrator_migration_20261106`; V1–V11 were applied, and SQLCMD confirmed successful migration rows V1–V11. |
+| `FreshDatabaseMigrationSqlServerTest` | **1/1 passed** against newly created `clinic_test_orchestrator_migration_20261106`; V1–V11 were applied, and SQLCMD confirmed successful migration rows V1–V11. The new disposable database was dropped after acceptance under the Owner cleanup policy. |
 | `PatientHistorySqlServerPersistenceTest` | **1/1 passed** against existing synthetic `clinic_test_patient_history_20261106`. |
 | `ReceptionSqlServerPersistenceTest` | **1/1 passed** against the same existing synthetic `clinic_test_patient_history_20261106`. |
 
