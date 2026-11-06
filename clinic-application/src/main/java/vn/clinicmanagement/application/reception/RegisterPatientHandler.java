@@ -96,6 +96,9 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                     patient.setUpdatedBy(command.createdBy());
                 }
 
+                patient.setDienThoai(normalizeOptionalPhone(patient.getDienThoai()));
+                patient.setNguoiLienHeDienThoai(normalizeOptionalPhone(patient.getNguoiLienHeDienThoai()));
+
                 if (existing) patients.update(patient);
                 else patients.add(patient);
                 appendAudit(command.auditActorContext(), context,
@@ -223,5 +226,9 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
         } catch (IllegalArgumentException ignored) {
             return false;
         }
+    }
+
+    private static String normalizeOptionalPhone(String value) {
+        return value == null || value.isBlank() ? value : new PhoneNumber(value).getValue();
     }
 }

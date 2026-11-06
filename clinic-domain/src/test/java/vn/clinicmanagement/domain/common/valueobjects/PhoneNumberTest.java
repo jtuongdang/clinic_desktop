@@ -3,6 +3,7 @@ package vn.clinicmanagement.domain.common.valueobjects;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PhoneNumberTest {
@@ -35,6 +36,18 @@ class PhoneNumberTest {
         assertThrows(IllegalArgumentException.class, () -> new PhoneNumber(null));
         assertThrows(IllegalArgumentException.class, () -> new PhoneNumber(""));
         assertThrows(IllegalArgumentException.class, () -> new PhoneNumber("   "));
+    }
+
+    @Test
+    void invalidInputExceptionMessagesDoNotExposeSuppliedPhoneValues() {
+        for (String rawPhone : new String[]{"synthetic-private-phone-marker", " 02 123.456-78 "}) {
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                    () -> new PhoneNumber(rawPhone));
+
+            assertEquals("Số điện thoại không hợp lệ.", exception.getMessage());
+            assertFalse(exception.getMessage().contains(rawPhone));
+            assertFalse(exception.getMessage().contains(rawPhone.replaceAll("[\\s.-]", "")));
+        }
     }
 
     @Test

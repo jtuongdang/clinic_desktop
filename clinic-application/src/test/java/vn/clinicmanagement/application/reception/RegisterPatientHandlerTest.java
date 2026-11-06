@@ -73,33 +73,60 @@ class RegisterPatientHandlerTest {
     }
 
     @Test
-    void optionalPatientAndEmergencyPhonesMayBeBlank() {
-        Fixture fixture = new Fixture();
-        BenhNhan patient = validPatient();
-        patient.setDienThoai("  ");
-        patient.setNguoiLienHeDienThoai(null);
-        fixture.visit = visit(96, 11, "Q-011");
+    void optionalPatientAndEmergencyPhonesRemainUnchangedOnInsertAndUpdate() {
+        for (boolean existing : List.of(false, true)) {
+            for (String primary : new String[]{null, "", " \t "}) {
+                for (String emergency : new String[]{null, "", " \t "}) {
+                    Fixture fixture = new Fixture();
+                    BenhNhan patient = validPatient();
+                    patient.setDienThoai(primary);
+                    patient.setNguoiLienHeDienThoai(emergency);
+                    if (existing) {
+                        patient.setId(52);
+                        fixture.duplicatePatient = patient;
+                    }
 
-        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
-                DoiTuongKham.THU_PHI));
+                    Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
+                            DoiTuongKham.THU_PHI));
 
-        assertTrue(result.isSuccess());
+                    assertTrue(result.isSuccess());
+                    assertEquals(existing ? 0 : 1, fixture.patientAdds.get());
+                    assertEquals(existing ? 1 : 0, fixture.patientUpdates.get());
+                    assertEquals(primary, fixture.savedPatientPhone);
+                    assertEquals(emergency, fixture.savedEmergencyPhone);
+                    assertEquals(primary, patient.getDienThoai());
+                    assertEquals(emergency, patient.getNguoiLienHeDienThoai());
+                }
+            }
+        }
     }
 
     @Test
-    void validatesPhoneFormatsWithoutRewritingNationalOrInternationalPrefix() {
-        Fixture fixture = new Fixture();
-        BenhNhan patient = validPatient();
-        patient.setDienThoai("0912 345 678");
-        patient.setNguoiLienHeDienThoai("+84 912-345-678");
-        fixture.visit = visit(97, 12, "Q-012");
+    void persistsCleanedPhonesWithNationalOrInternationalPrefixesOnInsertAndUpdate() {
+        for (boolean existing : List.of(false, true)) {
+            for (boolean internationalPrimary : List.of(false, true)) {
+                Fixture fixture = new Fixture();
+                BenhNhan patient = validPatient();
+                patient.setDienThoai(internationalPrimary ? " +84 3.123-456\t78 " : " 03 123.456-78 ");
+                patient.setNguoiLienHeDienThoai(internationalPrimary ? " 09 123.456-78 " : " +84 9.123-456\t78 ");
+                if (existing) {
+                    patient.setId(52);
+                    fixture.duplicatePatient = validPatient();
+                    fixture.duplicatePatient.setId(52);
+                }
 
-        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
-                DoiTuongKham.THU_PHI));
+                Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
+                        DoiTuongKham.THU_PHI));
 
-        assertTrue(result.isSuccess());
-        assertEquals("0912 345 678", patient.getDienThoai());
-        assertEquals("+84 912-345-678", patient.getNguoiLienHeDienThoai());
+                assertTrue(result.isSuccess());
+                assertEquals(existing ? 0 : 1, fixture.patientAdds.get());
+                assertEquals(existing ? 1 : 0, fixture.patientUpdates.get());
+                assertEquals(internationalPrimary ? "+84312345678" : "0312345678", fixture.savedPatientPhone);
+                assertEquals(internationalPrimary ? "0912345678" : "+84912345678", fixture.savedEmergencyPhone);
+                assertEquals(fixture.savedPatientPhone, patient.getDienThoai());
+                assertEquals(fixture.savedEmergencyPhone, patient.getNguoiLienHeDienThoai());
+            }
+        }
     }
 
     @Test
@@ -117,6 +144,8 @@ class RegisterPatientHandlerTest {
             assertEquals(0, fixture.transactions.calls);
             assertNoWritesOrVisit(fixture);
             assertFalse(result.getError().orElseThrow().message().contains("not-a-phone"));
+            assertTrue(fixture.auditEntries.isEmpty());
+            assertTrue(fixture.independentAuditEntries.isEmpty());
         }
     }
 
@@ -465,11 +494,16 @@ class RegisterPatientHandlerTest {
     void roomOutsideSelectedSessionScopeIsDeniedAndAuditedWithoutBusinessWrites() {
         Fixture fixture = new Fixture();
         fixture.room = activeRoom(FACILITY_ID, DEPARTMENT_ID + 1);
+        BenhNhan patient = validPatient();
+        patient.setDienThoai("03 123.456-78");
+        patient.setNguoiLienHeDienThoai("+84 9.123-456 78");
 
-        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
 
         assertFailure(result, "AUTH_SCOPE_MISMATCH");
         assertNoWritesOrVisit(fixture);
+        assertEquals("03 123.456-78", patient.getDienThoai());
+        assertEquals("+84 9.123-456 78", patient.getNguoiLienHeDienThoai());
         assertEquals(1, fixture.independentAuditEntries.size());
         SystemAuditEntry denial = fixture.independentAuditEntries.get(0);
         assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, denial.actionCode());
@@ -500,12 +534,17 @@ class RegisterPatientHandlerTest {
     void missingPatientGrantIsDeniedAndAuditedWithoutFormOrPatientDetails() {
         Fixture fixture = new Fixture();
         fixture.grants.removeIf(grant -> grant.getPhanHe().equals("PATIENT"));
+        BenhNhan patient = validPatient();
+        patient.setDienThoai("03 123.456-78");
+        patient.setNguoiLienHeDienThoai("+84 9.123-456 78");
 
-        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
 
         assertFailure(result, "AUTHORIZATION_DENIED");
         assertEquals(0, fixture.transactions.calls);
         assertNoWritesOrVisit(fixture);
+        assertEquals("03 123.456-78", patient.getDienThoai());
+        assertEquals("+84 9.123-456 78", patient.getNguoiLienHeDienThoai());
         assertEquals(1, fixture.independentAuditEntries.size());
         SystemAuditEntry denial = fixture.independentAuditEntries.get(0);
         assertEquals(AuditActionCode.AUTH_ACCESS_DENIED, denial.actionCode());
@@ -568,10 +607,14 @@ class RegisterPatientHandlerTest {
         Fixture fixture = new Fixture();
         BenhNhan patient = validPatient();
         patient.setId(912);
+        patient.setDienThoai("03 123.456-78");
+        patient.setNguoiLienHeDienThoai("+84 9.123-456 78");
 
         Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
 
         assertFailure(result, "AUTH_SCOPE_MISMATCH");
+        assertEquals("03 123.456-78", patient.getDienThoai());
+        assertEquals("+84 9.123-456 78", patient.getNguoiLienHeDienThoai());
         assertEquals(0, fixture.patientUpdates.get());
         assertEquals(0, fixture.insuranceAdds.get());
         assertEquals(0, fixture.visitCalls.get());
@@ -846,6 +889,8 @@ class RegisterPatientHandlerTest {
         private MetadataSnapshot updatedPatientMetadata;
         private MetadataSnapshot addedInsuranceMetadata;
         private MetadataSnapshot updatedInsuranceMetadata;
+        private String savedPatientPhone;
+        private String savedEmergencyPhone;
         private int patientInsertId = 41;
         private boolean identityConflictOnInsert;
         private RuntimeException insuranceFailure;
@@ -867,6 +912,8 @@ class RegisterPatientHandlerTest {
                         if (identityConflictOnInsert) throw new PatientIdentityConflictException();
                         BenhNhan patient = (BenhNhan) args[0];
                         addedPatientMetadata = MetadataSnapshot.of(patient);
+                        savedPatientPhone = patient.getDienThoai();
+                        savedEmergencyPhone = patient.getNguoiLienHeDienThoai();
                         patient.setId(patientInsertId);
                         patient.setMaBenhNhanFormat("SYNTH-PATIENT-" + patientInsertId);
                         transactions.stage("patient");
@@ -874,7 +921,10 @@ class RegisterPatientHandlerTest {
                     }
                     case "update" -> {
                         patientUpdates.incrementAndGet();
-                        updatedPatientMetadata = MetadataSnapshot.of((BenhNhan) args[0]);
+                        BenhNhan patient = (BenhNhan) args[0];
+                        updatedPatientMetadata = MetadataSnapshot.of(patient);
+                        savedPatientPhone = patient.getDienThoai();
+                        savedEmergencyPhone = patient.getNguoiLienHeDienThoai();
                         transactions.stage("patient");
                         yield null;
                     }

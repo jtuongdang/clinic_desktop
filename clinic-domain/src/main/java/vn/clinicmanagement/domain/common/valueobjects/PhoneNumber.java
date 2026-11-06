@@ -11,7 +11,7 @@ public final class PhoneNumber implements Serializable {
     public PhoneNumber(String rawPhone) {
         if (rawPhone == null || rawPhone.isBlank()) throw new IllegalArgumentException("Số điện thoại không được trống.");
         String cleaned = rawPhone.replaceAll("[\\s.-]", "");
-        if (!PHONE_PATTERN.matcher(cleaned).matches()) throw new IllegalArgumentException("Số điện thoại không hợp lệ: " + rawPhone);
+        if (!PHONE_PATTERN.matcher(cleaned).matches()) throw new IllegalArgumentException("Số điện thoại không hợp lệ.");
         this.value = cleaned;
     }
 
