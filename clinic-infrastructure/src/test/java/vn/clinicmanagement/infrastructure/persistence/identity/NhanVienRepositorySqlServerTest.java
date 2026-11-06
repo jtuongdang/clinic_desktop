@@ -1,5 +1,6 @@
 package vn.clinicmanagement.infrastructure.persistence.identity;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -13,7 +14,6 @@ import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
 import vn.clinicmanagement.infrastructure.persistence.JdbcTransactionManager;
 import vn.clinicmanagement.infrastructure.persistence.JdbcUnitOfWork;
 
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.sql.Connection;
@@ -26,16 +26,19 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,6 +50,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code -Dclinic.test.sqlserver=true} and a dedicated test database name matching
  * {@code clinic_test_*} or {@code clinic_orchestrator_review_*}. It will never run against
  * default {@code clinicDb} and fails closed when an unsafe or non-test target is supplied.
+ * Requires only {@code CLINIC_TEST_SQLSERVER_URL}, {@code CLINIC_TEST_SQLSERVER_USERNAME},
+ * and {@code CLINIC_TEST_SQLSERVER_PASSWORD}; application configuration is never a source.
+ * The URL must explicitly select the exact database and must not contain credentials.
  */
 class NhanVienRepositorySqlServerTest {
 
@@ -74,14 +80,23 @@ class NhanVienRepositorySqlServerTest {
         String databaseName = System.getProperty(DATABASE_PROPERTY);
         assertSyntheticDatabaseName(databaseName);
 
-        configureSyntheticDatabase(databaseName);
+        // A nonempty explicit override bypasses the application's lazy config loader.
+        DatabaseConnection.setConnectionString(testConnectionString(databaseName, System::getenv));
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement("SELECT DB_NAME()");
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next(), "SQL Server did not return its current database name");
             assertDatabaseIdentity(databaseName, rs.getString(1));
+        } catch (SQLException exception) {
+            // Driver diagnostics can contain URL/user/secret material. Do not retain the cause.
+            throw new IllegalStateException("Dedicated SQL Server test connection or catalog check failed");
         }
         assertTrue(runMigrationsWithoutLogging(), "Database migrations did not complete");
+    }
+
+    @AfterAll
+    static void clearTestConnectionOverride() {
+        DatabaseConnection.setConnectionString("");
     }
 
     private static void assertSyntheticDatabaseName(String databaseName) {
@@ -95,7 +110,7 @@ class NhanVienRepositorySqlServerTest {
 
     static void assertDatabaseIdentity(String expectedDatabaseName, String actualDatabaseName) {
         assertSyntheticDatabaseName(actualDatabaseName);
-        assertEquals(expectedDatabaseName, actualDatabaseName,
+        assertTrue(expectedDatabaseName.equals(actualDatabaseName),
                 "Connected SQL Server catalog must exactly match -D" + DATABASE_PROPERTY);
     }
 
@@ -425,57 +440,42 @@ class NhanVienRepositorySqlServerTest {
         }
     }
 
-    private static void configureSyntheticDatabase(String databaseName) throws Exception {
-        Properties properties = new Properties();
-        try (InputStream input = NhanVienRepositorySqlServerTest.class.getClassLoader()
-                .getResourceAsStream("db.properties")) {
-            if (input != null) {
-                properties.load(input);
-            }
-        }
-
-        String configuredUrl = properties.getProperty("db.url");
-        String username = properties.getProperty("db.username");
-        String credentialValue = properties.getProperty("db." + "password");
-
-        if (configuredUrl == null || configuredUrl.isBlank()) {
-            configuredUrl = System.getenv("DB_URL");
-        }
-        if (username == null || username.isBlank()) {
-            username = System.getenv("DB_USERNAME");
-        }
-        if (credentialValue == null || credentialValue.isBlank()) {
-            credentialValue = System.getenv("DB_PASSWORD");
-        }
-
-        if (configuredUrl == null || configuredUrl.isBlank()) {
-            String connStr = System.getenv("DB_CONNECTION_STRING");
-            if (connStr != null && !connStr.isBlank()) {
-                configuredUrl = connStr;
-            }
-        }
-
-        if (configuredUrl == null || !configuredUrl.regionMatches(true, 0, "jdbc:sqlserver://", 0, 17)
-                || username == null || username.isBlank() || credentialValue == null || credentialValue.isBlank()) {
-            throw new IllegalStateException("SQL Server credentials (db.properties or DB_URL/DB_USERNAME/DB_PASSWORD) "
-                    + "are required for the opt-in test");
-        }
-
+    static String testConnectionString(String databaseName, Function<String, String> environment) {
+        assertSyntheticDatabaseName(databaseName);
+        String configuredUrl = requiredTestInput(environment, "CLINIC_TEST_SQLSERVER_URL");
+        String username = requiredTestInput(environment, "CLINIC_TEST_SQLSERVER_USERNAME");
+        String credentialValue = requiredTestInput(environment, "CLINIC_TEST_SQLSERVER_PASSWORD");
         String targetUrl = syntheticDatabaseUrl(configuredUrl, databaseName);
+        // JDBC braced values preserve whitespace and escape semicolons/closing braces as data.
+        return targetUrl + ";user={" + username.replace("}", "}}")
+                + "};password={" + credentialValue.replace("}", "}}") + "}";
+    }
 
-        DatabaseConnection.setConnectionString("");
-        DatabaseConnection.configure(targetUrl, username, credentialValue);
+    private static String requiredTestInput(Function<String, String> environment, String key) {
+        String value = environment.apply(key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Missing dedicated SQL Server test input: " + key);
+        }
+        return value;
     }
 
     static String syntheticDatabaseUrl(String configuredUrl, String databaseName) {
         assertSyntheticDatabaseName(databaseName);
+        if (configuredUrl == null || !configuredUrl.startsWith("jdbc:sqlserver://")) {
+            throw new IllegalStateException("Dedicated test URL must be a SQL Server JDBC URL");
+        }
         int parameterStart = configuredUrl.indexOf(';');
-        if (parameterStart < 0) {
+        if (parameterStart <= "jdbc:sqlserver://".length()) {
             throw new IllegalStateException("SQL Server URL must explicitly select the synthetic database");
+        }
+        String server = configuredUrl.substring("jdbc:sqlserver://".length(), parameterStart);
+        if (server.chars().anyMatch(c -> Character.isWhitespace(c) || "{}=@/?#".indexOf(c) >= 0)) {
+            throw new IllegalStateException("SQL Server URL has an ambiguous server selector");
         }
 
         StringBuilder targetUrl = new StringBuilder(configuredUrl.substring(0, parameterStart));
         Matcher parameters = URL_PARAMETER.matcher(configuredUrl);
+        Set<String> propertyNames = new HashSet<>();
         int databaseSelectors = 0;
         int position = parameterStart;
         while (position < configuredUrl.length()) {
@@ -487,6 +487,13 @@ class NhanVienRepositorySqlServerTest {
                 throw new IllegalStateException("SQL Server URL has ambiguous or malformed properties");
             }
             String name = parameters.group(1);
+            String normalizedName = name.toLowerCase(Locale.ROOT);
+            if (!propertyNames.add(normalizedName)
+                    || Set.of("user", "username", "password", "integratedsecurity", "authentication",
+                            "authenticationscheme", "accesstoken", "accesstokencallbackclass").contains(normalizedName)) {
+                throw new IllegalStateException("SQL Server test URL must not contain duplicate properties, "
+                        + "credentials or alternate authentication");
+            }
             String value = parameters.group(2).trim();
             if (name.equalsIgnoreCase("databaseName") || name.equalsIgnoreCase("database")) {
                 databaseSelectors++;
@@ -498,11 +505,7 @@ class NhanVienRepositorySqlServerTest {
                             + "matching -D" + DATABASE_PROPERTY);
                 }
             }
-            // Parse braced values before removing credentials so embedded semicolons cannot create properties.
-            if (!name.equalsIgnoreCase("user") && !name.equalsIgnoreCase("username")
-                    && !name.equalsIgnoreCase("password")) {
-                targetUrl.append(parameters.group());
-            }
+            targetUrl.append(parameters.group());
             position = parameters.end();
         }
         if (databaseSelectors != 1) {
@@ -532,15 +535,95 @@ class NhanVienSqlServerTargetGuardTest {
     private static final String URL = "jdbc:sqlserver://synthetic-host:1433";
 
     @Test
-    void acceptsOneMatchingSelector_preservesTls_andRemovesWholeBracedCredentials() {
+    void acceptsOneMatchingSelector_andPreservesTlsAndBracedValues() {
         String tls = ";encrypt=true;trustServerCertificate=false;hostNameInCertificate=synthetic-host";
-        assertEquals(URL + ";databaseName=" + DATABASE_NAME + tls,
+        String braced = ";applicationName={synthetic;database=clinicDb;escaped}}value}";
+        assertEquals(URL + ";databaseName=" + DATABASE_NAME + braced + tls,
                 NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + ";databaseName=" + DATABASE_NAME
-                        + ";user=synthetic;password={synthetic;database=clinicDb;escaped}}value}" + tls,
-                        DATABASE_NAME));
+                        + braced + tls, DATABASE_NAME));
         assertEquals(URL + "; DaTaBaSe ={" + DATABASE_NAME + "}" + tls,
                 NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(
                         URL + "; DaTaBaSe ={" + DATABASE_NAME + "}" + tls, DATABASE_NAME));
+    }
+
+    @Test
+    void usesOnlyDedicatedInputs_andEscapesCredentialsWithoutTrimmingSecrets() {
+        List<String> requestedKeys = new ArrayList<>();
+        Map<String, String> inputs = Map.of(
+                "CLINIC_TEST_SQLSERVER_URL", URL + ";databaseName=" + DATABASE_NAME,
+                "CLINIC_TEST_SQLSERVER_USERNAME", "synthetic};user=other",
+                "CLINIC_TEST_SQLSERVER_PASSWORD", " synthetic};database=clinicDb;secret ");
+        String connectionString = NhanVienRepositorySqlServerTest.testConnectionString(DATABASE_NAME, key -> {
+            requestedKeys.add(key);
+            return inputs.get(key);
+        });
+        assertEquals(Set.of("CLINIC_TEST_SQLSERVER_URL", "CLINIC_TEST_SQLSERVER_USERNAME",
+                "CLINIC_TEST_SQLSERVER_PASSWORD"), new HashSet<>(requestedKeys));
+        assertEquals(3, requestedKeys.size());
+        // Use a boolean assertion so a failure cannot render credential-bearing strings.
+        assertTrue((URL + ";databaseName=" + DATABASE_NAME
+                + ";user={synthetic}};user=other};password={ synthetic}};database=clinicDb;secret }")
+                .equals(connectionString), "Dedicated credentials must be escaped and preserved");
+    }
+
+    @Test
+    void rejectsMissingOrBlankDedicatedInputs_evenWhenApplicationEnvironmentIsComplete() {
+        Map<String, String> complete = Map.of(
+                "CLINIC_TEST_SQLSERVER_URL", URL + ";databaseName=" + DATABASE_NAME,
+                "CLINIC_TEST_SQLSERVER_USERNAME", "synthetic_user_marker",
+                "CLINIC_TEST_SQLSERVER_PASSWORD", "synthetic_secret_marker");
+        for (String missingKey : complete.keySet()) {
+            for (String missingValue : new String[]{null, "", "   "}) {
+                IllegalStateException failure = assertThrows(IllegalStateException.class,
+                        () -> NhanVienRepositorySqlServerTest.testConnectionString(DATABASE_NAME, key -> {
+                            if (complete.containsKey(key)) {
+                                return key.equals(missingKey) ? missingValue : complete.get(key);
+                            }
+                            // Any attempted fallback to application keys fails this test.
+                            throw new AssertionError("Application environment must not be read");
+                        }));
+                assertEquals("Missing dedicated SQL Server test input: " + missingKey, failure.getMessage());
+                assertNull(failure.getCause());
+            }
+        }
+        Map<String, String> applicationOnly = Map.of(
+                "DB_URL", URL + ";databaseName=" + DATABASE_NAME,
+                "DB_USERNAME", "synthetic_user_marker", "DB_PASSWORD", "synthetic_secret_marker",
+                "DB_CONNECTION_STRING", URL + ";databaseName=" + DATABASE_NAME);
+        assertThrows(IllegalStateException.class,
+                () -> NhanVienRepositorySqlServerTest.testConnectionString(DATABASE_NAME, applicationOnly::get));
+    }
+
+    @Test
+    void rejectsMismatchedOrAmbiguousDedicatedUrl_withoutExposingInputs() {
+        for (String url : List.of(URL + ";databaseName=clinicDb",
+                URL + ";databaseName=clinic_test_other",
+                URL + ";databaseName=" + DATABASE_NAME + ";database=" + DATABASE_NAME,
+                "jdbc:postgresql://synthetic-host/" + DATABASE_NAME,
+                "jdbc:sqlserver://;databaseName=" + DATABASE_NAME)) {
+            Map<String, String> inputs = Map.of("CLINIC_TEST_SQLSERVER_URL", url,
+                    "CLINIC_TEST_SQLSERVER_USERNAME", "synthetic_user_marker",
+                    "CLINIC_TEST_SQLSERVER_PASSWORD", "synthetic_secret_marker");
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                    () -> NhanVienRepositorySqlServerTest.testConnectionString(DATABASE_NAME, inputs::get));
+            for (String value : inputs.values()) {
+                assertFalse(failure.toString().contains(value), "Validation must not render test inputs");
+            }
+            assertNull(failure.getCause());
+        }
+    }
+
+    @Test
+    void rejectsEmbeddedCredentialsAlternateAuthenticationAndDuplicateProperties() {
+        for (String properties : List.of(";user=synthetic", "; USERname ={synthetic}",
+                ";password={synthetic;database=clinicDb;escaped}}value}",
+                ";integratedSecurity=true", ";authentication=ActiveDirectoryIntegrated",
+                ";authenticationScheme=JavaKerberos", ";accessToken=synthetic",
+                ";accessTokenCallbackClass=synthetic", ";encrypt=true;ENCRYPT=false")) {
+            assertThrows(IllegalStateException.class,
+                    () -> NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(
+                            URL + ";databaseName=" + DATABASE_NAME + properties, DATABASE_NAME));
+        }
     }
 
     @Test
