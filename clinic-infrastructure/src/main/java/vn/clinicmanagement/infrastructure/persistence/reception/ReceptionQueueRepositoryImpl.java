@@ -1,6 +1,7 @@
 package vn.clinicmanagement.infrastructure.persistence.reception;
 
 import vn.clinicmanagement.application.reception.ClinicRoomQueueSummary;
+import vn.clinicmanagement.application.reception.DoctorQueuePort;
 import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.application.reception.ReceptionQueuePort;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
@@ -21,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** JDBC writes for newly registered visits and read models for the reception queue. */
-public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
+public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort, DoctorQueuePort {
     private final JdbcConnectionProvider connections;
     private final JdbcUnitOfWork unitOfWork;
 
@@ -102,6 +103,26 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
     }
 
     @Override
+    public List<ReceptionQueueItem> getActiveDoctorQueue(LocalDate date, int facilityId, int departmentId) {
+        if (date == null || facilityId <= 0 || departmentId <= 0) return List.of();
+        String sql = activeDoctorQueueSql();
+        try (JdbcConnectionProvider.Lease lease = connections.acquire();
+             PreparedStatement ps = lease.connection().prepareStatement(sql)) {
+            ps.setObject(1, date);
+            ps.setInt(2, facilityId);
+            ps.setInt(3, departmentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<ReceptionQueueItem> items = new ArrayList<>();
+                while (rs.next()) items.add(new ReceptionQueueItem(rs.getInt("visitId"), rs.getInt("patientId"),
+                        rs.getString("patientCode"), rs.getString("patientName"), rs.getInt("roomId"),
+                        rs.getString("roomName"), rs.getInt("queueNumber"), rs.getString("queueDisplay"),
+                        rs.getString("trangThai"), localDateTime(rs, "thoiGianTiepNhan")));
+                return items;
+            }
+        } catch (SQLException ex) { throw new IllegalStateException("Không thể đọc hàng đợi bác sĩ.", ex); }
+    }
+
+    @Override
     public List<ClinicRoomQueueSummary> getRoomSummaries(LocalDate date, int facilityId, int departmentId) {
         if (facilityId <= 0 || departmentId <= 0) return List.of();
         String sql = scopedRoomSummariesSql();
@@ -130,6 +151,17 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort {
                 + "LEFT JOIN PhongKham r ON r.id=l.maPhongKham "
                 + "WHERE l.ngayKham=? AND l.maCoSo=? AND l.maKhoa=? AND l.isDeleted=0 "
                 + "AND l.trangThai<>'DA_HUY' AND p.isDeleted=0 "
+                + "ORDER BY l.dnVnTien DESC, l.soThuTu, l.id";
+    }
+
+    static String activeDoctorQueueSql() {
+        return "SELECT l.id visitId, p.id patientId, p.maBenhNhanFormat patientCode, "
+                + "CONCAT(p.ho, N' ', p.ten) patientName, r.id roomId, r.tenPhong roomName, "
+                + "ISNULL(l.soThuTu,0) queueNumber, ISNULL(l.soThuTuDisplay,'') queueDisplay, l.trangThai, l.thoiGianTiepNhan "
+                + "FROM LuotKham l INNER JOIN BenhNhan p ON p.id=l.maBenhNhan "
+                + "LEFT JOIN PhongKham r ON r.id=l.maPhongKham "
+                + "WHERE l.ngayKham=? AND l.maCoSo=? AND l.maKhoa=? AND l.isDeleted=0 "
+                + "AND l.trangThai IN ('CHO_KHAM','DANG_KHAM','CHO_CLS') AND p.isDeleted=0 "
                 + "ORDER BY l.dnVnTien DESC, l.soThuTu, l.id";
     }
 

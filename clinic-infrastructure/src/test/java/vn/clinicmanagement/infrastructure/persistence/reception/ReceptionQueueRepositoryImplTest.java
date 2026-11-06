@@ -2,6 +2,7 @@ package vn.clinicmanagement.infrastructure.persistence.reception;
 
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.TrangThaiLuotKham;
 import vn.clinicmanagement.domain.examination.LuotKham;
@@ -22,6 +23,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +47,53 @@ class ReceptionQueueRepositoryImplTest {
         assertTrue(sql.contains("l.isDeleted=0"));
         assertTrue(sql.contains("p.isDeleted=0"));
         assertTrue(sql.contains("l.trangThai<>'DA_HUY'"));
+    }
+
+    @Test
+    void doctorQueueSqlFiltersDateExactScopeActiveRowsAndOnlyApprovedStatuses() {
+        String sql = ReceptionQueueRepositoryImpl.activeDoctorQueueSql();
+
+        assertTrue(sql.contains("l.ngayKham=?"));
+        assertTrue(sql.contains("l.maCoSo=?"));
+        assertTrue(sql.contains("l.maKhoa=?"));
+        assertTrue(sql.contains("l.isDeleted=0"));
+        assertTrue(sql.contains("p.isDeleted=0"));
+        assertTrue(sql.contains("l.trangThai IN ('CHO_KHAM','DANG_KHAM','CHO_CLS')"));
+        assertFalse(sql.contains("DA_HUY"));
+        assertFalse(sql.contains("DA_KHAM"));
+        assertFalse(sql.contains("KET_LUAN"));
+        assertFalse(sql.contains("HOAN_THANH"));
+        assertFalse(sql.contains("maBacSi"));
+    }
+
+    @Test
+    void doctorQueueBindsRequestedDateAndExactTeamScopeAndMapsSyntheticRow() throws Exception {
+        SyntheticDoctorQueueJdbc jdbc = new SyntheticDoctorQueueJdbc();
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcTransactionManager transactions = transactionManager(unitOfWork, jdbc.connection);
+        JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+        ReceptionQueueRepositoryImpl repository = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
+        LocalDate date = LocalDate.of(2026, 11, 6);
+
+        List<ReceptionQueueItem> items = withSyntheticStandaloneConnection(
+                jdbc.connection, () -> repository.getActiveDoctorQueue(date, 3, 8));
+
+        assertEquals(1, items.size());
+        var item = items.get(0);
+        assertEquals(51, item.visitId());
+        assertEquals(72, item.patientId());
+        assertEquals("BN-SYN-72", item.patientCode());
+        assertEquals("Người bệnh tổng hợp", item.patientName());
+        assertEquals(91, item.roomId());
+        assertEquals("Phòng tổng hợp", item.roomName());
+        assertEquals(5, item.queueNumber());
+        assertEquals("05", item.queueNumberDisplay());
+        assertEquals("CHO_CLS", item.status());
+        assertEquals(LocalDateTime.of(2026, 11, 6, 8, 30), item.registeredAt());
+        assertEquals(ReceptionQueueRepositoryImpl.activeDoctorQueueSql(), jdbc.statement.sql);
+        assertEquals(date, jdbc.statement.bindings.get(1));
+        assertEquals(3, jdbc.statement.bindings.get(2));
+        assertEquals(8, jdbc.statement.bindings.get(3));
     }
 
     @Test
@@ -326,6 +376,87 @@ class ReceptionQueueRepositoryImplTest {
                         case "equals" -> proxy == args[0];
                         default -> throw new UnsupportedOperationException(method.getName());
                     });
+        }
+    }
+
+    private static final class SyntheticDoctorQueueJdbc {
+        private final RecordedDoctorQueueStatement statement =
+                new RecordedDoctorQueueStatement(ReceptionQueueRepositoryImpl.activeDoctorQueueSql());
+        private final Connection connection = (Connection) Proxy.newProxyInstance(
+                Connection.class.getClassLoader(), new Class<?>[]{Connection.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "prepareStatement" -> {
+                        assertEquals(ReceptionQueueRepositoryImpl.activeDoctorQueueSql(), args[0]);
+                        yield statement.preparedStatement;
+                    }
+                    case "close" -> null;
+                    case "isClosed" -> false;
+                    case "toString" -> "SyntheticDoctorQueueConnection";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+    }
+
+    private static final class RecordedDoctorQueueStatement {
+        private final String sql;
+        private final Map<Integer, Object> bindings = new LinkedHashMap<>();
+        private final PreparedStatement preparedStatement;
+
+        private RecordedDoctorQueueStatement(String sql) {
+            this.sql = sql;
+            preparedStatement = (PreparedStatement) Proxy.newProxyInstance(
+                    PreparedStatement.class.getClassLoader(), new Class<?>[]{PreparedStatement.class},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "setInt", "setObject" -> {
+                            bindings.put((Integer) args[0], args[1]);
+                            yield null;
+                        }
+                        case "executeQuery" -> doctorQueueResultSet();
+                        case "close" -> null;
+                        case "toString" -> "SyntheticDoctorQueuePreparedStatement";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    });
+        }
+
+        private ResultSet doctorQueueResultSet() {
+            boolean[] returned = {false};
+            return (ResultSet) Proxy.newProxyInstance(
+                    ResultSet.class.getClassLoader(), new Class<?>[]{ResultSet.class}, (proxy, method, args) -> switch (method.getName()) {
+                        case "next" -> {
+                            if (returned[0]) yield false;
+                            returned[0] = true;
+                            yield true;
+                        }
+                        case "getInt" -> switch ((String) args[0]) {
+                            case "visitId" -> 51;
+                            case "patientId" -> 72;
+                            case "roomId" -> 91;
+                            case "queueNumber" -> 5;
+                            default -> throw new SQLException("Unexpected synthetic integer column.");
+                        };
+                        case "getString" -> switch ((String) args[0]) {
+                            case "patientCode" -> "BN-SYN-72";
+                            case "patientName" -> "Người bệnh tổng hợp";
+                            case "roomName" -> "Phòng tổng hợp";
+                            case "queueDisplay" -> "05";
+                            case "trangThai" -> "CHO_CLS";
+                            default -> throw new SQLException("Unexpected synthetic string column.");
+                        };
+                        case "getTimestamp" -> "thoiGianTiepNhan".equals(args[0])
+                                ? Timestamp.valueOf(LocalDateTime.of(2026, 11, 6, 8, 30))
+                                : throwUnexpectedColumn();
+                        case "close" -> null;
+                        case "toString" -> "SyntheticDoctorQueueResultSet";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    });
+        }
+
+        private static Timestamp throwUnexpectedColumn() throws SQLException {
+            throw new SQLException("Unexpected synthetic timestamp column.");
         }
     }
 
