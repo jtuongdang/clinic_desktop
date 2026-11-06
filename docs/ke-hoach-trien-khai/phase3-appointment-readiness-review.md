@@ -5,6 +5,33 @@
 **Scope:** Booking, rescheduling, cancellation, duplicate/overbooking, facility/department/doctor scope, check-in/no-show, visit conversion, time, reminders/notifications, payment, audit/privacy, UI/print, persistence, use cases, and tests.
 **Method:** Static source/document review only. No database connection, database query, or real patient data used.
 
+## Current status addendum — 2026-11-06
+
+This addendum reconciles the owner-decision ledger with Owner-confirmed contract `APPT-OWNER-DECISION-RECON-02` (`84c00d27-e4e1-463b-9964-67543c9ccb28`). It records policy only and does not authorize implementation.
+
+### Approved action mapping
+
+- Use existing `APPOINTMENT:XEM` for read only; existing `APPOINTMENT:TAO` for creation only, with new appointments starting at `CHO_XAC_NHAN`; and existing `APPOINTMENT:SUA` for editing and rescheduling only.
+- Cancellation, confirmation, check-in, no-show/reversal, and conversion to `LuotKham` remain **DENY / unimplemented** pending separate action-specific guard, actor, transition, and acceptance decisions.
+- Existing grants and exact selected facility/department session scope are unchanged. `CASHIER:XEM` remains read only; no grant is added or broadened. Patient self-service remains **DENY / unimplemented**.
+
+### Approved capacity basis
+
+- Allow one appointment at a time per doctor within the selected facility/department pair. Any overlapping interval for that doctor conflicts; intervals are half-open `[start,end)`, so adjacent appointments are allowed.
+- No room is required as an appointment capacity resource for this MVP basis. Overbooking is denied; no waitlist or exception role is approved.
+
+### Still open before implementation
+
+Required fields and source mapping; positive duration and appointment types; working hours, breaks, and holidays; which statuses and soft-deleted records occupy capacity and when capacity releases; reschedule limits; cancellation cutoff/reason policy; check-in window and late-arrival handling; no-show policy; conversion preconditions, atomic uniqueness, and idempotency; notifications, consent, content, and privacy; time-zone persistence; and audit, persistence, concurrency, rollback, and UI workflow acceptance. Appointment deposits, payment, refunds, and billing remain **DENY**.
+
+`SEC-01` remains **OPEN / default-deny**. Appointment work remains blocked pending SEC-01 baseline acceptance and separate APPT security, persistence, concurrency, audit, rollback, and visual acceptance.
+
+See the [current appointment owner-decision proposal](phase3-appointment-owner-decisions.md) for the approved contract and its evidence. Read-only inspection of `LichHen`, `ILichHenRepository`, `TrangThaiLichHen`, and V8 grants confirms source facts only; it does not change policy or authorize implementation. RAG retrieval was attempted first, but the sandbox denied permission to run the external script and returned no task-specific excerpts; no workaround, database access, or implementation change was made.
+
+## Historical report snapshot — original review content
+
+The report body below is preserved as the original review snapshot. Its open-decision ledger is historical, not a statement of current owner-decision status; consult the current-status addendum above.
+
 ## Evidence labels
 
 - **[FACT]** Directly visible in the cited source or document.
@@ -60,7 +87,7 @@
 
 - **[FACT]** The repository count contract accepts doctor and a time window only, while the V1 table has no slot uniqueness constraint (`ILichHenRepository.java:6-9`; `V1__Initial_Clinic_Schema.sql:294-324`).
 - **[INFERENCE]** A separate count-then-insert can race; no atomic slot reservation, conflict resource, capacity or overlap semantics are evident. A doctor-only count may not honor facility/department or room-specific schedules and cannot determine which statuses release capacity.
-- **[OWNER DECISION]** Define what consumes capacity (doctor, room, or both), appointment duration/overlap boundaries, whether capacity may exceed one, and which statuses/soft-deleted appointments count. Do not assume one appointment per doctor/time slot.
+- **[HISTORICAL OWNER DECISION — core resource, interval, and overbooking choices superseded by RECON-02]** Define what consumes capacity (doctor, room, or both), appointment duration/overlap boundaries, whether capacity may exceed one, and which statuses/soft-deleted appointments count. Do not assume one appointment per doctor/time slot.
 - **[ACCEPTANCE GATE]** Add deterministic concurrent booking tests proving that simultaneous requests cannot exceed the approved capacity, including overlapping intervals, cancellation/reschedule races, separate facilities/departments/resources, and database uniqueness/transaction/version behavior. A preflight count without an atomic persistence guarantee is insufficient.
 
 ### Facility, department, and doctor scope
@@ -120,13 +147,13 @@
 
 **[INFERENCE]** Print previews and generic menu dispatch can produce a slip/placeholder without a persisted appointment. They must not be treated as evidence of booking, check-in, reminder or conversion, or made to expose patient data outside approved access controls.
 
-## Owner decisions still open for APPT
+## Historical owner-decision ledger — original review snapshot
 
-These are appointment-specific gaps; the already-approved session, scope, audit, visit-cancel and visit-transfer decisions are not reopened here.
+The six entries below are preserved from the original review and are not the current ledger. Entry 1's action mapping and entry 3's core capacity/resource/overbooking choices were resolved by `APPT-OWNER-DECISION-RECON-02`; remaining details not decided there stay open as summarized in the current-status addendum. The already-approved session, scope, audit, visit-cancel and visit-transfer decisions are not reopened here.
 
-1. **Action semantics, not role invention:** Approved generic grants exist for `APPOINTMENT:XEM/TAO/SUA` (DOCTOR and RECEPTIONIST) and `XEM` (CASHIER), all within the approved exact-pair scope. Owner must clarify which specific lifecycle operations those generic actions cover—especially cancel, confirm, check-in, no-show, and conversion—and their guards. No patient-facing role/access is approved; keep patient self-service default-deny/unimplemented. Do not add or broaden grants.
+1. **HISTORICAL — action mapping resolved by RECON-02. Action semantics, not role invention:** Approved generic grants exist for `APPOINTMENT:XEM/TAO/SUA` (DOCTOR and RECEPTIONIST) and `XEM` (CASHIER), all within the approved exact-pair scope. Owner must clarify which specific lifecycle operations those generic actions cover—especially cancel, confirm, check-in, no-show, and conversion—and their guards. No patient-facing role/access is approved; keep patient self-service default-deny/unimplemented. Do not add or broaden grants.
 2. **Booking policy:** Required fields, valid duration/hours, scheduling/resource assignment, reschedule limits, cancellation cutoff/reason/refund behavior, and whether a department/room is mandatory.
-3. **Capacity/conflict policy:** Capacity resource(s), slot boundaries/overlap semantics, statuses occupying capacity, waitlist/overbooking exceptions, and the role authorized to approve any exception.
+3. **HISTORICAL — core capacity basis resolved by RECON-02; status/soft-delete/release details remain open. Capacity/conflict policy:** Capacity resource(s), slot boundaries/overlap semantics, statuses occupying capacity, waitlist/overbooking exceptions, and the role authorized to approve any exception.
 4. **Attendance/conversion policy:** Check-in timing/late arrival, no-show timing/reversal, handling of cancelled/no-show appointments, and whether/when a booking can be converted to a visit.
 5. **Reminder/notification policy:** Whether delivery is allowed; channels, consent/recipient, timing, approved content, retention, retries and external provider.
 6. **Deposit/payment policy:** Whether deposits exist at all and, if so, amount/default, actor, cash/refund/waiver process, gateway/callback requirements and receipt/reconciliation. Current approval says DENY; no default amount is authorized.
