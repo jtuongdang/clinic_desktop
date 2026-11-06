@@ -109,6 +109,10 @@
 4. Is SQL Server UTC time or the injected application `Clock` the authority for comparisons across clients?
 5. Should attempts against inactive employees update throttle state, or are they simply denied/audited without changing it?
 
+## Owner resolution — 2026-11-06
+
+The Owner approved the review's proposed implementation semantics on 2026-11-06: use a fixed 15-minute window from the first failure; the request after five failures waits before password verification; requests while delay is active are audited without increasing the delay; a correct password for an active account clears throttle immediately after verification even if role/scope selection later denies login; SQL Server UTC time is authoritative. Inactive/deleted accounts are not reset/reactivated. These decisions supersede the related open questions above for implementation and are recorded in approved Orchestrator contract `c67f6998-c9d4-402a-9fd0-008f2616c9eb`, which governs the resumed task.
+
 ## Guidance and sources read
 
 **Mandatory task-supplied guidance reviewed:** `docs/PROJECT_CONVENTIONS.md`, `README.md`, `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, and `UI_CODING_STANDARDS.md`. The task supplied excerpts. No repository `AGENTS.md`, `docs/PROJECT_CONVENTIONS.md`, `docs/DEVELOPMENT_CONVENTIONS.md`, or `docs/README.md` copy was found by the guidance-file search.

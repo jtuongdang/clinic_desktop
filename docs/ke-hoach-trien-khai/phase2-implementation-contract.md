@@ -48,6 +48,6 @@
 ## 4. Gates và chính sách chưa duyệt
 
 - `SEC-01` phải qua unit, persistence/transaction integration và UI acceptance trước EMR, prescription/pharmacy, billing hoặc mở rộng sang dữ liệu thật.
-- Login lockout sau đăng nhập sai chưa được duyệt. Không thêm cột, trigger, counter, thời lượng khóa hoặc UI cho lockout cho đến khi có quyết định riêng.
+- Login throttle policy B và semantics triển khai đã được Owner duyệt ngày 06/11/2026; xem [`phase2-login-lockout-policy-proposal.md`](phase2-login-lockout-policy-proposal.md), [`phase2-login-throttle-implementation-review.md`](phase2-login-throttle-implementation-review.md) và contract `c67f6998-c9d4-402a-9fd0-008f2616c9eb`. Thực thi đúng fixed window 15 phút, wait trước verify, blocked attempts chỉ audit, successful active password reset và SQL Server UTC authority.
 - Audit retention cụ thể chưa được quyết định. Giữ no-purge; `AUDIT_READ` được Chủ dự án duyệt là deny cho mọi role trong baseline hiện hành, không seed quyền đọc audit.
 - Nếu source/schema hiện có không thể biểu đạt đúng policy, task phải dừng ở contract/report và báo cáo phương án trước khi mở rộng migration hoặc thay dữ liệu.

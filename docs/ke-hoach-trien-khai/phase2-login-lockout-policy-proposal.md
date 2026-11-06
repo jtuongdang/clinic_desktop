@@ -30,7 +30,9 @@
 
 Owner chọn **B — trì hoãn tăng dần**. Policy được duyệt: sau 5 lần sai trong cửa sổ 15 phút, lần thử tiếp theo phải chờ 30 giây; thời gian chờ tăng gấp đôi theo các lần sai kế tiếp, tối đa 15 phút. Không khóa cứng tài khoản; đăng nhập thành công reset chuỗi sai; chuỗi sai hết hiệu lực sau 24 giờ không có lần sai mới. Tiếp tục dùng thông báo xác thực chung, lưu trạng thái nguyên tử theo tài khoản trong SQL Server và audit failure/throttle fail-closed như các điều khoản đề xuất. Implementation phải giữ nguyên tài khoản bị HR/Admin vô hiệu hóa; không thêm flow mở khóa thủ công. Chỉ áp dụng trên dữ liệu tổng hợp trong acceptance.
 
-**Triển khai:** Contract Orchestrator `a2c4ea7f-db14-4933-b8fc-a658972af395` được duyệt; task `baa9468c-40f3-4c8a-871d-949d00c43867` đang chạy bằng Codex CLI trên worktree/branch riêng. Chưa có code/migration được tích hợp; runtime acceptance còn chờ review.
+**Chi tiết triển khai Owner duyệt:** Cửa sổ 15 phút là fixed window bắt đầu tại lần sai đầu; tại đúng mốc 15 phút, cửa sổ trước hết hạn và bộ đếm trước ngưỡng bắt đầu mới. Sau 5 lỗi trong cửa sổ, yêu cầu kế tiếp bị delay trước khi kiểm tra mật khẩu. Yêu cầu đến trong lúc delay còn hiệu lực chỉ ghi audit throttle và không tăng cấp delay. Sau khi delay hết, nếu mật khẩu sai thì áp dụng mức delay tiếp theo. Mật khẩu đúng của tài khoản còn hoạt động reset throttle ngay sau xác minh, trước kiểm tra role/scope; tài khoản inactive/deleted không được reset trạng thái hay đăng nhập. SQL Server `SYSUTCDATETIME()` là nguồn thời gian chuẩn cho mọi so sánh/thời điểm lưu giữa nhiều máy. Sequence/delay hết sau 24 giờ kể từ lỗi gần nhất; success reset ngay.
+
+**Triển khai:** Contract Orchestrator đầu `a2c4ea7f-db14-4933-b8fc-a658972af395` được thay bằng contract chi tiết đã Owner duyệt `c67f6998-c9d4-402a-9fd0-008f2616c9eb`. Các lượt task trước bị dừng trước khi tích hợp để mở rộng đúng file scope và làm rõ semantics. Task đang chạy là `0fd9f235-6a40-4b08-93ae-91fefa16b1e3`; xem task board để theo dõi validation. Chưa có code/migration được tích hợp; runtime acceptance còn chờ review.
 
 ## Quy tắc chung đề nghị áp dụng
 
