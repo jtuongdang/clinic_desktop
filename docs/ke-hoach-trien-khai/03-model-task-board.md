@@ -229,3 +229,16 @@ Still open before transfer runtime implementation: optional-note length/normaliz
 | `9ba5a034-f254-4dd8-bfb1-57a478795fa2` · documentation retry | Ended without a change; superseded by successful Codex task `75850c9b-c647-4c44-b0b9-e324839829c1`. | No change from this task is claimed or integrated. |
 
 Combined root JDK 17 `mvn -Djava.awt.headless=true clean verify`: **BUILD SUCCESS** across all five Maven modules. Two opt-in SQL Server tests were skipped (not executed); this default run is not evidence that SQL Server is configured. The task-specific ClinicOrchestrator Maven validation/scope checks passed for all three completed tasks. RAG-first retrieval was attempted before local board reads, but the non-interactive runtime could not obtain approval and returned no fresh excerpts; supplied retrieved excerpts and the approved contract in the task context were used as fallback.
+
+## RECON-05 transfer-detail proposal evidence — 06/11/2026
+
+These are completed documentation-only, non-binding proposals and a proposal review. They do not accept implementation or settle the remaining Owner choices.
+
+| Orchestrator task · agent | Scope and evidence | Validation and remaining decisions |
+|---|---|---|
+| `e2e9d1d6-8400-4900-ace6-946a59662db7` · Codex | Optional transfer-note proposal; integrated commit `f7d9226`. | Orchestrator validation and scope checks passed. Owner approval is still needed for note privacy safeguards, limits/normalization and storage field. Proposal only; no note policy or storage is approved. |
+| `f3021f5f-6aaa-48de-884b-99bed6b05d8c` · Copilot | Transfer idempotency details proposal; integrated commit `023d6a6`. | Orchestrator validation and scope checks passed. Owner choices remain open for key scope/lifetime, canonical payload, receipt contents, concurrent-wait behavior and reservation retention for failed/denied attempts. Proposal only; no runtime behavior is accepted. |
+| `a5f2f302-3510-4ec3-8868-98e73d498613` · Antigravity | Queue/history persistence and cutover proposal; integrated commit `2865452`. | Orchestrator validation and scope checks passed. Owner choices remain open for persistence shape, counter/ledger, migration/cutover and legacy evidence boundary. The proposal's initial active/nondeleted-only seeding risk was corrected: assess all trustworthy evidence, including soft-deleted assignments, and block cutover if the committed high-water mark cannot be proven. Proposal only; no DDL or cutover is approved. |
+| `ae6d7070-ca10-494b-b1e8-ad0290af1c51` · Codex | Corrective review of the queue high-water proposal; integrated commit `ee87070`. | Orchestrator validation and scope checks passed. Confirms all trustworthy evidence, including soft-deleted assignments, must inform the high-water mark; block cutover when the committed high-water mark cannot be proven. Proposal review only; no persistence or cutover is accepted. |
+
+No DDL, runtime, permission/grant or gate changes are made or accepted by these tasks. No proposal task is acceptance of implementation. `SEC-01` remains OPEN and transfer runtime remains default-deny; optional-note choices, idempotency details, persistence/counter/ledger/migration/cutover and legacy evidence boundary still require Owner approval.
