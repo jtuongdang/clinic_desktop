@@ -52,3 +52,10 @@ Owner chọn **B — trì hoãn tăng dần**. Policy được duyệt: sau 5 l�
 - Nếu chọn B: xác nhận bắt đầu throttle sau `5 lần / 15 phút`, chờ đầu `30 giây`, tăng gấp đôi tới tối đa `15 phút`, reset khi đăng nhập thành công, hết chuỗi sau `24 giờ` không có lần sai.
 
 Task policy đã được duyệt và implementation trên đã hoàn tất trong phạm vi nêu trên. Các quyết định về retention, workflow quyền khác và acceptance UI vẫn theo gate riêng của `SEC-01`.
+
+
+## Xác nhận chi tiết của Owner — 06/11/2026
+
+Owner xác nhận lại bộ quy tắc triển khai: cửa sổ fixed 15 phút bắt đầu ở lỗi đầu tiên; sau 5 lỗi, lần kế tiếp phải chờ hết delay trước khi kiểm tra mật khẩu. Các lần thử khi delay còn hiệu lực chỉ ghi audit throttle và không tăng delay. Mật khẩu đúng của tài khoản đang hoạt động reset throttle ngay sau xác minh, kể cả khi bước role/scope sau đó không thành công. SQL Server UTC là nguồn giờ chuẩn. Các mức delay của phương án B đã duyệt vẫn là 30 giây, tăng gấp đôi tới trần 15 phút; chuỗi sai hết hiệu lực sau 24 giờ không có lỗi mới.
+
+Các quy tắc trên đã được triển khai và kiểm thử ở `SEC-LOCKOUT-IMPLEMENT-01`; test evidence vẫn không thay thế visual smoke của SEC-01.

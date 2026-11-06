@@ -1,7 +1,7 @@
 # Phase 0 — Quyết định tích hợp Value Object
 
 - **Task:** `PLAT-VO-POLICY-01`
-- **Trạng thái:** Đề xuất để chủ dự án quyết định; chưa thay đổi code/schema.
+- **Trạng thái:** Owner đã chốt chính sách ngày 06/11/2026; implementation consumer và acceptance vẫn chưa hoàn tất.
 - **Phạm vi:** `DateRange`, `PhoneNumber`, `Money` và các điểm tiêu thụ thật trong project.
 - **Gate:** Không thêm consumer vào workflow nhạy cảm trước `SEC-01`; mọi acceptance persistence dùng fixture tổng hợp.
 
@@ -9,7 +9,7 @@
 
 Ba Value Object hiện có unit test nhưng chưa được consumer production nào dùng. Báo cáo source audit xác nhận các lớp hiện dùng `LocalDate`, `String` và `BigDecimal` trực tiếp; do đó đổi model sang Value Object sẽ tác động Application validation, JDBC mapping, form và tìm kiếm, chứ không chỉ thay kiểu trong Domain. Cần chốt quy tắc nghiệp vụ trước khi tích hợp.
 
-**Khuyến nghị triển khai:** quyết định và kiểm thử theo từng loại dữ liệu; không chuyển đổi hàng loạt model trong một task. Chưa chọn default tiền tệ, công thức làm tròn, định dạng điện thoại hay migration. Giữ nguyên các workflow hiện tại cho đến khi có quyết định và acceptance riêng.
+**Nguyên tắc triển khai:** quyết định và kiểm thử theo từng loại dữ liệu; không chuyển đổi hàng loạt model trong một task. Owner đã chốt các quy tắc bên dưới. Chưa tích hợp consumer mới, thay schema hoặc mở workflow tài chính; các thay đổi đó vẫn cần task và acceptance riêng.
 
 ## 1. `DateRange` — ngày hiệu lực bảo hiểm
 
@@ -21,7 +21,9 @@ Ba Value Object hiện có unit test nhưng chưa được consumer production n
 | Ranh giới hiệu lực ngày kết thúc? | A. Có hiệu lực hết ngày ghi trên thẻ (inclusive). B. Hết hiệu lực từ đầu ngày đó (exclusive). | A phù hợp với cách người dùng đọc ngày hết hạn, nhưng cần nghiệp vụ bảo hiểm xác nhận. |
 | Có kiểm tra hiệu lực trong tiếp đón không? | A. Chỉ kiểm tra khoảng ngày hợp lệ; xác minh quyền lợi ở workflow riêng. B. Từ chối tiếp đón khi thẻ ngoài hạn. | A tránh biến đăng ký thành quyết định chi trả; việc kiểm tra bảo hiểm cần quy trình riêng. |
 
-**Điều kiện trước implementation:** xác định null-start semantics và inclusive/exclusive; sau đó mới chọn giữ `DateRange` hiện tại hay sửa constructor. Acceptance phải bao phủ form → handler → JDBC → đọc lại, gồm ngày đầu/cuối và null bắt đầu. Không suy ra quyền lợi thanh toán từ việc tạo được thẻ.
+**Quyết định Owner — 06/11/2026:** ngày bắt đầu có thể trống và có nghĩa là chưa biết; ngày hết hạn bao gồm toàn bộ ngày ghi trên thẻ; trạng thái ngày thẻ không chặn tiếp đón. Không suy ra quyền lợi thanh toán từ việc tạo được thẻ.
+
+**Điều kiện trước consumer acceptance:** `DateRange` hiện hỗ trợ start chưa biết. `contains` không khẳng định ngày thuộc khoảng nếu start chưa biết; `overlaps` xử lý thận trọng khi hai khoảng có thể giao nhau. Consumer tiếp đón không dùng kết quả ngày để chặn tiếp nhận. Acceptance tích hợp cần form → handler → JDBC → đọc lại, gồm ngày bắt đầu null, ngày hết hạn inclusive và ngày kết thúc trước ngày bắt đầu đã biết bị từ chối. Không tự thêm quyết định kiểm tra quyền lợi.
 
 ## 2. `PhoneNumber` — số liên hệ bệnh nhân
 
@@ -34,7 +36,9 @@ Ba Value Object hiện có unit test nhưng chưa được consumer production n
 | Loại số nào được chấp nhận? | A. Di động Việt Nam theo bộ prefix hiện có. B. Thêm cố định/bàn hoặc quốc tế. | A giới hạn thay đổi đầu tiên; chỉ chọn nếu nghiệp vụ xác nhận không cần số bàn/ngoại quốc. |
 | Lưu và tìm kiếm số thế nào? | A. Lưu nguyên dạng đã chuẩn hóa dấu phân cách, giữ prefix `0`/`+84`. B. Chuẩn hóa mọi số về một dạng quốc gia. | A ít thay đổi dữ liệu; tìm kiếm cần thử được cả cách nhập tương đương mà không mở rộng tìm kiếm ngoài scope. |
 
-**Điều kiện trước implementation:** chốt optionality, định dạng, chuẩn hóa và cách xử lý số legacy không hợp lệ. Không tự động sửa dữ liệu cũ; nếu cần chuẩn hóa dữ liệu phải có migration/backfill riêng được duyệt. Test cần bao phủ validation, lưu/đọc lại và tìm kiếm tương đương.
+**Quyết định Owner — 06/11/2026:** số chính và số khẩn cấp đều tùy chọn; validate khi có nhập; giữ bộ quy tắc mobile Việt Nam hiện có; không chuyển `0…` sang `+84…`. Giữ cách lưu đã làm sạch dấu phân cách; không backfill dữ liệu cũ.
+
+**Điều kiện trước consumer acceptance:** blank/null phải giữ là không có dữ liệu, còn số đã nhập phải qua validation. Test cần bao phủ form/handler, lưu/đọc lại và tìm kiếm trong đúng scope. Không tự động sửa số legacy không hợp lệ.
 
 ## 3. `Money` — các trường tiền
 
@@ -47,19 +51,21 @@ Ba Value Object hiện có unit test nhưng chưa được consumer production n
 | Áp dụng cho nhóm nào? | A. Chỉ dịch vụ/viện phí. B. Bao gồm thuốc, kho, công nợ, đặt cọc và lương. | A cho phép tách hợp đồng hóa đơn; các nhóm khác cần quy tắc riêng. Khoản đặt cọc lịch hẹn hiện vẫn `DENY`. |
 | Constructor có tự làm tròn không? | A. Có, scale cố định 2. B. Không; làm tròn tại boundary đã được nghiệp vụ chỉ định. | B tránh làm tròn lặp ngoài ý muốn, nhưng yêu cầu quy tắc scale/rounding được chốt trước khi có consumer. |
 
-**Điều kiện trước implementation:** xác nhận currency, scale, rounding point và field scope. Không thêm currency default hoặc đổi schema chỉ dựa vào kiểu decimal hiện hữu. Acceptance cần tính tổng/giảm trừ và persistence read-back trên số tổng hợp; không đưa đơn giá hoặc dữ liệu thật vào log.
+**Quyết định Owner — 06/11/2026:** chỉ dùng VND. Điểm làm tròn phải được làm rõ trước khi triển khai luồng hóa đơn. Quyết định này chưa chọn nhóm field ngoài nguyên tắc VND và không cho phép mở thanh toán, đặt cọc, giảm trừ hay hoàn tiền.
+
+**Điều kiện trước consumer acceptance:** không để constructor làm tròn ở một điểm nghiệp vụ chưa được duyệt. Trước luồng hóa đơn cần chốt field scope, scale và điểm làm tròn; acceptance cần kiểm tra tổng/giảm trừ và persistence read-back bằng dữ liệu tổng hợp. Không ghi đơn giá hoặc dữ liệu thật vào log.
 
 ## Thứ tự đề xuất
 
-1. Chốt optionality/format cho điện thoại bệnh nhân; nếu được duyệt, đây là consumer có luồng form → application → JDBC đang hoạt động và có thể test trên dữ liệu tổng hợp.
-2. Chốt ngày hiệu lực cho BHYT; tích hợp `DateRange` mà không biến ngày null thành giả định nghiệp vụ.
-3. Chỉ tích hợp `Money` khi có contract tính giá/chứng từ được duyệt và Phase 2 gate cho phép workflow liên quan. Không đưa deposit vào phạm vi hiện tại.
+1. `PhoneNumber` boundary tại handler tiếp đón đã kiểm tra blank/null optional và validate giá trị được nhập; luồng form → JDBC hiện có không đổi định dạng `0`/`+84`. Acceptance form/persistence read-back tiếp tục theo dõi ở task riêng.
+2. Điều chỉnh `DateRange` để hỗ trợ ngày bắt đầu chưa biết, sau đó tích hợp tại BHYT mà không biến null thành giả định quyền lợi.
+3. Giữ `Money` ở trạng thái chưa tích hợp consumer hóa đơn cho tới khi Owner chốt điểm làm tròn/field scope; mọi consumer được mở chỉ dùng VND.
 
 ## Không thuộc quyết định của tài liệu này
 
 - Không cấp quyền `APPOINTMENT`, `BILLING` hoặc `AUDIT_READ`; không thay đổi role/scope đã duyệt.
 - Không bật đặt cọc, thanh toán, xác minh quyền lợi BHYT hay quyết định y khoa.
-- Không thay schema, migration, format dữ liệu hiện hữu hoặc UI.
+- Chưa cho phép thay schema, migration, format dữ liệu hiện hữu hoặc UI ngoài task consumer có acceptance riêng.
 - Không dùng dữ liệu bệnh nhân thật; mọi integration test về sau phải dùng dữ liệu tổng hợp.
 
 ## Nguồn

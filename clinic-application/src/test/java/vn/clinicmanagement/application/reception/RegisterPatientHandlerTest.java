@@ -73,6 +73,54 @@ class RegisterPatientHandlerTest {
     }
 
     @Test
+    void optionalPatientAndEmergencyPhonesMayBeBlank() {
+        Fixture fixture = new Fixture();
+        BenhNhan patient = validPatient();
+        patient.setDienThoai("  ");
+        patient.setNguoiLienHeDienThoai(null);
+        fixture.visit = visit(96, 11, "Q-011");
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
+                DoiTuongKham.THU_PHI));
+
+        assertTrue(result.isSuccess());
+    }
+
+    @Test
+    void validatesPhoneFormatsWithoutRewritingNationalOrInternationalPrefix() {
+        Fixture fixture = new Fixture();
+        BenhNhan patient = validPatient();
+        patient.setDienThoai("0912 345 678");
+        patient.setNguoiLienHeDienThoai("+84 912-345-678");
+        fixture.visit = visit(97, 12, "Q-012");
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
+                DoiTuongKham.THU_PHI));
+
+        assertTrue(result.isSuccess());
+        assertEquals("0912 345 678", patient.getDienThoai());
+        assertEquals("+84 912-345-678", patient.getNguoiLienHeDienThoai());
+    }
+
+    @Test
+    void rejectsInvalidPatientOrEmergencyPhoneBeforeTransaction() {
+        for (boolean emergencyPhone : List.of(false, true)) {
+            Fixture fixture = new Fixture();
+            BenhNhan patient = validPatient();
+            if (emergencyPhone) patient.setNguoiLienHeDienThoai("not-a-phone");
+            else patient.setDienThoai("not-a-phone");
+
+            Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
+                    DoiTuongKham.THU_PHI));
+
+            assertFailure(result, "PATIENT_VALIDATION");
+            assertEquals(0, fixture.transactions.calls);
+            assertNoWritesOrVisit(fixture);
+            assertFalse(result.getError().orElseThrow().message().contains("not-a-phone"));
+        }
+    }
+
+    @Test
     void newPatientRegistrationPersistsPatientInsuranceAndVisitReceipt() {
         Fixture fixture = new Fixture();
         LocalDateTime patientCreatedAt = LocalDateTime.of(2026, 5, 1, 8, 0);

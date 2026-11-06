@@ -16,6 +16,7 @@ import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
+import vn.clinicmanagement.domain.common.valueobjects.PhoneNumber;
 import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
@@ -186,6 +187,10 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
         if (patient.getNgaySinh() == null || patient.getNgaySinh().isAfter(LocalDate.now()))
             return "Ngày sinh không hợp lệ.";
         if (patient.getGioiTinh() == null) return "Vui lòng chọn giới tính.";
+        if (!isValidOptionalPhone(patient.getDienThoai())
+                || !isValidOptionalPhone(patient.getNguoiLienHeDienThoai())) {
+            return "Số điện thoại người bệnh hoặc liên hệ khẩn cấp không hợp lệ.";
+        }
         if (command.roomId() <= 0) return "Vui lòng chọn phòng khám.";
         if (command.registrationType() == null || command.registrationType().isBlank()) return "Vui lòng chọn loại đăng ký khám.";
         if (command.payerType() == null) return "Vui lòng chọn đối tượng khám.";
@@ -203,5 +208,15 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
 
     private static boolean hasInsuranceNumber(BaoHiem insurance) {
         return insurance != null && insurance.getSoBaoHiem() != null && !insurance.getSoBaoHiem().isBlank();
+    }
+
+    private static boolean isValidOptionalPhone(String value) {
+        if (value == null || value.isBlank()) return true;
+        try {
+            new PhoneNumber(value);
+            return true;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 }

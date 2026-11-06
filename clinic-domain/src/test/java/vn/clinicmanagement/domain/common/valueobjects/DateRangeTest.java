@@ -11,12 +11,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DateRangeTest {
 
     @Test
-    void rejectsNullStartDateAndEndDateBeforeStartDate() {
+    void rejectsEndDateBeforeKnownStartDate() {
         LocalDate start = LocalDate.of(2025, 1, 10);
 
-        assertThrows(IllegalArgumentException.class, () -> new DateRange(null, start));
         assertThrows(IllegalArgumentException.class,
                 () -> new DateRange(start, LocalDate.of(2025, 1, 9)));
+    }
+
+    @Test
+    void acceptsUnknownStartDateWithoutClaimingDateMembership() {
+        LocalDate end = LocalDate.of(2025, 1, 12);
+        DateRange range = new DateRange(null, end);
+
+        assertFalse(range.contains(LocalDate.of(2025, 1, 11)));
+        assertFalse(range.contains(null));
+        assertTrue(range.toString().startsWith("Chưa rõ -> "));
     }
 
     @Test
@@ -72,5 +81,20 @@ class DateRangeTest {
         assertTrue(later.overlaps(openEnded));
         assertFalse(openEnded.overlaps(earlier));
         assertFalse(earlier.overlaps(openEnded));
+    }
+
+    @Test
+    void unknownStartRangeConservativelyOverlapsEarlierAndTouchingRanges() {
+        DateRange unknownStart = new DateRange(null, LocalDate.of(2025, 1, 12));
+        DateRange earlier = new DateRange(LocalDate.of(2020, 1, 1), LocalDate.of(2020, 1, 2));
+        DateRange touching = new DateRange(LocalDate.of(2025, 1, 12), LocalDate.of(2025, 1, 15));
+        DateRange later = new DateRange(LocalDate.of(2025, 1, 13), LocalDate.of(2025, 1, 15));
+
+        assertTrue(unknownStart.overlaps(earlier));
+        assertTrue(earlier.overlaps(unknownStart));
+        assertTrue(unknownStart.overlaps(touching));
+        assertTrue(touching.overlaps(unknownStart));
+        assertFalse(unknownStart.overlaps(later));
+        assertFalse(later.overlaps(unknownStart));
     }
 }
