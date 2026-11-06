@@ -283,3 +283,17 @@ Owner-approved contract `a43850af-4577-4ce7-9fc8-48f0f4f8497c` ("Owner-approved 
 | Orchestrator task · agent | Scope and evidence | Validation and remaining gate |
 |---|---|---|
 | `7d7d26a1-9de9-4457-b643-dbe6ed7b8762` · Google Antigravity CLI | Recorded Owner Option A deferral under approved contract `a43850af-4577-4ce7-9fc8-48f0f4f8497c`; updated the board legend, PLAT-EVENT rows, and evidence snapshot. | Documentation only; allowlisted scope confirmed. Event foundation remains unwired; `SEC-01` remains OPEN/default-deny. |
+
+## Verified SQL Server acceptance and TLS exception scope — 06/11/2026
+
+The Tech Lead reported the current-root `mvn -Djava.awt.headless=true clean verify` passed. Separate owner-directed SQL Server opt-in runs used synthetic fixtures only:
+
+| Test | Result and target |
+|---|---|
+| `FreshDatabaseMigrationSqlServerTest` | Passed **1/1** against newly created `clinic_test_orchestrator_migration_20261106`; applied migrations V1–V11. SQLCMD confirmed successful migration rows V1–V11. |
+| `PatientHistorySqlServerPersistenceTest` | Passed **1/1** against existing synthetic `clinic_test_patient_history_20261106`. |
+| `ReceptionSqlServerPersistenceTest` | Passed **1/1** against the same existing synthetic `clinic_test_patient_history_20261106`. |
+
+No tests or migrations targeted `clinicDb`; only synthetic fixtures were used. The ignored local `db.properties` was temporarily replaced for these runs and restored byte-for-byte. The connection property `encrypt=true;trustServerCertificate=true` was used only for these owner-directed, one-off local test connections. This is not certificate-validation acceptance and does not change the standing deployment requirement for TLS with validated server certificate and identity (`trustServerCertificate=false`).
+
+`NhanVienRepositorySqlServerTest` live persistence remains unverified: it was not run with the bypass connection, which its guard rejects; its accepted test URL requires `encrypt=true;trustServerCertificate=false`. `SEC-01` remains `[~]` / open pending interactive visual smoke; these headless and SQL persistence results do not satisfy that visual gate. No patient or credential data is recorded here, and no model or phase status is closed by this evidence.

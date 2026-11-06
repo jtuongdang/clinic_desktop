@@ -159,3 +159,26 @@ No database, local properties, or credentials were accessed for this documentati
 - `docs/ke-hoach-trien-khai/phase0-db-test-isolation-review.md` (target review and retrieved excerpts supplied in the task)
 - `docs/ke-hoach-trien-khai/phase0-db-config-resolution-contract.md` and `docs/ke-hoach-trien-khai/phase0-deployment-config-tls-decision-proposal.md` (retrieved excerpts supplied in the task)
 - Microsoft Learn, *Set the Connection Properties - JDBC Driver for SQL Server* (connection-property mechanism reference)
+
+## 8. Dated addendum — SQL Server acceptance and TLS exception scope (2026-11-06)
+
+This addendum supplements the dated snapshots above; it does not revise the employee adapter finding or the deployment TLS policy. The Tech Lead reported that current-root `mvn -Djava.awt.headless=true clean verify` passed, and these separate opt-in SQL Server tests passed using synthetic fixtures only:
+
+| Test | Result and target |
+|---|---|
+| `FreshDatabaseMigrationSqlServerTest` | **1/1 passed** against newly created `clinic_test_orchestrator_migration_20261106`; V1–V11 were applied, and SQLCMD confirmed successful migration rows V1–V11. |
+| `PatientHistorySqlServerPersistenceTest` | **1/1 passed** against existing synthetic `clinic_test_patient_history_20261106`. |
+| `ReceptionSqlServerPersistenceTest` | **1/1 passed** against the same existing synthetic `clinic_test_patient_history_20261106`. |
+
+No tests or migrations targeted `clinicDb`; all SQL Server fixtures were synthetic. The ignored local `db.properties` was temporarily replaced for these one-off runs and restored byte-for-byte. `encrypt=true;trustServerCertificate=true` was used only for the owner-directed local test connections. This bypass is not evidence that a certificate was validated or that TLS certificate validation was accepted. The standing deployment policy remains encrypted SQL Server connections with server-certificate and server-identity validation, including `trustServerCertificate=false`; it is unchanged.
+
+`NhanVienRepositorySqlServerTest` was not run with the bypass: its fixture guard rejects `trustServerCertificate=true` and requires `encrypt=true;trustServerCertificate=false`. Its live SQL persistence therefore remains unverified, and **FINDING-TEST-02 remains Low / Informational**. The separate tests above do not establish employee persistence acceptance or a validated TLS handshake. **FINDING-TEST-03 remains Low / Informational.** No patient or credential data is included in this record.
+
+`SEC-01` remains `[~]` / open pending interactive visual smoke. Headless verification and SQL Server persistence tests are not visual acceptance, and no phase or security gate is closed here.
+
+### Guidance and implementation sources consulted for this addendum
+
+- `docs/PROJECT_CONVENTIONS.md` (Orchestrator baseline), `README.md`, `DOMAIN_ANALYSIS.md`, and `ERD_DIAGRAM.md` (supplied in the task).
+- `docs/ke-hoach-trien-khai/phase3-visit-lifecycle-owner-decisions.md`, `phase3-appointment-owner-decisions.md`, `phase2-security-exit-gate-review.md`, `phase3-visit-transfer-decision-gaps.md`, and `phase3-visit-transfer-contract-review.md` (task-supplied excerpts).
+- `03-model-task-board.md` and this review (existing evidence and findings).
+- `clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java` (fixture opt-in and TLS guard).
