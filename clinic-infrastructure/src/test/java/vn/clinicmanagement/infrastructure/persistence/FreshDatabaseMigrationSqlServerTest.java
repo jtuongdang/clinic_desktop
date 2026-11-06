@@ -90,10 +90,11 @@ class FreshDatabaseMigrationSqlServerTest {
                             "V6__Enhance_Audit_Tables_Append_Only.sql",
                             "V7__Harden_Permission_Matrix_Defaults.sql",
                             "V8__Seed_Approved_Permission_Grants.sql",
-                            "V9__Enforce_Active_Patient_Facility_Uniqueness.sql"
+                            "V9__Enforce_Active_Patient_Facility_Uniqueness.sql",
+                            "V10__Add_TienSuBenh_Facility_Department_Scope.sql"
                     ),
                     queryMigrationRecords(connection),
-                    "All V1-V9 migrations must be recorded as successful"
+                    "All V1-V10 migrations must be recorded as successful"
             );
 
             assertEquals(1, queryInt(
@@ -106,6 +107,7 @@ class FreshDatabaseMigrationSqlServerTest {
                             "AND name = 'UX_BenhNhanCoSo_Active_Patient_Facility' AND is_unique = 1 AND has_filter = 1"
             ), "V9 must enforce unique active patient-facility links");
             assertV9ActivePatientFacilityUniqueness(connection);
+            assertV10ScopeSchema(connection);
             assertEquals(1, queryInt(
                     connection,
                     "SELECT COUNT(*) FROM sys.tables t "
@@ -308,6 +310,7 @@ class FreshDatabaseMigrationSqlServerTest {
         int patientId = -1;
         int firstLinkId = -1;
         int secondLinkId = -1;
+        int legacyHistoryId = -1;
         try {
             try (Connection connection = DatabaseConnection.getConnection()) {
                 try (PreparedStatement statement = connection.prepareStatement(
@@ -372,10 +375,103 @@ class FreshDatabaseMigrationSqlServerTest {
                 assertEquals(1, statement.executeUpdate(),
                         "Only the second generated duplicate link should be soft-deleted for retry");
             }
+            try (Connection connection = DatabaseConnection.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(
+                         "INSERT INTO TienSuBenh (maBenhNhan, loaiTienSu, moTa) "
+                                 + "OUTPUT INSERTED.id VALUES (?, 'BENH_NEN', 'Synthetic legacy history')")) {
+                statement.setInt(1, patientId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (!resultSet.next()) throw new SQLException("Synthetic legacy history insert returned no identity.");
+                    legacyHistoryId = resultSet.getInt(1);
+                }
+            }
             assertTrue(runMigrationsWithoutConsoleOutput(),
-                    "The real migration runner must apply V9 after the synthetic duplicate is resolved");
+                    "The real migration runner must apply V9 and V10 after the synthetic duplicate is resolved");
+            try (Connection connection = DatabaseConnection.getConnection()) {
+                assertEquals(0, queryInt(connection,
+                                "SELECT COUNT(*) FROM TienSuBenh WHERE id = " + legacyHistoryId
+                                        + " AND (maCoSo IS NOT NULL OR maKhoa IS NOT NULL)"),
+                        "V10 must leave legacy history ownership NULL rather than infer a scope");
+                assertV10RejectsMismatchedFacilityDepartment(connection, patientId, facilityId);
+            }
         } finally {
+            if (legacyHistoryId > 0) {
+                try (Connection connection = DatabaseConnection.getConnection();
+                     PreparedStatement statement = connection.prepareStatement(
+                             "DELETE FROM TienSuBenh WHERE id = ?")) {
+                    statement.setInt(1, legacyHistoryId);
+                    statement.executeUpdate();
+                }
+            }
             cleanupSyntheticPatientFacilityFixture(patientId, facilityId, firstLinkId, secondLinkId);
+        }
+    }
+
+    private static void assertV10ScopeSchema(Connection connection) throws SQLException {
+        assertEquals(2, queryInt(connection,
+                "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TienSuBenh') "
+                        + "AND name IN ('maCoSo', 'maKhoa') AND is_nullable = 1"),
+                "V10 must add both nullable ownership columns");
+        assertEquals(1, queryInt(connection,
+                "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('dbo.TienSuBenh') "
+                        + "AND name = 'CK_TienSuBenh_Facility_Department_Pair' AND is_disabled = 0 AND is_not_trusted = 0"),
+                "V10 must enforce the all-null or both-present pair");
+        assertEquals(1, queryInt(connection,
+                "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('dbo.TienSuBenh') "
+                        + "AND name = 'FK_TienSuBenh_Khoa_Facility' AND is_disabled = 0 AND is_not_trusted = 0"),
+                "V10 must enforce that the department belongs to the stored facility");
+        assertEquals(1, queryInt(connection,
+                "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.TienSuBenh') "
+                        + "AND name = 'IX_TienSuBenh_Facility_Department_Patient'"),
+                "V10 must add a history scope lookup index");
+    }
+
+    private static void assertV10RejectsMismatchedFacilityDepartment(
+            Connection connection, int patientId, int firstFacilityId) throws SQLException {
+        int secondFacilityId = -1;
+        int secondDepartmentId = -1;
+        try {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO CoSo (tenCoSo) OUTPUT INSERTED.id VALUES ('Synthetic PAT-V10 pair fixture')")) {
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (!resultSet.next()) throw new SQLException("Synthetic facility insert returned no identity.");
+                    secondFacilityId = resultSet.getInt(1);
+                }
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO Khoa (maCoSo, tenKhoa) OUTPUT INSERTED.id VALUES (?, 'Synthetic PAT-V10 department')")) {
+                statement.setInt(1, secondFacilityId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (!resultSet.next()) throw new SQLException("Synthetic department insert returned no identity.");
+                    secondDepartmentId = resultSet.getInt(1);
+                }
+            }
+            int mismatchingDepartmentId = secondDepartmentId;
+            SQLException mismatch = assertThrows(SQLException.class, () -> {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO TienSuBenh (maBenhNhan, loaiTienSu, moTa, maCoSo, maKhoa) "
+                                + "VALUES (?, 'BENH_NEN', 'Synthetic mismatched scope', ?, ?)")) {
+                    statement.setInt(1, patientId);
+                    statement.setInt(2, firstFacilityId);
+                    statement.setInt(3, mismatchingDepartmentId);
+                    statement.executeUpdate();
+                }
+            }, "V10 must reject a department owned by a different facility");
+            assertTrue(mismatch.getErrorCode() == 547 || mismatch.getErrorCode() == 23000,
+                    "The mismatch must fail as a SQL Server integrity violation");
+        } finally {
+            if (secondDepartmentId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM Khoa WHERE id = ?")) {
+                    statement.setInt(1, secondDepartmentId);
+                    statement.executeUpdate();
+                }
+            }
+            if (secondFacilityId > 0) {
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM CoSo WHERE id = ?")) {
+                    statement.setInt(1, secondFacilityId);
+                    statement.executeUpdate();
+                }
+            }
         }
     }
 

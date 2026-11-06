@@ -38,7 +38,7 @@ class PermissionMatrixMigrationScriptTest {
     }
 
     @Test
-    void migrationRunnerRegistersV1ThroughV9InOrder() throws ReflectiveOperationException {
+    void migrationRunnerRegistersV1ThroughV10InOrder() throws ReflectiveOperationException {
         var field = DatabaseMigrationRunner.class.getDeclaredField("MIGRATION_FILES");
         field.setAccessible(true);
         String[] migrationFiles = (String[]) field.get(null);
@@ -52,7 +52,8 @@ class PermissionMatrixMigrationScriptTest {
                 "migrations/V6__Enhance_Audit_Tables_Append_Only.sql",
                 "migrations/V7__Harden_Permission_Matrix_Defaults.sql",
                 "migrations/V8__Seed_Approved_Permission_Grants.sql",
-                "migrations/V9__Enforce_Active_Patient_Facility_Uniqueness.sql"
+                "migrations/V9__Enforce_Active_Patient_Facility_Uniqueness.sql",
+                "migrations/V10__Add_TienSuBenh_Facility_Department_Scope.sql"
         ), List.of(migrationFiles));
     }
 
