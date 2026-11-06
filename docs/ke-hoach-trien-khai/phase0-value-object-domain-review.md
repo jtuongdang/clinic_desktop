@@ -129,3 +129,13 @@ This section refreshes the report after its recorded source snapshot `8a8cdbf4ba
 - The Antigravity report-only attempt ended without producing a report. Codex retry task `dba4f671-4225-4162-aa12-81be5ac9a063` produced this report and Orchestrator recorded a successful post-task validation/scope check. The Agent's own offline Maven attempt was blocked by the shared cache lock, and its initial staged-commit attempt reported an index-lock error; Orchestrator finalized local report commit `83be338`, integrated as `483cb73`. The root verification above is an independent passing run on a later source snapshot.
 
 No push, PR, merge to `main`, database access, migration, or real patient data was used for this reconciliation.
+
+## Root reconciliation — 06/11/2026 (phone follow-up)
+
+This section refreshes findings F1/F2 and the prior 336-test root run; the original review and earlier reconciliation remain historical snapshots.
+
+- `PLAT-VO-PHONE-CANONICAL-01` was implemented by Codex task `abfcf8db-2433-4ac1-96a6-53689a6f003d` under approved contract `fa1f4a39-9116-4472-a523-982cdb978b66`. Commit `61b5698ce0c012394a2cf82648babec11987abba` was reviewed and fast-forward integrated locally into `feature/patient-reception-workflow`; Orchestrator task state is `completed`.
+- Finding F1 is resolved at the application persistence boundary: both supplied phone fields are replaced with `PhoneNumber.getValue()` only after authorization and scope checks and immediately before repository add/update. Null/blank values remain optional; separators are removed while the entered `0` or `+84` prefix is retained. Tests cover insert/update, both prefixes, optional values, invalid input and no mutation on authorization/scope denial.
+- Finding F2 is resolved: invalid-format `PhoneNumber` exceptions no longer include the raw value. A synthetic test verifies the original and separator-stripped private markers are absent from the exception message. `PhoneNumber.toString()` still returns the number; callers must not log the value object. The inspected reception flow does not log patient/phone fields.
+- Independent review confirmed exactly the four approved application/domain source/test files changed. Root JDK 17 `mvn -Djava.awt.headless=true clean verify` on the integrated feature branch: **BUILD SUCCESS, 337 tests, 0 failures, 0 errors, 6 SQL Server opt-in skips**, across 70 Surefire XML reports. `git diff --check` passed.
+- SQL Server read-back/search with equivalent entered formatting and desktop visual acceptance were not run. This task provides application/domain evidence, not broader `PAT-01`, `REC-01`, Phase 0/1, or project completion. No push, PR, main merge, database access, or real patient data was used.
