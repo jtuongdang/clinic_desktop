@@ -8,10 +8,14 @@ import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsHandler;
 import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsQuery;
 import vn.clinicmanagement.application.reception.GetReceptionQueueHandler;
 import vn.clinicmanagement.application.reception.GetReceptionQueueQuery;
+import vn.clinicmanagement.application.reception.PatientSearchItem;
 import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.application.reception.ReceptionQueueSnapshot;
+import vn.clinicmanagement.application.reception.RegisterPatientCommand;
 import vn.clinicmanagement.application.reception.RegisterPatientHandler;
+import vn.clinicmanagement.application.reception.RegistrationReceipt;
 import vn.clinicmanagement.application.reception.SearchPatientsHandler;
+import vn.clinicmanagement.application.reception.SearchPatientsQuery;
 import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
 import vn.clinicmanagement.desktop.core.diagnostics.DesktopWorkerDiagnostics;
 import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
@@ -30,6 +34,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -135,9 +140,12 @@ public class ReceptionPanel extends BaseViewPanel {
         footerBar = new ReceptionFooterBar();
         add(footerBar, BorderLayout.SOUTH);
 
-        // Wire toolbar buttons
-        findButtonByText(topToolbar, "Làm Mới").ifPresent(b -> b.addActionListener(e -> refreshData()));
-        findButtonByText(topToolbar, "Bệnh Nhân Mới").ifPresent(b -> b.addActionListener(e -> clearForm()));
+        // Wire toolbar buttons and action listeners
+        topToolbar.setOnRefresh(this::refreshData);
+        topToolbar.setOnNew(this::clearForm);
+        footerBar.setOnSave(this::saveRegistration);
+        footerBar.setOnNew(this::clearForm);
+        formPanel.setOnSearch(this::searchPatients);
 
         // Wire session lifecycle listener
         if (this.sessionLifecycleService != null) {
@@ -466,6 +474,171 @@ public class ReceptionPanel extends BaseViewPanel {
 
     public ReceptionTopToolbar getTopToolbar() {
         return topToolbar;
+    }
+
+    public void saveRegistration() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::saveRegistration);
+            return;
+        }
+        if (registerPatientHandler == null) return;
+        AuthorizationContext authzContext = currentAuthorizationContext();
+        AuditActorContext auditContext = currentAuditActorContext();
+        if (authzContext == null || auditContext == null) {
+            showError("Phiên làm việc không hợp lệ hoặc đã hết hạn.");
+            return;
+        }
+
+        final RegisterPatientCommand command;
+        try {
+            command = formPanel.toRegisterCommand(authzContext, auditContext);
+        } catch (IllegalArgumentException ex) {
+            showError(ReceptionPanelMessagePolicy.toUserMessage("PATIENT_VALIDATION"));
+            return;
+        }
+
+        footerBar.setSaving(true);
+        SwingWorker<Result<RegistrationReceipt>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Result<RegistrationReceipt> doInBackground() {
+                return registerPatientHandler.handle(command);
+            }
+
+            @Override
+            protected void done() {
+                inFlightWorkers.remove(this);
+                footerBar.setSaving(false);
+                if (isCancelled()) return;
+                try {
+                    Result<RegistrationReceipt> result = get();
+                    if (result.isFailure()) {
+                        String errCode = result.getError().map(Result.ApplicationError::code).orElse("DEFAULT");
+                        if ("PATIENT_DUPLICATE_CCCD".equals(errCode) || "PATIENT_IDENTITY_CONFLICT".equals(errCode)) {
+                            handleDuplicateCccd(formPanel.enteredCccd());
+                        } else {
+                            showError(ReceptionPanelMessagePolicy.toUserMessage(result));
+                        }
+                        return;
+                    }
+                    RegistrationReceipt receipt = result.getValue().orElseThrow();
+                    showMessage("Đã đăng ký người bệnh " + receipt.patientCode() + " · Số tiếp đón " + receipt.queueNumberDisplay(),
+                            "Đăng ký thành công", JOptionPane.INFORMATION_MESSAGE);
+                    formPanel.clearForm();
+                    refreshData();
+                } catch (InterruptedException ex) {
+                    DesktopWorkerDiagnostics.restoreInterruptStatus();
+                } catch (CancellationException ex) {
+                    // Safe cancellation
+                } catch (ExecutionException ex) {
+                    showError("Không thể lưu đăng ký. Vui lòng thử lại.");
+                }
+            }
+        };
+
+        inFlightWorkers.add(worker);
+        worker.execute();
+    }
+
+    public void searchPatients(String phone, String cccd) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> searchPatients(phone, cccd));
+            return;
+        }
+        if (searchPatientsHandler == null) return;
+        String first = phone == null ? "" : phone.trim();
+        String second = cccd == null ? "" : cccd.trim();
+        if (first.isBlank() && second.isBlank()) {
+            showError("Nhập số điện thoại hoặc CCCD để tìm hồ sơ.");
+            return;
+        }
+
+        AuthorizationContext authzContext = currentAuthorizationContext();
+        AuditActorContext auditContext = currentAuditActorContext();
+        if (authzContext == null || auditContext == null) {
+            showError("Phiên làm việc không hợp lệ hoặc đã hết hạn.");
+            return;
+        }
+
+        SwingWorker<List<PatientSearchItem>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<PatientSearchItem> doInBackground() {
+                Map<Integer, PatientSearchItem> results = new LinkedHashMap<>();
+                if (!first.isBlank() && !isCancelled()) {
+                    Result<List<PatientSearchItem>> r1 = searchPatientsHandler.handle(
+                            new SearchPatientsQuery(first, authzContext, auditContext));
+                    if (r1.isSuccess()) {
+                        r1.getValue().ifPresent(items -> items.forEach(it -> results.put(it.patient().getId(), it)));
+                    }
+                }
+                if (!second.isBlank() && !second.equals(first) && !isCancelled()) {
+                    Result<List<PatientSearchItem>> r2 = searchPatientsHandler.handle(
+                            new SearchPatientsQuery(second, authzContext, auditContext));
+                    if (r2.isSuccess()) {
+                        r2.getValue().ifPresent(items -> items.forEach(it -> results.put(it.patient().getId(), it)));
+                    }
+                }
+                return new ArrayList<>(results.values());
+            }
+
+            @Override
+            protected void done() {
+                inFlightWorkers.remove(this);
+                if (isCancelled()) return;
+                try {
+                    List<PatientSearchItem> matches = get();
+                    if (matches.isEmpty()) {
+                        showMessage("Không tìm thấy hồ sơ phù hợp. Dữ liệu đang nhập vẫn được giữ nguyên.",
+                                "Tìm người bệnh", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+                    PatientSearchItem selected = matches.size() == 1 ? matches.get(0) : choosePatient(matches);
+                    if (selected != null) {
+                        formPanel.selectPatient(selected.patient(), selected.latestInsurance());
+                    }
+                } catch (InterruptedException ex) {
+                    DesktopWorkerDiagnostics.restoreInterruptStatus();
+                } catch (CancellationException ex) {
+                    // Safe cancellation
+                } catch (ExecutionException ex) {
+                    showError("Không thể tìm hồ sơ người bệnh. Kiểm tra kết nối cơ sở dữ liệu.");
+                }
+            }
+        };
+
+        inFlightWorkers.add(worker);
+        worker.execute();
+    }
+
+    private void handleDuplicateCccd(String cccd) {
+        String msg = ReceptionPanelMessagePolicy.toDuplicateCccdMessage(cccd);
+        int choice = JOptionPane.showConfirmDialog(this, msg, "Trùng số CCCD", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (choice == JOptionPane.YES_OPTION) {
+            formPanel.prepareDuplicateCccdSearch();
+            searchPatients("", cccd);
+        }
+    }
+
+    private PatientSearchItem choosePatient(List<PatientSearchItem> matches) {
+        JOptionPane pane = new JOptionPane("Chọn hồ sơ người bệnh hiện có (Hủy để giữ thông tin đang nhập):",
+                JOptionPane.PLAIN_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
+        pane.setWantsInput(true);
+        pane.setSelectionValues(matches.toArray());
+        pane.setInitialSelectionValue(matches.get(0));
+        JDialog dialog = pane.createDialog(this, "Kết quả tìm kiếm");
+        try {
+            dialog.setVisible(true);
+        } finally {
+            dialog.dispose();
+        }
+        return pane.getInputValue() instanceof PatientSearchItem item ? item : null;
+    }
+
+    private void showMessage(String message, String title, int type) {
+        JOptionPane.showMessageDialog(this, message, title, type);
+    }
+
+    private void showError(String message) {
+        showMessage(message, "Thông báo lỗi", JOptionPane.ERROR_MESSAGE);
     }
 
     public ReceptionFooterBar getFooterBar() {

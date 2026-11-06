@@ -376,6 +376,16 @@ public class PatientRegistrationFormPanel extends JPanel {
         }
     }
 
+    public String enteredCccd() {
+        return txtCccd != null ? txtCccd.getText().trim() : "";
+    }
+
+    public void prepareDuplicateCccdSearch() {
+        if (txtCccd != null && txtCccdSearch != null) {
+            txtCccdSearch.setText(txtCccd.getText().trim());
+        }
+    }
+
     public void setOnServiceChanged(java.util.function.Consumer<String> listener) {
         this.onServiceListener = listener;
     }
