@@ -1,23 +1,23 @@
 # VIS-TRANSFER-DOMAIN-01 — Phase 3 Visit Transfer Domain & Authorization Invariants Review
 
-**Tài liệu:** Báo cáo rà soát và thiết kế bất biến miền (Domain & Authorization Invariants Design) cho luồng điều chuyển lượt khám (`LuotKham`)  
-**Mã task:** `VIS-TRANSFER-DOMAIN-01`  
-**Hợp đồng cơ sở:** `VIS-TRANSFER-SOURCE-RECON-01` (Approved Contract v1)  
-**Trạng thái:** Báo cáo phân tích kỹ thuật và thiết kế khế ước bất biến miền. Tài liệu tài liệu hóa thuần túy (Documentation only); không sửa đổi mã nguồn, không sửa đổi schema CSDL, không nới lỏng chính sách an ninh.  
+**Tài liệu:** Báo cáo rà soát và thiết kế bất biến miền (Domain & Authorization Invariants Design) cho luồng điều chuyển lượt khám (`LuotKham`)<br>
+**Mã task:** `VIS-TRANSFER-DOMAIN-01`<br>
+**Hợp đồng cơ sở:** `VIS-TRANSFER-SOURCE-RECON-01` (Approved Contract v1)<br>
+**Trạng thái:** Báo cáo phân tích kỹ thuật và thiết kế khế ước bất biến miền. Tài liệu tài liệu hóa thuần túy (Documentation only); không sửa đổi mã nguồn, không sửa đổi schema CSDL, không nới lỏng chính sách an ninh.<br>
 **Cổng an ninh (Security Gate):** Mọi luồng điều chuyển tại runtime tiếp tục bị từ chối (`DENY`) theo cổng an ninh SEC-01 ([`phase2-implementation-contract.md:32-50`](phase2-implementation-contract.md#L32-L50)) cho đến khi toàn bộ guard, handler, audit, persistence và bộ test nghiệm thu được triển khai đầy đủ.
 
 ---
 
 ## 1. Tóm tắt điều hành & Mục tiêu tài liệu
 
-Báo cáo này thực hiện rà soát chuyên sâu mã nguồn hiện hành và thiết kế các **bất biến miền (Domain Invariants)** và **bất biến phân quyền tầng ứng dụng (Application Authorization Invariants)** cho use case điều chuyển lượt khám (`Transfer Visit`). 
+Báo cáo này thực hiện rà soát chuyên sâu mã nguồn hiện hành và thiết kế các **bất biến miền (Domain Invariants)** và **bất biến phân quyền tầng ứng dụng (Application Authorization Invariants)** cho use case điều chuyển lượt khám (`Transfer Visit`).
 
 Nhiệm vụ tuân thủ các nguyên tắc cốt lõi:
 1. **Bảo toàn nguyên vẹn toàn bộ quyết định của Chủ dự án (Owner):** Tái hiện chính xác các quy tắc đã được phê duyệt về vai trò (`RECEPTIONIST`, `DOCTOR`), trạng thái hợp lệ, phạm vi cơ sở/khoa, bắt buộc chọn phòng hoạt động, khóa EMR, số thứ tự hàng đợi, bảo lưu cờ ưu tiên, bảo toàn chỉ định/thu phí và tính nguyên tử giao tác. Tuyệt đối không mở lại (reopen) bất kỳ quyết định chính sách nào.
-2. **Phân định minh bạch 3 cấp độ thông tin:**
+2. **Phân định minh bạch các cấp độ thông tin:**
    - **Thực tế mã nguồn (Source Facts):** Hiện trạng code, schema, interface và test hiện hữu với đường dẫn và line anchor đã đối soát.
    - **Chính sách Owner đã duyệt (Approved Policy):** Các bất biến nghiệp vụ và an ninh có hiệu lực bắt buộc.
-   - **Khuyến nghị & Thiết kế kỹ thuật (Technical Invariants & Proposals):** Thiết kế command/result tối giản, phân bổ bất biến theo lớp kiến trúc, và xử lý an toàn khi xảy ra lỗi.
+   - **Khoảng trống & Đề xuất kỹ thuật chưa ngã ngũ (Unresolved Choices & Technical Proposals):** Phân định rạch ròi các phương án kỹ thuật hoặc lựa chọn tác nghiệp còn mở (chuyển tiếp trạng thái, ranh giới ngày, cùng phòng, phạm vi số thứ tự, mã lý do, bảng lịch sử) — không tự ý gán nhãn là quyết định đã phê duyệt.
 3. **Chỉ ra các khoảng trống và hành vi vắng mặt (Absent Behavior):** Liệt kê chi tiết những thành phần chưa có trong mã nguồn (absence claims) để làm tiền đề cho pha hiện thực hóa mã sau này.
 
 ---
@@ -51,6 +51,7 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
    - Vai trò `RECEPTIONIST`: Chỉ được phép điều chuyển các lượt khám đang ở trạng thái `CHO_KHAM`. Mọi trạng thái khác đều bị từ chối (`DENY`).
    - Vai trò `DOCTOR`: Được phép điều chuyển các lượt khám ở trạng thái `CHO_KHAM`, `DANG_KHAM`, hoặc `CHO_CLS`.
    - Các vai trò khác (`ADMIN`, `PHARMACIST`, `CASHIER`, `LAB_TECH`): Hoàn toàn bị cấm (`DENY`) thực hiện điều chuyển.
+   - *Lưu ý về chuyển tiếp trạng thái / mốc thời gian (Unresolved):* Việc quyết định lượt khám ở trạng thái `DANG_KHAM` hoặc `CHO_CLS` khi chuyển sang phòng mới sẽ bảo toàn nguyên trạng (`DANG_KHAM`/`CHO_CLS`) hay chuyển tiếp bàn giao (reset về `CHO_KHAM` và xóa/ghi nhận lại mốc bắt đầu khám tại phòng đích) là lựa chọn khế ước tác nghiệp chưa ngã ngũ; không có quy tắc reset tự động nào được phê duyệt.
 2. **Các trạng thái cấm tuyệt đối (Hard Ineligible Statuses):**
    - Lượt khám ở các trạng thái kết thúc/hoàn tất: `DA_KHAM`, `KET_LUAN`, `HOAN_THANH` luôn bị từ chối.
    - Lượt khám đã bị hủy (`trangThai == DA_HUY`) hoặc đã bị xóa mềm (`isDeleted == true`) luôn bị từ chối.
@@ -61,7 +62,7 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
    - **Phạm vi của `DOCTOR`:** Chỉ được phép điều chuyển trong nội bộ khoa của phiên làm việc (`source.facilityId == destination.facilityId == session.facilityId` VÀ `source.departmentId == destination.departmentId == session.departmentId`). Nghiêm cấm chuyển sang khoa khác.
    - **Nguyên tắc cô lập dữ liệu (Zero Target Patient Read):** Thao tác điều chuyển không cấp quyền đọc hồ sơ bệnh nhân, lịch sử khám, hay chi tiết hàng đợi của khoa/phòng đích cho người thực hiện. Biên nhận điều chuyển chỉ trả về kết quả tối giản.
 4. **Quy tắc cấp số thứ tự và bảo toàn cờ ưu tiên:**
-   - Cấp số thứ tự mới (`soThuTu`, `soThuTuDisplay`) tại phòng khám/khoa đích theo bộ đếm ngày khám.
+   - Cấp số thứ tự mới (`soThuTu`, `soThuTuDisplay`) tại phòng khám/khoa đích. Phạm vi bộ đếm số thứ tự (theo phòng khám hay theo khoa) và ngày áp dụng bộ đếm hàng đợi (queue date) là đề xuất kỹ thuật chưa ngã ngũ (unresolved proposal), chưa có quyết định chính sách chốt.
    - Bảo lưu nguyên vẹn cờ ưu tiên hiện tại của lượt khám (`dnVnTien`); tuyệt đối không tự ý bật cờ ưu tiên và không tự ý xóa cờ ưu tiên khi chuyển.
 5. **Ràng buộc với chỉ định dịch vụ, đơn thuốc và thanh toán (Linked Work & Billing):**
    - Toàn bộ chỉ định dịch vụ (`ChiDinhDichVu`), đơn thuốc (`DonThuoc`), kết quả CLS và hóa đơn (`HoaDon`) đã phát sinh vẫn gắn liền với lượt khám.
@@ -70,8 +71,8 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
    - Đơn thuốc đã duyệt/cấp phát, kết quả CLS đã xác nhận và giao dịch tài chính đã ghi nhận là bất biến (immutable); mọi điều chỉnh phải thông qua quy trình riêng có thẩm quyền, đối soát và audit.
 6. **Kiểm soát đồng thời, giao tác và thời gian:**
    - Kiểm soát đồng thời bằng khóa lạc quan thông qua `LuotKham.version` (CAS update).
-   - Đảm bảo tính nguyên tử trong một `TransactionBoundary`: cập nhật lượt khám, cấp số hàng đợi, ghi vết lịch sử và ghi audit. Thất bại ở bất kỳ khâu nào (đặc biệt là audit) phải rollback toàn bộ (fail-closed).
-   - Thời gian kỹ thuật và audit metadata lưu bằng UTC; thời gian nghiệp vụ phòng khám tính theo múi giờ `Asia/Ho_Chi_Minh`.
+   - Đảm bảo tính nguyên tử trong một `TransactionBoundary`: cập nhật lượt khám, cấp số hàng đợi và ghi audit. Thất bại ở bất kỳ khâu nào (đặc biệt là audit) phải rollback toàn bộ (fail-closed). (Việc ghi bảng lịch sử chuyên biệt là đề xuất kỹ thuật chưa ngã ngũ).
+   - Thời gian kỹ thuật và audit metadata lưu bằng UTC (Instant); thời gian nghiệp vụ phòng khám tính theo múi giờ `Asia/Ho_Chi_Minh`. Ranh giới ngày điều chuyển so với ngày khám (`ngayKham`) vẫn là lựa chọn khế ước chưa ngã ngũ (unresolved contract choice); việc phê duyệt quy chuẩn thời gian UTC/local time không tự động đồng nghĩa với quy tắc chỉ cho phép điều chuyển trong ngày hiện tại.
 
 ---
 
@@ -95,7 +96,7 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 |     a. Load LuotKham with pessimistic/optimistic concurrency lock     |
 |     b. Validate INV-TX-03 (EMR Lock & Soft Delete)                    |
 |     c. Validate INV-TX-01 (Actor-Status Compatibility)                |
-|     d. Validate INV-TX-08 (Business Date Boundary: Asia/Ho_Chi_Minh)  |
+|     d. Validate INV-TX-08 (UTC Metadata & Local Effective Time)       |
 |     e. Validate INV-TX-02 (Target Room Active & Belongs to Dept)      |
 |     f. Validate INV-TX-05 (Linked Orders/Billing Safety Check)        |
 |     g. Invoke Domain Method: visit.transferTo(destDept, destRoom,...) |
@@ -110,10 +111,10 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 
 #### `INV-TX-01`: Bất biến tương thích Vai trò - Trạng thái (Actor-Status Compatibility Invariant)
 * **Tầng sở hữu:** Application Guard kết hợp Domain Entity (`LuotKham`).
-* **Nội dung:** 
+* **Nội dung:**
   - Một yêu cầu điều chuyển do `RECEPTIONIST` khởi tạo chỉ hợp lệ khi và chỉ khi `visit.trangThai == TrangThaiLuotKham.CHO_KHAM`.
   - Một yêu cầu điều chuyển do `DOCTOR` khởi tạo chỉ hợp lệ khi và chỉ khi `visit.trangThai ∈ {CHO_KHAM, DANG_KHAM, CHO_CLS}`.
-  - Khi điều chuyển một lượt khám đang ở trạng thái `DANG_KHAM` hoặc `CHO_CLS` sang phòng khám mới, trạng thái lượt khám tại phòng đích phải được đặt lại thành `CHO_KHAM` (hoặc `CHO_CLS` nếu đang chờ kết quả), và `thoiGianBatDauKham` tại phòng cũ được lưu vào lịch sử để phòng mới bắt đầu phiên khám mới.
+  - **Lưu ý về chuyển tiếp trạng thái / mốc thời gian (Unresolved Proposal):** Không có quy tắc chuyển đổi trạng thái tự động (reset) hay xóa/đặt lại `thoiGianBatDauKham` nào được phê duyệt. Việc bảo toàn nguyên vẹn trạng thái (State Preservation: giữ nguyên `DANG_KHAM`/`CHO_CLS` khi bàn giao chuyên môn) hay chuyển tiếp bàn giao (Handoff Transition: reset về `CHO_KHAM` tại phòng đích để bắt đầu phiên khám mới và ghi vết mốc bắt đầu cũ) là một lựa chọn khế ước tác nghiệp còn mở (unresolved choice), tuyệt đối không được coi là quyết định đã duyệt.
 
 #### `INV-TX-02`: Bất biến phân cấp phạm vi và Phòng khám hoạt động (Scope & Room Hierarchy Invariant)
 * **Tầng sở hữu:** Application Authorization Guard kết hợp Persistence Validation.
@@ -122,8 +123,9 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
   - Phòng khám đích phải thuộc về khoa đích: `PhongKham.maKhoa == destinationDepartmentId`.
   - Khoa đích phải thuộc về cơ sở đích: `Khoa.maCoSo == destinationFacilityId`.
   - Cơ sở đích bắt buộc phải trùng với cơ sở của phiên và cơ sở hiện tại của lượt khám: `destinationFacilityId == context.facilityId() == visit.maCoSo`.
-  - Đối với `DOCTOR`: Bắt buộc `destinationDepartmentId == context.departmentId() == visit.maKhoa`. Phòng khám đích phải khác phòng khám hiện tại (`destinationRoomId != visit.maPhongKham`).
+  - Đối với `DOCTOR`: Bắt buộc `destinationDepartmentId == context.departmentId() == visit.maKhoa`.
   - Đối với `RECEPTIONIST`: Cho phép `destinationDepartmentId != visit.maKhoa` nhưng bắt buộc cùng `facilityId`.
+  - **Lưu ý về điều chuyển cùng phòng / cấp lại số thứ tự (Unresolved Proposal):** Việc cấm hay cho phép điều chuyển lại vào cùng một phòng khám (same-room requeue / đổi số thứ tự trong cùng phòng: `destinationRoomId == visit.maPhongKham`) là một đề xuất tác nghiệp còn mở (unresolved choice), chưa được Owner phê duyệt thành bất biến bắt buộc.
 
 #### `INV-TX-03`: Bất biến đóng băng Bệnh án & Tính hoàn tất lâm sàng (EMR Lock & Clinical Finality Invariant)
 * **Tầng sở hữu:** Domain Aggregate Root (`LuotKham`).
@@ -135,9 +137,8 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 #### `INV-TX-04`: Bất biến cấp số hàng đợi và Bảo lưu độ ưu tiên (Queue Allocation & Priority Preservation Invariant)
 * **Tầng sở hữu:** Domain Aggregate Root (`LuotKham`) kết hợp Repository/Persistence Port.
 * **Nội dung:**
-  - Lượt khám khi chuyển đến phòng đích phải được cấp một số thứ tự mới: `newQueueNumber = nextSequence(destinationFacilityId, destinationDepartmentId, destinationRoomId, businessDate)`.
-  - Trường hiển thị `soThuTuDisplay` được định dạng lại theo chuẩn của phòng đích.
-  - Cờ ưu tiên `dnVnTien` được giữ nguyên giá trị ban đầu (`newVisit.dnVnTien == oldVisit.dnVnTien`). Hệ thống nghiêm cấm việc tự động nâng cờ ưu tiên (auto-promote) hoặc tự động hạ cờ ưu tiên khi chuyển.
+  - **Chính sách đã phê duyệt:** Lượt khám khi chuyển đến phòng đích phải được cấp một số thứ tự mới (`soThuTu`, `soThuTuDisplay`). Cờ ưu tiên `dnVnTien` được giữ nguyên giá trị ban đầu (`newVisit.dnVnTien == oldVisit.dnVnTien`); hệ thống nghiêm cấm việc tự động nâng cờ ưu tiên (auto-promote) hoặc tự động hạ/xóa cờ ưu tiên khi chuyển.
+  - **Khoảng trống đề xuất kỹ thuật (Unresolved Proposal):** Phạm vi sinh chuỗi số thứ tự (queue sequence scope: sinh số theo phòng khám `destinationRoomId` hay theo khoa `destinationDepartmentId`) và ngày dùng để xác định bộ đếm hàng đợi (queue date: theo ngày tiếp nhận ban đầu hay ngày chuyển thực tế) là các đề xuất kỹ thuật chưa ngã ngũ, chưa có quyết định chính sách phê duyệt cuối cùng.
 
 #### `INV-TX-05`: Bất biến an toàn công việc liên kết và Bất biến tài chính (Linked Work Safety & Financial Immutability Invariant)
 * **Tầng sở hữu:** Application Domain Service / Dependency Validator.
@@ -162,15 +163,14 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 #### `INV-TX-07`: Bất biến giao tác nguyên tử & Thất bại đóng an toàn (Atomic Transaction & Fail-Closed Audit Invariant)
 * **Tầng sở hữu:** Application Service (`TransactionBoundary`).
 * **Nội dung:**
-  - Toàn bộ các bước: (1) Kiểm tra điều kiện, (2) Cập nhật `LuotKham`, (3) Cấp số hàng đợi, (4) Lưu bản ghi lịch sử điều chuyển, và (5) Ghi bản ghi kiểm toán `VISIT_TRANSFERRED` phải nằm trong cùng một giao tác CSDL (`TransactionBoundary.inTransaction(...)`).
+  - Toàn bộ các bước: (1) Kiểm tra điều kiện, (2) Cập nhật `LuotKham`, (3) Cấp số hàng đợi, và (4) Ghi bản ghi kiểm toán `VISIT_TRANSFERRED` (cùng lưu bản ghi lịch sử nếu đề xuất bảng lịch sử chuyên biệt được thông qua) phải nằm trong cùng một giao tác CSDL (`TransactionBoundary.inTransaction(...)`).
   - Nếu khâu ghi audit thất bại (do lỗi CSDL, vi phạm constraint, hoặc timeout), toàn bộ cập nhật vị trí và hàng đợi phải bị rollback 100%. Không bao giờ chấp nhận tình trạng chuyển vị trí thành công mà không có bản ghi audit đi kèm (Fail-closed principle).
 
-#### `INV-TX-08`: Bất biến ranh giới ngày nghiệp vụ phòng khám (Business Date Boundary Invariant)
-* **Tầng sở hữu:** Application Handler / Domain Validator.
+#### `INV-TX-08`: Bất biến chuẩn hóa thời gian kỹ thuật UTC và thời gian nghiệp vụ địa phương (Technical UTC Metadata & Local Business Time Invariant)
+* **Tầng sở hữu:** Application Handler / Audit & Domain Event Boundary.
 * **Nội dung:**
-  - Chỉ cho phép điều chuyển các lượt khám có ngày khám trùng với ngày nghiệp vụ hiện tại: `visit.getNgayKham().equals(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")))`.
-  - Lượt khám của các ngày trước đó (quá khứ) hoặc đặt lịch trong tương lai không được phép điều chuyển qua use case này.
-  - Các mốc thời gian kỹ thuật (`createdAt`, `updatedAt`, `auditTimestamp`) được ghi nhận theo chuẩn UTC; các mốc thời gian hiển thị hoặc nghiệp vụ tiếp nhận tính theo múi giờ `Asia/Ho_Chi_Minh`.
+  - **Phân định rõ thời gian kỹ thuật và thời gian nghiệp vụ:** Toàn bộ mốc thời gian kỹ thuật, audit metadata và thời điểm xảy ra sự kiện điều chuyển (`occurredAtUtc` / `transferredAtUtc`) bắt buộc ghi nhận theo chuẩn UTC Instant (`java.time.Instant`). Toàn bộ mốc thời gian hiển thị hoặc nghiệp vụ khám chữa bệnh tại phòng khám tính theo múi giờ địa phương `Asia/Ho_Chi_Minh` (`LocalDateTime effectiveLocalTime`).
+  - **Ranh giới ngày điều chuyển là vấn đề chưa ngã ngũ (Unresolved Choice):** Giới hạn chỉ cho phép điều chuyển trong ngày làm việc hiện tại (`visit.getNgayKham().equals(today)`) hay cho phép điều chuyển cả lượt khám kéo dài qua ngày hoặc lượt khám đặt trước là câu hỏi tác nghiệp còn mở, chưa được phê duyệt. Quyết định của Owner về việc chuẩn hóa metadata UTC và giờ nghiệp vụ `Asia/Ho_Chi_Minh` không mặc định thiết lập hay chốt ranh giới ngày khám. Tuyệt đối không dán nhãn quy tắc chỉ điều chuyển trong ngày là đã duyệt.
 
 #### `INV-TX-09`: Bất biến cô lập dữ liệu & Không tiết lộ hồ sơ đích (Zero Target Patient Read Invariant)
 * **Tầng sở hữu:** Application Output Boundary / DTO Receipt.
@@ -184,14 +184,14 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 
 | Bất biến | Domain Model (`LuotKham`) | Domain Service / Validator | Application Guard / Handler | Persistence / SQL Trigger / Constraint |
 |---|:---:|:---:|:---:|:---:|
-| **INV-TX-01 (Actor-Status)** | Chặn trạng thái không hợp lệ trong `transferTo()` | — | Thẩm định role `RECEPTIONIST` vs `DOCTOR` | — |
+| **INV-TX-01 (Actor-Status)** | Thẩm định trạng thái hợp lệ trong `transferTo()` | — | Thẩm định role `RECEPTIONIST` vs `DOCTOR` | — |
 | **INV-TX-02 (Scope & Room)** | Lưu `maKhoa`, `maPhongKham` | Kiểm tra quan hệ phòng - khoa - cơ sở | Guard kiểm tra `targetFacilityId` & `targetDepartmentId` | FK constraints `maKhoa`, `maPhongKham` |
 | **INV-TX-03 (EMR Lock/Final)** | `if (emrLocked) throw EmrLockedException` | — | Chặn trước khi thực hiện logic nặng | Kiểm tra `emrLocked == 0` |
-| **INV-TX-04 (Queue & Priority)** | Cập nhật `soThuTu`, giữ nguyên `dnVnTien` | — | Gọi sequence generator theo phòng đích | Sequence / Unique index theo ngày + phòng |
+| **INV-TX-04 (Queue & Priority)** | Cập nhật `soThuTu`, giữ nguyên `dnVnTien` | — | Cấp số mới (scope/date là unresolved proposal) | Sequence / Unique index theo quy tắc cấp số |
 | **INV-TX-05 (Linked Work)** | Giữ nguyên các danh sách con | Thẩm định an toàn công việc liên kết | Điều phối không thay đổi billing/orders | Ràng buộc toàn vẹn khóa ngoại FK |
 | **INV-TX-06 (Concurrency CAS)** | Quản lý `version` (`BaseEntity`) | — | Truyền `expectedVersion` vào command | `WHERE id = ? AND version = ?` |
 | **INV-TX-07 (Atomic Fail-closed)** | Phát sinh `LuotKhamTransferredEvent` | — | Điều phối trong `TransactionBoundary` | Database Transaction Rollback |
-| **INV-TX-08 (Business Date)** | Kiểm tra `ngayKham` | — | Xác thực múi giờ `Asia/Ho_Chi_Minh` | `WHERE ngayKham = ?` |
+| **INV-TX-08 (UTC & Local Time)** | Phân định UTC metadata & local time | — | Ghi nhận UTC Instant cho audit; local time cho nghiệp vụ | Audit timestamp UTC; ranh giới ngày khám (unresolved proposal) |
 | **INV-TX-09 (Zero Read)** | — | — | DTO Receipt tối giản, không query đọc | Phân quyền truy vấn `WHERE maKhoa = ?` |
 
 ---
@@ -226,7 +226,7 @@ public record TransferVisitCommand(
         int destinationDepartmentId,
         int destinationRoomId,
 
-        // Phân loại lý do chuẩn hóa & ghi chú tùy chọn (không chứa PHI)
+        // Đề xuất kỹ thuật (Unresolved Proposal): Mã lý do chuẩn hóa & ghi chú tùy chọn (không chứa PHI)
         String transferReasonCode,
         String optionalNote,
 
@@ -246,8 +246,9 @@ public record TransferVisitCommand(
         if (destinationDepartmentId <= 0 || destinationRoomId <= 0) {
             throw new IllegalArgumentException("Khoa và phòng khám đích phải là số dương.");
         }
+        // Lưu ý: Yêu cầu bắt buộc transferReasonCode dưới đây là đề xuất kỹ thuật đang chờ chốt:
         if (transferReasonCode == null || transferReasonCode.isBlank()) {
-            throw new IllegalArgumentException("Mã lý do điều chuyển không được để trống.");
+            throw new IllegalArgumentException("Mã lý do điều chuyển không được để trống (theo đề xuất).");
         }
         if (idempotencyKey == null) {
             throw new IllegalArgumentException("Khóa idempotency không được để trống.");
@@ -258,15 +259,17 @@ public record TransferVisitCommand(
 
 ### 5.2. Cấu trúc Biên nhận kết quả tối giản (`TransferReceipt`)
 
-Biên nhận điều chuyển chỉ chứa các dữ kiện kỹ thuật của giao tác chuyển phòng; **tuyệt đối không trả về thông tin bệnh nhân hay chi tiết hàng đợi khoa đích**:
+Biên nhận điều chuyển chỉ chứa các dữ kiện kỹ thuật của giao tác chuyển phòng; **tuyệt đối không trả về thông tin bệnh nhân hay chi tiết hàng đợi khoa đích**. Metadata thời gian được ghi nhận theo chuẩn UTC Instant, song song với thời gian nghiệp vụ địa phương:
 
 ```java
 package vn.clinicmanagement.application.examination.dto;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 /**
  * Minimal transfer receipt. Strictly excludes patient identifiers and destination queue lists.
+ * Distinguishes UTC metadata instant from local business time.
  */
 public record TransferReceipt(
         int visitId,
@@ -280,7 +283,8 @@ public record TransferReceipt(
         int newQueueNumber,
         String newQueueDisplay,
         long newVersion,
-        LocalDateTime transferredAt
+        Instant transferredAtUtc,         // UTC metadata instant
+        LocalDateTime effectiveLocalTime  // Giờ nghiệp vụ phòng khám (Asia/Ho_Chi_Minh)
 ) {}
 ```
 
@@ -300,7 +304,7 @@ Mọi trường hợp vi phạm bất biến miền hoặc bất biến phân qu
 | `VISIT_STATUS_INELIGIBLE` | `INV-TX-01` | `RECEPTIONIST` chuyển lượt khác `CHO_KHAM`; hoặc `DOCTOR` chuyển lượt đã hoàn thành. | Rollback / No write | "Trạng thái hiện tại của lượt khám không đủ điều kiện để điều chuyển." |
 | `EMR_LOCKED_CANNOT_TRANSFER` | `INV-TX-03` | Lượt khám đã bị khóa hồ sơ bệnh án điện tử (`emrLocked == true`). | Rollback / No write | "Bệnh án điện tử đã bị khóa. Không thể thực hiện điều chuyển." |
 | `VISIT_INACTIVE_OR_CANCELLED` | `INV-TX-03` | Lượt khám đã bị hủy (`DA_HUY`) hoặc bị xóa mềm (`isDeleted == true`). | Rollback / No write | "Lượt khám đã bị hủy hoặc không còn hiệu lực." |
-| `DATE_BOUNDARY_VIOLATION` | `INV-TX-08` | `ngayKham` của lượt khám không trùng ngày hiện tại (`Asia/Ho_Chi_Minh`). | Rollback / No write | "Chỉ được phép điều chuyển các lượt khám trong ngày làm việc hiện tại." |
+| `DATE_BOUNDARY_VIOLATION` | `INV-TX-08` (Đề xuất / Unresolved) | Lượt khám ngoài ngày làm việc (nếu áp dụng quy tắc giới hạn ngày khám). | Rollback / No write | "Chỉ được phép điều chuyển các lượt khám trong ngày làm việc hiện tại." (Mã lỗi dự phòng theo đề xuất giới hạn ngày). |
 | `LINKED_WORK_BLOCKING` | `INV-TX-05` | Tồn tại chỉ định dịch vụ hoặc đơn thuốc đang xử lý dở dang không thể chuyển. | Rollback / No write | "Lượt khám đang có dịch vụ cận lâm sàng hoặc thuốc chưa hoàn tất xử lý tại nguồn." |
 | `CONCURRENCY_CONFLICT` | `INV-TX-06` | Khóa lạc quan không khớp (`expectedVersion != currentVersion`). | Rollback / No write | "Dữ liệu lượt khám đã bị thay đổi bởi thao tác khác. Vui lòng tải lại và thử lại." |
 | `AUDIT_APPEND_FAILED` | `INV-TX-07` | Ghi nhật ký kiểm toán thất bại trong giao tác. | **Toàn bộ Rollback** | "Không thể hoàn tất điều chuyển do lỗi ghi vết kiểm toán hệ thống. Thao tác đã được hoàn tác." |
@@ -313,20 +317,26 @@ Mọi trường hợp vi phạm bất biến miền hoặc bất biến phân qu
 
 Để chuẩn bị cho task triển khai code tiếp theo (sau khi SEC-01 mở), nhóm phân tích đề xuất các phương án kỹ thuật cụ thể cho các điểm chưa có trong mã nguồn hiện hành:
 
-### 6.1. Phương án lưu vết Lịch sử điều chuyển (Transfer History Persistence)
+### 6.1. Phương án lưu vết Lịch sử điều chuyển (Transfer History Persistence) (Unresolved Technical Proposal)
+* **Trạng thái:** Khoảng trống kỹ thuật chưa ngã ngũ (Unresolved Choice). Hiện tại chỉ có việc ghi nhật ký kiểm toán (Audit Log append) trong giao tác là hành vi bắt buộc đã duyệt. Phương án bổ sung bảng lịch sử chuyên biệt dưới đây là đề xuất kỹ thuật, chưa được phê duyệt thành schema chính thức:
 * **Thực tế:** CSDL hiện tại chỉ lưu vị trí hiện hành của `LuotKham` ([`V1__Initial_Clinic_Schema.sql:329-380`](../../clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql#L329-L380)).
-* **Lựa chọn 1 (Khuyến nghị kỹ thuật - Tạo bảng chuyên biệt):** Tạo bảng mới qua Flyway migration: `LichSuDieuChuyenLuotKham` (`id`, `maLuotKham`, `maCoSoNguon`, `maKhoaNguon`, `maPhongNguon`, `maKhoaDich`, `maPhongDich`, `soThuTuCu`, `soThuTuMoi`, `maLyDo`, `ghiChu`, `nguoiChuyen`, `thoiGianChuyen`).
+* **Lựa chọn 1 (Đề xuất kỹ thuật - Tạo bảng chuyên biệt):** Tạo bảng mới qua Flyway migration: `LichSuDieuChuyenLuotKham` (`id`, `maLuotKham`, `maCoSoNguon`, `maKhoaNguon`, `maPhongNguon`, `maKhoaDich`, `maPhongDich`, `soThuTuCu`, `soThuTuMoi`, `maLyDo`, `ghiChu`, `nguoiChuyen`, `thoiGianChuyen`).
   - *Ưu điểm:* Hỗ trợ nghiệp vụ in phiếu chuyển khoa, thống kê điều phối buồng phòng, và hiển thị lịch sử luân chuyển trên bệnh án mà không cần giải mã Audit Log.
-* **Lựa chọn 2 (Tối giản schema):** Lưu toàn bộ thông tin nguồn/đích dưới dạng JSON payload trong `AuditLog` với mã `VISIT_TRANSFERRED`.
+* **Lựa chọn 2 (Tối giản schema - Không tạo bảng mới):** Lưu toàn bộ thông tin nguồn/đích dưới dạng JSON payload trong `AuditLog` với mã `VISIT_TRANSFERRED`.
   - *Nhược điểm:* Khó truy vấn nhanh trên desktop UI; vi phạm nguyên tắc tách biệt giữa Audit Trail (an ninh) và Lịch sử nghiệp vụ (Domain History).
 
 ### 6.2. Thiết kế Sự kiện miền (`LuotKhamTransferredEvent`)
-* Đề xuất bổ sung sự kiện miền kế thừa `IDomainEvent`:
+* Đề xuất bổ sung sự kiện miền kế thừa `IDomainEvent`, trong đó phân định rõ thời gian kỹ thuật UTC Instant và giờ nghiệp vụ địa phương:
   ```java
   package vn.clinicmanagement.domain.common.events;
 
+  import java.time.Instant;
   import java.time.LocalDateTime;
 
+  /**
+   * Đề xuất sự kiện miền khi điều chuyển lượt khám.
+   * Phân định rõ thời gian kỹ thuật UTC metadata (occurredAtUtc) và thời gian nghiệp vụ địa phương (effectiveLocalTime).
+   */
   public record LuotKhamTransferredEvent(
           int visitId,
           int patientId,
@@ -336,12 +346,13 @@ Mọi trường hợp vi phạm bất biến miền hoặc bất biến phân qu
           int targetDepartmentId,
           int targetRoomId,
           int transferredBy,
-          LocalDateTime transferredAt
+          Instant occurredAtUtc,            // UTC Instant metadata
+          LocalDateTime effectiveLocalTime  // Giờ nghiệp vụ phòng khám (Asia/Ho_Chi_Minh)
   ) implements IDomainEvent {}
   ```
 
-### 6.3. Danh mục Mã lý do điều chuyển chuẩn hóa (`TransferReasonCode`)
-* Đề xuất chuẩn hóa enum lý do để ngăn chặn nhân viên nhập văn bản tự do chứa thông tin sức khỏe nhạy cảm (PHI) vào log:
+### 6.3. Đề xuất Danh mục Mã lý do điều chuyển chuẩn hóa (`TransferReasonCode`) (Unresolved Technical Proposal)
+* **Trạng thái:** Đề xuất kỹ thuật chưa ngã ngũ (Unresolved Proposal). Việc bắt buộc nhập lý do điều chuyển và danh mục mã chuẩn hóa dưới đây chưa phải là quyết định chính sách đã được Owner phê duyệt, mà là khuyến nghị kỹ thuật nhằm ngăn ngừa nhập văn bản tự do chứa thông tin sức khỏe nhạy cảm (PHI) vào audit log:
   1. `CHUYEN_KHOA_CHUYEN_MON`: Chuyển khoa khám chuyên môn sâu hơn.
   2. `YEU_CAU_NGUOI_BENH`: Bệnh nhân hoặc người nhà có nguyện vọng đổi phòng.
   3. `PHONG_KHAM_QUA_TAI`: Điều phối giảm tải cho phòng khám đông bệnh nhân.
@@ -382,3 +393,9 @@ Quá trình rà soát và lập báo cáo này đã nghiên cứu và tuân th�
    - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/ExaminationPanel.java`
    - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/menus/PatientQueueContextMenu.java`
    - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/dialogs/TransferRoomSelectDialog.java`
+
+### 7.1. Bằng chứng và Quy trình đối soát RAG (RAG Process & Evidence Record)
+
+- **Quy trình RAG điều phối cấp dự án (Coordinator RAG):** Điều phối viên (Orchestrator) đã thực thi thành công script tìm kiếm RAG của dự án (`/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py`) trước khi tiến hành đọc mã nguồn hoặc duyệt tài liệu chi tiết, qua đó cung cấp các đoạn trích dẫn và hợp đồng điều chuyển đã được phê duyệt làm cơ sở cho tài liệu này. Không có sự tắc nghẽn (blocker) ở cấp độ RAG dự án.
+- **Trạng thái môi trường agent cục bộ (Agent-Local Environment):** Tại runtime của môi trường agent, công cụ dòng lệnh RAG cục bộ (`rag` hoặc `ClinicOrchestrator`) không thể triệu gọi trực tiếp do hạn chế môi trường thực thi sandbox độc lập; việc này được công bố minh bạch và được bù đắp hoàn toàn bằng việc điều phối viên đã nạp sẵn kết quả RAG chuẩn xác vào ngữ cảnh task.
+- **Phạm vi bảo đảm:** Báo cáo này là tài liệu kỹ thuật thuần túy (Documentation-only), không chỉnh sửa mã nguồn Java, không sửa đổi schema CSDL SQL Server, không nới lỏng chính sách an ninh SEC-01. Toàn bộ các trích dẫn và line anchor trong tài liệu đã được đối chiếu và kiểm tra tính hợp lệ trực tiếp trên mã nguồn repository.
