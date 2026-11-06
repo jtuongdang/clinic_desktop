@@ -33,6 +33,11 @@ import java.util.regex.Pattern;
 public final class SessionLifecycleService implements ActiveSessionPort {
     public enum State { ACTIVE, LOCKED_IDLE, LOCKED_ABSOLUTE, LOGGED_OUT }
 
+    @FunctionalInterface
+    public interface SessionListener {
+        void onSessionChanged();
+    }
+
     private static final Logger LOGGER = Logger.getLogger(SessionLifecycleService.class.getName());
     private static final Pattern ROLE_CODE_PATTERN = Pattern.compile("[A-Z][A-Z0-9_]{0,49}");
     private static final Pattern WORKSTATION_ID_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:-]{0,99}");
@@ -54,6 +59,8 @@ public final class SessionLifecycleService implements ActiveSessionPort {
     private final AuditWritePort auditWritePort;
     private final Executor auditExecutor;
     private final Consumer<String> diagnosticConsumer;
+    private final java.util.concurrent.CopyOnWriteArrayList<SessionListener> listeners =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
     private volatile String lastAuditDiagnostic = "";
 
     public SessionLifecycleService(UserSession session, SessionTimeoutPolicy policy, Clock clock) {
@@ -103,6 +110,27 @@ public final class SessionLifecycleService implements ActiveSessionPort {
                 UserSession.getInstance(), policy, Clock.systemUTC(), auditWritePort);
     }
 
+    public void addSessionListener(SessionListener listener) {
+        Objects.requireNonNull(listener, "listener");
+        listeners.addIfAbsent(listener);
+    }
+
+    public void removeSessionListener(SessionListener listener) {
+        if (listener != null) {
+            listeners.remove(listener);
+        }
+    }
+
+    private void notifyListeners() {
+        for (SessionListener listener : listeners) {
+            try {
+                listener.onSessionChanged();
+            } catch (RuntimeException ex) {
+                LOGGER.log(java.util.logging.Level.WARNING, "Error notifying SessionListener", ex);
+            }
+        }
+    }
+
     public synchronized void startSession(
             int userId,
             String username,
@@ -112,7 +140,7 @@ public final class SessionLifecycleService implements ActiveSessionPort {
         startSession(userId, username, fullName, role, scope, UUID.randomUUID().toString());
     }
 
-    public synchronized void startSession(
+    public void startSession(
             int userId,
             String username,
             String fullName,
@@ -123,11 +151,14 @@ public final class SessionLifecycleService implements ActiveSessionPort {
                 ? UUID.randomUUID().toString()
                 : sessionId.trim();
         Instant now = clock.instant();
-        session.setSession(userId, username, fullName, role, scope);
-        session.setLifecycleMetadata(resolvedSessionId, now, now, now.plus(policy.absoluteTimeout()));
+        synchronized (this) {
+            session.setSession(userId, username, fullName, role, scope);
+            session.setLifecycleMetadata(resolvedSessionId, now, now, now.plus(policy.absoluteTimeout()));
+        }
+        notifyListeners();
     }
 
-    public synchronized void startSession(CompletedLoginSession completed) {
+    public void startSession(CompletedLoginSession completed) {
         Objects.requireNonNull(completed, "completed");
         startSession(
                 completed.userId(),
@@ -138,50 +169,69 @@ public final class SessionLifecycleService implements ActiveSessionPort {
                 completed.correlationId().toString());
     }
 
-    public synchronized State evaluate() {
-        if (!session.isLoggedOn()) return State.LOGGED_OUT;
-        if (!hasValidBoundedSession()) {
-            session.clearSession();
-            return State.LOGGED_OUT;
-        }
-        Instant now = clock.instant();
-        if (session.isLocked()) {
-            if (!session.isAbsoluteExpiryPending() && !now.isBefore(session.getAbsoluteExpiresAt())) {
-                session.setLocked(true, true);
-                dispatchAudit(buildSessionAuditEntry(
-                        AuditActionCode.AUTH_SESSION_EXPIRED_ABSOLUTE,
-                        AuditOutcome.SUCCESS,
-                        null,
-                        now));
-                return State.LOCKED_ABSOLUTE;
+    public State evaluate() {
+        boolean transitioned = false;
+        State result;
+        SystemAuditEntry auditEntry = null;
+        synchronized (this) {
+            if (!session.isLoggedOn()) return State.LOGGED_OUT;
+            if (!hasValidBoundedSession()) {
+                session.clearSession();
+                transitioned = true;
+                result = State.LOGGED_OUT;
+            } else {
+                Instant now = clock.instant();
+                if (session.isLocked()) {
+                    if (!session.isAbsoluteExpiryPending() && !now.isBefore(session.getAbsoluteExpiresAt())) {
+                        session.setLocked(true, true);
+                        auditEntry = buildSessionAuditEntry(
+                                AuditActionCode.AUTH_SESSION_EXPIRED_ABSOLUTE,
+                                AuditOutcome.SUCCESS,
+                                null,
+                                now);
+                        transitioned = true;
+                        result = State.LOCKED_ABSOLUTE;
+                    } else {
+                        result = session.isAbsoluteExpiryPending() ? State.LOCKED_ABSOLUTE : State.LOCKED_IDLE;
+                    }
+                } else if (!now.isBefore(session.getAbsoluteExpiresAt())) {
+                    session.setLocked(true, true);
+                    auditEntry = buildSessionAuditEntry(
+                            AuditActionCode.AUTH_SESSION_EXPIRED_ABSOLUTE,
+                            AuditOutcome.SUCCESS,
+                            null,
+                            now);
+                    transitioned = true;
+                    result = State.LOCKED_ABSOLUTE;
+                } else if (!now.isBefore(session.getLastActivityAt().plus(policy.idleTimeout()))) {
+                    session.setLocked(true, false);
+                    auditEntry = buildSessionAuditEntry(
+                            AuditActionCode.AUTH_SESSION_LOCKED_IDLE,
+                            AuditOutcome.SUCCESS,
+                            null,
+                            now);
+                    transitioned = true;
+                    result = State.LOCKED_IDLE;
+                } else {
+                    result = State.ACTIVE;
+                }
             }
-            return session.isAbsoluteExpiryPending() ? State.LOCKED_ABSOLUTE : State.LOCKED_IDLE;
         }
-        if (!now.isBefore(session.getAbsoluteExpiresAt())) {
-            session.setLocked(true, true);
-            dispatchAudit(buildSessionAuditEntry(
-                    AuditActionCode.AUTH_SESSION_EXPIRED_ABSOLUTE,
-                    AuditOutcome.SUCCESS,
-                    null,
-                    now));
-            return State.LOCKED_ABSOLUTE;
+        if (auditEntry != null) {
+            dispatchAudit(auditEntry);
         }
-        if (!now.isBefore(session.getLastActivityAt().plus(policy.idleTimeout()))) {
-            session.setLocked(true, false);
-            dispatchAudit(buildSessionAuditEntry(
-                    AuditActionCode.AUTH_SESSION_LOCKED_IDLE,
-                    AuditOutcome.SUCCESS,
-                    null,
-                    now));
-            return State.LOCKED_IDLE;
+        if (transitioned) {
+            notifyListeners();
         }
-        return State.ACTIVE;
+        return result;
     }
 
     /** Activity while locked is intentionally ignored. */
-    public synchronized State recordActivity() {
+    public State recordActivity() {
         State state = evaluate();
-        if (state == State.ACTIVE) session.setLastActivityAt(clock.instant());
+        synchronized (this) {
+            if (state == State.ACTIVE) session.setLastActivityAt(clock.instant());
+        }
         return state;
     }
 
@@ -238,6 +288,7 @@ public final class SessionLifecycleService implements ActiveSessionPort {
             return false;
         }
 
+        boolean notify = false;
         synchronized (this) {
             if (!Objects.equals(originalSessionId, session.getSessionId())) return false;
             State currentLockState = evaluate();
@@ -254,77 +305,94 @@ public final class SessionLifecycleService implements ActiveSessionPort {
             } else {
                 session.setLocked(false, false);
                 session.setLastActivityAt(now);
+                notify = true;
             }
-            return true;
         }
+        if (notify) {
+            notifyListeners();
+        }
+        return true;
     }
 
-    public synchronized void logout() {
+    public void logout() {
         clear();
     }
 
-    public synchronized void clear() {
+    public void clear() {
+        boolean hadSession;
         SystemAuditEntry logoutEntry = null;
-        if (hasValidBoundedSession()) {
-            logoutEntry = buildSessionAuditEntry(
-                    AuditActionCode.AUTH_LOGOUT,
-                    AuditOutcome.SUCCESS,
-                    null,
-                    clock.instant());
+        synchronized (this) {
+            hadSession = hasValidBoundedSession() || session.isLoggedOn();
+            if (hasValidBoundedSession()) {
+                logoutEntry = buildSessionAuditEntry(
+                        AuditActionCode.AUTH_LOGOUT,
+                        AuditOutcome.SUCCESS,
+                        null,
+                        clock.instant());
+            }
+            session.clearSession();
         }
-        session.clearSession();
         if (logoutEntry != null) {
             dispatchAudit(logoutEntry);
         }
+        if (hadSession) {
+            notifyListeners();
+        }
     }
 
-    public synchronized State state() {
+    public State state() {
         return evaluate();
     }
 
     @Override
-    public synchronized Optional<ActiveSession> findActiveSession(UUID requestedSessionId) {
+    public Optional<ActiveSession> findActiveSession(UUID requestedSessionId) {
         State currentState = evaluate();
-        UUID currentSessionId = parseSessionId(session.getSessionId());
-        if (currentSessionId == null || !currentSessionId.equals(requestedSessionId)) {
-            return Optional.empty();
+        synchronized (this) {
+            UUID currentSessionId = parseSessionId(session.getSessionId());
+            if (currentSessionId == null || !currentSessionId.equals(requestedSessionId)) {
+                return Optional.empty();
+            }
+            Instant now = clock.instant();
+            boolean notExpired = session.getAbsoluteExpiresAt() != null
+                    && now.isBefore(session.getAbsoluteExpiresAt());
+            return Optional.of(new ActiveSession(
+                    currentSessionId,
+                    session.getUserId(),
+                    session.getRoleId(),
+                    session.getRoleCode(),
+                    session.getFacilityId(),
+                    session.getDepartmentId(),
+                    currentState == State.ACTIVE,
+                    !session.isLocked(),
+                    notExpired));
         }
-        Instant now = clock.instant();
-        boolean notExpired = session.getAbsoluteExpiresAt() != null
-                && now.isBefore(session.getAbsoluteExpiresAt());
-        return Optional.of(new ActiveSession(
-                currentSessionId,
-                session.getUserId(),
-                session.getRoleId(),
-                session.getRoleCode(),
-                session.getFacilityId(),
-                session.getDepartmentId(),
-                currentState == State.ACTIVE,
-                !session.isLocked(),
-                notExpired));
     }
 
-    public synchronized Optional<AuthorizationContext> currentAuthorizationContext() {
+    public Optional<AuthorizationContext> currentAuthorizationContext() {
         if (evaluate() != State.ACTIVE) return Optional.empty();
-        UUID currentSessionId = parseSessionId(session.getSessionId());
-        if (currentSessionId == null) return Optional.empty();
-        AuthorizationContext context = new AuthorizationContext(
-                session.getUserId(), session.getRoleId(), session.getRoleCode(),
-                session.getFacilityId(), session.getDepartmentId(), currentSessionId);
-        return context.isValid() ? Optional.of(context) : Optional.empty();
+        synchronized (this) {
+            UUID currentSessionId = parseSessionId(session.getSessionId());
+            if (currentSessionId == null) return Optional.empty();
+            AuthorizationContext context = new AuthorizationContext(
+                    session.getUserId(), session.getRoleId(), session.getRoleCode(),
+                    session.getFacilityId(), session.getDepartmentId(), currentSessionId);
+            return context.isValid() ? Optional.of(context) : Optional.empty();
+        }
     }
 
     /** Creates per-operation audit metadata without reusing the session correlation ID. */
-    public synchronized Optional<AuditActorContext> currentAuditActorContext() {
+    public Optional<AuditActorContext> currentAuditActorContext() {
         if (evaluate() != State.ACTIVE) return Optional.empty();
-        UUID sessionId = parseSessionId(session.getSessionId());
-        if (sessionId == null || session.getUserId() <= 0 || session.getRoleId() <= 0
-                || session.getFacilityId() <= 0 || session.getDepartmentId() <= 0) return Optional.empty();
-        String roleCode = normalizeRoleCode(session.getRoleCode());
-        if (roleCode == null) return Optional.empty();
-        return Optional.of(new AuditActorContext(session.getUserId(), session.getRoleId(), roleCode,
-                session.getFacilityId(), session.getDepartmentId(),
-                normalizeWorkstationId(session.getWorkstationId(), session.getStationId()), UUID.randomUUID()));
+        synchronized (this) {
+            UUID sessionId = parseSessionId(session.getSessionId());
+            if (sessionId == null || session.getUserId() <= 0 || session.getRoleId() <= 0
+                    || session.getFacilityId() <= 0 || session.getDepartmentId() <= 0) return Optional.empty();
+            String roleCode = normalizeRoleCode(session.getRoleCode());
+            if (roleCode == null) return Optional.empty();
+            return Optional.of(new AuditActorContext(session.getUserId(), session.getRoleId(), roleCode,
+                    session.getFacilityId(), session.getDepartmentId(),
+                    normalizeWorkstationId(session.getWorkstationId(), session.getStationId()), UUID.randomUUID()));
+        }
     }
 
     public String lastAuditDiagnostic() {

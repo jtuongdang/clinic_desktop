@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
 /** Doctor station read workflow for the scoped team queue and patient history. */
-public class DoctorStationPanel extends BaseViewPanel {
+public class DoctorStationPanel extends BaseViewPanel implements SessionLifecycleService.SessionListener {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String UNAVAILABLE_MESSAGE = "Không thể tải dữ liệu bác sĩ trong phiên hiện tại.";
 
@@ -44,6 +44,9 @@ public class DoctorStationPanel extends BaseViewPanel {
     private AuthorizationContext observedSession;
     private ReceptionQueueItem selectedItem;
     private long requestGeneration;
+    private SwingWorker<List<ReceptionQueueItem>, Void> activeQueueWorker;
+    private SwingWorker<List<TienSuBenh>, Void> activeHistoryWorker;
+    private boolean active;
 
     public DoctorStationPanel(SessionLifecycleService sessionLifecycle) {
         this(sessionLifecycle, DoctorCompositionRoot.create(sessionLifecycle));
@@ -107,7 +110,9 @@ public class DoctorStationPanel extends BaseViewPanel {
             SwingUtilities.invokeLater(this::onShow);
             return;
         }
+        active = true;
         observedSession = currentAuthorizationContext();
+        sessionLifecycle.addSessionListener(this);
         sessionMonitor.start();
         refreshData();
     }
@@ -118,9 +123,22 @@ public class DoctorStationPanel extends BaseViewPanel {
             SwingUtilities.invokeLater(this::onHide);
             return;
         }
+        active = false;
         sessionMonitor.stop();
+        sessionLifecycle.removeSessionListener(this);
         observedSession = null;
+        cancelActiveWorkers();
         clearProtectedData();
+    }
+
+    @Override
+    public void onSessionChanged() {
+        cancelActiveWorkers();
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::handleSessionChange);
+            return;
+        }
+        handleSessionChange();
     }
 
     @Override
@@ -130,6 +148,7 @@ public class DoctorStationPanel extends BaseViewPanel {
             return;
         }
 
+        cancelActiveWorkers();
         long generation = ++requestGeneration;
         selectedItem = null;
         actionBar.updatePatient(null);
@@ -149,10 +168,16 @@ public class DoctorStationPanel extends BaseViewPanel {
         LocalDate businessDate = LocalDate.now(BUSINESS_ZONE);
         queueSidebar.showLoading(businessDate);
         GetDoctorQueueQuery query = new GetDoctorQueueQuery(businessDate, authorization, auditActor);
-        new SwingWorker<List<ReceptionQueueItem>, Void>() {
+        SwingWorker<List<ReceptionQueueItem>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<ReceptionQueueItem> doInBackground() {
+                if (Thread.currentThread().isInterrupted()) {
+                    return List.of();
+                }
                 Result<List<ReceptionQueueItem>> result = queueReader.apply(query);
+                if (Thread.currentThread().isInterrupted()) {
+                    return List.of();
+                }
                 if (result == null || result.isFailure()) {
                     throw new ProtectedReadFailure();
                 }
@@ -161,7 +186,7 @@ public class DoctorStationPanel extends BaseViewPanel {
 
             @Override
             protected void done() {
-                if (generation != requestGeneration) return;
+                if (isCancelled() || generation != requestGeneration) return;
                 if (!isCurrentSession(authorization)) {
                     handleSessionChange();
                     return;
@@ -175,9 +200,19 @@ public class DoctorStationPanel extends BaseViewPanel {
                     queueSidebar.showUnavailable();
                 } catch (RuntimeException exception) {
                     queueSidebar.showUnavailable();
+                } finally {
+                    synchronized (DoctorStationPanel.this) {
+                        if (activeQueueWorker == this) {
+                            activeQueueWorker = null;
+                        }
+                    }
                 }
             }
-        }.execute();
+        };
+        synchronized (this) {
+            activeQueueWorker = worker;
+        }
+        worker.execute();
     }
 
     /** Clears protected queue and history data immediately, such as when the dashboard locks or logs out. */
@@ -186,7 +221,10 @@ public class DoctorStationPanel extends BaseViewPanel {
             SwingUtilities.invokeLater(this::clearSensitiveData);
             return;
         }
+        cancelActiveWorkers();
         clearProtectedData();
+        queueSidebar.showUnavailable();
+        historyPanel.showUnavailable();
     }
 
     private void onPatientChanged(ReceptionQueueItem item) {
@@ -194,6 +232,7 @@ public class DoctorStationPanel extends BaseViewPanel {
             SwingUtilities.invokeLater(() -> onPatientChanged(item));
             return;
         }
+        cancelActiveHistoryWorker();
         long generation = ++requestGeneration;
         selectedItem = item;
         historyPanel.clearHistory();
@@ -209,11 +248,18 @@ public class DoctorStationPanel extends BaseViewPanel {
             return;
         }
 
+        historyPanel.showLoading();
         GetPatientHistoryQuery query = new GetPatientHistoryQuery(item.patientId(), authorization, auditActor);
-        new SwingWorker<List<TienSuBenh>, Void>() {
+        SwingWorker<List<TienSuBenh>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<TienSuBenh> doInBackground() {
+                if (Thread.currentThread().isInterrupted()) {
+                    return List.of();
+                }
                 Result<List<TienSuBenh>> result = historyReader.apply(query);
+                if (Thread.currentThread().isInterrupted()) {
+                    return List.of();
+                }
                 if (result == null || result.isFailure()) {
                     throw new ProtectedReadFailure();
                 }
@@ -222,7 +268,8 @@ public class DoctorStationPanel extends BaseViewPanel {
 
             @Override
             protected void done() {
-                if (generation != requestGeneration
+                if (isCancelled()
+                        || generation != requestGeneration
                         || selectedItem == null
                         || selectedItem.patientId() != item.patientId()) {
                     return;
@@ -245,34 +292,80 @@ public class DoctorStationPanel extends BaseViewPanel {
                     historyPanel.showUnavailable();
                 } catch (RuntimeException exception) {
                     historyPanel.showUnavailable();
+                } finally {
+                    synchronized (DoctorStationPanel.this) {
+                        if (activeHistoryWorker == this) {
+                            activeHistoryWorker = null;
+                        }
+                    }
                 }
             }
-        }.execute();
+        };
+        synchronized (this) {
+            activeHistoryWorker = worker;
+        }
+        worker.execute();
     }
 
     void monitorSession() {
         AuthorizationContext current = currentAuthorizationContext();
         if (Objects.equals(observedSession, current)) return;
+        handleSessionChange();
+    }
+
+    private void handleSessionChange() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::handleSessionChange);
+            return;
+        }
+        cancelActiveWorkers();
+        AuthorizationContext current = currentAuthorizationContext();
         observedSession = current;
         clearProtectedData();
-        if (current != null && isShowing()) refreshData();
-        else if (current == null) {
+        if (current != null && (active || isShowing())) {
+            refreshData();
+        } else {
             queueSidebar.showUnavailable();
             historyPanel.showUnavailable();
         }
     }
 
-    private void handleSessionChange() {
-        AuthorizationContext current = currentAuthorizationContext();
-        observedSession = current;
-        clearProtectedData();
-        queueSidebar.showUnavailable();
-        historyPanel.showUnavailable();
-        if (current != null && isShowing()) refreshData();
+    private synchronized void cancelActiveWorkers() {
+        requestGeneration++;
+        if (activeQueueWorker != null) {
+            if (!activeQueueWorker.isDone()) {
+                activeQueueWorker.cancel(true);
+            }
+            activeQueueWorker = null;
+        }
+        if (activeHistoryWorker != null) {
+            if (!activeHistoryWorker.isDone()) {
+                activeHistoryWorker.cancel(true);
+            }
+            activeHistoryWorker = null;
+        }
+    }
+
+    private synchronized void cancelActiveHistoryWorker() {
+        requestGeneration++;
+        if (activeHistoryWorker != null) {
+            if (!activeHistoryWorker.isDone()) {
+                activeHistoryWorker.cancel(true);
+            }
+            activeHistoryWorker = null;
+        }
+    }
+
+    synchronized SwingWorker<List<ReceptionQueueItem>, Void> activeQueueWorker() {
+        return activeQueueWorker;
+    }
+
+    synchronized SwingWorker<List<TienSuBenh>, Void> activeHistoryWorker() {
+        return activeHistoryWorker;
     }
 
     private void clearProtectedData() {
-        requestGeneration++;
+        cancelActiveWorkers();
         selectedItem = null;
         if (actionBar != null) actionBar.updatePatient(null);
         if (clinicalForm != null) clinicalForm.updatePatient(null);

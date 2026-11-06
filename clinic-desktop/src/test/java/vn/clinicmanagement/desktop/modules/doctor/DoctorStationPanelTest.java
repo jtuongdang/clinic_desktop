@@ -181,6 +181,123 @@ class DoctorStationPanelTest {
         assertFalse(containsText(panel, "Must not return after logout"));
     }
 
+    @Test
+    void immediateSessionClearWithoutTimerTickCancelsWorkersAndClearsProtectedData() throws Exception {
+        lifecycle = activeLifecycle();
+        CountDownLatch historyStarted = new CountDownLatch(1);
+        CountDownLatch releaseHistory = new CountDownLatch(1);
+        panel = new DoctorStationPanel(lifecycle,
+                query -> Result.success(List.of(queueItem(101, 501, "SYN-501"))),
+                query -> {
+                    historyStarted.countDown();
+                    awaitLatch(releaseHistory);
+                    return Result.success(List.of(history(501, "Protected history detail")));
+                });
+        SwingUtilities.invokeAndWait(panel::onShow);
+        await(() -> queueTable().getRowCount() == 1);
+        SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
+        assertTrue(historyStarted.await(2, TimeUnit.SECONDS));
+
+        SwingWorker<?, ?> activeWorker = panel.activeHistoryWorker();
+        assertNotNull(activeWorker, "History worker must be active during background read");
+
+        // Clear session: listener must immediately notify without waiting for monitorSession or 500ms timer
+        lifecycle.clear();
+        SwingUtilities.invokeAndWait(() -> {});
+
+        assertTrue(activeWorker.isCancelled(), "Active history worker must be cancelled immediately");
+        assertNull(panel.activeHistoryWorker());
+        assertEquals(0, queueTable().getRowCount(), "Queue rows must be cleared immediately");
+        assertEquals(0, historyRowCount(), "History rows must be cleared immediately");
+        assertNotNull(statusLabel("Không thể tải hàng đợi."));
+        assertNotNull(statusLabel("Không thể tải tiền sử bệnh."));
+
+        // When the background read finishes, its done() must not repopulate UI
+        releaseHistory.countDown();
+        Thread.sleep(150);
+        SwingUtilities.invokeAndWait(() -> {});
+        assertEquals(0, historyRowCount());
+        assertFalse(containsText(panel, "Protected history detail"));
+    }
+
+    @Test
+    void replacementValidSessionSafelyReloadsThroughAuthorizedQueuePath() throws Exception {
+        lifecycle = activeLifecycle();
+        AtomicReference<GetDoctorQueueQuery> lastQueueQuery = new AtomicReference<>();
+        panel = new DoctorStationPanel(lifecycle,
+                query -> {
+                    lastQueueQuery.set(query);
+                    int doctorId = query.authorizationContext().employeeId();
+                    return Result.success(List.of(queueItem(200 + doctorId, 600 + doctorId, "DOC-" + doctorId)));
+                },
+                query -> Result.success(List.of()));
+        SwingUtilities.invokeAndWait(panel::onShow);
+        await(() -> queueTable().getRowCount() == 1);
+        assertEquals(701, lastQueueQuery.get().authorizationContext().employeeId());
+
+        // Replace session with Doctor 702
+        lifecycle.startSession(
+                702, "synthetic-doctor-2", "Synthetic Doctor 2",
+                new RoleChoice(42, "DOCTOR", "Synthetic Doctor"),
+                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+                UUID.randomUUID().toString());
+
+        // Must reload immediately through listener without waiting for monitorSession timer
+        await(() -> lastQueueQuery.get() != null
+                && lastQueueQuery.get().authorizationContext().employeeId() == 702
+                && queueTable().getRowCount() == 1);
+
+        JTable queueTable = queueTable();
+        ReceptionQueueItem queued = (ReceptionQueueItem) queueTable.getModel().getValueAt(0, 0);
+        assertEquals(200 + 702, queued.visitId());
+        assertEquals(600 + 702, queued.patientId());
+    }
+
+    @Test
+    void hidingPanelUnsubscribesAndCancelsPendingWorkers() throws Exception {
+        lifecycle = activeLifecycle();
+        CountDownLatch historyStarted = new CountDownLatch(1);
+        CountDownLatch releaseHistory = new CountDownLatch(1);
+        AtomicInteger queueLoads = new AtomicInteger();
+        panel = new DoctorStationPanel(lifecycle,
+                query -> {
+                    queueLoads.incrementAndGet();
+                    return Result.success(List.of(queueItem(101, 501, "SYN-501")));
+                },
+                query -> {
+                    historyStarted.countDown();
+                    awaitLatch(releaseHistory);
+                    return Result.success(List.of(history(501, "Protected history")));
+                });
+        SwingUtilities.invokeAndWait(panel::onShow);
+        await(() -> queueTable().getRowCount() == 1);
+        SwingUtilities.invokeAndWait(() -> queueTable().setRowSelectionInterval(0, 0));
+        assertTrue(historyStarted.await(2, TimeUnit.SECONDS));
+
+        SwingWorker<?, ?> activeWorker = panel.activeHistoryWorker();
+        assertNotNull(activeWorker);
+
+        // Hide panel: cancels active workers and unsubscribes
+        SwingUtilities.invokeAndWait(panel::onHide);
+        assertTrue(activeWorker.isCancelled(), "Worker must be cancelled on hide");
+        assertNull(panel.activeHistoryWorker());
+        assertEquals(0, queueTable().getRowCount());
+        assertEquals(0, historyRowCount());
+
+        int loadsBeforeReplacement = queueLoads.get();
+        // New session start while hidden must not trigger reload
+        lifecycle.startSession(
+                702, "synthetic-doctor-2", "Synthetic Doctor 2",
+                new RoleChoice(42, "DOCTOR", "Synthetic Doctor"),
+                new WorkScopeChoice(11, "Synthetic Facility", 21, "Synthetic Department"),
+                UUID.randomUUID().toString());
+        Thread.sleep(150);
+        SwingUtilities.invokeAndWait(() -> {});
+        assertEquals(loadsBeforeReplacement, queueLoads.get(), "Hidden panel must not reload after unsubscribing");
+
+        releaseHistory.countDown();
+    }
+
     private JTable queueTable() {
         return findTable(panel, 3);
     }

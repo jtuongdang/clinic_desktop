@@ -304,6 +304,77 @@ class SessionLifecycleServiceTest {
         assertEquals(AuditActionCode.AUTH_SESSION_LOCKED_IDLE, capturedEntry.get().actionCode());
     }
 
+    @Test void listenerNotifiedImmediatelyOnSessionReplacementAndUnsubscribeSafely() {
+        java.util.concurrent.atomic.AtomicInteger notifications = new java.util.concurrent.atomic.AtomicInteger();
+        SessionLifecycleService.SessionListener listener = notifications::incrementAndGet;
+        lifecycle.addSessionListener(listener);
+        assertEquals(0, notifications.get());
+
+        start();
+        assertEquals(1, notifications.get(), "Immediate notification on initial session start");
+
+        // Identity/session replacement
+        lifecycle.startSession(702, "synthetic.702", "Bác sĩ khác", role, scope);
+        assertEquals(2, notifications.get(), "Immediate notification on session replacement");
+
+        lifecycle.removeSessionListener(listener);
+        lifecycle.startSession(703, "synthetic.703", "Bác sĩ thứ ba", role, scope);
+        assertEquals(2, notifications.get(), "Unsubscribed listener receives no further notifications");
+    }
+
+    @Test void listenerNotifiedImmediatelyOnIdleLockAndAbsoluteExpiryTransitions() {
+        start();
+        java.util.concurrent.atomic.AtomicInteger notifications = new java.util.concurrent.atomic.AtomicInteger();
+        lifecycle.addSessionListener(notifications::incrementAndGet);
+
+        clock.advance(Duration.ofMinutes(15));
+        assertEquals(0, notifications.get(), "No notification before evaluation");
+        assertEquals(SessionLifecycleService.State.LOCKED_IDLE, lifecycle.evaluate());
+        assertEquals(1, notifications.get(), "Immediate notification on idle lock transition");
+
+        // Idempotent evaluate calls do not re-notify
+        assertEquals(SessionLifecycleService.State.LOCKED_IDLE, lifecycle.evaluate());
+        assertEquals(1, notifications.get());
+
+        clock.advance(Duration.ofHours(12));
+        assertEquals(SessionLifecycleService.State.LOCKED_ABSOLUTE, lifecycle.evaluate());
+        assertEquals(2, notifications.get(), "Immediate notification on absolute expiry transition");
+
+        assertEquals(SessionLifecycleService.State.LOCKED_ABSOLUTE, lifecycle.evaluate());
+        assertEquals(2, notifications.get());
+    }
+
+    @Test void listenerNotifiedImmediatelyOnLogoutAndClearTransitions() {
+        start();
+        java.util.concurrent.atomic.AtomicInteger notifications = new java.util.concurrent.atomic.AtomicInteger();
+        lifecycle.addSessionListener(notifications::incrementAndGet);
+
+        lifecycle.clear();
+        assertEquals(1, notifications.get(), "Immediate notification on session clear/logout");
+
+        // Subsequent clear when already logged out does not re-notify
+        lifecycle.clear();
+        assertEquals(1, notifications.get());
+    }
+
+    @Test void listenerNotifiedImmediatelyOnSuccessfulReauthentication() {
+        start();
+        clock.advance(Duration.ofMinutes(15));
+        assertEquals(SessionLifecycleService.State.LOCKED_IDLE, lifecycle.evaluate());
+
+        java.util.concurrent.atomic.AtomicInteger notifications = new java.util.concurrent.atomic.AtomicInteger();
+        lifecycle.addSessionListener(notifications::incrementAndGet);
+
+        // Denied reauthentication should not trigger transition
+        assertFalse(lifecycle.reauthenticate(authenticated(702, List.of(role), List.of(scope))));
+        assertEquals(0, notifications.get());
+
+        // Successful reauthentication unlocks session and notifies
+        assertTrue(lifecycle.reauthenticate(authenticated(701, List.of(role), List.of(scope))));
+        assertEquals(1, notifications.get(), "Immediate notification on unlocking reauthentication");
+        assertEquals(SessionLifecycleService.State.ACTIVE, lifecycle.evaluate());
+    }
+
     private void start() { lifecycle.startSession(701, "synthetic.701", "Nhân viên mẫu", role, scope); }
     private AuthenticatedUser authenticated(int id, List<RoleChoice> roles, List<WorkScopeChoice> scopes) {
         return new AuthenticatedUser(id, "synthetic." + id, "Nhân viên mẫu", roles, scopes);
