@@ -16,19 +16,34 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /** JDBC writes for newly registered visits and read models for the reception queue. */
 public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort, DoctorQueuePort {
+    public static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final JdbcConnectionProvider connections;
     private final JdbcUnitOfWork unitOfWork;
+    private final Clock clock;
 
     public ReceptionQueueRepositoryImpl(JdbcConnectionProvider connections, JdbcUnitOfWork unitOfWork) {
-        this.connections = connections;
-        this.unitOfWork = unitOfWork;
+        this(connections, unitOfWork, Clock.system(CLINIC_ZONE));
+    }
+
+    public ReceptionQueueRepositoryImpl(JdbcConnectionProvider connections, JdbcUnitOfWork unitOfWork, Clock clock) {
+        this.connections = Objects.requireNonNull(connections, "connections");
+        this.unitOfWork = Objects.requireNonNull(unitOfWork, "unitOfWork");
+        this.clock = Objects.requireNonNull(clock, "clock").withZone(CLINIC_ZONE);
+    }
+
+    public Clock clock() {
+        return clock;
     }
 
     @Override
@@ -36,10 +51,11 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort, D
                                  String registrationType, String reason, DoiTuongKham payerType,
                                  boolean priority, int createdBy) {
         return withConnection(connection -> {
-            LocalDate today = LocalDate.now();
-            int queueNumber = nextQueueNumber(connection, roomId, today);
+            LocalDateTime businessNow = LocalDateTime.now(clock);
+            LocalDate visitDate = businessNow.toLocalDate();
+            LocalDateTime registeredAt = businessNow;
+            int queueNumber = nextQueueNumber(connection, roomId, visitDate);
             String queueDisplay = String.format("%02d", queueNumber);
-            LocalDateTime registeredAt = LocalDateTime.now();
             String sql = "INSERT INTO LuotKham (maBenhNhan, maCoSo, maKhoa, maPhongKham, trangThai, soThuTu, "
                     + "soThuTuDisplay, ngayKham, thoiGianTiepNhan, lyDoKham, doiTuongKham, loaiDangKyKham, dnVnTien, createdBy) "
                     + "OUTPUT INSERTED.id VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -51,7 +67,7 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort, D
             visit.setTrangThai(TrangThaiLuotKham.CHO_KHAM);
             visit.setSoThuTu(queueNumber);
             visit.setSoThuTuDisplay(queueDisplay);
-            visit.setNgayKham(today);
+            visit.setNgayKham(visitDate);
             visit.setThoiGianTiepNhan(registeredAt);
             visit.setLyDoKham(reason == null ? "" : reason.trim());
             visit.setDoiTuongKham(payerType);
@@ -65,7 +81,7 @@ public final class ReceptionQueueRepositoryImpl implements ReceptionQueuePort, D
                 ps.setString(5, TrangThaiLuotKham.CHO_KHAM.name());
                 ps.setInt(6, queueNumber);
                 ps.setString(7, queueDisplay);
-                ps.setObject(8, today);
+                ps.setObject(8, visitDate);
                 ps.setTimestamp(9, Timestamp.valueOf(registeredAt));
                 ps.setString(10, reason == null ? "" : reason.trim());
                 ps.setString(11, payerType.name());

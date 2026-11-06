@@ -23,13 +23,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.TimeZone;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -166,6 +170,117 @@ class ReceptionQueueRepositoryImplTest {
         assertEquals(0, standaloneJdbc.commits);
         assertEquals(0, standaloneJdbc.rollbacks);
         assertEquals(1, standaloneJdbc.closes);
+    }
+
+    @Test
+    void defaultConstructorUsesExplicitClinicZoneClock() {
+        SyntheticReceptionJdbc jdbc = new SyntheticReceptionJdbc(1, 100);
+        JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+        JdbcTransactionManager transactions = transactionManager(unitOfWork, jdbc.connection);
+        JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+        ReceptionQueueRepositoryImpl repository = new ReceptionQueueRepositoryImpl(connections, unitOfWork);
+
+        assertEquals(ReceptionQueueRepositoryImpl.CLINIC_ZONE, repository.clock().getZone());
+    }
+
+    @Test
+    void registerVisitUsesCapturedVietnamBusinessTimeDespiteNonVietnamDefaultZone() throws Exception {
+        TimeZone originalZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            Instant fixedInstant = Instant.parse("2026-11-06T18:30:00Z");
+            LocalDate expectedVietnamDate = LocalDate.of(2026, 11, 7);
+            LocalDateTime expectedVietnamDateTime = LocalDateTime.of(2026, 11, 7, 1, 30, 0);
+            LocalDate utcDate = LocalDate.of(2026, 11, 6);
+
+            assertFalse(expectedVietnamDate.equals(utcDate));
+
+            SyntheticReceptionJdbc jdbc = new SyntheticReceptionJdbc(3, 501);
+            JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+            JdbcTransactionManager transactions = transactionManager(unitOfWork, jdbc.connection);
+            JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+            Clock utcZonedClock = Clock.fixed(fixedInstant, ZoneId.of("UTC"));
+            ReceptionQueueRepositoryImpl repository =
+                    new ReceptionQueueRepositoryImpl(connections, unitOfWork, utcZonedClock);
+
+            assertEquals(ReceptionQueueRepositoryImpl.CLINIC_ZONE, repository.clock().getZone());
+
+            LuotKham visit = withSyntheticStandaloneConnection(
+                    jdbc.connection,
+                    () -> repository.registerVisit(
+                            88, 1, 5, 20, "KHAM_MOI", "Kham tong quat", DoiTuongKham.THU_PHI, false, 9));
+
+            assertEquals(expectedVietnamDate, visit.getNgayKham());
+            assertEquals(expectedVietnamDateTime, visit.getThoiGianTiepNhan());
+            assertEquals(visit.getNgayKham(), visit.getThoiGianTiepNhan().toLocalDate());
+
+            assertEquals(2, jdbc.statements.size());
+            RecordedStatement queueSelect = jdbc.statements.get(0);
+            assertTrue(queueSelect.sql.startsWith("SELECT ISNULL(MAX(soThuTu), 0) + 1 FROM LuotKham"));
+            assertEquals(20, queueSelect.bindings.get(1));
+            assertEquals(expectedVietnamDate, queueSelect.bindings.get(2));
+
+            RecordedStatement visitInsert = jdbc.statements.get(1);
+            assertTrue(visitInsert.sql.startsWith("INSERT INTO LuotKham"));
+            assertEquals(88, visitInsert.bindings.get(1));
+            assertEquals(1, visitInsert.bindings.get(2));
+            assertEquals(5, visitInsert.bindings.get(3));
+            assertEquals(20, visitInsert.bindings.get(4));
+            assertEquals(TrangThaiLuotKham.CHO_KHAM.name(), visitInsert.bindings.get(5));
+            assertEquals(3, visitInsert.bindings.get(6));
+            assertEquals("03", visitInsert.bindings.get(7));
+            assertEquals(expectedVietnamDate, visitInsert.bindings.get(8));
+            assertTrue(visitInsert.bindings.get(9) instanceof Timestamp);
+            Timestamp boundTimestamp = (Timestamp) visitInsert.bindings.get(9);
+            assertEquals(Timestamp.valueOf(expectedVietnamDateTime), boundTimestamp);
+            assertEquals(expectedVietnamDateTime, boundTimestamp.toLocalDateTime());
+            assertEquals(expectedVietnamDate, boundTimestamp.toLocalDateTime().toLocalDate());
+
+            assertEquals(visit.getNgayKham(), queueSelect.bindings.get(2));
+            assertEquals(visit.getNgayKham(), visitInsert.bindings.get(8));
+        } finally {
+            TimeZone.setDefault(originalZone);
+        }
+    }
+
+    @Test
+    void registerVisitInTransactionUsesCapturedVietnamBusinessTimeDespiteNonVietnamDefaultZone() {
+        TimeZone originalZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            Instant fixedInstant = Instant.parse("2026-11-06T18:30:00Z");
+            LocalDate expectedVietnamDate = LocalDate.of(2026, 11, 7);
+            LocalDateTime expectedVietnamDateTime = LocalDateTime.of(2026, 11, 7, 1, 30, 0);
+
+            SyntheticReceptionJdbc jdbc = new SyntheticReceptionJdbc(4, 502);
+            JdbcUnitOfWork unitOfWork = new JdbcUnitOfWork();
+            JdbcTransactionManager transactions = transactionManager(unitOfWork, jdbc.connection);
+            JdbcConnectionProvider connections = new JdbcConnectionProvider(transactions);
+            Clock utcZonedClock = Clock.fixed(fixedInstant, ZoneId.of("UTC"));
+            ReceptionQueueRepositoryImpl repository =
+                    new ReceptionQueueRepositoryImpl(connections, unitOfWork, utcZonedClock);
+
+            Result<LuotKham> result = transactions.inTransaction(() ->
+                    Result.success(repository.registerVisit(
+                            88, 1, 5, 20, "KHAM_MOI", "Kham tong quat", DoiTuongKham.THU_PHI, false, 9)));
+
+            assertTrue(result.isSuccess());
+            LuotKham visit = result.getValue().orElseThrow();
+            assertEquals(expectedVietnamDate, visit.getNgayKham());
+            assertEquals(expectedVietnamDateTime, visit.getThoiGianTiepNhan());
+            assertEquals(0, unitOfWork.saveChanges());
+
+            assertEquals(2, jdbc.statements.size());
+            RecordedStatement queueSelect = jdbc.statements.get(0);
+            assertEquals(expectedVietnamDate, queueSelect.bindings.get(2));
+
+            RecordedStatement visitInsert = jdbc.statements.get(1);
+            assertEquals(expectedVietnamDate, visitInsert.bindings.get(8));
+            Timestamp boundTimestamp = (Timestamp) visitInsert.bindings.get(9);
+            assertEquals(Timestamp.valueOf(expectedVietnamDateTime), boundTimestamp);
+        } finally {
+            TimeZone.setDefault(originalZone);
+        }
     }
 
     private static void assertSyntheticVisit(
