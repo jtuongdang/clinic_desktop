@@ -25,6 +25,8 @@ class DoctorHistoryPanelTest {
             JProgressBar progress = findProgressBar(panel);
             assertNotNull(loadingLabel);
             assertTrue(loadingLabel.isVisible());
+            assertEquals("Đang tải tiền sử bệnh...",
+                    loadingLabel.getAccessibleContext().getAccessibleName());
             assertNotNull(progress);
             assertTrue(progress.isVisible());
             assertTrue(progress.isIndeterminate());
@@ -48,6 +50,13 @@ class DoctorHistoryPanelTest {
             assertFalse(table.getModel().isCellEditable(0, 1));
             assertFalse(containsMutationButton(panel));
             assertFalse(containsText(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực."));
+
+            panel.showLoading();
+            assertEquals(0, table.getRowCount());
+            assertFalse(containsText(panel, "Synthetic history detail"));
+            assertFalse(containsText(panel, "Chưa có dữ liệu tiền sử bệnh đã xác thực."));
+            assertFalse(containsText(panel, "Không thể tải tiền sử bệnh."));
+            assertNotNull(findProgressBar(panel));
 
             panel.showUnavailable();
             assertEquals("Không thể tải tiền sử bệnh.",

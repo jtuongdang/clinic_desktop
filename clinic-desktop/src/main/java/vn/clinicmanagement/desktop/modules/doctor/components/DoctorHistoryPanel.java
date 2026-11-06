@@ -46,6 +46,7 @@ public class DoctorHistoryPanel extends JPanel {
 
         loadingLabel.setFont(AppFonts.BODY);
         loadingLabel.setForeground(new Color(100, 110, 120));
+        loadingLabel.getAccessibleContext().setAccessibleName(LOADING_MESSAGE);
         loadingProgress.setIndeterminate(true);
         loadingProgress.setPreferredSize(new Dimension(180, 16));
         loadingProgress.getAccessibleContext().setAccessibleName(LOADING_MESSAGE);
