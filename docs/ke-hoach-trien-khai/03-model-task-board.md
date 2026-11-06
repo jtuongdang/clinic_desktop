@@ -321,3 +321,14 @@ Following rate-limit exhaustion on the OpenAI infrastructure for the Codex agent
 - **Task `4ea576cc-500c-4656-bd23-fdd0dd29e462` Integrated:** Produced authoritative reception wiring and behavior map in [`desktop-main-reception-wiring-review.md`](desktop-main-reception-wiring-review.md) (Commit `1799773`).
 - **Authoritative Baseline:** Combined reactor unit tests pass 100% (**393 tests, 0 failures, 0 errors, 7 SQL Server opt-in skips**). `clinicDb` runtime isolation per contract `18847587` and security gates `SEC-01` / `PAT-02` remain strictly OPEN / default-deny.
 
+## REC-01 Patient Reception Wiring Completed & Handover to Codex — 07/11/2026
+
+Under the leadership of `leaderANTI`, the Patient Reception workflow (`REC-01`) was completed 100%, verified, and integrated into `feature/patient-reception-workflow`:
+
+1. **Slice 1 (`eb7cbc16`):** Re-introduced `ReceptionCompositionRoot` and `ReceptionPanelMessagePolicy`. Added session lifecycle listeners to `ReceptionPanel` to safely cancel background workers and clear sensitive forms on logout/lock. Verified 3 new headless synthetic test suites (`32fdef9`).
+2. **Slice 2 (`7637041e` by `copilot-cli`):** Wired `PatientRegistrationFormPanel` demographic and BHYT fields to `RegisterPatientCommand`, dynamic age calculation, and search triggers. Populated `ClinicRoomStatusPanel` Tab 0 queue and Tab 2 room occupancy tables with room selection highlight (`d4fbbca`).
+3. **Slice 3 (`e6a1d1e`):** End-to-end wiring in `ReceptionPanel`: F2 shortcut / `btnSave` dispatches `saveRegistration()` via `SwingWorker` with duplicate CCCD intercept; search triggers wire to `searchPatients()`.
+4. **Authoritative Quality Status:** Full reactor verification (`mvn -Djava.awt.headless=true test`): **417/417 tests pass 100%** (0 failures, 0 errors, 7 skips, 65 desktop tests). Shaded fat jar `clinic-desktop-1.0.0-SNAPSHOT.jar` (3.6 MB) built successfully.
+5. **Codex Handover:** Background execution stopped. Complete handover report recorded in [`LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md`](LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md) ready for Codex resumption.
+
+
