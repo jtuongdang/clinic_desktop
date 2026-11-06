@@ -1,7 +1,7 @@
 # Phase 1 — `TienSuBenh` row scope contract
 
 **Decision date:** 2026-11-06  
-**Status:** Owner-approved policy; implementation pending  
+**Status:** Owner-approved policy; V10 storage foundation accepted; read/write workflow pending
 **Related tasks:** `PAT-02`, `PAT-HISTORY-REVIEW-01`, `PAT-HISTORY-SCOPE-01`
 
 ## Approved policy
@@ -15,7 +15,7 @@
 
 ## Current source facts
 
-`TienSuBenh` currently has patient ID, category and narrative only. V1 table `TienSuBenh` has no facility/department columns or history repository. `Khoa` belongs to `CoSo` through `Khoa.maCoSo`; the stored pair must be validated as a real facility/department pair, not as two unrelated foreign keys. `PAT-HISTORY-UI-01` replaced a mock encounter-history table with an explicit unavailable state; it did not implement `TienSuBenh`.
+Before V10, `TienSuBenh` had patient ID, category and narrative only, with no history repository. `Khoa` belongs to `CoSo` through `Khoa.maCoSo`; the stored pair must be validated as a real facility/department pair, not as two unrelated foreign keys. `PAT-HISTORY-UI-01` replaced a mock encounter-history table with an explicit unavailable state; it did not implement a `TienSuBenh` read/write workflow.
 
 ## Implementation sequence
 
@@ -28,3 +28,8 @@
 ## Interim behavior
 
 Until each required step is implemented and accepted, all history reads and writes remain default-deny. The Doctor UI may show unavailable state; it must not synthesize history from the current encounter DTO.
+
+
+## Storage foundation evidence — 2026-11-06
+
+V10 is integrated on `feature/patient-reception-workflow`. SQL Server opt-in `FreshDatabaseMigrationSqlServerTest` passed 1/1 on disposable `clinic_test_v10_history_scope_final_20261106`: V1–V10 applied; a legacy row inserted before V10 retained null scope; new unscoped inserts were rejected; a mismatched department/facility pair was rejected; a matching pair was accepted. No legacy backfill was performed. Root JDK 17 `mvn -Djava.awt.headless=true clean verify` passed 283 tests, 0 failures/errors, 4 SQL Server opt-in skips (61 reports). These results accept storage only; no history query, repository, guard, audit or UI workflow is enabled, so read/write remain default-deny. Two earlier disposable DBs from failed assertion iterations were left untouched and were not dropped.
