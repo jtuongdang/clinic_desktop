@@ -26,7 +26,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -55,10 +54,8 @@ class NhanVienRepositorySqlServerTest {
     private static final String DATABASE_PROPERTY = "clinic.test.sqlserver.databaseName";
     private static final Pattern SAFE_DATABASE_NAME =
             Pattern.compile("(?:clinic_orchestrator_review_|clinic_test_)[A-Za-z0-9_]+");
-    private static final Pattern DATABASE_NAME_PARAMETER =
-            Pattern.compile("(?i)(databaseName\\s*=)[^;]*");
-    private static final Pattern URL_CREDENTIAL_PARAMETER =
-            Pattern.compile("(?i);\\s*(?:user|username|password)\\s*=[^;]*");
+    private static final Pattern URL_PARAMETER =
+            Pattern.compile(";\\s*([^=;{}\\s]+)\\s*=\\s*(\\{(?:[^}]|}})*\\}|[^;{}]*)\\s*(?=;|$)");
 
     private final List<Integer> generatedEmployeeIds = new ArrayList<>();
     private final List<Integer> generatedRoleIds = new ArrayList<>();
@@ -75,15 +72,31 @@ class NhanVienRepositorySqlServerTest {
                         + OPT_IN_PROPERTY + "=true");
 
         String databaseName = System.getProperty(DATABASE_PROPERTY);
+        assertSyntheticDatabaseName(databaseName);
+
+        configureSyntheticDatabase(databaseName);
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT DB_NAME()");
+             ResultSet rs = ps.executeQuery()) {
+            assertTrue(rs.next(), "SQL Server did not return its current database name");
+            assertDatabaseIdentity(databaseName, rs.getString(1));
+        }
+        assertTrue(runMigrationsWithoutLogging(), "Database migrations did not complete");
+    }
+
+    private static void assertSyntheticDatabaseName(String databaseName) {
         assertNotNull(databaseName, "An explicit synthetic SQL Server database name is required via -D"
                 + DATABASE_PROPERTY);
         assertFalse("clinicDb".equalsIgnoreCase(databaseName.trim()),
                 "Must never connect to default clinicDb");
         assertTrue(SAFE_DATABASE_NAME.matcher(databaseName).matches(),
                 "SQL Server target must use an approved synthetic database name starting with clinic_test_ or clinic_orchestrator_review_");
+    }
 
-        configureSyntheticDatabase(databaseName);
-        assertTrue(runMigrationsWithoutLogging(), "Database migrations did not complete");
+    static void assertDatabaseIdentity(String expectedDatabaseName, String actualDatabaseName) {
+        assertSyntheticDatabaseName(actualDatabaseName);
+        assertEquals(expectedDatabaseName, actualDatabaseName,
+                "Connected SQL Server catalog must exactly match -D" + DATABASE_PROPERTY);
     }
 
     @BeforeEach
@@ -442,20 +455,60 @@ class NhanVienRepositorySqlServerTest {
             }
         }
 
-        if (configuredUrl == null || !configuredUrl.toLowerCase(Locale.ROOT).startsWith("jdbc:sqlserver:")
+        if (configuredUrl == null || !configuredUrl.regionMatches(true, 0, "jdbc:sqlserver://", 0, 17)
                 || username == null || username.isBlank() || credentialValue == null || credentialValue.isBlank()) {
             throw new IllegalStateException("SQL Server credentials (db.properties or DB_URL/DB_USERNAME/DB_PASSWORD) "
                     + "are required for the opt-in test");
         }
 
-        String url = URL_CREDENTIAL_PARAMETER.matcher(configuredUrl).replaceAll("");
-        Matcher matcher = DATABASE_NAME_PARAMETER.matcher(url);
-        String targetUrl = matcher.find()
-                ? matcher.replaceAll("$1" + Matcher.quoteReplacement(databaseName))
-                : url + ";databaseName=" + databaseName;
+        String targetUrl = syntheticDatabaseUrl(configuredUrl, databaseName);
 
         DatabaseConnection.setConnectionString("");
         DatabaseConnection.configure(targetUrl, username, credentialValue);
+    }
+
+    static String syntheticDatabaseUrl(String configuredUrl, String databaseName) {
+        assertSyntheticDatabaseName(databaseName);
+        int parameterStart = configuredUrl.indexOf(';');
+        if (parameterStart < 0) {
+            throw new IllegalStateException("SQL Server URL must explicitly select the synthetic database");
+        }
+
+        StringBuilder targetUrl = new StringBuilder(configuredUrl.substring(0, parameterStart));
+        Matcher parameters = URL_PARAMETER.matcher(configuredUrl);
+        int databaseSelectors = 0;
+        int position = parameterStart;
+        while (position < configuredUrl.length()) {
+            if (position == configuredUrl.length() - 1 && configuredUrl.charAt(position) == ';') {
+                break;
+            }
+            parameters.region(position, configuredUrl.length());
+            if (!parameters.lookingAt()) {
+                throw new IllegalStateException("SQL Server URL has ambiguous or malformed properties");
+            }
+            String name = parameters.group(1);
+            String value = parameters.group(2).trim();
+            if (name.equalsIgnoreCase("databaseName") || name.equalsIgnoreCase("database")) {
+                databaseSelectors++;
+                if (value.startsWith("{")) {
+                    value = value.substring(1, value.length() - 1).replace("}}", "}");
+                }
+                if (databaseSelectors > 1 || !databaseName.equals(value)) {
+                    throw new IllegalStateException("SQL Server URL must contain exactly one database selector "
+                            + "matching -D" + DATABASE_PROPERTY);
+                }
+            }
+            // Parse braced values before removing credentials so embedded semicolons cannot create properties.
+            if (!name.equalsIgnoreCase("user") && !name.equalsIgnoreCase("username")
+                    && !name.equalsIgnoreCase("password")) {
+                targetUrl.append(parameters.group());
+            }
+            position = parameters.end();
+        }
+        if (databaseSelectors != 1) {
+            throw new IllegalStateException("SQL Server URL must explicitly select the synthetic database");
+        }
+        return targetUrl.toString();
     }
 
     private static boolean runMigrationsWithoutLogging() {
@@ -469,5 +522,51 @@ class NhanVienRepositorySqlServerTest {
             System.setOut(originalOut);
             System.setErr(originalErr);
         }
+    }
+}
+
+/** Runs without SQL Server opt-in; the actual catalog is verified by the fixture's DB_NAME() query. */
+class NhanVienSqlServerTargetGuardTest {
+
+    private static final String DATABASE_NAME = "clinic_test_employee_guard";
+    private static final String URL = "jdbc:sqlserver://synthetic-host:1433";
+
+    @Test
+    void acceptsOneMatchingSelector_preservesTls_andRemovesWholeBracedCredentials() {
+        String tls = ";encrypt=true;trustServerCertificate=false;hostNameInCertificate=synthetic-host";
+        assertEquals(URL + ";databaseName=" + DATABASE_NAME + tls,
+                NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + ";databaseName=" + DATABASE_NAME
+                        + ";user=synthetic;password={synthetic;database=clinicDb;escaped}}value}" + tls,
+                        DATABASE_NAME));
+        assertEquals(URL + "; DaTaBaSe ={" + DATABASE_NAME + "}" + tls,
+                NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(
+                        URL + "; DaTaBaSe ={" + DATABASE_NAME + "}" + tls, DATABASE_NAME));
+    }
+
+    @Test
+    void rejectsMissingConflictingDuplicateOrMalformedDatabaseSelectors() {
+        for (String properties : List.of("", ";encrypt=true", ";databaseName=clinicDb", ";database=clinicDb",
+                ";databaseName=clinic_test_other", ";databaseName=" + DATABASE_NAME + ";database=clinicDb",
+                ";database=clinicDb;databaseName=" + DATABASE_NAME,
+                ";databaseName=" + DATABASE_NAME + "; DATABASEname =" + DATABASE_NAME,
+                ";database=" + DATABASE_NAME + ";databaseName=" + DATABASE_NAME,
+                ";password={synthetic;databaseName=" + DATABASE_NAME + "}",
+                ";databaseName=" + DATABASE_NAME + ";password={unterminated")) {
+            assertThrows(IllegalStateException.class,
+                    () -> NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + properties, DATABASE_NAME));
+        }
+        assertThrows(AssertionError.class,
+                () -> NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + ";databaseName=clinicDb", "clinicDb"));
+    }
+
+    @Test
+    void requiresExactActualCatalogMatch_andTestOnlyPrefix() {
+        NhanVienRepositorySqlServerTest.assertDatabaseIdentity(DATABASE_NAME, DATABASE_NAME);
+        for (String actual : List.of("clinicDb", "master", "clinic_test_other", "CLINIC_TEST_EMPLOYEE_GUARD", "")) {
+            assertThrows(AssertionError.class,
+                    () -> NhanVienRepositorySqlServerTest.assertDatabaseIdentity(DATABASE_NAME, actual));
+        }
+        assertThrows(AssertionError.class,
+                () -> NhanVienRepositorySqlServerTest.assertDatabaseIdentity(DATABASE_NAME, null));
     }
 }
