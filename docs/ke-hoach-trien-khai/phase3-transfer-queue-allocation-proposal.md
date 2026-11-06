@@ -1,6 +1,57 @@
 # Phase 3 — Transfer queue allocation and queueDate persistence proposal
 
-**Status: NON-BINDING — Owner review required.** Snapshot: 2026-11-06. Scope: `VIS-TRANSFER-OPEN-DECISION-PROPOSALS-01`, updated under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-05` (carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04`). This document approves no implementation, DDL, permission, audit-policy change or runtime enablement. SEC-01 remains OPEN and transfer remains default-deny. Only allowlisted proposal Markdown files are changed.
+**Status: OWNER-APPROVED DESIGN BASIS (P1 + M3) — DDL / MIGRATION UNAUTHORIZED.** Snapshot: 2026-11-06. Scope: `VIS-TRANSFER-OPEN-DECISION-PROPOSALS-01`, updated under approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-06` (contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`), carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04` and `VIS-TRANSFER-OWNER-DECISION-RECON-05` unchanged. P1 and M3 are approved as architecture design basis only; physical DDL, schema, migration scripts, runtime enablement, and permission grants remain strictly unauthorized. SEC-01 remains OPEN and transfer remains default-deny. Only allowlisted proposal Markdown files are changed.
+
+## RECON-06 supplement — 2026-11-06 (current approved contract: P1 + M3 design basis)
+
+**Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-06` (contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`), received 2026-11-06, following RAG-grounded proposal review. This decision supplement controls as the latest authority, carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04` and `VIS-TRANSFER-OWNER-DECISION-RECON-05` unchanged. It records only the choices explicitly approved below. It does not authorize DDL, SQL migrations, runtime transfer, permission grants, queue reads, push, PR, or merge. SEC-01 remains OPEN and transfer remains default-deny.
+
+### 1. Approved queue persistence design basis: P1 + M3
+
+Owner has formally approved **P1** and **M3** as the architecture design basis for queue persistence and allocation:
+
+1. **P1 approved as persistence design basis:** Current `queueDate DATE NULL` and a pointer to the current allocation (`maCapSoHienTai BIGINT NULL`) are stored directly on `LuotKham`, paired with an authoritative, immutable allocation ledger (`QueueAllocation`).
+   - The current visit queue fields (`maPhongKham`, `queueDate`, `soThuTu`, `soThuTuDisplay`, `maCapSoHienTai`) are a synchronized projection of the authoritative `QueueAllocation` ledger. Both must be updated atomically within the same database transaction, protected by foreign keys and transactional checks ensuring the allocation belongs to the visit.
+   - P1 enables direct, performant room queue indexing `(queueDate, maPhongKham, trangThai)` for frequent desktop UI reads ([`ReceptionQueueRepositoryImpl.getQueueList`][reads] and [`GetDoctorQueueHandler`][doctor]) without requiring mandatory multi-table joins on every refresh.
+2. **M3 approved as allocator design basis:** A transactional per-room/day high-water counter (`QueueDayCounter` keyed by `(maPhongKham, queueDate)`) paired with the immutable `QueueAllocation` ledger.
+   - Allocation coordinates via `QueueDayCounter` using `UPDLOCK, HOLDLOCK`, serializing allocations per room/day stream.
+   - Allocations insert an immutable record into `QueueAllocation` with an engine-enforced unique constraint `UNIQUE (maPhongKham, queueDate, soThuTu)` across all issued allocations.
+3. **Settled RECON-05 policies implemented without modification:**
+   - **Shared room/day sequence:** Registration and transfer share exactly one number sequence per `(roomId, queueDate)`. No partitioning by priority, status, or role.
+   - **No reuse of committed numbers & visible gaps allowed:** Committed sequence numbers are **never reused** within a room/day, even if a visit is subsequently transferred out, cancelled, completed, or soft-deleted. A visit returning A → B → A consumes a fresh allocation in A. Visible gaps in the queue sequence are explicitly permitted. Numbers in confirmed rolled-back transactions were never committed and may be allocated by subsequent attempts; no uncommitted number may be exposed via receipt, printing, or event.
+   - **Single DB UTC clock authority:** Exactly one SQL Server DB UTC instant captured on the transaction connection at transaction start (before acquiring destination queue locks) determines the `Asia/Ho_Chi_Minh` queue date throughout the attempt, even if lock wait crosses clinic-local midnight.
+   - **Atomic mutation, allocation, history, and audit:** Transfer visit projection update, destination queue allocation, immutable transfer history (`LichSuDieuChuyenLuotKham`), and security audit (`NhatKyHeThong`, action `VISIT_TRANSFERRED`) must commit atomically or roll back atomically in the same database transaction.
+4. **Preserved high-water cutover safeguard (fail closed on unknown history):**
+   - Migration design must establish the committed high-water mark from all trustworthy persisted allocation evidence, including soft-deleted rows/assignments and any retained historical assignment record.
+   - If hard deletion, purging, overwritten assignments, or missing historical commits make the high-water unprovable, **cutover and both issuers must stop for the affected room/day** until a verifiable reconciliation source or a separately approved safe boundary exists. Legacy unknowns fail closed; do not infer, estimate, or fabricate history.
+
+### 2. Explicit distinction: architecture design basis vs. still-open implementation decisions
+
+This approval establishes **only an architecture design direction** for further design. It does **NOT** authorize DDL, migrations, or runtime execution. The following technical implementation areas remain **explicitly OPEN and unapproved**:
+
+- **Physical DDL and schema:** Column data types, nullability, table definitions, naming, and foreign key definitions.
+- **Indexes and constraints:** Exact index compositions, filtered index predicates, and unique constraint definitions.
+- **Counter initialization and locking:** Precise locking hints, deadlock retry policies, transaction isolation configurations, and lock timeout parameters.
+- **High-water reconciliation procedure:** Detailed SQL scripts or data verification tooling for cutover auditing.
+- **Migration version and scripts:** Migration version number (e.g. `V12`), runner registration in `DatabaseMigrationRunner`, and script contents.
+- **Cutover window and writer coordination:** Operational execution plan, write barrier timing, and simultaneous deployment of registration and transfer adapters.
+- **Rollback and error recovery:** Precise transaction rollback handling and client error contracts.
+- **Legacy-row semantics:** Handling of pre-cutover visits with `NULL` queue dates upon first transfer.
+
+### 3. Status of architecture alternatives
+
+Earlier architecture alternatives are formally categorized as follows (preserving historical analysis snapshots):
+
+| Category | Option | Status under RECON-06 | Description / Decision |
+|---|---|---|---|
+| **Persistence Shape** | **P1** (Inline visit `queueDate` + allocation pointer) | **OWNER-APPROVED (Design Basis Only)** | Current `queueDate` and `maCapSoHienTai` stored inline on `LuotKham` alongside current room/number as a synchronized projection of immutable `QueueAllocation`. Physical DDL/migration remains unapproved. |
+| Persistence Shape | **P2** (One current queue-assignment side table) | **NOT SELECTED (Historical Alternative)** | Preserved as historical analysis. Clean separation of concerns, but requires additional join on all queue reads and adds sync overhead. |
+| Persistence Shape | **P3** (Retained allocations with pointer only) | **NOT SELECTED (Historical Alternative)** | Preserved as historical analysis. Avoids duplicate date storage, but requires join on every queue query, degrading read performance. |
+| Persistence Shape | **P4** (Deriving date from history/audit) | **REJECTED (Historical Alternative)** | Fragile, unindexable, requires scanning history for current state; rejected for desktop UI. |
+| **Allocator Mechanism** | **M1** (Current MAX over `LuotKham`) | **REJECTED (Violates Policy)** | Rejected by RECON-05/RECON-06. Moving or deleting visits lowers the maximum and reuses numbers, violating no-reuse invariant. |
+| Allocator Mechanism | **M2** (MAX over `QueueAllocation` ledger) | **NOT SELECTED (Historical Alternative)** | Preserved as historical analysis. Feasible no-reuse design, but range locking on ledger index under high concurrency creates lock contention/escalation risk. |
+| **Allocator Mechanism** | **M3** (Transactional counter + immutable ledger) | **OWNER-APPROVED (Design Basis Only)** | Coordination table `QueueDayCounter` PK `(roomId, queueDate)` with `UPDLOCK, HOLDLOCK` atomic increment + immutable `QueueAllocation` ledger. Physical DDL/migration remains unapproved. |
+| Allocator Mechanism | **M4** (SQL Server native SEQUENCE) | **NOT SELECTED (Historical Alternative)** | Preserved as historical analysis. Sequences cannot be dynamically keyed by `(roomId, queueDate)` without dynamic DDL per room/day; rollbacks discard numbers unpredictably. |
 
 ## Corrective review — 2026-11-06: legacy high-water mark cutover
 
@@ -10,7 +61,7 @@ A maximum over retained rows proves only the largest **observed** assignment unl
 
 Reconciliation from a verifiable retained source, a justified upper boundary, or deferral to a demonstrably unused future room/day are alternatives for Owner review, not approvals. A boundary must identify the room/day, evidence and rationale proving future allocations exceed all prior committed numbers; arbitrary headroom, resetting to zero or accepting an unknown maximum does not meet RECON-05. Missing history remains unknown even after a boundary is approved. DDL, operational cutover and runtime enablement remain unauthorized.
 
-## RECON-05 addendum — 2026-11-06 (current approved contract)
+## RECON-05 addendum — 2026-11-06 (carried forward by RECON-06)
 
 **Authority:** Owner-confirmed `VIS-TRANSFER-OWNER-DECISION-RECON-05`, received 2026-11-06, following RAG-grounded proposals. This addendum controls over historical snapshots and prior proposals below, carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04` without reopening its approved rules.
 
@@ -28,19 +79,21 @@ The following decisions are approved and binding; they must not be treated as op
 
 ### 2. Concrete recommended persistence, allocator, transaction, and cutover design
 
-The following recommendations provide a concrete technical architecture for a future authorized implementation, distinguishing recommendations from settled policies:
+The following sections document the concrete technical architecture implementing the Owner-approved P1+M3 design basis and distinguish approved design directions from still-open implementation decisions:
 
-#### 2.1. Recommended persistence shape: P1 (Inline visit `queueDate` + retained allocation ledger link)
-- **Recommendation:** Store current `queueDate DATE NULL` directly on `LuotKham` alongside current `maPhongKham`, `soThuTu`, and `soThuTuDisplay`, accompanied by `maCapSoHienTai BIGINT NULL` referencing an immutable `QueueAllocation` record.
+#### 2.1. Owner-approved persistence design basis: P1 (Inline visit `queueDate` + retained allocation ledger link)
+- **Approval status:** Owner-approved architecture design basis under RECON-06 (`VIS-TRANSFER-OWNER-DECISION-RECON-06`). Physical DDL, schema column data types, constraints, indexes, and migrations remain unapproved and strictly open.
+- **Design:** Store current `queueDate DATE NULL` directly on `LuotKham` alongside current `maPhongKham`, `soThuTu`, and `soThuTuDisplay`, accompanied by `maCapSoHienTai BIGINT NULL` referencing an immutable `QueueAllocation` record.
 - **Rationale:** Desktop queue readers ([`ReceptionQueueRepositoryImpl.getQueueList`][reads] and [`GetDoctorQueueHandler`][doctor]) query active room queues with high frequency. Storing `queueDate` inline allows immediate indexing on `(queueDate, maPhongKham, trangThai)` without introducing mandatory multi-table joins on every queue refresh.
 - **Integrity safeguard:** The current visit fields (`maPhongKham`, `queueDate`, `soThuTu`, `soThuTuDisplay`) are a synchronized projection of the authoritative `QueueAllocation` ledger. Both must be updated atomically in the same transaction, protected by database foreign key and transactional checks ensuring the allocation belongs to the visit.
 - **Alternatives analyzed:**
-  * *P2 (One current queue-assignment side table):* Cleanly isolates queue fields from clinical `LuotKham`, but requires an additional join on all desktop queue screens and complicates existing queries.
-  * *P3 (Retained allocations with pointer only):* Stores `queueDate` exclusively in `QueueAllocation` with only an FK on `LuotKham`. Avoids duplicate date storage, but makes every queue reader join `QueueAllocation`, impacting query performance.
-  * *P4 (Deriving date from history/audit):* Fragile, unindexable, requires scanning history for current state; rejected as unsuitable for high-frequency desktop UI.
+  * *P2 (One current queue-assignment side table — NOT SELECTED / Historical alternative):* Cleanly isolates queue fields from clinical `LuotKham`, but requires an additional join on all desktop queue screens and complicates existing queries. Preserved as a historical analysis snapshot.
+  * *P3 (Retained allocations with pointer only — NOT SELECTED / Historical alternative):* Stores `queueDate` exclusively in `QueueAllocation` with only an FK on `LuotKham`. Avoids duplicate date storage, but makes every queue reader join `QueueAllocation`, impacting query performance. Preserved as a historical analysis snapshot.
+  * *P4 (Deriving date from history/audit — REJECTED / Historical alternative):* Fragile, unindexable, requires scanning history for current state; rejected as unsuitable for high-frequency desktop UI. Preserved as a historical analysis snapshot.
 
-#### 2.2. Recommended allocator mechanism: M3 (Transactional room/day counter + immutable allocation ledger)
-- **Recommendation:** Deploy a mutable coordination table `QueueDayCounter` paired with an immutable ledger table `QueueAllocation`.
+#### 2.2. Owner-approved allocator mechanism: M3 (Transactional room/day counter + immutable allocation ledger)
+- **Approval status:** Owner-approved architecture design basis under RECON-06 (`VIS-TRANSFER-OWNER-DECISION-RECON-06`). Physical DDL, locking configuration, counter initialization SQL, and migrations remain unapproved and strictly open.
+- **Design:** Deploy a mutable coordination table `QueueDayCounter` paired with an immutable ledger table `QueueAllocation`.
   * `QueueDayCounter`: PK `(maPhongKham INT, queueDate DATE)`, `lastNumber INT NOT NULL`, `version BIGINT NOT NULL`, `updatedAt DATETIME2 NOT NULL`. Tracks the durable high-water mark for each room/day stream.
   * `QueueAllocation`: PK `id BIGINT IDENTITY`, `maLuotKham INT NOT NULL`, `maPhongKham INT NOT NULL`, `queueDate DATE NOT NULL`, `soThuTu INT NOT NULL`, `soThuTuDisplay VARCHAR(10) NOT NULL`, `loaiPhanBo VARCHAR(20) NOT NULL` (`TIEP_NHAN` or `DIEU_CHUYEN`), `maThaoTac NVARCHAR(100) NOT NULL`, `thoiGianCapUTC DATETIME2 NOT NULL`.
   * Unique constraint: `UNIQUE (maPhongKham, queueDate, soThuTu)` across all issued allocations, ensuring collision prevention at the engine level.
@@ -51,9 +104,9 @@ The following recommendations provide a concrete technical architecture for a fu
   4. Format display string (minimum 2 digits, e.g. `%02d`, preserving larger numbers like `100` without truncation).
   5. Insert the immutable row into `QueueAllocation`.
 - **Alternatives analyzed:**
-  * *M1 (Current MAX over LuotKham):* Rejected by RECON-05. Moving or deleting visits lowers the maximum and reuses numbers.
-  * *M2 (MAX over QueueAllocation ledger):* Feasible, but scanning/locking the ledger index under high concurrency creates range locks and potential lock escalation.
-  * *M4 (SQL Server native SEQUENCE):* SQL Server sequences cannot be dynamically keyed by `(roomId, queueDate)` without dynamic DDL per room/day or cyclical resets; sequence rollbacks discard numbers unpredictably.
+  * *M1 (Current MAX over LuotKham — REJECTED):* Rejected by RECON-05/RECON-06. Moving or deleting visits lowers the maximum and reuses numbers, violating the binding no-reuse invariant.
+  * *M2 (MAX over QueueAllocation ledger — NOT SELECTED / Historical alternative):* Feasible, but scanning/locking the ledger index under high concurrency creates range locks and potential lock escalation. Preserved as a historical analysis snapshot.
+  * *M4 (SQL Server native SEQUENCE — NOT SELECTED / Historical alternative):* SQL Server sequences cannot be dynamically keyed by `(roomId, queueDate)` without dynamic DDL per room/day or cyclical resets; sequence rollbacks discard numbers unpredictably. Preserved as a historical analysis snapshot.
 
 #### 2.3. Concurrency, locking, and atomic execution order
 To prevent deadlocks (especially during concurrent bidirectional transfers A → B and B → A, or concurrent registration and transfer targeting the same room), operations must follow a strict, deterministic resource locking hierarchy:
@@ -115,14 +168,17 @@ The following validation matrix specifies test scenarios using synthetic data on
 
 ### 5. Remaining open implementation choices
 
-The following choices remain explicitly open for Owner decision; no implementation or schema is authorized:
-1. **QA-01 (Persistence shape for queueDate):** Formal approval of P1 (inline visit `queueDate` + allocation pointer) vs P3 (pointer only) vs P2 (side table).
-2. **QA-03 (Allocator implementation):** Formal approval of M3 (table counter + ledger) vs M2 (ledger MAX).
-3. **QA-07 (Lock ordering & timeout policy):** Detailed configuration of lock timeouts, deadlock retry limits, and isolation parameters in infrastructure.
-4. **QA-08 (Cutover baseline & legacy reconciliation):** Acceptance of the preflight legacy verification baseline and coordinated cutover window.
-5. **Transfer note policy:** Maximum character length, normalization regex, and privacy redaction for the optional short note.
-6. **Idempotency details:** Request key expiration/cleanup retention period, canonical fingerprinting algorithm, and concurrent duplicate wait timeout.
-7. **Linked-work readers & workflow acceptance:** Implementation of readers to verify pending orders/results safety before transfer can be permitted in runtime.
+While Owner confirmed P1 and M3 as the architecture design basis under `VIS-TRANSFER-OWNER-DECISION-RECON-06`, this does **not** authorize schema creation or migration. The following implementation choices remain explicitly open; no DDL or runtime enablement is authorized:
+
+1. **Physical DDL and schema definition:** Exact SQL Server data types, column names, nullability constraints, and table schemas for `QueueDayCounter`, `QueueAllocation`, and `LuotKham` queue fields.
+2. **Indexes and database constraints:** Specific index definitions (e.g. `(queueDate, maPhongKham, trangThai)`), foreign key constraints between `LuotKham.maCapSoHienTai` and `QueueAllocation`, and unique index declarations.
+3. **QA-07 (Lock ordering, concurrency & timeout policy):** Detailed configuration of lock timeouts, deadlock retry limits, transaction isolation parameters, and locking hints in infrastructure adapters.
+4. **QA-08 (Cutover baseline & legacy high-water reconciliation):** Acceptance of the preflight legacy verification baseline, reconciliation scripts for historical room/day records, fail-closed handling when committed numbers cannot be proven, and the coordinated cutover window.
+5. **Migration version, scripts & writer coordination:** Forward migration versioning (e.g. `V12`), integration with `DatabaseMigrationRunner`, writer barrier timing, and synchronized cutover for registration and transfer adapters.
+6. **Rollback & legacy semantics:** Indeterminate commit handling, client error contracts, and legacy visits (`queueDate = NULL`) upon their first transfer.
+7. **Transfer note operational limits:** Pinning Unicode version/category behavior, field placement/retention, and Application boundary validation under approved policy N2.
+8. **Idempotency storage & operational parameters:** Exact key format/entropy, numeric key retention/reconciliation window, canonical fingerprinting algorithm, duplicate wait timeout deadline, and commit-resolution mechanism after process loss.
+9. **Linked-work readers & workflow acceptance:** Implementation of readers to verify pending orders/results safety before transfer can be permitted in runtime.
 
 **Gate status: SEC-01 remains OPEN; runtime transfer remains default-deny.** No permissions, grants, destination reads, or migrations are authorized.
 
@@ -163,14 +219,14 @@ The [prior queue/history persistence proposal §§3–8][prior] recommends count
 
 All options below require separate implementation authorization. Names describe responsibilities, not approved DDL. A queue allocation ledger is about issued tickets; it need not decide whether dedicated immutable **transfer history**, audit-only transfer history, or both is selected.
 
-| Option | Shape and benefits | Consequences / integrity and access costs |
-|---|---|---|
-| P1 — Current date inline on visit | Add `queueDate DATE` beside current room/number/display; initial registration uses its registration business date, transfer replaces only queue assignment/date. Simple date filtering and indexing; clinical date remains intact. | Alone, this overwrites previous assignments and cannot reserve departed numbers. Needs a durable allocator/reservation store for a no-reuse policy, plus a link to the current allocation if that store is chosen. Date, room, number and display must change atomically. |
-| P2 — One current queue-assignment side table | Unique visit reference holds current room, `queueDate`, number/display. Separates clinical and queue concerns and can avoid adding date to clinical rows. | Reader joins and legacy mapping; current visit location/number fields would be projections requiring atomic synchronization or a separately approved removal. Replacing the side row still loses issued-number history unless reservations are retained. Missing/duplicate assignment must be an explicit error, not an empty queue. |
-| P3 — Retained allocations with current pointer | Immutable allocation rows contain room/date/number; visit points to exactly one current allocation. `queueDate` is read through that pointer; past allocations retain reservations. | Clear current-versus-past identity, but adds joins, pointer ownership constraints and projection consistency with existing visit fields. Never find current assignment by `MAX(time)`; ties, retries and later moves make that ambiguous. |
-| P4 — Derive date from transfer timestamp or audit on every read | A structured durable transfer record could supply the latest effective instant/date without an inline date. | Requires authoritative current-operation identity, initial-registration fallback and indexing; timezone interpretation becomes part of every reader. Existing audit DTO/writer lacks necessary facts. Not deployable using current audit unchanged; fragile as the primary queue read model. |
+| Option | Shape and benefits | Consequences / integrity and access costs | Status under RECON-06 |
+|---|---|---|---|
+| P1 — Current date inline on visit | Add `queueDate DATE` beside current room/number/display; initial registration uses its registration business date, transfer replaces only queue assignment/date. Simple date filtering and indexing; clinical date remains intact. | Alone, this overwrites previous assignments and cannot reserve departed numbers. Needs a durable allocator/reservation store for a no-reuse policy, plus a link to the current allocation if that store is chosen. Date, room, number and display must change atomically. | **OWNER-APPROVED (Design Basis Only)** — Architecture preference under RECON-06. Physical schema/DDL and migrations remain unapproved. |
+| P2 — One current queue-assignment side table | Unique visit reference holds current room, `queueDate`, number/display. Separates clinical and queue concerns and can avoid adding date to clinical rows. | Reader joins and legacy mapping; current visit location/number fields would be projections requiring atomic synchronization or a separately approved removal. Replacing the side row still loses issued-number history unless reservations are retained. Missing/duplicate assignment must be an explicit error, not an empty queue. | **NOT SELECTED (Historical Alternative)** — Preserved snapshot; rejected due to reader join overhead on all desktop queue screens. |
+| P3 — Retained allocations with current pointer | Immutable allocation rows contain room/date/number; visit points to exactly one current allocation. `queueDate` is read through that pointer; past allocations retain reservations. | Clear current-versus-past identity, but adds joins, pointer ownership constraints and projection consistency with existing visit fields. Never find current assignment by `MAX(time)`; ties, retries and later moves make that ambiguous. | **NOT SELECTED (Historical Alternative)** — Preserved snapshot; rejected due to mandatory joins impacting queue query performance. |
+| P4 — Derive date from transfer timestamp or audit on every read | A structured durable transfer record could supply the latest effective instant/date without an inline date. | Requires authoritative current-operation identity, initial-registration fallback and indexing; timezone interpretation becomes part of every reader. Existing audit DTO/writer lacks necessary facts. Not deployable using current audit unchanged; fragile as the primary queue read model. | **REJECTED (Historical Alternative)** — Preserved snapshot; rejected as unsuitable and fragile for desktop UI. |
 
-**Proposal — recommend P1 plus retained allocation identity and shared counter/ledger.** Store current `queueDate` directly on `LuotKham` for reads; store an allocation reference linking that visit to the exact retained room/date/number assignment. An equivalent constrained relationship may be chosen during later schema review. The ledger tuple is authoritative issuance evidence; the current visit tuple is a projection updated in the same transaction, with reviewed database enforcement that the allocation belongs to that visit and matches room/date/number/display. A bare FK to an unrelated allocation ID is insufficient. This deliberately duplicates current data for read simplicity and adds synchronization cost; P3 is the feasible alternative if Owner prefers one canonical date storage location and accepts mandatory joins.
+**Owner approval status — P1 approved as design basis under RECON-06.** Store current `queueDate` directly on `LuotKham` for reads; store an allocation reference linking that visit to the exact retained room/date/number assignment. An equivalent constrained relationship may be chosen during later schema review. The ledger tuple is authoritative issuance evidence; the current visit tuple is a projection updated in the same transaction, with reviewed database enforcement that the allocation belongs to that visit and matches room/date/number/display. A bare FK to an unrelated allocation ID is insufficient. This deliberately duplicates current data for read simplicity and adds synchronization cost; alternatives (P2, P3, P4) are not selected and remain historical snapshots. Physical DDL/migration is not authorized by this design basis approval.
 
 Provisional records for the recommended bundle:
 
@@ -191,12 +247,12 @@ Queue, doctor-queue and room-count reads would use **current `queueDate`** with 
 | N3 — Facility/day or global/day | Simpler broad uniqueness, substantially larger contention domain, less room-local numbering; no additional read permissions should accompany it. | Feasible but weak fit to existing room allocator; broad identity is not authority to read broader queues. |
 | N4 — Partition additionally by priority/status/issuer | Smaller streams but duplicate visible numbers inside one room/day and unstable identity on status/priority change; separate registration/transfer streams can collide. | Do not recommend. Priority affects ordering only; preserve its existing value and one shared room/day stream. |
 
-| Mechanism option | Consequences and evidence limits |
-|---|---|
-| M1 — Continue MAX over current visits | Smallest apparent change, but moving/deleting rows releases apparent capacity. Even adding a current-row unique index cannot preserve numbers after rows leave. Does not support the recommended committed no-reuse policy. |
-| M2 — MAX over retained allocation ledger | Feasible no-reuse design if all issuers retain rows and serialize the indexed room/day range within the transaction, including empty ranges; unique key is a final collision defense. Increasing ledger volume and lock plans need measurement. |
-| M3 — Transactional room/day counter plus ledger | **Recommend.** Counter avoids repeatedly scanning issued allocations; ledger provides ownership/reservation evidence and unique tuple. Counter increment, ledger insert and visit mutation must commit or roll back together. Costs an extra coordination row and a ledger write. |
-| M4 — Dedicated database sequence/reserved blocks | Candidate only if Owner accepts a separately specified gap/reservation lifecycle, room/day reset strategy and operational management. No native sequence exists in inspected source. Engine rollback/cache behavior and exhaustion must be verified in the later implementation; do not assume transaction rollback restores issued values. |
+| Mechanism option | Consequences and evidence limits | Status under RECON-06 |
+|---|---|---|
+| M1 — Continue MAX over current visits | Smallest apparent change, but moving/deleting rows releases apparent capacity. Even adding a current-row unique index cannot preserve numbers after rows leave. Does not support the recommended committed no-reuse policy. | **REJECTED (Violates Policy)** — Accidental reuse violates RECON-05/RECON-06 committed no-reuse invariant. |
+| M2 — MAX over retained allocation ledger | Feasible no-reuse design if all issuers retain rows and serialize the indexed room/day range within the transaction, including empty ranges; unique key is a final collision defense. Increasing ledger volume and lock plans need measurement. | **NOT SELECTED (Historical Alternative)** — Preserved snapshot; range locking under high concurrency poses lock escalation risk compared to M3 counter. |
+| M3 — Transactional room/day counter plus ledger | **Approved design basis.** Counter avoids repeatedly scanning issued allocations; ledger provides ownership/reservation evidence and unique tuple. Counter increment, ledger insert and visit mutation must commit or roll back together. Costs an extra coordination row and a ledger write. | **OWNER-APPROVED (Design Basis Only)** — Architecture preference under RECON-06. Physical schema/DDL, index definitions, and migrations remain unapproved. |
+| M4 — Dedicated database sequence/reserved blocks | Candidate only if Owner accepts a separately specified gap/reservation lifecycle, room/day reset strategy and operational management. No native sequence exists in inspected source. Engine rollback/cache behavior and exhaustion must be verified in the later implementation; do not assume transaction rollback restores issued values. | **NOT SELECTED (Historical Alternative)** — Preserved snapshot; lacks native room/day dynamic keying and sequence rollbacks discard numbers unpredictably. |
 
 For M3, propose a unique counter key, protected lookup/creation for a missing room/day (the existing `UPDLOCK,HOLDLOCK` pattern is a starting point), and atomic increment returning the allocated value. A unique-insert conflict, deadlock or lock timeout aborts the whole attempt; do not continue a partly failed transaction. SQL Server plans, absent-key range protection and lock escalation require isolated synthetic integration evidence. Java synchronization would not coordinate multiple desktop processes. Unique ledger enforcement does not protect direct visit writers that bypass the ledger; every issuer must use the protocol and current-assignment linkage must be enforced in the later schema review.
 
@@ -281,22 +337,22 @@ Future tests use synthetic fixtures only and remain **not run / not passing evid
 | Target deactivation/reparenting, linked-work change, missing readers | Guard remains valid until commit or whole attempt denied; no linked/billing mutation. |
 | Unknown commit, exhausted `INT`, duplicate baseline, mixed writer versions | Safe failure/reconciliation without speculative reuse, wrapping or silent repair. |
 
-## 9. Status of allocation choices: RECON-05 approvals and remaining open decisions
+## 9. Status of allocation choices: RECON-06 approvals and remaining open decisions
 
-The approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-05` confirmed key allocation policies (QA-02, QA-04, QA-05), while preserving the remaining items as open implementation proposals. The table below delineates approved facts from still-open choices:
+The approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-06` (contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`) confirmed P1 and M3 as the architecture design basis, building upon RECON-04 and RECON-05 policies (QA-02, QA-04, QA-05), while explicitly preserving schema, DDL, locking, and cutover details as open implementation choices:
 
-| ID | Topic & decision | Status under RECON-05 | Approved policy / Proposed recommendation |
+| ID | Topic & decision | Status under RECON-06 | Approved policy / Open scope |
 |---|---|---|---|
-| QA-01 | Where is current `queueDate` persisted: P1 inline visit, P2 side table, P3 allocation pointer only, or P4 structured-history derivation? | **OPEN (Proposal)** | **Recommend P1:** Inline `queueDate DATE NULL` on `LuotKham` with index `(queueDate, maPhongKham, trangThai)` plus `maCapSoHienTai` referencing `QueueAllocation`. Ensures fast queue queries without multi-table joins. |
-| QA-02 | Which sequence namespace: N1 room/day, N2 department/day, N3 broader/day? Shared across registration and transfer? | **APPROVED (RECON-05)** | **N1 room/day:** Exactly one number stream per `(roomId, queueDate)` shared by registration and transfer. Hierarchy is validated metadata, not a counter reset key. |
-| QA-03 | Which coordination/reservation mechanism: M2 retained-ledger MAX, M3 counter+ledger, or M4 sequence? | **OPEN (Proposal)** | **Recommend M3:** Mutable `QueueDayCounter` PK `(roomId, queueDate)` with `UPDLOCK, HOLDLOCK` atomic increment + immutable `QueueAllocation` ledger with unique `(roomId, queueDate, soThuTu)`. |
-| QA-04 | May any **committed** allocation be reused after move/cancellation/completion/deletion? Are gaps acceptable? | **APPROVED (RECON-05)** | **R2 no-reuse; gaps allowed:** Committed numbers are never reused within the same room/day; visible gaps are permitted. Confirmed-aborted unissued numbers may be allocated later. |
-| QA-05 | Which clock authority and capture point define `queueDate`? | **APPROVED (RECON-05)** | **DB UTC instant at transaction start:** Exactly one SQL Server DB UTC instant sampled at transaction start and converted to `Asia/Ho_Chi_Minh` calendar date for `queueDate`. Bound for the entire transaction even if crossing midnight. |
+| QA-01 | Where is current `queueDate` persisted: P1 inline visit, P2 side table, P3 allocation pointer only, or P4 structured-history derivation? | **APPROVED AS DESIGN BASIS (P1)** | **P1 approved as design basis:** Inline `queueDate DATE NULL` on `LuotKham` + `maCapSoHienTai` referencing immutable `QueueAllocation` ledger. Physical DDL, schema, data types, indexes, and constraints remain strictly OPEN. |
+| QA-02 | Which sequence namespace: N1 room/day, N2 department/day, N3 broader/day? Shared across registration and transfer? | **APPROVED (RECON-05/RECON-06)** | **N1 room/day:** Exactly one number stream per `(roomId, queueDate)` shared by registration and transfer. Hierarchy is validated metadata, not a counter reset key. |
+| QA-03 | Which coordination/reservation mechanism: M2 retained-ledger MAX, M3 counter+ledger, or M4 sequence? | **APPROVED AS DESIGN BASIS (M3)** | **M3 approved as design basis:** Mutable `QueueDayCounter` PK `(roomId, queueDate)` + immutable `QueueAllocation` ledger with unique `(roomId, queueDate, soThuTu)`. Counter locking hints, initialization preflight, and migration scripts remain strictly OPEN. |
+| QA-04 | May any **committed** allocation be reused after move/cancellation/completion/deletion? Are gaps acceptable? | **APPROVED (RECON-05/RECON-06)** | **R2 no-reuse; gaps allowed:** Committed numbers are never reused within the same room/day; visible gaps are permitted. Confirmed-aborted unissued numbers may be allocated later. |
+| QA-05 | Which clock authority and capture point define `queueDate`? | **APPROVED (RECON-05/RECON-06)** | **DB UTC instant at transaction start:** Exactly one SQL Server DB UTC instant sampled at transaction start and converted to `Asia/Ho_Chi_Minh` calendar date for `queueDate`. Bound for the entire transaction even if crossing midnight. |
 | QA-06 | After confirmed rollback, does a fresh attempt sample a new date or retain the original attempt date? | **OPEN (Proposal)** | **Recommend fresh sample:** Fresh DB UTC sample after full revalidation. Committed allocations never change date upon replay/recovery. |
 | QA-07 | Which consistency strategy protects hierarchy/linked-work until commit? | **OPEN (Proposal)** | **Recommend CAS + targeted locking:** One connection/transaction, original-version CAS on `LuotKham`, targeted protection for target hierarchy, and deterministic resource order. |
-| QA-08 | For legacy allocations with incomplete history, accept explicit baseline or require reconciliation? Coordinated cutover? | **OPEN (Proposal)** | **Recommend coordinated cutover:** Preflight legacy verification baseline; coordinated cutover migrating all registration and transfer writers together. No invented history. |
+| QA-08 | For legacy allocations with incomplete history, accept explicit baseline or require reconciliation? Coordinated cutover? | **OPEN (Proposal)** | **Recommend coordinated cutover:** Preflight legacy verification baseline; coordinated cutover migrating all registration and transfer writers together. If committed numbers cannot be proven, fail closed. No invented history. |
 
-Reason-code taxonomy is approved as a 6-code role-partitioned business taxonomy; optional note length/normalization remains open. Dedicated immutable transfer history plus same-transaction security audit is approved under RECON-05; audit-only is closed. Replay outcomes are approved (stored receipt on same key+payload; conflict on same key+different payload; timeout requires determining commit vs rollback); detailed key scope/lifetime remains open. SEC-01 remains OPEN and runtime transfer remains default-deny.
+Reason-code taxonomy is approved as a 6-code role-partitioned business taxonomy; optional note policy N2 is approved as design direction, while exact Unicode limits, field placement, and retention remain open. Dedicated immutable transfer history plus same-transaction security audit is approved under RECON-05; audit-only is closed. Idempotency direction is approved under RECON-06 (high-entropy key, canonical command, stored receipt on same key+payload, conflict on same key+different payload); detailed key format, wait deadlines, and operational recovery remain open. SEC-01 remains OPEN and runtime transfer remains default-deny.
 
 ## 10. Guidance, retrieval and validation record
 
@@ -306,28 +362,29 @@ Read before editing:
 3. Architecture and domain specifications: `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `UI_CODING_STANDARDS.md`.
 4. Runbook and plans: `docs/OPERATIONS_RUNBOOK.md`, `docs/ke-hoach-trien-khai/README.md`.
 5. Retrieved phase reviews: `docs/ke-hoach-trien-khai/phase3-visit-transfer-contract-review.md`, `docs/ke-hoach-trien-khai/phase3-transfer-linked-work-eligibility-review.md`, `docs/ke-hoach-trien-khai/phase3-visit-lifecycle-owner-decisions.md`, `docs/ke-hoach-trien-khai/phase0-db-config-remaining-decisions-proposal.md`, `docs/ke-hoach-trien-khai/phase3-transfer-reason-policy-proposal.md`, `docs/ke-hoach-trien-khai/phase3-visit-transfer-decision-gaps.md`, `docs/ke-hoach-trien-khai/phase3-transfer-queue-history-persistence-proposal.md`, `docs/ke-hoach-trien-khai/phase3-transfer-domain-invariant-design.md`, and `docs/ke-hoach-trien-khai/phase0-repository-contract-review.md`.
-6. Approved contracts: `VIS-TRANSFER-OWNER-DECISION-RECON-05` (carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-04`).
+6. Approved contracts: `VIS-TRANSFER-OWNER-DECISION-RECON-06` (contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`), carrying forward `VIS-TRANSFER-OWNER-DECISION-RECON-05` and `VIS-TRANSFER-OWNER-DECISION-RECON-04`.
 
 No applicable `AGENTS.md` was found in checkout inventory, target ancestors, or filesystem ancestors checked. Repository-local `docs/DEVELOPMENT_CONVENTIONS.md`, `CONTRIBUTING.md`, `docs/README.md`, and `ARCHITECTURE.md` were absent; the supplied baseline was used.
 
 **RAG first execution record (2026-11-06):**
-Executed `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'queue history persistence cutover queueDate ngayKham RECON-05'`.
+Executed `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 5 'VIS-TRANSFER-OWNER-DECISION-RECON-06 P1 M3 queue persistence allocation proposal'`.
 - *Result:* Command execution was blocked by the user-configured terminal sandbox deny rule (`permission check failed for command ...: Permission denied for command ... Matches user-configured deny rule`).
-- *Primary guidance:* Used task-supplied retrieved excerpts, approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-05`, and direct inspection of allowlisted files. No sandbox circumvention, privilege escalation, clinic DB connection, or patient data access.
+- *Primary guidance:* Used task-supplied retrieved excerpts, approved contract `VIS-TRANSFER-OWNER-DECISION-RECON-06`, and direct inspection of allowlisted files. No sandbox circumvention, privilege escalation, clinic DB connection, or patient data access.
 
 Validation for this deliverable:
 - Only allowlisted files modified (`docs/ke-hoach-trien-khai/phase3-transfer-queue-allocation-proposal.md` and `docs/ke-hoach-trien-khai/phase3-transfer-queue-history-persistence-proposal.md`).
-- `git diff --check` clean: no trailing whitespace or formatting errors.
+- Formatting checks: clean markdown, valid line anchors, no trailing whitespace.
 - Document-only scope: no Java, SQL migrations, runtime permissions, or gate changes. SEC-01 remains OPEN / default-deny.
 - Synthetic validation matrix provided without using real PHI or patient data.
 
 | Acceptance criterion | Result and evidence |
 |---|---|
 | Only allowlisted proposal docs change | PASS — Edits confined strictly to the allowlisted files. |
-| Dated addenda and historical alternatives clearly labeled | PASS — RECON-05 addendum dated 2026-11-06 prefixed; historical proposals clearly reconciled and labeled. |
-| All approved queue/history/audit facts carried forward exactly | PASS — `queueDate` separation, shared `(roomId, queueDate)` stream, committed no-reuse/gaps allowed, single DB UTC instant, and atomic history+audit carried forward. |
-| Unresolved physical storage and legacy semantics remain proposals | PASS — Concrete recommendations P1, M3, coordinated cutover distinguished from open Owner choices (QA-01, QA-03, QA-07, QA-08). |
-| Concrete recommended storage/transaction/cutover approach & validation matrix | PASS — Comprehensive design in Section 2, synthetic SQL Server validation matrix in Section 4. |
+| Dated RECON-06 supplement included | PASS — RECON-06 supplement dated 2026-11-06 included under authority of contract id `13d19fa9-eaed-404e-bdfc-4070daffd38a`. |
+| P1 and M3 marked Owner-approved design direction, not schema/migration approval | PASS — P1 and M3 explicitly labeled as architecture design basis only; physical DDL, schema, and migrations remain unapproved. |
+| Historical alternatives relabeled | PASS — P2, P3, P4 and M1, M2, M4 formally categorized as not selected / historical alternatives or rejected, preserving analysis snapshots. |
+| No-reuse/high-water correction remains correct and legacy unknowns fail closed | PASS — High-water cutover safeguard preserved; cutover stops on unproven history until verifiable reconciliation or approved boundary. |
+| Remaining DDL and cutover implementation decisions clearly open | PASS — Physical DDL, indexes, constraints, locking hints, counter initialization, migration version, cutover window, and writer coordination remain open. |
 | No Java, SQL migration, runtime behavior, grants or gate changes | PASS — Pure documentation analysis; SEC-01 remains OPEN/default-deny. |
 
 [contract]: phase3-visit-transfer-contract-review.md#L7-L19
