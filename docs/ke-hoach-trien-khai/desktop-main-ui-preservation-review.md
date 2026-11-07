@@ -78,3 +78,31 @@ No application source, tests, configuration, or database were changed for this r
 Guidance supplied and read: `docs/PROJECT_CONVENTIONS.md`, `README.md`, `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`, `docs/ke-hoach-trien-khai/README.md`, `UI_CODING_STANDARDS.md`, `docs/ke-hoach-trien-khai/01-ma-tran-model-man-hinh.md`, `docs/ke-hoach-trien-khai/00-hien-trang.md`, and `PROJECT_COMPLETENESS_REPORT.md`.
 
 Mandatory project RAG retrieval was unavailable in this session (no RAG connector was exposed). Per the task instruction, this review used the supplied RAG excerpts and tracked sources. Source comparisons were read-only across the three commits. The worker performed source review only. The Orchestrator Maven validation ran on `982c1f6` and failed at the existing three Desktop authentication compilation errors. The worktree contained only this new Markdown file. The Tech Lead checked its source and scope before local integration.
+
+## Bounded Follow-Up Resolution Status (2026-11-07 — leaderANTI)
+
+Following the initial static review of restored desktop tree `982c1f6` against baseline `6aabb85`, all four bounded follow-up items specified in Section 'Bounded follow-up' above have been systematically resolved on `feature/patient-reception-workflow` while preserving 100% of the `6aabb85` UI geometry, component hierarchy, and visual layout:
+
+1. **Login, Session Lifecycle, and Scoped Navigation Hardening:**
+   - Reattached `SessionLifecycleService` and `SessionLockOverlay` to manage authenticated user activity, idle timeout, lock screens, and logout cleanup (`a01bbc1`, `074aa71`).
+   - Hardened `UserSession` by restricting `setStationId` and `setWorkstationId` to package-private scope (`b4e29f6`). Reconfigured `MainDashboardFrame` to source user-dialog context and identity strictly from immutable `CompletedLoginSession` rather than mutable singleton state (`030e043`).
+   - Reconnected and hardened `DashboardNavigationPolicy` to enforce strict role- and scope-based tab navigation with `default-deny` for unauthorized modules (`527ba96`).
+   - `LoginForm` maintains the exact 440×390 centered window, field order, and styling; `MainDashboardFrame` retains its Ribbon, `CardLayout` center workspace, MDI tab strip, and status bar without layout drift.
+
+2. **Reception Workflow Reattachment and Hardening (Waves P0.2, P1.3–P1.7, P2.8):**
+   - The full reception slice (`ReceptionCompositionRoot`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel`, `ReceptionFooterBar`, `ReceptionPanelMessagePolicy`) has been reattached and hardened across sequential engineering waves (`035e815` through `81bf3a4`), preserving the 218 px split and component proportions of `ReceptionPanel`.
+   - **P0.2 (`563f4d6`, `1062f79`, `1235e91`):** Existing patient and insurance updates preserve record identity, existing cards, and unmapped fields; new records populate `createdBy`; strict date parsing and `Asia/Ho_Chi_Minh` timezone handling enforced in `PatientRegistrationFormPanel` and `ReceptionPanel`.
+   - **P1.3 (`035e815`, `13178f9`):** Active room entity identity binding in `ClinicRoomStatusPanel` and `ReceptionPanel`, removing reflective mutations; stale selections clear safely on catalog refresh failure.
+   - **P1.4 & P1.7 (`2efc3a6`, `096e8c0`, `81bf3a4`):** `ReceptionPanel.clearForm()` delegates to `PatientRegistrationFormPanel.clearForm()`; `ReceptionFooterBar` F1/F2 shortcuts are bound and respect in-flight saving states; room summaries populate from live queries with stale summary cleanup on refresh errors.
+   - **P1.5 & P1.6 (`4e4035d`, `1239784`, `644a904`):** Worker session lifecycle guards (`viewSessionEpoch`, `refreshSequence`, `searchSequence`) prevent race conditions from out-of-order background threads; context is sourced through `SessionLifecycleService`; search queries are capped at 50 results; form fields lock during active save operations.
+   - **P2.8 (`947853d`, `4e4035d`):** `ReceptionPanelMessagePolicy` sanitizes user-facing notifications, maps authorization errors (`AUTH_SCOPE_MISMATCH`, `OUT_OF_SCOPE`) to safe localized copy, and attaches unique correlation UUIDs to separately audited operations.
+
+3. **Build Configuration, Diagnostics, and Synthetic Regression Suite:**
+   - Shaded-jar `db.properties` exclusion is explicitly retained in `clinic-desktop/pom.xml` to prevent packaging local connection strings and credentials into build artifacts.
+   - Restored `DesktopWorkerDiagnostics` for bounded observability into EDT operations, background worker lifecycles, and uncaught Swing exception tracking.
+   - Expanded the synthetic regression suite to 457+ passing tests (0 failures, 0 errors) executing entirely against headless synthetic fixtures and test doubles, keeping default CI execution 100% decoupled from live SQL Server / `clinicDb` instances.
+
+4. **Doctor Station Gating and Baseline Status:**
+   - Doctor station remains strictly gated (`default-deny` enforced in `DashboardNavigationPolicy`).
+   - `DoctorStationPanel` remains byte-identical to `6aabb85` (two-pane layout with 250 px split), preserving all original placeholders and structure.
+   - Full clinical workflow integration remains deferred pending Owner visual smoke acceptance of `SEC-01` and `REC-01` on dedicated review environments.
