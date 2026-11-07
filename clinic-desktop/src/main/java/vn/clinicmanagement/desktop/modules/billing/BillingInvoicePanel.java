@@ -415,9 +415,8 @@ public class BillingInvoicePanel extends BaseViewPanel {
 
             @Override
             protected void done() {
-                inFlightWorkers.remove(this);
-                if (isCancelled()) return;
                 try {
+                    if (isCancelled()) return;
                     Result<RecordPaymentReceipt> result = get();
                     if (result != null && result.isSuccess()) {
                         RecordPaymentReceipt receipt = result.getValue().orElse(null);
@@ -442,6 +441,8 @@ public class BillingInvoicePanel extends BaseViewPanel {
                     // Normal worker cancellation
                 } catch (ExecutionException ex) {
                     showMessage("Lỗi hệ thống khi thu tiền: " + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+                } finally {
+                    inFlightWorkers.remove(this);
                 }
             }
         };
@@ -532,9 +533,8 @@ public class BillingInvoicePanel extends BaseViewPanel {
 
             @Override
             protected void done() {
-                inFlightWorkers.remove(this);
-                if (isCancelled()) return;
                 try {
+                    if (isCancelled()) return;
                     Result<List<PatientDebtDto>> result = get();
                     if (result != null && result.isSuccess()) {
                         latestPatientDebts = result.getValue().orElse(List.of());
@@ -543,6 +543,8 @@ public class BillingInvoicePanel extends BaseViewPanel {
                     DesktopWorkerDiagnostics.restoreInterruptStatus();
                 } catch (CancellationException ignored) {
                 } catch (ExecutionException ignored) {
+                } finally {
+                    inFlightWorkers.remove(this);
                 }
             }
         };
@@ -723,11 +725,10 @@ public class BillingInvoicePanel extends BaseViewPanel {
 
             @Override
             protected void done() {
-                inFlightWorkers.remove(this);
-                if (epoch != viewSessionEpoch.get() || sequence != refreshSequence.get() || isCancelled()) {
-                    return;
-                }
                 try {
+                    if (epoch != viewSessionEpoch.get() || sequence != refreshSequence.get() || isCancelled()) {
+                        return;
+                    }
                     List<InvoiceDto> invoices = get();
                     currentInvoices.clear();
                     if (invoices != null) {
@@ -743,6 +744,8 @@ public class BillingInvoicePanel extends BaseViewPanel {
                     invoiceTableModel.setRowCount(0);
                     detailTableModel.setRowCount(0);
                     updateSummaryCounters();
+                } finally {
+                    inFlightWorkers.remove(this);
                 }
             }
         };
@@ -796,6 +799,11 @@ public class BillingInvoicePanel extends BaseViewPanel {
 
     public JButton getBtnRefresh() {
         return btnRefresh;
+    }
+
+    public JPanel getToolbar() {
+        Component north = ((BorderLayout) getLayout()).getLayoutComponent(BorderLayout.NORTH);
+        return north instanceof JPanel p ? p : null;
     }
 
     public JTextField getTxtSearch() {

@@ -4,8 +4,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
-import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.audit.AuditWritePort;
 import vn.clinicmanagement.application.audit.MedicalRecordAuditEntry;
@@ -327,12 +325,16 @@ class BillingInvoicePanelWiringTest {
         }
     }
 
-    private static void waitForSwingWorkers(BillingInvoicePanel panel, int timeoutMs) throws InterruptedException {
+    private static void waitForSwingWorkers(BillingInvoicePanel panel, int timeoutMs) throws InterruptedException, InvocationTargetException {
         long start = System.currentTimeMillis();
+        Thread.sleep(40);
         while (panel.getInFlightWorkersCount() > 0 && System.currentTimeMillis() - start < timeoutMs) {
             Thread.sleep(20);
         }
-        Thread.sleep(60);
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeAndWait(() -> {});
+        }
+        Thread.sleep(40);
     }
 
     private static <T extends Component> List<T> descendantsOfType(Container root, Class<T> type) {

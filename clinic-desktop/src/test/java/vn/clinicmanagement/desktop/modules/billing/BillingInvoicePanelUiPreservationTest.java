@@ -86,6 +86,15 @@ class BillingInvoicePanelUiPreservationTest {
         assertEquals(" In Bảng Kê (F7)", panel.getBtnPrintSlip().getText());
         assertEquals("🔄 Làm Mới", panel.getBtnRefresh().getText());
 
+        assertNotNull(panel.getToolbar());
+        List<JButton> toolbarButtons = descendantsOfType(panel.getToolbar(), JButton.class).stream()
+                .filter(b -> b.getText() != null && !b.getText().isBlank())
+                .toList();
+        assertEquals(3, toolbarButtons.size());
+        assertEquals(" Thu Tiền (F2)", toolbarButtons.get(0).getText());
+        assertEquals(" In Bảng Kê (F7)", toolbarButtons.get(1).getText());
+        assertEquals("🔄 Làm Mới", toolbarButtons.get(2).getText());
+
         // Kiểm tra phím tắt F2 và F7 đã được đăng ký trên InputMap
         InputMap inputMap = panel.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
         assertNotNull(inputMap.get(KeyStroke.getKeyStroke("F2")), "F2 keybinding must be registered");

@@ -92,6 +92,10 @@ public final class BillingCompositionRoot {
         );
     }
 
+    public static Services create(vn.clinicmanagement.desktop.core.session.SessionLifecycleService sessionLifecycle) {
+        return createDefault();
+    }
+
     public static Services createDefault() {
         InMemoryInvoiceRepository invoiceRepo = new InMemoryInvoiceRepository();
         InMemoryVisitRepository visitRepo = new InMemoryVisitRepository();
@@ -152,6 +156,22 @@ public final class BillingCompositionRoot {
             Objects.requireNonNull(getInvoiceByVisit, "getInvoiceByVisit");
             Objects.requireNonNull(recordPayment, "recordPayment");
             Objects.requireNonNull(patientDebt, "patientDebt");
+        }
+
+        public CreateInvoiceHandler getCreateInvoice() {
+            return createInvoice;
+        }
+
+        public GetInvoiceByVisitHandler getGetInvoiceByVisit() {
+            return getInvoiceByVisit;
+        }
+
+        public RecordPaymentHandler getRecordPayment() {
+            return recordPayment;
+        }
+
+        public GetPatientDebtHandler getPatientDebt() {
+            return patientDebt;
         }
     }
 
