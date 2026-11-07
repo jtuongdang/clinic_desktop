@@ -95,6 +95,12 @@ abstract class HrHandlerTestSupport {
         @Override public List<String> getRoleNames(int employeeId) {
             return roleNames.getOrDefault(employeeId, List.of());
         }
+        @Override public List<vn.clinicmanagement.domain.identity.VaiTro> getAssignedRoles(int employeeId) {
+            return List.of();
+        }
+        @Override public List<vn.clinicmanagement.domain.identity.NhanVienWorkScope> getAssignedWorkScopes(int employeeId) {
+            return List.of();
+        }
         @Override public void recordSuccessfulLogin(int employeeId, LocalDateTime loginAt) {}
     }
 }
