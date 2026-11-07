@@ -246,6 +246,7 @@ public class ReceptionPanel extends BaseViewPanel {
                         if (snapshot.queueResult != null && snapshot.queueResult.isSuccess()) {
                             snapshot.queueResult.getValue().ifPresent(ReceptionPanel.this::updateQueueAndRoomSummaries);
                         } else if (snapshot.queueResult != null && snapshot.queueResult.isFailure()) {
+                            ReceptionPanel.this.clearQueueAndRoomSummaries();
                             showError(ReceptionPanelMessagePolicy.toUserMessage(snapshot.queueResult));
                         }
                         if (snapshot.roomsResult != null && snapshot.roomsResult.isSuccess()) {
@@ -260,6 +261,8 @@ public class ReceptionPanel extends BaseViewPanel {
                 } catch (CancellationException ex) {
                     // Safe cancellation on session lock or close
                 } catch (ExecutionException ex) {
+                    ReceptionPanel.this.clearQueueAndRoomSummaries();
+                    ReceptionPanel.this.updateActiveRooms(List.of());
                     showError(ReceptionPanelMessagePolicy.MSG_RECEPTION_QUEUE_FAILED);
                 }
             }
@@ -340,6 +343,13 @@ public class ReceptionPanel extends BaseViewPanel {
             }
         }
         statusPanel.setRoomSummaries(snapshot.rooms());
+        statusPanel.revalidate();
+        statusPanel.repaint();
+    }
+
+    private void clearQueueAndRoomSummaries() {
+        statusPanel.setQueue(List.of());
+        statusPanel.setRoomSummaries(List.of());
         statusPanel.revalidate();
         statusPanel.repaint();
     }

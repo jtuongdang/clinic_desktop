@@ -159,6 +159,26 @@ class ReceptionPanelFormResetAndSummaryTest {
     }
 
     @Test
+    void failedQueueRefreshClearsPreviouslyDisplayedRoomSummaries() throws Exception {
+        queue.rooms = List.of(
+                new ClinicRoomQueueSummary(71, "Phòng mẫu A", "Khoa mẫu", 8, 5, 2),
+                new ClinicRoomQueueSummary(72, "Phòng mẫu B", "Khoa mẫu", 6, 3, 1));
+        refreshAndWait();
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(1, roomTables().get(0).getRowCount());
+            assertEquals(1, roomTables().get(1).getRowCount());
+        });
+
+        queue.failQueue = true;
+        refreshAndWait();
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(0, roomTables().get(0).getRowCount());
+            assertEquals(0, roomTables().get(1).getRowCount());
+            assertEquals(ReceptionPanelMessagePolicy.MSG_RECEPTION_QUEUE_FAILED, panel.getLastErrorMessage());
+        });
+    }
+
+    @Test
     void refreshReportsSafeMessageWhenQueueResultFails() throws Exception {
         queue.failQueue = true;
         refreshAndWait();
