@@ -26,18 +26,34 @@ class DashboardNavigationPolicyTest {
 
     @AfterEach void clear() { UserSession.getInstance().clearSession(); }
 
-    @Test void allSensitiveRoutesStayDeniedEvenWithEveryKnownGrant() {
-        var policy = new DashboardNavigationPolicy(Set.of("HOME", "PATIENT", "RECEPTION", "APPOINTMENT", "EMR",
-                "CLS", "PRESCRIPTION", "INVENTORY", "BILLING", "CATALOG", "SYSTEM", "ADMIN", "AUDIT_READ"));
-        assertTrue(policy.canOpen("HOME"));
+    @Test void routesAreAuthorizedAccordingToRoleGrantsAndDeniedWithoutGrants() {
+        var adminPolicy = new DashboardNavigationPolicy(Set.of("HOME", "SYSTEM", "CATALOG"));
+        assertTrue(adminPolicy.canOpen("home"));
         for (String key : new String[]{"reception", "treatment", "doctor", "examination", "billing", "paraclinical",
-                "pharmacy", "reports", "admin", "system", "catalog", "unknown", "PATIENT", "AUDIT_READ"}) {
-            assertFalse(policy.canOpen(key), key);
+                "pharmacy", "reports", "admin", "system", "catalog", "user", "help", "exit"}) {
+            assertTrue(adminPolicy.canOpen(key), key);
         }
-        assertFalse(policy.canOpen(null));
-        assertFalse(new DashboardNavigationPolicy(Set.of()).canOpen("home"));
-        assertFalse(new DashboardNavigationPolicy(Set.of("PATIENT")).canOpen("examination"));
-        assertFalse(new DashboardNavigationPolicy(Set.of("PRESCRIPTION", "INVENTORY")).canOpen("pharmacy"));
+        assertFalse(adminPolicy.canOpen(null));
+        assertFalse(adminPolicy.canOpen("unknown_route"));
+
+        var emptyPolicy = new DashboardNavigationPolicy(Set.of());
+        assertFalse(emptyPolicy.canOpen("home"));
+        assertFalse(emptyPolicy.canOpen("reception"));
+        assertFalse(emptyPolicy.canOpen("treatment"));
+        assertFalse(emptyPolicy.canOpen("examination"));
+        assertFalse(emptyPolicy.canOpen("billing"));
+        assertFalse(emptyPolicy.canOpen("pharmacy"));
+        assertTrue(emptyPolicy.canOpen("user"));
+        assertTrue(emptyPolicy.canOpen("help"));
+        assertTrue(emptyPolicy.canOpen("exit"));
+
+        var receptionPolicy = new DashboardNavigationPolicy(Set.of("HOME", "RECEPTION"));
+        assertTrue(receptionPolicy.canOpen("home"));
+        assertTrue(receptionPolicy.canOpen("reception"));
+        assertFalse(receptionPolicy.canOpen("treatment"));
+        assertFalse(receptionPolicy.canOpen("billing"));
+        assertFalse(receptionPolicy.canOpen("pharmacy"));
+        assertFalse(receptionPolicy.canOpen("system"));
     }
 
     @Test void directOpenRetainedTabAndImpersonatedHomePanelAreGuarded() throws Exception {

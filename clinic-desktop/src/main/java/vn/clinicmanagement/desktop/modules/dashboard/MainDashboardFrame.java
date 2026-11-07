@@ -246,7 +246,7 @@ public class MainDashboardFrame extends JFrame {
             mi.setBorder(BorderFactory.createEmptyBorder(2, 14, 2, 8));
             mi.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-            mi.setEnabled(false);
+            mi.setEnabled(canNavigate("reception"));
             mi.addActionListener(e -> {
                 if (!canNavigate("reception")) return;
                 switch (title) {
@@ -524,8 +524,23 @@ public class MainDashboardFrame extends JFrame {
         private boolean allowed(String key) {
             return !disposed && lifecycle.evaluate() == SessionLifecycleService.State.ACTIVE && navigation.canOpen(key);
         }
+        private static final Set<Class<? extends BaseViewPanel>> APPROVED_VIEWS = Set.of(
+                HomeWelcomePanel.class,
+                ReceptionPanel.class,
+                DoctorStationPanel.class,
+                ExaminationPanel.class,
+                BillingInvoicePanel.class,
+                ClinicReportPanel.class,
+                SystemConfigPanel.class,
+                CatalogPanel.class,
+                PharmacyDispensePanel.class,
+                ParaclinicalOrderPanel.class
+        );
+
         @Override public void openView(BaseViewPanel view) {
-            if (view != null && view.getClass() == HomeWelcomePanel.class && allowed(view.getViewKey())) super.openView(view);
+            if (view != null && APPROVED_VIEWS.contains(view.getClass()) && allowed(view.getViewKey())) {
+                super.openView(view);
+            }
         }
         @Override public void activateView(String key) {
             if (allowed(key)) super.activateView(key);
