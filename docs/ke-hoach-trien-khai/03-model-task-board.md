@@ -372,7 +372,9 @@ At `feature/patient-reception-workflow` up to commits `1239784` and `644a904`, c
    - `4c98449` (`27a6d80c` — `copilot-cli`): Added `DesktopWorkerDiagnosticsTest` (3/3 PASS) and `DocxTableTest` (4/4 PASS) in `clinic-desktop` [leaderANTI]
    - `bd5db20` (`c2e19e6f` — `antigravity-cli`): Added `AuditMetadataValidatorTest` (43/43 PASS) and `ApprovedRoleCodesTest` (43/43 PASS) in `clinic-application` [leaderANTI]
    - `d10cd04` (`92979f03` — `google-antigravity-cli-claude-sonnet-02507d`): Synced task board, completion review, and handover docs for Wave 14 [leaderANTI]
-5. **Current automated evidence at HEAD `d10cd04`:** Verified on `feature/patient-reception-workflow` with reactor test count updated to **592 tests run (100 domain + 235 application + 125 infrastructure + 132 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop)**. `clinicDb` was not used; this validation did not run SQL Server opt-in tests. Shaded JAR inspection confirms no packaged `db.properties`.
+   - `267c176` (`83da02cd` — `copilot-cli`): Added `BenhNhanTest` (`6/6 PASS`), `BaoHiemTest` (`3/3 PASS`), and `BenhNhanCoSoTest` (`3/3 PASS`) in `clinic-domain` [leaderANTI]
+   - `512eeff` (`dcbd3de6` — `google-antigravity-cli-claude-sonnet-02507d`): Synced task board, completion review, and handover docs for Wave 15 [leaderANTI]
+5. **Current automated evidence at HEAD `512eeff`:** Verified on `feature/patient-reception-workflow` with reactor test count updated to **604 tests run (112 domain + 235 application + 125 infrastructure + 132 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop)**. `clinicDb` was not used; this validation did not run SQL Server opt-in tests. Shaded JAR inspection confirms no packaged `db.properties`.
 6. **Open acceptance and Owner gate status preservation:**
    - All Owner gate statuses (`REC-01`, `PAT-02`, and `SEC-01`) remain strictly **OPEN** (`[~] In progress`) pending Owner visual smoke / visual-interaction acceptance and signed-in route gate decision.
    - Headless synthetic tests establish wiring and unit invariant compliance, not interactive visual acceptance or live SQL Server end-to-end multi-user verification.
@@ -486,6 +488,16 @@ At `feature/patient-reception-workflow` up to commits `1239784` and `644a904`, c
 | `d10cd04` · `92979f03` (`google-antigravity-cli-claude-sonnet-02507d`) | Đồng bộ task board (`03-model-task-board.md`), biên bản nghiệm thu ca trực (`phase1-rec01-and-sec01-shift-completion-review.md`) và biên bản bàn giao (`LEADERSHIP_HANDOVER_LEADER_ANTI.md`) ghi nhận Wave 14. | Tài liệu đồng bộ hoàn tất; 499 tests run toàn reactor (6 opt-in skips). | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
 
 **Reactor test count:** 592 tests run (100 domain + 235 application + 125 infrastructure + 132 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 và Phase 3 đã được củng cố tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+
+## Wave 16 Hardening and Verification — 07/11/2026 [leaderANTI]
+
+| Commit · task | Phân hệ · Thay đổi cụ thể | Bằng chứng kiểm thử tự động | Trạng thái cổng |
+|---|---|---|---|
+| `267c176` · `83da02cd` (`copilot-cli`) | `clinic-domain`: Bổ sung kiểm thử `BenhNhanTest`, `BaoHiemTest`, và `BenhNhanCoSoTest`, mở rộng kiểm thử miền cho thực thể bệnh nhân, thẻ bảo hiểm y tế và đăng ký cơ sở khám chữa bệnh. | `6/6` tests PASS trong `BenhNhanTest`, `3/3` tests PASS trong `BaoHiemTest`, `3/3` tests PASS trong `BenhNhanCoSoTest`. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `512eeff` · `dcbd3de6` (`google-antigravity-cli-claude-sonnet-02507d`) | Đồng bộ task board (`03-model-task-board.md`), biên bản nghiệm thu ca trực (`phase1-rec01-and-sec01-shift-completion-review.md`) và biên bản bàn giao (`LEADERSHIP_HANDOVER_LEADER_ANTI.md`) ghi nhận Wave 15. | Tài liệu đồng bộ hoàn tất; 592 tests run toàn reactor (6 opt-in skips). | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+
+**Reactor test count:** 604 tests run (112 domain + 235 application + 125 infrastructure + 132 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 và Phase 3 đã được củng cố tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+
 
 
 

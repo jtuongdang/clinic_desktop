@@ -52,7 +52,7 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 
 ---
 
-## 5. Nhật ký Điều hành Ca 2 của leaderANTI (07/11/2026 — Waves 1–15)
+## 5. Nhật ký Điều hành Ca 2 của leaderANTI (07/11/2026 — Waves 1–16)
 
 ### 5.1. Hợp đồng & Chế độ Điều phối
 - **Hợp đồng thực thi:** `b556c230-4b4f-4d5d-94bc-bf95ce4338d8` (*`leaderANTI Shift Resumption: REC-01 P1.3 Integration & P1.4/P1.7 Hardening`*).
@@ -63,7 +63,7 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
     2. `antigravity-cli` (Google Antigravity CLI — Gemini 3 Flash)
     3. `google-antigravity-cli-claude-sonnet-02507d` (Claude Sonnet 4.6)
 
-### 5.2. Danh mục 52 Commits đã tích hợp trên `feature/patient-reception-workflow` (Waves 1–15)
+### 5.2. Danh mục 54 Commits đã tích hợp trên `feature/patient-reception-workflow` (Waves 1–16)
 1. **`035e815`** (`bbafd718` — `antigravity-cli` + `leaderANTI`): `Repair REC-01 active room binding validation and test harness [leaderANTI]`
 2. **`a7f93fb`** (`cd124ec5` — `copilot-cli`): `Review REC-01 active room binding and tests [leaderANTI]`
 3. **`563f4d6`** (`1a2d14bf` — `antigravity-cli`): `Add synthetic JDBC tests for BaoHiemRepositoryImpl [leaderANTI]` (`10/10 PASS`)
@@ -116,10 +116,12 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 50. **`4c98449`** (`27a6d80c` — `copilot-cli`): `Added DesktopWorkerDiagnosticsTest (3/3 PASS) and DocxTableTest (4/4 PASS) in clinic-desktop [leaderANTI]`
 51. **`bd5db20`** (`c2e19e6f` — `antigravity-cli`): `Added AuditMetadataValidatorTest (43/43 PASS) and ApprovedRoleCodesTest (43/43 PASS) in clinic-application [leaderANTI]`
 52. **`d10cd04`** (`92979f03` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover docs for Wave 14 [leaderANTI]`
+53. **`267c176`** (`83da02cd` — `copilot-cli`): `Added BenhNhanTest (6/6 PASS), BaoHiemTest (3/3 PASS), and BenhNhanCoSoTest (3/3 PASS) in clinic-domain [leaderANTI]`
+54. **`512eeff`** (`dcbd3de6` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover docs for Wave 15 [leaderANTI]`
 
 ### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
-- **Tổng số bài test tự động:** **592 tests run** (`100` domain + `235` application + `125` infrastructure + `132` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop).
+- **Tổng số bài test tự động:** **604 tests run** (`112` domain + `235` application + `125` infrastructure + `132` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop).
 - **Gói ứng dụng thực thi:** Fat JAR đã được đóng gói mới nhất tại `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` (không nhúng `db.properties`, hoàn toàn tuân thủ quy tắc bảo mật).
 - **Bảo toàn 100% UI gốc (`6aabb85`) & Cổng an ninh:** Toàn bộ giao diện `LoginForm`, `MainDashboardFrame`, `ReceptionPanel`, `DoctorStationPanel` giữ nguyên 100% bố cục, kích thước, màu sắc và bảng cột gốc; các cổng `SEC-01`, `PAT-02`, `REC-01` giữ nguyên trạng thái `[~] In progress` (`default-deny`) chờ Owner chạy `./run-app.sh` nghiệm thu trực quan.
-- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–3:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) và Phase 3 (`VIS-01`, `APPT-01`) cùng bằng chứng kiểm định 592 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–3:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) và Phase 3 (`VIS-01`, `APPT-01`) cùng bằng chứng kiểm định 604 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 
