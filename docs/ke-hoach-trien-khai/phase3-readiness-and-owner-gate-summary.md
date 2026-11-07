@@ -1,12 +1,16 @@
 # Phase 1–3 Readiness and Owner Gate Summary
 
 **For:** Owner  
-**Snapshot:** `9d7afcf` (`feature/patient-reception-workflow`), 2026-11-07  
-**Decision:** Phase 1–2 code/test evidence is ready for Owner visual acceptance, but `SEC-01`, `REC-01`, and `PAT-02` remain open/default-deny. Phase 3 has useful domain/application building blocks, but Owner policy and implementation decisions remain prerequisites to migrations and handlers.
+**Snapshot:** `2899866` (`feature/patient-reception-workflow`), 2026-11-07  
+**Decision:** Phase 1–2 code/test evidence is ready for Owner visual acceptance, but `SEC-01`, `REC-01`, and `PAT-02` remain open/default-deny. Phase 3 application workflow slices (VIS-01 visit cancellation and room transfer, APPT-01 appointment booking) are currently running under leaderANTI orchestration in Wave 21.
 
 ## 1. Reactor and Desktop verification
 
-- **Reactor:** 724 tests run — 185 domain, 270 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
+- **Reactor:** 767 tests run — 228 domain, 270 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
+- **Wave 20 commits recorded:**
+  - `6342d46` (`6f659bb1` — `copilot-cli`): Added `HoaDonTest` (17/17 PASS), `ChiTietHoaDonTest` (4/4 PASS), `PhieuThuTest` (5/5 PASS), and `CongNoBenhNhanTest` (6/6 PASS) in `clinic-domain`.
+  - `858b863` (`0edf46b7` — `antigravity-cli`): Added `ChiDinhDichVuTest` (5/5 PASS), `DanhMucDichVuTest` (3/3 PASS), and `ChiTietKetQuaXetNghiemTest` (3/3 PASS) in `clinic-domain`.
+  - `2899866` (`92d96f34` — `google-antigravity-cli-claude-sonnet-02507d`): Synced task board, completion review, and handover docs for Wave 19.
 - **Wave 19 commits recorded:**
   - `f309e1c` (`e283a3f2` — `copilot-cli`): Added `DonThuocTest` (`9/9 PASS`), `ChiTietDonThuocTest` (`2/2 PASS`), and `ClinicalDrugSafetyServiceTest` (`4/4 PASS`) in `clinic-domain`.
   - `48c5194` (`8770e868` — `antigravity-cli`): Added `NhatKyHeThongTest`, `NhatKyHoSoBenhAnTest`, and `ThamSoHeThongTest` (`28/28 PASS`) in `clinic-domain`.

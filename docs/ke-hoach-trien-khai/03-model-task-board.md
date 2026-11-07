@@ -527,6 +527,17 @@ At `feature/patient-reception-workflow` up to commits `1239784` and `644a904`, c
 
 **Reactor test count:** 724 tests run (185 domain + 270 application + 125 infrastructure + 144 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 và Phase 3 đã được củng cố tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 
+## Wave 20 Hardening and Verification — 07/11/2026 [leaderANTI]
+
+| Commit · task | Phân hệ · Thay đổi cụ thể | Bằng chứng kiểm thử tự động | Trạng thái cổng |
+|---|---|---|---|
+| `6342d46` · `6f659bb1` (`copilot-cli`) | `clinic-domain`: Bổ sung kiểm thử `HoaDonTest`, `ChiTietHoaDonTest`, `PhieuThuTest`, và `CongNoBenhNhanTest`, bao phủ toàn diện thực thể kế toán và viện phí. | `17/17` PASS `HoaDonTest`, `4/4` PASS `ChiTietHoaDonTest`, `5/5` PASS `PhieuThuTest`, `6/6` PASS `CongNoBenhNhanTest`. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `858b863` · `0edf46b7` (`antigravity-cli`) | `clinic-domain`: Bổ sung kiểm thử `ChiDinhDichVuTest`, `DanhMucDichVuTest`, và `ChiTietKetQuaXetNghiemTest`, bao phủ dịch vụ cận lâm sàng và chỉ định. | `5/5` PASS `ChiDinhDichVuTest`, `3/3` PASS `DanhMucDichVuTest`, `3/3` PASS `ChiTietKetQuaXetNghiemTest`. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `2899866` · `92d96f34` (`google-antigravity-cli-claude-sonnet-02507d`) | Đồng bộ task board (`03-model-task-board.md`), biên bản nghiệm thu ca trực (`phase1-rec01-and-sec01-shift-completion-review.md`) và biên bản bàn giao (`LEADERSHIP_HANDOVER_LEADER_ANTI.md`) ghi nhận Wave 19. | Tài liệu đồng bộ hoàn tất; 767 tests run toàn reactor (6 opt-in skips). | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+
+**Reactor test count:** 767 tests run (228 domain + 270 application + 125 infrastructure + 144 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Wave 21 (Phase 3 Core Implementation) hiện đang được điều phối chạy nền song song trên 3 worker agents (`copilot-cli`, `antigravity-cli`, `google-antigravity-cli-claude-sonnet-02507d`).
+
+
 
 
 
