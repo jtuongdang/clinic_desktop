@@ -143,17 +143,22 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 77. **`ed183c1`** (`350298c4` — `copilot-cli` + `leaderANTI`): `EMR-03: Implemented AddDiagnosisCommand, AddDiagnosisReceipt, AddDiagnosisHandler, and AddDiagnosisHandlerTest (10/10 PASS) in clinic-application [leaderANTI]`
 78. **`c5359d6`** (`leaderANTI`): `EMR-04: Added reopenEmr and EmrReopenedEvent to LuotKham aggregate and expanded LuotKhamTest (26/26 PASS) in clinic-domain [leaderANTI]`
 79. **`2caaaf2`** (`leaderANTI`): `EMR-04: Implemented ReopenEmrCommand, ReopenEmrReceipt, ReopenEmrHandler, and ReopenEmrHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+80. **`b8d7424`** (`leaderANTI`): `RX-03 prep: Added cancel method and DonThuocCancelledEvent to DonThuoc aggregate and expanded DonThuocTest (13/13 PASS) in clinic-domain [leaderANTI]`
+81. **`473241e`** (`c5c313fb` — `copilot-cli` + `leaderANTI`): `RX-01: Implemented PrescribeMedicationCommand, PrescriptionItemInput, PrescribeMedicationReceipt, PrescribeMedicationHandler, and PrescribeMedicationHandlerTest (11/11 PASS) in clinic-application [leaderANTI]`
+82. **`1140efb`** (`590340e1` — `copilot-cli` + `leaderANTI`): `RX-02: Implemented ApprovePrescriptionCommand, ApprovePrescriptionReceipt, ApprovePrescriptionHandler, and ApprovePrescriptionHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+83. **`5ed898a`** (`ca92d29f` — `copilot-cli` + `leaderANTI`): `RX-03: Implemented CancelPrescriptionCommand, CancelPrescriptionReceipt, CancelPrescriptionHandler, and CancelPrescriptionHandlerTest (10/10 PASS) in clinic-application [leaderANTI]`
+84. **`15eca44`** (`2faefdb0` — `copilot-cli` + `leaderANTI`): `RX-04: Implemented GetPrescriptionByVisitQuery, PrescriptionDto, PrescriptionItemDto, GetPrescriptionByVisitHandler, and GetPrescriptionByVisitHandlerTest (6/6 PASS) in clinic-application [leaderANTI]`
 
 ### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
-- **Tổng số bài test tự động:** **872 tests run** (`231` domain + `372` application + `125` infrastructure + `144` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS** in 13.2s.
-- **Tiến độ Phase 4 (Wave 22 Hoàn tất & Tích hợp Toàn diện):**
-  - Đã triển khai đầy đủ và hoàn tất toàn bộ phân hệ Hồ sơ Bệnh án Điện tử Lâm sàng (EMR):
-    - Cập nhật diễn biến & khám lâm sàng (`UpdateEmrClinicalRecordHandler` - 8/8 PASS)
-    - Ghi nhận chỉ số sinh tồn và tự động tính BMI (`RecordVitalSignsHandler` - 8/8 PASS)
-    - Chẩn đoán, gắn mã ICD-10 và quản lý chẩn đoán chính (`AddDiagnosisHandler` - 10/10 PASS)
-    - Mở khóa bệnh án có kiểm soát giải trình (`ReopenEmrHandler` - 8/8 PASS)
-  - Mọi quy tắc an ninh, kiểm tra quyền theo vai trò (`DOCTOR`/`RECEPTIONIST`/`ADMIN`/`CHIEF_DOCTOR`), bảo vệ trạng thái EMR (`emrLocked`), và ghi nhật ký kiểm toán giao dịch/an ninh (`AuditActionCode.EMR_UPDATED`, `EMR_REOPENED`, `AUTH_ACCESS_DENIED`) đều đạt 100% bằng chứng kiểm thử synthetic.
+- **Tổng số bài test tự động:** **907 tests run** (`231` domain + `407` application + `125` infrastructure + `144` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS** in 13.0s.
+- **Tiến độ Phase 5 (Wave 23 Hoàn tất & Tích hợp Toàn diện):**
+  - Đã triển khai đầy đủ và hoàn tất toàn bộ phân hệ Đơn thuốc Ngoại trú & An toàn Dược Lâm sàng (Prescriptions & Drug Safety):
+    - Kê đơn thuốc ngoại trú & Đánh giá an toàn dị ứng thuốc (`PrescribeMedicationHandler` - 11/11 PASS)
+    - Phê duyệt đơn thuốc ngoại trú (`ApprovePrescriptionHandler` - 8/8 PASS)
+    - Hủy đơn thuốc ngoại trú có lý do giải trình & bảo vệ đơn đã xuất cấp (`CancelPrescriptionHandler` - 10/10 PASS)
+    - Truy vấn đơn thuốc theo lượt khám phục vụ hiển thị/in đơn/phát thuốc (`GetPrescriptionByVisitHandler` - 6/6 PASS)
+  - Mọi quy tắc an ninh, kiểm tra quyền theo vai trò (`DOCTOR`/`ADMIN`/`RECEPTIONIST`), bảo vệ trạng thái EMR (`emrLocked`), đối chiếu dị ứng hoạt chất (`ClinicalDrugSafetyService`), và ghi nhật ký kiểm toán giao dịch/an ninh (`AuditActionCode.RX_CREATED`, `RX_APPROVED`, `RX_CANCELLED`, `EMR_VIEW`, `AUTH_ACCESS_DENIED`) đều đạt 100% bằng chứng kiểm thử synthetic.
 - **Gói ứng dụng thực thi:** Fat JAR đã được đóng gói mới nhất tại `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` (không nhúng `db.properties`, hoàn toàn tuân thủ quy tắc bảo mật).
 - **Bảo toàn 100% UI gốc (`6aabb85`) & Cổng an ninh:** Toàn bộ giao diện `LoginForm`, `MainDashboardFrame`, `ReceptionPanel`, `DoctorStationPanel` giữ nguyên 100% bố cục, kích thước, màu sắc và bảng cột gốc; các cổng `SEC-01`, `PAT-02`, `REC-01` giữ nguyên trạng thái `[~] In progress` (`default-deny`) chờ Owner chạy `./run-app.sh` nghiệm thu trực quan.
-- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–4:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`), Phase 3 (`VIS-01`, `APPT-01`) và Phase 4 (`EMR-01` đến `EMR-04`) cùng bằng chứng kiểm định 872 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–5:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`), Phase 3 (`VIS-01`, `APPT-01`), Phase 4 (`EMR-01` đến `EMR-04`) và Phase 5 (`RX-01` đến `RX-04`) cùng bằng chứng kiểm định 907 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 
