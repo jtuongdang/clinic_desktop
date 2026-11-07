@@ -151,15 +151,23 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 85. **`e1422a5`** (`leaderANTI`): `Phase 6 prep: Enhanced IKhoRepository with 17 specialized ports, added Stocktake.approve(), and configured AuditResourceType.ITEM & AuditActionCode.INV_ITEM_CREATED [leaderANTI]`
 86. **`7b1dc5b`** (`8a5fe480` — `copilot-cli` + `leaderANTI`): `INV-01: Implemented CreateItemCommand, CreateItemReceipt, CreateItemHandler, ItemSummaryDto, GetItemCatalogQuery, GetItemCatalogHandler, CreateItemHandlerTest (5/5 PASS), and GetItemCatalogHandlerTest (3/3 PASS) in clinic-application [leaderANTI]`
 87. **`8582107`** (`3d57c0aa` — `copilot-cli` + `leaderANTI`): `INV-02: Implemented StockBatchDto, StockAvailabilityDto, GetStockAvailabilityQuery, GetStockAvailabilityHandler, and GetStockAvailabilityHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+88. **`6a629da`** (`2040635d` — `copilot-cli` + `leaderANTI`): `INV-03: Implemented PurchaseOrderItemInput, CreatePurchaseOrderCommand, CreatePurchaseOrderReceipt, CreatePurchaseOrderHandler, and CreatePurchaseOrderHandlerTest (6/6 PASS) in clinic-application [leaderANTI]`
+89. **`cc96ed3`** (`18249516` — `copilot-cli` + `leaderANTI`): `INV-04: Implemented StockReceiptItemInput, ReceiveWarehouseStockCommand, ReceiveWarehouseStockReceipt, ReceiveWarehouseStockHandler, and ReceiveWarehouseStockHandlerTest (10/10 PASS) in clinic-application [leaderANTI]`
+90. **`16bd683`** (`b7a81fe2` — `antigravity-cli` + `leaderANTI`): `INV-06: Implemented StocktakeAdjustmentLineDto, ApproveStocktakeCommand, ApproveStocktakeReceipt, ApproveStocktakeHandler, and ApproveStocktakeHandlerTest (11/11 PASS) in clinic-application [leaderANTI]`
+91. **`b0ee056`** (`a891eafa` — `antigravity-cli` + `leaderANTI`): `INV-05: Implemented DispensedItemAllocationDto, DispensePrescriptionCommand, DispensePrescriptionReceipt, DispensePrescriptionHandler with FEFO allocation, and DispensePrescriptionHandlerTest (11/11 PASS) in clinic-application [leaderANTI]`
 
 ### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
-- **Tổng số bài test tự động:** **923 tests run** (`231` domain + `423` application + `125` infrastructure + `144` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS** in 12.6s.
+- **Tổng số bài test tự động:** **961 tests run** (`231` domain + `461` application + `125` infrastructure + `144` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS** in 7.8s.
 - **Tiến độ Phase 6 (Wave 24 - Dược phẩm, Kho dược FEFO & Cấp phát thuốc):**
   - Hợp đồng triển khai Phase 6 đã phê duyệt: `5bd6daa9-0c4b-4a16-9243-792d834d2579` (`PHASE-6-INVENTORY-FEFO-AND-DISPENSING-CONTRACT-LEADERANTI`).
-  - **`INV-01` Hoàn tất:** Quản lý danh mục Thuốc & Vật tư y tế (`CreateItemHandler` - 5/5 PASS, `GetItemCatalogHandler` - 3/3 PASS).
-  - **`INV-02` Hoàn tất:** Tra cứu tồn kho & Phân bổ FEFO (`GetStockAvailabilityHandler` - 8/8 PASS).
-  - **`INV-03` đến `INV-06`:** Đang được lập lịch và tự động thực thi bởi đội thợ code trên ClinicOrchestrator (đơn đặt hàng, nhập kho lô/hạn dùng, cấp phát đơn thuốc trừ tồn FEFO, và phê duyệt kiểm kê).
+  - **Hoàn tất 100% toàn bộ 6 use case Phase 6:**
+    - **`INV-01` Hoàn tất:** Quản lý danh mục Thuốc & Vật tư y tế (`CreateItemHandler` - 5/5 PASS, `GetItemCatalogHandler` - 3/3 PASS).
+    - **`INV-02` Hoàn tất:** Tra cứu tồn kho & Phân bổ FEFO (`GetStockAvailabilityHandler` - 8/8 PASS).
+    - **`INV-03` Hoàn tất:** Đơn đặt hàng nhà cung cấp (`CreatePurchaseOrderHandler` - 6/6 PASS).
+    - **`INV-04` Hoàn tất:** Nhập kho dược phẩm & Quản lý lô/hạn dùng (`ReceiveWarehouseStockHandler` - 10/10 PASS).
+    - **`INV-05` Hoàn tất:** Cấp phát đơn thuốc ngoại trú & Trừ tồn FEFO (`DispensePrescriptionHandler` - 11/11 PASS).
+    - **`INV-06` Hoàn tất:** Phê duyệt kiểm kê & Cân bằng tồn kho (`ApproveStocktakeHandler` - 11/11 PASS).
 - **Gói ứng dụng thực thi:** Fat JAR đã được đóng gói mới nhất tại `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` (không nhúng `db.properties`, hoàn toàn tuân thủ quy tắc bảo mật).
 - **Bảo toàn 100% UI gốc (`6aabb85`) & Cổng an ninh:** Toàn bộ giao diện `LoginForm`, `MainDashboardFrame`, `ReceptionPanel`, `DoctorStationPanel` giữ nguyên 100% bố cục, kích thước, màu sắc và bảng cột gốc; các cổng `SEC-01`, `PAT-02`, `REC-01` giữ nguyên trạng thái `[~] In progress` (`default-deny`) chờ Owner chạy `./run-app.sh` nghiệm thu trực quan.
-- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–5:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`), Phase 3 (`VIS-01`, `APPT-01`), Phase 4 (`EMR-01` đến `EMR-04`) và Phase 5 (`RX-01` đến `RX-04`) cùng bằng chứng kiểm định 907 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–6:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`), Phase 3 (`VIS-01`, `APPT-01`), Phase 4 (`EMR-01` đến `EMR-04`), Phase 5 (`RX-01` đến `RX-04`) và Phase 6 (`INV-01` đến `INV-06`) cùng bằng chứng kiểm định 961 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 
