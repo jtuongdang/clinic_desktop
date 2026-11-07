@@ -1,12 +1,16 @@
 # Phase 1–3 Readiness and Owner Gate Summary
 
 **For:** Owner  
-**Snapshot:** `db924db` (`feature/patient-reception-workflow`), 2026-11-07  
+**Snapshot:** `9d7afcf` (`feature/patient-reception-workflow`), 2026-11-07  
 **Decision:** Phase 1–2 code/test evidence is ready for Owner visual acceptance, but `SEC-01`, `REC-01`, and `PAT-02` remain open/default-deny. Phase 3 has useful domain/application building blocks, but Owner policy and implementation decisions remain prerequisites to migrations and handlers.
 
 ## 1. Reactor and Desktop verification
 
-- **Reactor:** 681 tests run — 142 domain, 270 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
+- **Reactor:** 724 tests run — 185 domain, 270 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
+- **Wave 19 commits recorded:**
+  - `f309e1c` (`e283a3f2` — `copilot-cli`): Added `DonThuocTest` (`9/9 PASS`), `ChiTietDonThuocTest` (`2/2 PASS`), and `ClinicalDrugSafetyServiceTest` (`4/4 PASS`) in `clinic-domain`.
+  - `48c5194` (`8770e868` — `antigravity-cli`): Added `NhatKyHeThongTest`, `NhatKyHoSoBenhAnTest`, and `ThamSoHeThongTest` (`28/28 PASS`) in `clinic-domain`.
+  - `9d7afcf` (`852e5660` — `google-antigravity-cli-claude-sonnet-02507d`): Synced task board, completion review, and handover docs for Wave 18.
 - **Wave 18 commits recorded:**
   - `8c5836f` (`0170d664` — `copilot-cli`): Added `NhanVienTest` (`5/5 PASS`), `NhanVienWorkScopeTest` (`3/3 PASS`), and `VaiTroTest` (`4/4 PASS`) in `clinic-domain`.
   - `db924db` (`d38e7a83` — `antigravity-cli` + `leaderANTI`): Added `ReceptionReadAuditTest` (`35/35 PASS`) in `clinic-application` and `DocxExportServiceTest` (`12/12 PASS`) in `clinic-desktop`.
@@ -114,4 +118,4 @@ These are domain/test foundations, not proof of end-to-end persistence or workfl
 
 ## Evidence basis and limits
 
-This summary consolidates `03-model-task-board.md`, `phase1-rec01-and-sec01-shift-completion-review.md`, `phase1-doctor-ui-preservation-and-wiring-plan.md`, `phase3-visit-lifecycle-owner-decisions.md`, `phase3-visit-transfer-decision-gaps.md`, `phase3-appointment-owner-decisions.md`, and `desktop-owner-visual-smoke-checklist.md`. The requested reactor totals and JAR-ready status are the `db924db` snapshot (681 tests run, 6 opt-in skips) supplied for this task; the local JAR was absent at inspection, and no new test/build or live-database verification was performed.
+This summary consolidates `03-model-task-board.md`, `phase1-rec01-and-sec01-shift-completion-review.md`, `phase1-doctor-ui-preservation-and-wiring-plan.md`, `phase3-visit-lifecycle-owner-decisions.md`, `phase3-visit-transfer-decision-gaps.md`, `phase3-appointment-owner-decisions.md`, and `desktop-owner-visual-smoke-checklist.md`. The requested reactor totals and JAR-ready status are the `9d7afcf` snapshot (724 tests run, 6 opt-in skips) supplied for this task; the local JAR was absent at inspection, and no new test/build or live-database verification was performed.
