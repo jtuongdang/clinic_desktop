@@ -52,7 +52,7 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 
 ---
 
-## 5. Nhật ký Điều hành Ca 2 của leaderANTI (07/11/2026 — Waves 1–13)
+## 5. Nhật ký Điều hành Ca 2 của leaderANTI (07/11/2026 — Waves 1–14)
 
 ### 5.1. Hợp đồng & Chế độ Điều phối
 - **Hợp đồng thực thi:** `b556c230-4b4f-4d5d-94bc-bf95ce4338d8` (*`leaderANTI Shift Resumption: REC-01 P1.3 Integration & P1.4/P1.7 Hardening`*).
@@ -63,7 +63,7 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
     2. `antigravity-cli` (Google Antigravity CLI — Gemini 3 Flash)
     3. `google-antigravity-cli-claude-sonnet-02507d` (Claude Sonnet 4.6)
 
-### 5.2. Danh mục 46 Commits đã tích hợp trên `feature/patient-reception-workflow` (Waves 1–13)
+### 5.2. Danh mục 49 Commits đã tích hợp trên `feature/patient-reception-workflow` (Waves 1–14)
 1. **`035e815`** (`bbafd718` — `antigravity-cli` + `leaderANTI`): `Repair REC-01 active room binding validation and test harness [leaderANTI]`
 2. **`a7f93fb`** (`cd124ec5` — `copilot-cli`): `Review REC-01 active room binding and tests [leaderANTI]`
 3. **`563f4d6`** (`1a2d14bf` — `antigravity-cli`): `Add synthetic JDBC tests for BaoHiemRepositoryImpl [leaderANTI]` (`10/10 PASS`)
@@ -110,10 +110,13 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 44. **`f0751bd`** (`96bdaaea` — `copilot-cli`): `Created docs/ke-hoach-trien-khai/phase3-readiness-and-owner-gate-summary.md consolidating Phase 1–2 (SEC-01, REC-01, PAT-02) and Phase 3 (VIS-01, APPT-01) Owner gate checklists [leaderANTI]` ([`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md))
 45. **`56e49ce`** (`025052f7` — `antigravity-cli`): `Updated LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md and desktop-owner-visual-smoke-checklist.md for Wave 12 (474 tests, 6 opt-in skips) [leaderANTI]`
 46. **`7bcaacc`** (`f42ac562` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover doc for Wave 12 [leaderANTI]`
+47. **`de46e71`** (`2aec762b` — `copilot-cli`): `Added JdbcUnitOfWorkTest (5/5 PASS) and JdbcConnectionProviderTest (2/2 PASS) in clinic-infrastructure (achieving 100% class-level test coverage across all 16 classes in clinic-infrastructure) [leaderANTI]`
+48. **`f83a5a9`** (`1b882db2` — `google-antigravity-cli-claude-sonnet-02507d`): `Cross-linked phase3-readiness-and-owner-gate-summary.md across task board and handover docs [leaderANTI]`
+49. **`4fe4bf2`** (`d987a612` — `antigravity-cli`): `Added GetActiveReceptionRoomsHandlerTest (10/10 PASS) and ResultTest (8/8 PASS) in clinic-application [leaderANTI]`
 
 ### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
-- **Tổng số bài test tự động:** **474 tests run** (`100` domain + `131` application + `118` infrastructure + `125` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop).
+- **Tổng số bài test tự động:** **499 tests run** (`100` domain + `149` application + `125` infrastructure + `125` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop).
 - **Gói ứng dụng thực thi:** Fat JAR đã được đóng gói mới nhất tại `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` (không nhúng `db.properties`, hoàn toàn tuân thủ quy tắc bảo mật).
 - **Bảo toàn 100% UI gốc (`6aabb85`) & Cổng an ninh:** Toàn bộ giao diện `LoginForm`, `MainDashboardFrame`, `ReceptionPanel`, `DoctorStationPanel` giữ nguyên 100% bố cục, kích thước, màu sắc và bảng cột gốc; các cổng `SEC-01`, `PAT-02`, `REC-01` giữ nguyên trạng thái `[~] In progress` (`default-deny`) chờ Owner chạy `./run-app.sh` nghiệm thu trực quan.
-- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–3:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) và Phase 3 (`VIS-01`, `APPT-01`) cùng bằng chứng kiểm định 474 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–3:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) và Phase 3 (`VIS-01`, `APPT-01`) cùng bằng chứng kiểm định 499 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 

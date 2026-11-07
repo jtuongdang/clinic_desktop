@@ -1,7 +1,7 @@
 # REC-01 and SEC-01 Desktop Hardening Completion Review
 
 **Review date:** 2026-11-07  
-**Reviewed baseline:** `feature/patient-reception-workflow` at `7bcaacc`  
+**Reviewed baseline:** `feature/patient-reception-workflow` at `4fe4bf2`  
 **Review type:** Read-only source/commit verification and focused synthetic headless tests.
 
 This review verifies the requested REC-01 and SEC-01 hardening slices against the current source, cited commits, focused test classes, and the existing completion reviews. It does not claim Owner visual acceptance or close any gate.
@@ -63,15 +63,23 @@ This review verifies the requested REC-01 and SEC-01 hardening slices against th
 | **LEADERSHIP_HANDOVER_CODEX_RESUMPTION and visual checklist sync for Wave 12** | Updated `LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md` and `desktop-owner-visual-smoke-checklist.md` for Wave 12 (`474` tests, `6` opt-in skips). | `56e49ce` (task `025052f7` — `antigravity-cli`): [`LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md`](LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md), [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md). |
 | **Wave 12 documentation sync** | Synced task board, completion review, and handover doc for Wave 12. | `7bcaacc` (task `f42ac562` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md), [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md). |
 
+## Wave 14 completion evidence (de46e71, f83a5a9, 4fe4bf2)
+
+| Item | Verified implementation and evidence | Commit and focused tests |
+|---|---|---|
+| **100% Infrastructure class-level test coverage — `JdbcUnitOfWorkTest` & `JdbcConnectionProviderTest`** | Added `JdbcUnitOfWorkTest` and `JdbcConnectionProviderTest` in `clinic-infrastructure`, achieving 100% class-level test coverage across all 16 classes in `clinic-infrastructure` ([`JdbcUnitOfWorkTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/JdbcUnitOfWorkTest.java), [`JdbcConnectionProviderTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/JdbcConnectionProviderTest.java)). | `de46e71` (task `2aec762b` — `copilot-cli`): [`JdbcUnitOfWorkTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/JdbcUnitOfWorkTest.java), **5/5 PASS**; [`JdbcConnectionProviderTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/JdbcConnectionProviderTest.java), **2/2 PASS**. |
+| **Phase 3 readiness cross-linking** | Cross-linked `phase3-readiness-and-owner-gate-summary.md` across task board and handover docs. | `f83a5a9` (task `1b882db2` — `google-antigravity-cli-claude-sonnet-02507d`): [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md). |
+| **Application reception handler & Result test coverage — `GetActiveReceptionRoomsHandlerTest` & `ResultTest`** | Added `GetActiveReceptionRoomsHandlerTest` and `ResultTest` in `clinic-application`, thoroughly verifying reception room filtering, department mapping, sorting, and Result monad railway-oriented programming semantics ([`GetActiveReceptionRoomsHandlerTest`](../../clinic-application/src/test/java/vn/clinicmanagement/application/reception/GetActiveReceptionRoomsHandlerTest.java), [`ResultTest`](../../clinic-application/src/test/java/vn/clinicmanagement/application/common/ResultTest.java)). | `4fe4bf2` (task `d987a612` — `antigravity-cli`): [`GetActiveReceptionRoomsHandlerTest`](../../clinic-application/src/test/java/vn/clinicmanagement/application/reception/GetActiveReceptionRoomsHandlerTest.java), **10/10 PASS**; [`ResultTest`](../../clinic-application/src/test/java/vn/clinicmanagement/application/common/ResultTest.java), **8/8 PASS**. |
+
 ## Verification run and gate preservation
 
-The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, the restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**), the Wave 11 test suites (`ReceptionProtectedReadWiringTest` **1/1**, `DoctorStationUiPreservationTest` **3/3**, `DoctorCompositionRootTest` **2/2**), and the restored Wave 12 opt-in suites (`ReceptionSqlServerPersistenceTest`, `ReceptionSqlServerProcessRestartTest`). Across the reactor, **474 tests run (100 domain + 131 application + 118 infrastructure + 125 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
+The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, the restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**), the Wave 11 test suites (`ReceptionProtectedReadWiringTest` **1/1**, `DoctorStationUiPreservationTest` **3/3**, `DoctorCompositionRootTest` **2/2**), the restored Wave 12 opt-in suites (`ReceptionSqlServerPersistenceTest`, `ReceptionSqlServerProcessRestartTest`), the Wave 14 infrastructure test suites (`JdbcUnitOfWorkTest` **5/5**, `JdbcConnectionProviderTest` **2/2**), and the Wave 14 application test suites (`GetActiveReceptionRoomsHandlerTest` **10/10**, `ResultTest` **8/8**). Across the reactor, **499 tests run (100 domain + 149 application + 125 infrastructure + 125 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
 
 ```sh
 mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
-  -pl clinic-desktop,clinic-infrastructure -am \
+  -pl clinic-desktop,clinic-infrastructure,clinic-application -am \
   -Djava.awt.headless=true -Dsurefire.failIfNoSpecifiedTests=false \
-  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest,MainLookAndFeelTest,ExaminationShortcutMaskTest,DocxManagerTest,DocxDocumentTest,ReceptionProtectedReadWiringTest,DoctorStationUiPreservationTest,DoctorCompositionRootTest,ReceptionSqlServerPersistenceTest,ReceptionSqlServerProcessRestartTest \
+  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest,MainLookAndFeelTest,ExaminationShortcutMaskTest,DocxManagerTest,DocxDocumentTest,ReceptionProtectedReadWiringTest,DoctorStationUiPreservationTest,DoctorCompositionRootTest,ReceptionSqlServerPersistenceTest,ReceptionSqlServerProcessRestartTest,JdbcUnitOfWorkTest,JdbcConnectionProviderTest,GetActiveReceptionRoomsHandlerTest,ResultTest \
   test
 ```
 
@@ -79,9 +87,9 @@ mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
 
 ## Related Artifacts
 
-- [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md) — Consolidated Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) and Phase 3 (`VIS-01`, `APPT-01`) Owner gate checklists and readiness summary (`f0751bd`)
+- [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md) — Consolidated Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) and Phase 3 (`VIS-01`, `APPT-01`) Owner gate checklists and readiness summary (`f0751bd`, cross-linked `f83a5a9`)
 - [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md) — Doctor UI invariants and surgical wiring blueprint for PAT-02 (`797cc8c`, updated `aa09058`)
-- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`7bcaacc`)
+- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`4fe4bf2`)
 - [`LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md`](LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md) — Technical handover for Codex resumption (`56e49ce`)
 - [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)
 - [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md)
