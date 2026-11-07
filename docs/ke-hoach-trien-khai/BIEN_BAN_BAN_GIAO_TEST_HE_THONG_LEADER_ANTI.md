@@ -44,14 +44,64 @@ java -jar clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar
 
 ## 3. Thông Tin Tài Khoản Đăng Nhập Mẫu (Seed Data)
 
-Các tài khoản dưới đây đã được mã hóa chuẩn PBKDF2-HMAC-SHA256 trong CSDL qua migration `V2` và `V3`:
+Tất cả các tài khoản dưới đây đã được cấu hình và đồng bộ hoàn chỉnh vào CSDL `clinicDb` với mã hóa mật khẩu PBKDF2-HMAC-SHA256 (210,000 vòng lặp):
 
-| Tài khoản (Username) | Mật khẩu (Password) | Vai trò (Role) | Chức năng chính trên giao diện |
-|---|---|---|---|
-| **`admin`** | `Password123!` | `ADMIN` (Quản trị viên) | Toàn quyền truy cập mọi phân hệ: Tiếp đón, Bàn khám, Kho dược, Viện phí, Quản trị nhân sự, Báo cáo thống kê, Cấu hình hệ thống. |
-| **`tiennv`** | `Password123!` | `DOCTOR` (Bác sĩ điều trị) | Truy cập Bàn khám Bác sĩ (`DoctorStationPanel`), khám bệnh, kê đơn thuốc, chỉ định cận lâm sàng, xem lịch sử bệnh án. |
+| Tài khoản (Username) | Mật khẩu (Password) | Vai trò (Role) | Họ và Tên | Phân hệ truy cập & Chức năng |
+|---|---|---|---|---|
+| **`admin`** | `Password123!` | `ADMIN` | Nguyễn Quản Trị | Toàn quyền quản trị hệ thống, danh mục, phân quyền. |
+| **`tiennv`** | `Password123!` | `DOCTOR` | BS. Nguyễn Văn Tiến | Bàn khám Bác sĩ (`DoctorStationPanel`), kê đơn, chỉ định CLS. |
+| **`doctor`** | `Password123!` | `DOCTOR` | BS. Lê Thị Bác Sĩ | Bàn khám Bác sĩ (`DoctorStationPanel`), kê đơn, chỉ định CLS. |
+| **`director`** | `Password123!` | `ADMIN` | BS.CKII Trần Văn Giám Đốc | Toàn quyền kiểm tra, xem dashboard chỉ số lãnh đạo. |
+| **`receptionist`** | `Password123!` | `RECEPTIONIST` | Hoàng Thị Lễ Tân | Tiếp đón & Đăng ký khám (`ReceptionPanel`), phân buồng khám. |
+| **`pharmacist`** | `Password123!` | `PHARMACIST` | DS. Phạm Văn Dược Sĩ | Kho dược (`PharmacyInventoryPanel`), xuất nhập thuốc, thẻ kho. |
+| **`accountant`** | `Password123!` | `CASHIER` | Vũ Thị Thu Ngân | Thu ngân & Viện phí (`BillingInvoicePanel`), in bảng kê viện phí. |
+| **`cashier`** | `Password123!` | `CASHIER` | Đặng Văn Thu Ngân | Thu ngân & Viện phí (`BillingInvoicePanel`), thu tiền tạm ứng/thanh toán. |
 
 *(Lưu ý: Hệ thống được trang bị cơ chế chống dò mật khẩu `V11__Add_Account_Login_Throttle`. Nếu đăng nhập sai quá số lần quy định, tài khoản sẽ tự động bị khóa tạm thời theo chính sách bảo mật).*
+
+---
+
+## 3.1. Dữ Liệu Khởi Tạo Thực Tế Sẵn Sàng Kiểm Thử (Operational Data Seeded)
+
+CSDL `clinicDb` đã được nạp dữ liệu vận hành thực tế:
+- **Cơ sở y tế:** BỆNH VIỆN SẢN NHI BẮC NINH (Cơ sở 1).
+- **Khoa phòng:** Khoa Khám Bệnh, Khoa Nhi, Khoa Phụ Sản, Khoa Cận Lâm Sàng & CĐHA, Khoa Dược.
+- **Buồng khám ngoại trú:** PK Nhi 1, PK Nhi 2, Phòng Tiêm Chủng, Cấp Cứu Nhi, PK Phụ Khoa...
+- **Bệnh nhân mẫu:**
+  - `BN-20261104-35777CEC`: Trần Văn Bình (Đang chờ khám tại Cấp cứu nhi)
+  - `BN-20261104-308B2B4D`: Lê Thị Mai (Đang chờ khám tại Cấp cứu nhi)
+  - `BN-20261107-0003`: Nguyễn Hoàng Long (Đang chờ khám tại PK Nhi 1 - STT 01)
+  - `BN-20261107-0004`: Phạm Quỳnh Trang (Đang chờ khám tại PK Nhi 1 - STT 02)
+- **Kho Dược & Tồn Kho (Lô/Hạn FEFO):**
+  - Duphalac 10g/15ml (Kho Ngoại Trú - Lô L0124 - Hạn 2028-11-04)
+  - Aciclovir 5% 5g (Kho Ngoại Trú - Lô A0524 - Hạn 2028-05-04)
+  - Paracetamol 500mg (Kho Ngoại Trú - Lô P0824 - Hạn 2029-11-04)
+  - Amoxicillin 500mg (Kho Ngoại Trú - Lô AMOX-2026A - Hạn 2028-10-15)
+  - Cefixim 200mg (Kho Ngoại Trú - Lô CEF-2026B - Hạn 2028-12-31)
+  - Oresol 245mg (Kho Ngoại Trú - Lô ORE-2026C - Hạn 2029-06-30)
+
+---
+
+## 3.2. Báo Cáo Dọn Dẹp Cơ Sở Dữ Liệu & Giải Phóng Tài Nguyên
+
+Trong quá trình triển khai kiểm thử tự động, 11 CSDL tạm (`clinic_test_*`, `clinic_orchestrator_*`) đã phát sinh. Leader ANTI đã thực hiện:
+1. **Kiểm tra và đồng bộ:** Toàn bộ cấu trúc chuẩn (49 bảng, V1-V11) và dữ liệu vận hành mẫu đã được đồng bộ chuẩn hóa vào CSDL chính `clinicDb`.
+2. **Giải phóng CSDL rác:** Đã xóa sạch (`DROP DATABASE`) toàn bộ 11 CSDL tạm:
+   - `clinic_orchestrator_review_20261105`
+   - `clinic_test_migration_bootstrap_20261105`
+   - `clinic_test_audit_20261105`
+   - `clinic_test_v9_20261106`
+   - `clinic_test_v9_preflight_20261106`
+   - `clinic_test_sec_reception_20261106`
+   - `clinic_test_v10_history_scope_20261106`
+   - `clinic_test_v10_history_scope_retry_20261106`
+   - `clinic_test_v10_history_scope_final_20261106`
+   - `clinic_test_patient_history_20261106`
+   - `clinic_test_lockout_fresh_20261106`
+3. **Danh sách CSDL hiện hành trên SQL Server:** Chỉ giữ lại CSDL hệ thống và CSDL chính:
+   - `master`, `tempdb`, `model`, `msdb` (System)
+   - `clinicDb` (Core HIS System - Sẵn sàng kiểm thử)
+   - `ClinicManagementDb`, `QLSanpham`, `HotelDb` (CSDL độc lập của Owner không bị ảnh hưởng)
 
 ---
 
