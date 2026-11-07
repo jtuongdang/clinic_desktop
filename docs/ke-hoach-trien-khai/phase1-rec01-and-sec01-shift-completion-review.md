@@ -1,7 +1,7 @@
 # REC-01 and SEC-01 Desktop Hardening Completion Review
 
 **Review date:** 2026-11-07  
-**Reviewed baseline:** `feature/patient-reception-workflow` at `f150edc`  
+**Reviewed baseline:** `feature/patient-reception-workflow` at `8fa16a0`  
 **Review type:** Read-only source/commit verification and focused synthetic headless tests.
 
 This review verifies the requested REC-01 and SEC-01 hardening slices against the current source, cited commits, focused test classes, and the existing completion reviews. It does not claim Owner visual acceptance or close any gate.
@@ -31,6 +31,14 @@ This review verifies the requested REC-01 and SEC-01 hardening slices against th
 | **`PLAT-ERROR-DOCX-01` — Safe non-leaking DOCX save error handling** | Restored safe non-leaking save error handling in `DocxManager.java` (`PLAT-ERROR-DOCX-01`, utilizing static `toUserFacingSaveFailureMessage` returning fixed safe message without appending raw exception details or `ex.getMessage()` to prevent OS/path disclosure) ([`DocxManager`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/docx/DocxManager.java)). | `669cf3f` (task `7815363c` — `antigravity-cli`): [`DocxManagerTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/core/docx/DocxManagerTest.java), **1/1 PASS**; [`DocxDocumentTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/core/docx/DocxDocumentTest.java), **2/2 PASS**. |
 | **Desktop Main UI Preservation Review (Wave 1–8)** | Updated `desktop-main-ui-preservation-review.md` with Wave 1–8 preservation verification, confirming 100% adherence to `6aabb85` UI geometry, component hierarchy, and design standards across login, shell, reception, and doctor screens. | `f150edc` (task `81cd98ec` — `google-antigravity-cli-claude-sonnet-02507d`): [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md). |
 
+## Wave 10 completion evidence (797cc8c, b7c550b, 8fa16a0)
+
+| Item | Verified implementation and evidence | Commit and focused tests |
+|---|---|---|
+| **`PAT-02` — Doctor UI preservation and surgical wiring plan** | Created `phase1-doctor-ui-preservation-and-wiring-plan.md` documenting `6aabb85` Doctor UI invariants, `50c53ce` regression analysis, and surgical wiring blueprint for `PAT-02` ([`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md)). | `797cc8c` (task `5630061f` — `copilot-cli`): [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md). |
+| **Wave 9 documentation sync** | Synced `03-model-task-board.md` and `phase1-rec01-and-sec01-shift-completion-review.md` for Wave 9 commits (`b69be2b`, `669cf3f`, `f150edc`). | `b7c550b` (task `e572f1c2` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md). |
+| **Waves 1–10 leadership summary and visual checklist sync** | Updated `LEADERSHIP_HANDOVER_LEADER_ANTI.md` and `desktop-owner-visual-smoke-checklist.md` with Waves 1–10 summary (36 commits integrated, 466 passing synthetic tests) ([`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md), [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)). | `8fa16a0` (task `3468a083` — `leaderANTI`): [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md), [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md). |
+
 ## Verification run and gate preservation
 
 The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, and the newly restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**). Across the reactor, **466 tests PASS (100 domain + 131 application + 118 infrastructure + 117 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
@@ -45,10 +53,12 @@ mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
 
 **Gate decision is unchanged:** `SEC-01`, `PAT-02`, and `REC-01` remain **`[~] In progress` (default-deny)** pending Owner visual smoke acceptance on `clinicDb`. Headless tests and static review do not substitute for that acceptance. This review did not launch the application, connect to `clinicDb`, or perform live-system verification. The existing Owner smoke checklist remains unaccepted.
 
-## Review inputs
+## Related Artifacts
 
-- [`phase1-rec01-desktop-evidence-review.md`](phase1-rec01-desktop-evidence-review.md)
-- [`phase2-sec01-desktop-auth-review.md`](phase2-sec01-desktop-auth-review.md)
-- [`03-model-task-board.md`](03-model-task-board.md)
+- [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md) — Doctor UI invariants and surgical wiring blueprint for PAT-02 (`797cc8c`)
+- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`8fa16a0`)
 - [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)
 - [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md)
+- [`03-model-task-board.md`](03-model-task-board.md)
+- [`phase1-rec01-desktop-evidence-review.md`](phase1-rec01-desktop-evidence-review.md)
+- [`phase2-sec01-desktop-auth-review.md`](phase2-sec01-desktop-auth-review.md)
