@@ -91,4 +91,59 @@ Khi Codex quay trở lại làm việc, vui lòng tuân thủ nghiêm ngặt cá
    * **Phân hệ Lịch hẹn (`APPT-01`):** Triển khai quản lý đặt lịch/hủy lịch có chống trùng và audit.
 
 ---
-*Biên bản được lập và ký nhận điện tử bởi `leaderANTI`. Toàn bộ tiến trình chạy nền đã được dừng an toàn theo yêu cầu của Owner.*
+*Biên bản được lập và ký nhận điện tử ban đầu bởi `leaderANTI`. Toàn bộ tiến trình chạy nền đã được dừng an toàn theo yêu cầu của Owner.*
+
+---
+
+## 6. CẬP NHẬT CA TRỰC SỐ 2 CỦA LEADERANTI — WAVES 1–12, 07/11/2026
+
+### 6.1. Bối cảnh tái tiếp nhận điều hành tự trị
+Sau khi hoàn tất ca trực số 1 (commit `e6a1d1e`, 417 tests), tiến trình `codex-local` tạm dừng hoạt động (`enabled = 0`) do hết hạn ngạch token (token exhaustion). Dưới Hợp đồng điều hành tự trị số `b556c230-4b4f-4d5d-94bc-bf95ce4338d8` được phê duyệt trong hệ thống Orchestrator, `leaderANTI` đã tái tiếp nhận quyền điều hành kỹ thuật, chỉ đạo xuyên suốt các worker agents thực hiện toàn diện Waves 1–12.
+
+### 6.2. Tổng kết thành quả Waves 1–12 (42 commits: `035e815` → `29d99cc`)
+Ca trực số 2 đã thực thi và tích hợp thành công 42 commits từ `035e815` đến `29d99cc` với các cụm thành tựu chính:
+
+1. **Gia cố toàn diện phân hệ Tiếp Đón (`REC-01` Hardening):**
+   - **P0.2:** Phân biệt phòng khám trùng tên bằng định danh duy nhất (`TenPhong (#id)`), liên kết phím tắt F1 (Bệnh nhân mới) và F2 (Lưu lại), thiết lập cờ khóa form tạm thời (`in-flight save form lock`) chống double-submit khi worker đang lưu dữ liệu ngầm.
+   - **P1.3:** Ràng buộc chặt chẽ định danh phòng khám đang kích hoạt (`active room identity binding`) và loại bỏ hoàn toàn việc can thiệp phản chiếu (reflective mutation) vào `JList` của `MedicalPopupChooser`.
+   - **P1.4:** Chuẩn hóa việc ủy quyền xóa form từ `ReceptionPanel.clearForm()` sang `PatientRegistrationFormPanel.clearForm()`; đấu nối cập nhật dữ liệu bảng tổng hợp phòng khám qua `statusPanel.setRoomSummaries(...)`.
+   - **P1.5:** Quản lý vòng đời tác vụ nền `SwingWorker` bằng thế hệ phiên (`session-generation`) và epoch guards; chuẩn hóa cơ chế khử độc thông báo lỗi (sanitizer) kết hợp Correlation ID an toàn.
+   - **P1.6:** Hoàn thiện cơ chế xử lý trùng CCCD (`duplicate-CCCD alignment`): bảo toàn nguyên vẹn dữ liệu nháp (draft preservation) khi phát hiện trùng CCCD, hiển thị hộp thoại xác nhận gợi ý tra cứu hồ sơ cũ mà không xóa thông tin draft.
+   - **P1.7:** Chuẩn hóa ngày khám hệ thống theo múi giờ `Asia/Ho_Chi_Minh`; giới hạn kết quả tìm kiếm tối đa 50 bản ghi (`50-result search cap`); tự động dọn sạch bảng phòng khám khi nạp dữ liệu thất bại.
+   - **P2.8:** Khôi phục hoàn chỉnh hạ tầng dây nối (wiring) tiếp đón và các test tích hợp nghiệp vụ.
+
+2. **Cổng bảo mật & Xác thực danh tính (`SEC-01`):**
+   - Khắc phục triệt để các phát hiện bảo mật `FINDING-SEC-01-01`, `FINDING-SEC-01-02`, và `FINDING-SEC-01-03`.
+   - Hộp thoại 'Người Dùng' trên `MainDashboardFrame` đọc dữ liệu xác thực từ `CompletedLoginSession`.
+   - Bổ sung các helper đồng bộ trạng thái thanh Ribbon/khóa màn hình ở chế độ headless và bộ test xác minh `SessionLockOverlay`.
+
+3. **Khắc phục lỗi nền tảng đồ họa & Phím tắt (`PLAT-ERROR-03`):**
+   - `Main.java`: Bổ sung cơ chế fallback an toàn khi cài đặt giao diện `installLookAndFeel` cùng bộ test `MainLookAndFeelTest`.
+   - `ExaminationPanel.java`: Khôi phục `getMenuShortcutKeyMaskEx(Toolkit)` đa nền tảng cùng bộ test `ExaminationShortcutMaskTest`.
+
+4. **Bảo mật & Ổn định xuất tài liệu Word (`PLAT-ERROR-DOCX-01`):**
+   - `DocxManager.java`: Khắc phục nguy cơ rò rỉ thông tin nhạy cảm qua thông báo lỗi khi lưu tài liệu DOCX thất bại, chuyển thành thông báo an toàn không làm lộ đường dẫn nội bộ; bổ sung các bộ test `DocxManagerTest` và `DocxDocumentTest`.
+
+5. **Bảo toàn giao diện Bàn khám Bác sĩ & Kế hoạch đấu nối (`PAT-02`):**
+   - Xây dựng `DoctorCompositionRoot` thuần non-UI, tách biệt hoàn toàn logic điều phối và không làm thay đổi giao diện đồ họa.
+   - Bổ sung bộ test kiểm chứng bảo toàn UI: `DoctorStationUiPreservationTest`.
+   - Ban hành tài liệu quy hoạch chi tiết: `docs/ke-hoach-trien-khai/phase1-doctor-ui-preservation-and-wiring-plan.md`.
+
+6. **Khôi phục bộ kiểm thử tích hợp & Lưu trữ SQL Server:**
+   - Khôi phục và đảm bảo độ ổn định cho 3 suite kiểm thử quan trọng:
+     - `ReceptionProtectedReadWiringTest`
+     - `ReceptionSqlServerPersistenceTest`
+     - `ReceptionSqlServerProcessRestartTest`
+
+### 6.3. Bằng chứng kiểm định Reactor tại commit `29d99cc`
+Kiểm thử toàn bộ hệ thống bằng Maven Reactor (`mvn test` với `java.awt.headless=true`):
+* **Tổng số test thực thi:** **474 tests run**
+  * **Domain:** 100 tests passed (0 failures, 0 errors)
+  * **Application:** 131 tests passed (0 failures, 0 errors)
+  * **Infrastructure:** 118 tests passed (0 failures, 0 errors, 4 expected opt-in SQL Server skips)
+  * **Desktop:** 125 tests passed (0 failures, 0 errors, 2 expected opt-in SQL Server skips)
+* **Tổng kết:** **474 tests run (100 domain + 131 application + 118 infrastructure + 125 desktop), 0 failures, 0 errors, 6 expected opt-in SQL Server skips (4 in infrastructure + 2 in desktop)**.
+* **Đóng gói ứng dụng:** Đã tạo thành công Fat JAR `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` sẵn sàng cho Owner chạy visual smoke.
+* **Nguyên tắc an toàn dữ liệu:**
+  - Không có bất kỳ kiểm thử tự động nào can thiệp hay ghi dữ liệu vào `clinicDb` (`localhost:1433`).
+  - Các phân hệ `SEC-01`, `PAT-02`, và `REC-01` tiếp tục duy trì trạng thái default-deny chờ Owner nghiệm thu trực quan.
