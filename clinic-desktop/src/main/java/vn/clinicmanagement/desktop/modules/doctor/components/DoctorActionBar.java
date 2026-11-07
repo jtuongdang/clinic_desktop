@@ -48,15 +48,15 @@ public class DoctorActionBar extends JPanel {
         JPanel bannerText = new JPanel(new GridLayout(3, 1, 0, 2));
         bannerText.setOpaque(false);
 
-        lblBannerLine1 = new JLabel("TEST BN 033 | 18039327 | 1995 (23 tuổi) | Nam", SwingConstants.RIGHT);
+        lblBannerLine1 = new JLabel("Chưa chọn bệnh nhân", SwingConstants.RIGHT);
         lblBannerLine1.setFont(AppFonts.SECTION);
         lblBannerLine1.setForeground(new Color(139, 20, 20)); // Red bold
 
-        lblBannerLine2 = new JLabel("GD-4-21-21-212-12125 | Còn 49 ngày", SwingConstants.RIGHT);
+        lblBannerLine2 = new JLabel("-", SwingConstants.RIGHT);
         lblBannerLine2.setFont(AppFonts.BODY);
         lblBannerLine2.setForeground(new Color(139, 20, 20));
 
-        lblBannerLine3 = new JLabel("Xã Việt Hồng, H. Thanh Hà, Hải Dương", SwingConstants.RIGHT);
+        lblBannerLine3 = new JLabel("", SwingConstants.RIGHT);
         lblBannerLine3.setFont(AppFonts.BODY);
         lblBannerLine3.setForeground(new Color(139, 20, 20));
 
@@ -64,14 +64,14 @@ public class DoctorActionBar extends JPanel {
         bannerText.add(lblBannerLine2);
         bannerText.add(lblBannerLine3);
 
-        // Khối BHYT 80% to rõ ràng
+        // Khối BHYT to rõ ràng
         JPanel bhytBox = new JPanel(new GridLayout(2, 1));
         bhytBox.setOpaque(false);
         JLabel lblBhytTag = new JLabel("BHYT", SwingConstants.CENTER);
         lblBhytTag.setFont(AppFonts.BODY_BOLD);
         lblBhytTag.setForeground(new Color(139, 20, 20));
 
-        lblBannerBhytRate = new JLabel("80%", SwingConstants.CENTER);
+        lblBannerBhytRate = new JLabel("-", SwingConstants.CENTER);
         lblBannerBhytRate.setFont(AppFonts.HEADER);
         lblBannerBhytRate.setForeground(new Color(20, 40, 160)); // Navy bold
 
@@ -85,11 +85,22 @@ public class DoctorActionBar extends JPanel {
     }
 
     public void updatePatient(PatientExamDto p) {
-        if (p == null) return;
-        lblBannerLine1.setText(p.getName() + " | " + p.getShortCode() + " | " + p.getBirthYear() + " (" + p.getAge() + ") | " + p.getGender());
-        lblBannerLine2.setText(p.getBhytCode() + " | Còn 49 ngày");
-        lblBannerLine3.setText(p.getAddress());
-        lblBannerBhytRate.setText(p.getBhytRate());
+        if (p == null) {
+            lblBannerLine1.setText("Chưa chọn bệnh nhân");
+            lblBannerLine2.setText("-");
+            lblBannerLine3.setText("");
+            lblBannerBhytRate.setText("-");
+            return;
+        }
+        String name = p.getName() != null && !p.getName().isBlank() ? p.getName() : "-";
+        String code = p.getShortCode() != null && !p.getShortCode().isBlank() ? p.getShortCode() : "-";
+        String age = p.getAge() != null && !p.getAge().isBlank() ? " (" + p.getAge() + ")" : "";
+        String birthYear = p.getBirthYear() != null && !p.getBirthYear().isBlank() ? p.getBirthYear() + age : "-";
+        String gender = p.getGender() != null && !p.getGender().isBlank() ? p.getGender() : "-";
+        lblBannerLine1.setText(name + " | " + code + " | " + birthYear + " | " + gender);
+        lblBannerLine2.setText(p.getBhytCode() != null && !p.getBhytCode().isBlank() ? p.getBhytCode() : "-");
+        lblBannerLine3.setText(p.getAddress() != null ? p.getAddress() : "");
+        lblBannerBhytRate.setText(p.getBhytRate() != null && !p.getBhytRate().isBlank() ? p.getBhytRate() : "-");
     }
 
     private JButton createActionButton(String text, String icon, boolean highlighted, Color bg) {

@@ -12,5 +12,6 @@ public enum AuditResourceType {
     INVENTORY_RECEIPT,
     INVENTORY_ISSUE,
     STOCKTAKE,
-    ITEM
+    ITEM,
+    SERVICE_ORDER
 }

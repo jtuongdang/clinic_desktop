@@ -1,7 +1,15 @@
 package vn.clinicmanagement.desktop.modules.doctor;
 
-import vn.clinicmanagement.desktop.core.config.AppFonts;
+import vn.clinicmanagement.application.audit.AuditActorContext;
+import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.reception.GetDoctorQueueQuery;
+import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
+import vn.clinicmanagement.desktop.core.config.AppFonts;
+import vn.clinicmanagement.desktop.core.diagnostics.DesktopWorkerDiagnostics;
+import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.desktop.modules.doctor.components.DoctorActionBar;
 import vn.clinicmanagement.desktop.modules.doctor.components.DoctorClinicalForm;
 import vn.clinicmanagement.desktop.modules.doctor.components.DoctorHistoryPanel;
@@ -11,8 +19,15 @@ import vn.clinicmanagement.desktop.modules.doctor.model.PatientExamDto;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Màn hình Bàn Khám Bác Sĩ & Quản Lý Điều Trị (Doctor Station)
@@ -22,62 +37,38 @@ import java.util.List;
 public class DoctorStationPanel extends BaseViewPanel {
 
     private final List<PatientExamDto> patientList = new ArrayList<>();
+    private final DoctorCompositionRoot.Services services;
+    private final SessionLifecycleService sessionLifecycleService;
+    private final List<SwingWorker<?, ?>> inFlightWorkers = new CopyOnWriteArrayList<>();
+    private final AtomicLong refreshSequence = new AtomicLong();
+    private final AtomicLong viewSessionEpoch = new AtomicLong();
+
     private DoctorActionBar actionBar;
     private DoctorQueueSidebar queueSidebar;
     private DoctorClinicalForm clinicalForm;
     private DoctorHistoryPanel historyPanel;
 
     public DoctorStationPanel() {
-        super("treatment", "Điều Trị", "👨‍⚕️");
-        initPatientData();
-        buildUI();
-        queueSidebar.selectPatient(1); // Mặc định chọn TEST BN 033 như trong ảnh mẫu
+        this(resolveDefaultServices(), null);
     }
 
-    private void initPatientData() {
-        patientList.add(new PatientExamDto("TEST BN 060", "18039321 - GD4", "Nữ", "1988", "30 tuổi",
-                "Phường Lê Thanh Nghị, TP Hải Dương", "GD-4-21-21-212-00060", "80%", "01/01/18 - 31/12/18",
-                "08:15 11/11/2018", "BS. Nguyễn Văn Tuấn", "Khoa Khám Bệnh > Phòng Nội 1", "Viêm họng cấp", "J02"));
+    public DoctorStationPanel(DoctorCompositionRoot.Services services) {
+        this(services, null);
+    }
 
-        patientList.add(new PatientExamDto("TEST BN 033", "18039327 - GD4", "Nam", "1995", "23 tuổi",
-                "Xã Việt Hồng, H. Thanh Hà, Hải Dương", "GD-4-21-21-212-12125", "80%", "01/01/18 - 31/12/18",
-                "09:40 11/11/2018", "Lê Tiến Quân", "Ngoại Đầu cổ > P.Điều Trị Ngoại DC", "D21 - Bướu lành khác của mô liên kết và mô mềm", "D21"));
+    public DoctorStationPanel(DoctorCompositionRoot.Services services, SessionLifecycleService sessionLifecycleService) {
+        super("treatment", "Điều Trị", "👨‍⚕️");
+        this.services = services;
+        this.sessionLifecycleService = sessionLifecycleService;
+        buildUI();
+    }
 
-        patientList.add(new PatientExamDto("TEST BN 032", "18033325 - GD4", "Nữ", "1992", "26 tuổi",
-                "Huyện Tứ Kỳ, Hải Dương", "GD-4-21-21-212-12032", "80%", "01/01/18 - 31/12/18",
-                "08:45 11/11/2018", "Lê Tiến Quân", "Khoa Ngoại", "Viêm xoang hàm", "J01.0"));
-
-        patientList.add(new PatientExamDto("TEST BN 031", "18039225 - GD4", "Nam", "1978", "40 tuổi",
-                "Thị xã Kinh Môn, Hải Dương", "GD-4-21-21-212-12031", "80%", "01/01/18 - 31/12/18",
-                "09:00 11/11/2018", "BS. Trần Văn Hùng", "Khoa Tai Mũi Họng", "Viêm amidan hốc mủ", "J03.9"));
-
-        patientList.add(new PatientExamDto("TEST BN B30", "18039224 - GD4", "Nữ", "2000", "18 tuổi",
-                "TP Hải Dương", "GD-4-21-21-212-12030", "80%", "01/01/18 - 31/12/18",
-                "09:15 11/11/2018", "Lê Tiến Quân", "Khoa Ngoại", "Polyp mũi xoang", "J33.0"));
-
-        patientList.add(new PatientExamDto("PHẠM QUANG XX", "18039323 - DN4", "Nam", "1991", "27 tuổi",
-                "Huyện Nam Sách, Hải Dương", "DN-4-21-21-212-99999", "100%", "01/01/18 - 31/12/18",
-                "09:30 11/11/2018", "Lê Tiến Quân", "Khoa Khám Bệnh", "Rối loạn tiền đình", "H81.0"));
-
-        patientList.add(new PatientExamDto("PHẠM VĂN KHÁP", "18039229 - BT2", "Nam", "1965", "53 tuổi",
-                "Huyện Cẩm Giàng, Hải Dương", "BT-2-21-21-212-88888", "100%", "01/01/18 - 31/12/18",
-                "09:35 11/11/2018", "BS. Nguyễn Văn Tuấn", "Khoa Nội", "Tăng huyết áp", "I10"));
-
-        patientList.add(new PatientExamDto("TRẦN QUỐC CHÍNH", "18038221 - HT2", "Nam", "1958", "60 tuổi",
-                "TP Hải Dương", "HT-2-21-21-212-77777", "95%", "01/01/18 - 31/12/18",
-                "09:50 11/11/2018", "Lê Tiến Quân", "Ngoại Đầu cổ", "Viêm khớp dạng thấp", "M06.9"));
-
-        patientList.add(new PatientExamDto("NGUYỄN THỊ NHÀ", "18038790 - MS2", "Nữ", "1972", "46 tuổi",
-                "Huyện Gia Lộc, Hải Dương", "MS-2-21-21-212-66666", "80%", "01/01/18 - 31/12/18",
-                "10:00 11/11/2018", "BS. Trần Văn Hùng", "Khoa Mắt", "Đục thủy tinh thể", "H25"));
-
-        patientList.add(new PatientExamDto("NGUYỄN KIẾN SƠN", "18038797 - KC2", "Nam", "1984", "34 tuổi",
-                "Huyện Bình Giang, Hải Dương", "KC-2-21-21-212-55555", "80%", "01/01/18 - 31/12/18",
-                "10:15 11/11/2018", "Lê Tiến Quân", "Khoa Ngoại", "Chấn thương phần mềm", "T14.0"));
-
-        patientList.add(new PatientExamDto("NGUYỄN VĂN THÁI", "18038799 - GD4", "Nam", "1996", "22 tuổi",
-                "TP Hải Dương", "GD-4-21-21-212-44444", "80%", "01/01/18 - 31/12/18",
-                "10:20 11/11/2018", "BS. Nguyễn Văn Tuấn", "Khoa Khám Bệnh", "Viêm phế quản cấp", "J20.9"));
+    private static DoctorCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return DoctorCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private void buildUI() {
@@ -130,7 +121,6 @@ public class DoctorStationPanel extends BaseViewPanel {
     }
 
     private void onPatientChanged(PatientExamDto p) {
-        if (p == null) return;
         actionBar.updatePatient(p);
         clinicalForm.updatePatient(p);
         historyPanel.updateHistory(p);
@@ -151,6 +141,153 @@ public class DoctorStationPanel extends BaseViewPanel {
 
     @Override
     public void refreshData() {
-        // Tải danh sách bệnh nhân từ Application / Domain Service
+        if (services == null || services.doctorQueue() == null) {
+            queueSidebar.setPatients(List.of());
+            onPatientChanged(null);
+            return;
+        }
+
+        cancelInFlightWorkers();
+
+        AuthorizationContext authzContext = currentAuthorizationContext();
+        AuditActorContext auditContext = currentAuditActorContext();
+        if (authzContext == null) {
+            queueSidebar.setPatients(List.of());
+            onPatientChanged(null);
+            return;
+        }
+
+        long epoch = viewSessionEpoch.get();
+        long sequence = refreshSequence.incrementAndGet();
+
+        SwingWorker<Result<List<ReceptionQueueItem>>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Result<List<ReceptionQueueItem>> doInBackground() {
+                GetDoctorQueueQuery query = new GetDoctorQueueQuery(
+                        LocalDate.now(), authzContext, auditContext);
+                return services.doctorQueue().handle(query);
+            }
+
+            @Override
+            protected void done() {
+                inFlightWorkers.remove(this);
+                if (epoch != viewSessionEpoch.get() || sequence != refreshSequence.get() || isCancelled()) {
+                    return;
+                }
+                try {
+                    Result<List<ReceptionQueueItem>> result = get();
+                    if (result != null && result.isSuccess()) {
+                        List<ReceptionQueueItem> items = result.getValue().orElse(List.of());
+                        List<PatientExamDto> mapped = new ArrayList<>();
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+                        for (ReceptionQueueItem item : items) {
+                            if (item == null) continue;
+                            String regTime = item.registeredAt() != null
+                                    ? item.registeredAt().format(formatter)
+                                    : "";
+                            mapped.add(new PatientExamDto(
+                                    item.patientName(),
+                                    item.patientCode() != null ? item.patientCode() : "",
+                                    "-",
+                                    "-",
+                                    "-",
+                                    "",
+                                    "-",
+                                    "-",
+                                    "",
+                                    regTime,
+                                    authzContext.roleCode(),
+                                    item.roomName() != null ? item.roomName() : "",
+                                    item.status() != null ? item.status() : "",
+                                    ""
+                            ));
+                        }
+                        queueSidebar.setPatients(mapped);
+                    } else {
+                        queueSidebar.setPatients(List.of());
+                        onPatientChanged(null);
+                    }
+                } catch (InterruptedException ex) {
+                    DesktopWorkerDiagnostics.restoreInterruptStatus();
+                } catch (CancellationException ex) {
+                    // Normal worker cancellation
+                } catch (ExecutionException ex) {
+                    queueSidebar.setPatients(List.of());
+                    onPatientChanged(null);
+                }
+            }
+        };
+
+        inFlightWorkers.add(worker);
+        worker.execute();
+    }
+
+    public void cancelInFlightWorkers() {
+        for (SwingWorker<?, ?> worker : inFlightWorkers) {
+            worker.cancel(true);
+        }
+        inFlightWorkers.clear();
+    }
+
+    public int getInFlightWorkersCount() {
+        return inFlightWorkers.size();
+    }
+
+    public DoctorCompositionRoot.Services getServices() {
+        return services;
+    }
+
+    public DoctorQueueSidebar getQueueSidebar() {
+        return queueSidebar;
+    }
+
+    public DoctorActionBar getActionBar() {
+        return actionBar;
+    }
+
+    public DoctorClinicalForm getClinicalForm() {
+        return clinicalForm;
+    }
+
+    public DoctorHistoryPanel getHistoryPanel() {
+        return historyPanel;
+    }
+
+    private AuthorizationContext currentAuthorizationContext() {
+        if (sessionLifecycleService != null) {
+            return sessionLifecycleService.currentAuthorizationContext().orElse(null);
+        }
+        UserSession session = UserSession.getInstance();
+        int employeeId = session.getUserId() > 0 ? session.getUserId() : 1;
+        int roleId = session.getRoleId() > 0 ? session.getRoleId() : 1;
+        String roleCode = session.getRoleCode() != null && !session.getRoleCode().isBlank()
+                ? session.getRoleCode() : "DOCTOR";
+        int facilityId = session.getFacilityId() > 0 ? session.getFacilityId() : 1;
+        int departmentId = session.getDepartmentId() > 0 ? session.getDepartmentId() : 1;
+        UUID sessionId;
+        try {
+            sessionId = session.getSessionId() != null ? UUID.fromString(session.getSessionId()) : UUID.randomUUID();
+        } catch (Exception ex) {
+            sessionId = UUID.randomUUID();
+        }
+        return new AuthorizationContext(employeeId, roleId, roleCode, facilityId, departmentId, sessionId);
+    }
+
+    private AuditActorContext currentAuditActorContext() {
+        if (sessionLifecycleService != null) {
+            return sessionLifecycleService.currentAuditActorContext().orElse(null);
+        }
+        UserSession session = UserSession.getInstance();
+        int employeeId = session.getUserId() > 0 ? session.getUserId() : 1;
+        int roleId = session.getRoleId() > 0 ? session.getRoleId() : 1;
+        String roleCode = session.getRoleCode() != null && !session.getRoleCode().isBlank()
+                ? session.getRoleCode() : "DOCTOR";
+        int facilityId = session.getFacilityId() > 0 ? session.getFacilityId() : 1;
+        int departmentId = session.getDepartmentId() > 0 ? session.getDepartmentId() : 1;
+        String workstationId = session.getWorkstationId();
+        if (workstationId == null || workstationId.isBlank()) {
+            workstationId = "DOCTOR-01";
+        }
+        return new AuditActorContext(employeeId, roleId, roleCode, facilityId, departmentId, workstationId, UUID.randomUUID());
     }
 }

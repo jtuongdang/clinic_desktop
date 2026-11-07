@@ -46,62 +46,62 @@ public class DoctorClinicalForm extends JPanel {
         int row = 0;
 
         // Hàng 1: Mã BN | Tên BN | Giới tính
-        lblMaBN = createValueLabel("18039327", true);
-        lblTenBN = createValueLabel("TEST BN 033", true);
-        lblGioiTinh = createValueLabel("Nam", false);
+        lblMaBN = createValueLabel("-", true);
+        lblTenBN = createValueLabel("Chưa chọn bệnh nhân", true);
+        lblGioiTinh = createValueLabel("-", false);
         addRow3(c, row++, "Mã BN:", lblMaBN, "Tên bệnh nhân:", lblTenBN, "Giới tính:", lblGioiTinh);
 
         // Hàng 2: Ngày sinh | NS | Nghề nghiệp
-        lblNgaySinh = createValueLabel("01/02/1995", false);
-        lblNS = createValueLabel("1995", false);
-        lblNgheNghiep = createValueLabel("Nhân dân", false);
+        lblNgaySinh = createValueLabel("-", false);
+        lblNS = createValueLabel("-", false);
+        lblNgheNghiep = createValueLabel("-", false);
         addRow3(c, row++, "Ngày sinh:", lblNgaySinh, "NS:", lblNS, "Nghề nghiệp:", lblNgheNghiep);
 
         // Hàng 3: Dân tộc | Quốc tịch | Điện thoại | Nhóm máu
-        lblDanToc = createValueLabel("Kinh", false);
+        lblDanToc = createValueLabel("-", false);
         lblQuocTich = createValueLabel("Việt Nam", true);
         JLabel lblDienThoai = createValueLabel("", false);
         addRow3(c, row++, "Dân tộc:", lblDanToc, "Quốc tịch:", lblQuocTich, "Điện thoại:", lblDienThoai);
 
         // Hàng 4: Địa chỉ | Nơi làm việc
-        lblDiaChi = createValueLabel("Xã Việt Hồng, H. Thanh Hà, Hải Dương", true);
+        lblDiaChi = createValueLabel("-", true);
         JLabel lblNoiLamViec = createValueLabel("", false);
         addRow2(c, row++, "Địa chỉ:", lblDiaChi, "Nơi làm việc:", lblNoiLamViec);
 
         // Hàng 5: Người nhà | Đón tiếp lúc | Loại đón tiếp
         JLabel lblNguoiNha = createValueLabel("", false);
-        lblDonTiepLuc = createValueLabel("08:26 07/11/2018", true);
+        lblDonTiepLuc = createValueLabel("-", true);
         lblLoaiDonTiep = createValueLabel("Khám bệnh", true);
         addRow3(c, row++, "Người nhà:", lblNguoiNha, "Đón tiếp lúc:", lblDonTiepLuc, "Loại đón tiếp:", lblLoaiDonTiep);
 
         // Hàng 6: Đối tượng | Lý do khám | Số BHYT | Mức hưởng
-        lblDoiTuong = createValueLabel("Bảo hiểm", false);
-        lblSoBHYT = createValueLabel("GD-4-21-21-212-12125", true);
-        lblMucHuong = createValueLabel("80%", false);
+        lblDoiTuong = createValueLabel("-", false);
+        lblSoBHYT = createValueLabel("-", true);
+        lblMucHuong = createValueLabel("-", false);
         addRow3(c, row++, "Đối tượng:", lblDoiTuong, "Số BHYT:", lblSoBHYT, "Mức hưởng:", lblMucHuong);
 
         // Hàng 7: Nơi KCBBĐ | Hạn thẻ | Tuyến BHYT
-        lblNoiKCBBandau = createValueLabel("30001 - Bệnh viện đa khoa thành phố Hải Dương", false);
-        lblHanThe = createValueLabel("01/01/18 - 31/12/18", true);
-        lblTuyenBHYT = createValueLabel("Đúng tuyến", true);
+        lblNoiKCBBandau = createValueLabel("-", false);
+        lblHanThe = createValueLabel("-", true);
+        lblTuyenBHYT = createValueLabel("-", true);
         addRow3(c, row++, "Nơi KCBBĐ:", lblNoiKCBBandau, "Hạn thẻ:", lblHanThe, "Tuyến BHYT:", lblTuyenBHYT);
 
         // Hàng 8: Mã bệnh án | Số vào viện | Số vào khoa | Mã điều trị
-        lblMaBenhAn = createValueLabel("18KNGDC001599", true);
-        lblSoVaoVien = createValueLabel("028850/18", true);
-        JLabel lblMaDieuTri = createValueLabel("346777", false);
+        lblMaBenhAn = createValueLabel("-", true);
+        lblSoVaoVien = createValueLabel("-", true);
+        JLabel lblMaDieuTri = createValueLabel("-", false);
         addRow3(c, row++, "Mã bệnh án:", lblMaBenhAn, "Số vào viện:", lblSoVaoVien, "Mã điều trị:", lblMaDieuTri);
 
         // Hàng 9: Khoa phòng | Bác sĩ điều trị | Bệnh án
-        lblKhoaPhong = createValueLabel("Ngoại Đầu cổ > P.Điều Trị Ngoại DC", true);
-        lblBacSiDieuTri = createValueLabel("Lê Tiến Quân", true);
-        JLabel lblBenhAn = createValueLabel("Ung bướu", false);
+        lblKhoaPhong = createValueLabel("-", true);
+        lblBacSiDieuTri = createValueLabel("-", true);
+        JLabel lblBenhAn = createValueLabel("-", false);
         addRow3(c, row++, "Khoa phòng:", lblKhoaPhong, "Bác sĩ điều trị:", lblBacSiDieuTri, "Bệnh án:", lblBenhAn);
 
         // Hàng 10: Ngày vào | Ngày ra | Chẩn đoán
-        lblNgayVao = createValueLabel("09:40 11/11/2018", true);
+        lblNgayVao = createValueLabel("-", true);
         JLabel lblNgayRa = createValueLabel("", false);
-        lblChanDoan = createValueLabel("D21-Bướu lành khác của mô liên kết và mô mềm khác", true);
+        lblChanDoan = createValueLabel("-", true);
         lblChanDoan.setFont(AppFonts.BODY_BOLD);
         addRow3(c, row++, "Ngày vào:", lblNgayVao, "Ngày ra:", lblNgayRa, "Chẩn đoán:", lblChanDoan);
 
@@ -112,19 +112,33 @@ public class DoctorClinicalForm extends JPanel {
     }
 
     public void updatePatient(PatientExamDto p) {
-        if (p == null) return;
-        lblMaBN.setText(p.getShortCode());
-        lblTenBN.setText(p.getName());
-        lblGioiTinh.setText(p.getGender());
-        lblNgaySinh.setText("01/02/" + p.getBirthYear());
-        lblNS.setText(p.getBirthYear());
-        lblDiaChi.setText(p.getAddress());
-        lblSoBHYT.setText(p.getBhytCode());
-        lblMucHuong.setText(p.getBhytRate());
-        lblKhoaPhong.setText(p.getDepartment());
-        lblBacSiDieuTri.setText(p.getDoctor());
-        lblNgayVao.setText(p.getAdmissionDate());
-        lblChanDoan.setText(p.getDiagnosis());
+        if (p == null) {
+            lblMaBN.setText("-");
+            lblTenBN.setText("Chưa chọn bệnh nhân");
+            lblGioiTinh.setText("-");
+            lblNgaySinh.setText("-");
+            lblNS.setText("-");
+            lblDiaChi.setText("-");
+            lblSoBHYT.setText("-");
+            lblMucHuong.setText("-");
+            lblKhoaPhong.setText("-");
+            lblBacSiDieuTri.setText("-");
+            lblNgayVao.setText("-");
+            lblChanDoan.setText("-");
+            return;
+        }
+        lblMaBN.setText(p.getShortCode() != null && !p.getShortCode().isBlank() ? p.getShortCode() : "-");
+        lblTenBN.setText(p.getName() != null && !p.getName().isBlank() ? p.getName() : "-");
+        lblGioiTinh.setText(p.getGender() != null && !p.getGender().isBlank() ? p.getGender() : "-");
+        lblNgaySinh.setText(p.getBirthYear() != null && !p.getBirthYear().isBlank() ? p.getBirthYear() : "-");
+        lblNS.setText(p.getBirthYear() != null && !p.getBirthYear().isBlank() ? p.getBirthYear() : "-");
+        lblDiaChi.setText(p.getAddress() != null && !p.getAddress().isBlank() ? p.getAddress() : "-");
+        lblSoBHYT.setText(p.getBhytCode() != null && !p.getBhytCode().isBlank() ? p.getBhytCode() : "-");
+        lblMucHuong.setText(p.getBhytRate() != null && !p.getBhytRate().isBlank() ? p.getBhytRate() : "-");
+        lblKhoaPhong.setText(p.getDepartment() != null && !p.getDepartment().isBlank() ? p.getDepartment() : "-");
+        lblBacSiDieuTri.setText(p.getDoctor() != null && !p.getDoctor().isBlank() ? p.getDoctor() : "-");
+        lblNgayVao.setText(p.getAdmissionDate() != null && !p.getAdmissionDate().isBlank() ? p.getAdmissionDate() : "-");
+        lblChanDoan.setText(p.getDiagnosis() != null && !p.getDiagnosis().isBlank() ? p.getDiagnosis() : "-");
     }
 
     private void addRow3(GridBagConstraints c, int row,

@@ -1,13 +1,14 @@
 package vn.clinicmanagement.domain.service;
 
 import vn.clinicmanagement.domain.common.BaseEntity;
+import vn.clinicmanagement.domain.common.IAggregateRoot;
 import vn.clinicmanagement.domain.common.enums.TrangThaiChiDinhDichVu;
 import vn.clinicmanagement.domain.examination.LuotKham;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public class ChiDinhDichVu extends BaseEntity<Integer> {
+public class ChiDinhDichVu extends BaseEntity<Integer> implements IAggregateRoot {
     private int maLuotKham;
     private int maDichVu;
     private int maBacSiChiDinh;

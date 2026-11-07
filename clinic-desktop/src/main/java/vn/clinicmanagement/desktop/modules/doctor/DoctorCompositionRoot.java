@@ -1,9 +1,14 @@
 package vn.clinicmanagement.desktop.modules.doctor;
 
+import vn.clinicmanagement.application.audit.AuditWritePort;
+import vn.clinicmanagement.application.audit.MedicalRecordAuditEntry;
+import vn.clinicmanagement.application.audit.SystemAuditEntry;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.patienthistory.GetPatientHistoryHandler;
 import vn.clinicmanagement.application.reception.GetDoctorQueueHandler;
+import vn.clinicmanagement.application.session.SessionTimeoutPolicy;
 import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
+import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.infrastructure.persistence.DatabaseConnection;
 import vn.clinicmanagement.infrastructure.persistence.JdbcConnectionProvider;
 import vn.clinicmanagement.infrastructure.persistence.JdbcTransactionManager;
@@ -14,11 +19,29 @@ import vn.clinicmanagement.infrastructure.persistence.reception.ReceptionQueueRe
 import vn.clinicmanagement.infrastructure.persistence.system.JdbcAuditRepositoryImpl;
 import vn.clinicmanagement.infrastructure.persistence.system.SystemRepositoryImpl;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Objects;
 
 /** Builds the guarded, audited JDBC reads used by the Doctor station. */
 public final class DoctorCompositionRoot {
     private DoctorCompositionRoot() {}
+
+    private static final AuditWritePort FALLBACK_AUDIT = new AuditWritePort() {
+        @Override public void appendInCurrentTransaction(SystemAuditEntry entry) {}
+        @Override public void appendIndependently(SystemAuditEntry entry) {}
+        @Override public void appendMedicalRecordInCurrentTransaction(MedicalRecordAuditEntry entry) {}
+        @Override public void appendMedicalRecordIndependently(MedicalRecordAuditEntry entry) {}
+    };
+
+    public static Services createDefault() {
+        SessionLifecycleService lifecycle = new SessionLifecycleService(
+                UserSession.getInstance(),
+                new SessionTimeoutPolicy(Duration.ofMinutes(15), Duration.ofHours(12)),
+                Clock.systemUTC(),
+                FALLBACK_AUDIT);
+        return create(lifecycle);
+    }
 
     public static Services create(SessionLifecycleService sessionLifecycle) {
         Objects.requireNonNull(sessionLifecycle, "sessionLifecycle");
