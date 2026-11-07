@@ -43,6 +43,7 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Phân hệ Đón Tiếp & Đăng Ký Khám Bệnh (EHC Reception Station).
@@ -70,6 +71,10 @@ public class ReceptionPanel extends BaseViewPanel {
     private final SessionLifecycleService.SessionListener sessionListener;
 
     private final List<SwingWorker<?, ?>> inFlightWorkers = new CopyOnWriteArrayList<>();
+    private final AtomicLong viewSessionEpoch = new AtomicLong();
+    private final AtomicLong refreshSequence = new AtomicLong();
+    private final AtomicLong searchSequence = new AtomicLong();
+    private volatile boolean disposed;
     private Clock queueClock = Clock.system(CLINIC_ZONE);
 
     // Headless test seams
@@ -166,6 +171,7 @@ public class ReceptionPanel extends BaseViewPanel {
 
     private void handleSessionChanged() {
         if (sessionLifecycleService == null) return;
+        viewSessionEpoch.incrementAndGet();
         SessionLifecycleService.State state = sessionLifecycleService.evaluate();
         if (state != SessionLifecycleService.State.ACTIVE) {
             cancelInFlightWorkers();
@@ -185,12 +191,23 @@ public class ReceptionPanel extends BaseViewPanel {
         refreshData();
     }
 
+    @Override
+    public void onHide() {
+        viewSessionEpoch.incrementAndGet();
+        cancelInFlightWorkers();
+    }
+
     void setQueueClock(Clock clock) {
         queueClock = clock.withZone(CLINIC_ZONE);
     }
 
     @Override
     public void refreshData() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::refreshData);
+            return;
+        }
+        if (disposed) return;
         if (sessionLifecycleService != null && sessionLifecycleService.evaluate() != SessionLifecycleService.State.ACTIVE) {
             cancelInFlightWorkers();
             return;
@@ -198,6 +215,9 @@ public class ReceptionPanel extends BaseViewPanel {
 
         AuthorizationContext authzContext = currentAuthorizationContext();
         AuditActorContext auditContext = currentAuditActorContext();
+        if (authzContext == null || auditContext == null) return;
+        long epoch = viewSessionEpoch.get();
+        long sequence = refreshSequence.incrementAndGet();
         Clock clock = queueClock;
 
         SwingWorker<RefreshDataSnapshot, Void> worker = new SwingWorker<>() {
@@ -206,12 +226,12 @@ public class ReceptionPanel extends BaseViewPanel {
                 Result<ReceptionQueueSnapshot> queueResult = null;
                 if (queueHandler != null) {
                     queueResult = queueHandler.handle(
-                            new GetReceptionQueueQuery(LocalDate.now(clock), authzContext, auditContext));
+                            new GetReceptionQueueQuery(LocalDate.now(clock), authzContext, freshAuditContext(auditContext)));
                 }
                 Result<List<PhongKham>> roomsResult = null;
                 if (roomsHandler != null) {
                     roomsResult = roomsHandler.handle(
-                            new GetActiveReceptionRoomsQuery(authzContext, auditContext));
+                            new GetActiveReceptionRoomsQuery(authzContext, freshAuditContext(auditContext)));
                 }
                 return new RefreshDataSnapshot(queueResult, roomsResult);
             }
@@ -219,9 +239,7 @@ public class ReceptionPanel extends BaseViewPanel {
             @Override
             protected void done() {
                 inFlightWorkers.remove(this);
-                if (isCancelled()) {
-                    return;
-                }
+                if (!isCurrentWorker(epoch) || sequence != refreshSequence.get() || isCancelled()) return;
                 try {
                     RefreshDataSnapshot snapshot = get();
                     if (snapshot != null) {
@@ -278,7 +296,9 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     public void clearForm() {
+        viewSessionEpoch.incrementAndGet();
         formPanel.clearForm();
+        footerBar.setSaving(false);
     }
 
     private void setComponentsEditable(Component comp, boolean editable) {
@@ -325,6 +345,9 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     private AuthorizationContext currentAuthorizationContext() {
+        if (sessionLifecycleService != null) {
+            return sessionLifecycleService.currentAuthorizationContext().orElse(null);
+        }
         UserSession session = UserSession.getInstance();
         int employeeId = session.getUserId() > 0 ? session.getUserId() : 1;
         int roleId = session.getRoleId() > 0 ? session.getRoleId() : 1;
@@ -342,6 +365,9 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     private AuditActorContext currentAuditActorContext() {
+        if (sessionLifecycleService != null) {
+            return sessionLifecycleService.currentAuditActorContext().orElse(null);
+        }
         UserSession session = UserSession.getInstance();
         int employeeId = session.getUserId() > 0 ? session.getUserId() : 1;
         int roleId = session.getRoleId() > 0 ? session.getRoleId() : 1;
@@ -356,7 +382,20 @@ public class ReceptionPanel extends BaseViewPanel {
         return new AuditActorContext(employeeId, roleId, roleCode, facilityId, departmentId, workstationId, UUID.randomUUID());
     }
 
+    private static AuditActorContext freshAuditContext(AuditActorContext context) {
+        return new AuditActorContext(context.employeeId(), context.roleId(), context.roleCode(),
+                context.facilityId(), context.departmentId(), context.workstationId(), UUID.randomUUID());
+    }
+
+    private boolean isCurrentWorker(long epoch) {
+        if (sessionLifecycleService != null
+                && sessionLifecycleService.evaluate() != SessionLifecycleService.State.ACTIVE) return false;
+        return !disposed && viewSessionEpoch.get() == epoch;
+    }
+
     public void destroy() {
+        disposed = true;
+        viewSessionEpoch.incrementAndGet();
         cancelInFlightWorkers();
         if (sessionLifecycleService != null && sessionListener != null) {
             sessionLifecycleService.removeSessionListener(sessionListener);
@@ -441,6 +480,12 @@ public class ReceptionPanel extends BaseViewPanel {
             SwingUtilities.invokeLater(this::saveRegistration);
             return;
         }
+        if (disposed) return;
+        if (sessionLifecycleService != null
+                && sessionLifecycleService.evaluate() != SessionLifecycleService.State.ACTIVE) {
+            showError("Phiên làm việc không hợp lệ hoặc đã hết hạn.");
+            return;
+        }
         if (registerPatientHandler == null) return;
         AuthorizationContext authzContext = currentAuthorizationContext();
         AuditActorContext auditContext = currentAuditActorContext();
@@ -461,6 +506,8 @@ public class ReceptionPanel extends BaseViewPanel {
             commandConsumerForTest.accept(command);
         }
 
+        String submittedCccd = formPanel.enteredCccd();
+        long epoch = viewSessionEpoch.get();
         footerBar.setSaving(true);
         SwingWorker<Result<RegistrationReceipt>, Void> worker = new SwingWorker<>() {
             @Override
@@ -471,6 +518,7 @@ public class ReceptionPanel extends BaseViewPanel {
             @Override
             protected void done() {
                 inFlightWorkers.remove(this);
+                if (!isCurrentWorker(epoch)) return;
                 footerBar.setSaving(false);
                 if (isCancelled()) return;
                 try {
@@ -478,7 +526,7 @@ public class ReceptionPanel extends BaseViewPanel {
                     if (result.isFailure()) {
                         String errCode = result.getError().map(Result.ApplicationError::code).orElse("DEFAULT");
                         if ("PATIENT_DUPLICATE_CCCD".equals(errCode) || "PATIENT_IDENTITY_CONFLICT".equals(errCode)) {
-                            handleDuplicateCccd(formPanel.enteredCccd());
+                            handleDuplicateCccd(submittedCccd);
                         } else {
                             showError(ReceptionPanelMessagePolicy.toUserMessage(result));
                         }
@@ -487,7 +535,8 @@ public class ReceptionPanel extends BaseViewPanel {
                     RegistrationReceipt receipt = result.getValue().orElseThrow();
                     showMessage("Đã đăng ký người bệnh " + receipt.patientCode() + " · Số tiếp đón " + receipt.queueNumberDisplay(),
                             "Đăng ký thành công", JOptionPane.INFORMATION_MESSAGE);
-                    formPanel.clearForm();
+                    if (!isCurrentWorker(epoch)) return;
+                    clearForm();
                     refreshData();
                 } catch (InterruptedException ex) {
                     DesktopWorkerDiagnostics.restoreInterruptStatus();
@@ -508,6 +557,12 @@ public class ReceptionPanel extends BaseViewPanel {
             SwingUtilities.invokeLater(() -> searchPatients(phone, cccd));
             return;
         }
+        if (disposed) return;
+        if (sessionLifecycleService != null
+                && sessionLifecycleService.evaluate() != SessionLifecycleService.State.ACTIVE) {
+            showError("Phiên làm việc không hợp lệ hoặc đã hết hạn.");
+            return;
+        }
         if (searchPatientsHandler == null) return;
         String first = phone == null ? "" : phone.trim();
         String second = cccd == null ? "" : cccd.trim();
@@ -523,40 +578,45 @@ public class ReceptionPanel extends BaseViewPanel {
             return;
         }
 
-        SwingWorker<List<PatientSearchItem>, Void> worker = new SwingWorker<>() {
+        long epoch = viewSessionEpoch.get();
+        long sequence = searchSequence.incrementAndGet();
+        SwingWorker<Result<List<PatientSearchItem>>, Void> worker = new SwingWorker<>() {
             @Override
-            protected List<PatientSearchItem> doInBackground() {
+            protected Result<List<PatientSearchItem>> doInBackground() {
                 Map<Integer, PatientSearchItem> results = new LinkedHashMap<>();
                 if (!first.isBlank() && !isCancelled()) {
                     Result<List<PatientSearchItem>> r1 = searchPatientsHandler.handle(
-                            new SearchPatientsQuery(first, authzContext, auditContext));
-                    if (r1.isSuccess()) {
-                        r1.getValue().ifPresent(items -> items.forEach(it -> results.put(it.patient().getId(), it)));
-                    }
+                            new SearchPatientsQuery(first, authzContext, freshAuditContext(auditContext)));
+                    if (r1.isFailure()) return r1;
+                    r1.getValue().ifPresent(items -> items.forEach(it -> results.put(it.patient().getId(), it)));
                 }
                 if (!second.isBlank() && !second.equals(first) && !isCancelled()) {
                     Result<List<PatientSearchItem>> r2 = searchPatientsHandler.handle(
-                            new SearchPatientsQuery(second, authzContext, auditContext));
-                    if (r2.isSuccess()) {
-                        r2.getValue().ifPresent(items -> items.forEach(it -> results.put(it.patient().getId(), it)));
-                    }
+                            new SearchPatientsQuery(second, authzContext, freshAuditContext(auditContext)));
+                    if (r2.isFailure()) return r2;
+                    r2.getValue().ifPresent(items -> items.forEach(it -> results.put(it.patient().getId(), it)));
                 }
-                return new ArrayList<>(results.values());
+                return Result.success(results.values().stream().limit(50).toList());
             }
 
             @Override
             protected void done() {
                 inFlightWorkers.remove(this);
-                if (isCancelled()) return;
+                if (!isCurrentWorker(epoch) || sequence != searchSequence.get() || isCancelled()) return;
                 try {
-                    List<PatientSearchItem> matches = get();
+                    Result<List<PatientSearchItem>> result = get();
+                    if (result.isFailure()) {
+                        showError(ReceptionPanelMessagePolicy.toUserMessage(result));
+                        return;
+                    }
+                    List<PatientSearchItem> matches = result.getValue().orElse(List.of());
                     if (matches.isEmpty()) {
                         showMessage("Không tìm thấy hồ sơ phù hợp. Dữ liệu đang nhập vẫn được giữ nguyên.",
                                 "Tìm người bệnh", JOptionPane.INFORMATION_MESSAGE);
                         return;
                     }
                     PatientSearchItem selected = matches.size() == 1 ? matches.get(0) : choosePatient(matches);
-                    if (selected != null) {
+                    if (selected != null && isCurrentWorker(epoch) && sequence == searchSequence.get()) {
                         formPanel.selectPatient(selected.patient(), selected.latestInsurance());
                     }
                 } catch (InterruptedException ex) {
