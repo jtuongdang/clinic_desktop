@@ -360,7 +360,10 @@ At `feature/patient-reception-workflow` up to commits `1239784` and `644a904`, c
    - `f04315d` (`34a27647` — `copilot-cli`): Restored `ReceptionProtectedReadWiringTest` (`1/1 PASS`, `SEC-AUTHZ-02C`) and added `DoctorStationUiPreservationTest` (`3/3 PASS`, guarding `6aabb85` Doctor UI 8-column history table, 9 action buttons, `250px` split pane, and 5 tabs) [leaderANTI]
    - `14f671c` (`a5f7c1e4` — `google-antigravity-cli-claude-sonnet-02507d`): Synced task board and completion review with Wave 10 evidence [leaderANTI]
    - `eb52b71` (`a990195c` — `leaderANTI`): Restored non-UI `DoctorCompositionRoot` and `DoctorCompositionRootTest` (`2/2 PASS`) without modifying `DoctorStationPanel` or any Doctor UI component [leaderANTI]
-5. **Current automated evidence at HEAD `eb52b71`:** Verified on `feature/patient-reception-workflow` with reactor test count updated to 472 tests PASS (100 domain + 131 application + 118 infrastructure + 123 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips). `clinicDb` was not used; this validation did not run SQL Server opt-in tests. Shaded JAR inspection confirms no packaged `db.properties`.
+   - `9ec7829` (`125fe945` — `copilot-cli`): Restored opt-in `ReceptionSqlServerPersistenceTest` and `ReceptionSqlServerProcessRestartTest` in `clinic-desktop`, adapted to current `SessionLifecycleService` and `ReceptionCompositionRoot` APIs, restoring the full 6 expected SQL Server opt-in skips across the reactor (4 in `clinic-infrastructure` + 2 in `clinic-desktop`) [leaderANTI]
+   - `aa09058` (`335577de` — `antigravity-cli`): Updated `phase1-doctor-ui-preservation-and-wiring-plan.md` with Wave 11 evidence (`f04315d`, `eb52b71`) [leaderANTI]
+   - `29d99cc` (`3f547d29` — `google-antigravity-cli-claude-sonnet-02507d`): Synced task board, completion review, and handover doc for Wave 11 [leaderANTI]
+5. **Current automated evidence at HEAD `29d99cc`:** Verified on `feature/patient-reception-workflow` with reactor test count updated to **474 tests run (100 domain + 131 application + 118 infrastructure + 125 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop)**. `clinicDb` was not used; this validation did not run SQL Server opt-in tests. Shaded JAR inspection confirms no packaged `db.properties`.
 6. **Open acceptance and Owner gate status preservation:**
    - All Owner gate statuses (`REC-01`, `PAT-02`, and `SEC-01`) remain strictly **OPEN** (`[~] In progress`) pending Owner visual smoke / visual-interaction acceptance and signed-in route gate decision.
    - Headless synthetic tests establish wiring and unit invariant compliance, not interactive visual acceptance or live SQL Server end-to-end multi-user verification.
@@ -434,6 +437,16 @@ At `feature/patient-reception-workflow` up to commits `1239784` and `644a904`, c
 | `eb52b71` · `a990195c` (`leaderANTI`) | Khôi phục `DoctorCompositionRoot` và `DoctorCompositionRootTest` thuần DI (non-UI) phục vụ cấu hình use case Bác sĩ mà tuyệt đối không chỉnh sửa `DoctorStationPanel` hay bất kỳ thành phần UI Bác sĩ nào. | `2/2` tests PASS trong `DoctorCompositionRootTest`. Toàn reactor: 472 tests PASS (100 domain + 131 application + 118 infrastructure + 123 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips). | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
 
 **Reactor test count:** 472 tests PASS (100 domain + 131 application + 118 infrastructure + 123 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke.
+
+## Wave 12 Hardening and Verification — 07/11/2026 [leaderANTI]
+
+| Commit · task | Phân hệ · Thay đổi cụ thể | Bằng chứng kiểm thử tự động | Trạng thái cổng |
+|---|---|---|---|
+| `9ec7829` · `125fe945` (`copilot-cli`) | `clinic-desktop`: Khôi phục các bài kiểm thử opt-in `ReceptionSqlServerPersistenceTest` và `ReceptionSqlServerProcessRestartTest`, tương thích với các API hiện hành của `SessionLifecycleService` và `ReceptionCompositionRoot`, khôi phục đầy đủ 6 skips opt-in SQL Server trên toàn reactor (4 ở `clinic-infrastructure` + 2 ở `clinic-desktop`). | 2 opt-in skips trong `clinic-desktop`; 474 tests run toàn reactor (6 opt-in skips). | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `aa09058` · `335577de` (`antigravity-cli`) | Cập nhật tài liệu `phase1-doctor-ui-preservation-and-wiring-plan.md` với các bằng chứng Wave 11 (`f04315d`, `eb52b71`). | Tài liệu đối soát hoàn tất; 474 tests run toàn reactor. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `29d99cc` · `3f547d29` (`google-antigravity-cli-claude-sonnet-02507d`) | Đồng bộ `03-model-task-board.md`, `phase1-rec01-and-sec01-shift-completion-review.md` và `LEADERSHIP_HANDOVER_LEADER_ANTI.md` ghi nhận Wave 11. | Tài liệu đồng bộ hoàn tất; 474 tests run toàn reactor. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+
+**Reactor test count:** 474 tests run (100 domain + 131 application + 118 infrastructure + 125 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke.
 
 
 

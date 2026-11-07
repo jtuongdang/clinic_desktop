@@ -1,7 +1,7 @@
 # REC-01 and SEC-01 Desktop Hardening Completion Review
 
 **Review date:** 2026-11-07  
-**Reviewed baseline:** `feature/patient-reception-workflow` at `eb52b71`  
+**Reviewed baseline:** `feature/patient-reception-workflow` at `29d99cc`  
 **Review type:** Read-only source/commit verification and focused synthetic headless tests.
 
 This review verifies the requested REC-01 and SEC-01 hardening slices against the current source, cited commits, focused test classes, and the existing completion reviews. It does not claim Owner visual acceptance or close any gate.
@@ -47,15 +47,23 @@ This review verifies the requested REC-01 and SEC-01 hardening slices against th
 | **Wave 10 documentation sync** | Synced task board and completion review with Wave 10 evidence (`797cc8c`, `b7c550b`, `8fa16a0`). | `14f671c` (task `a5f7c1e4` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md). |
 | **Non-UI Doctor composition wiring & tests** | Restored non-UI `DoctorCompositionRoot` and `DoctorCompositionRootTest` providing pure dependency injection wiring for doctor station use cases without modifying `DoctorStationPanel` or any Doctor UI component ([`DoctorCompositionRoot`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/DoctorCompositionRoot.java), [`DoctorCompositionRootTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/examination/DoctorCompositionRootTest.java)). | `eb52b71` (task `a990195c` — `leaderANTI`): [`DoctorCompositionRootTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/examination/DoctorCompositionRootTest.java), **2/2 PASS**. |
 
+## Wave 12 completion evidence (9ec7829, aa09058, 29d99cc)
+
+| Item | Verified implementation and evidence | Commit and focused tests |
+|---|---|---|
+| **SQL Server opt-in test restoration in `clinic-desktop`** | Restored opt-in `ReceptionSqlServerPersistenceTest` and `ReceptionSqlServerProcessRestartTest` in `clinic-desktop`, adapted to current `SessionLifecycleService` and `ReceptionCompositionRoot` APIs, restoring the full 6 expected SQL Server opt-in skips across the reactor (4 in `clinic-infrastructure` + 2 in `clinic-desktop`). | `9ec7829` (task `125fe945` — `copilot-cli`): [`ReceptionSqlServerPersistenceTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/reception/ReceptionSqlServerPersistenceTest.java), [`ReceptionSqlServerProcessRestartTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/reception/ReceptionSqlServerProcessRestartTest.java) (2 opt-in skips in `clinic-desktop`). |
+| **Doctor UI preservation plan update with Wave 11 evidence** | Updated `phase1-doctor-ui-preservation-and-wiring-plan.md` with Wave 11 evidence (`f04315d`, `eb52b71`). | `aa09058` (task `335577de` — `antigravity-cli`): [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md). |
+| **Wave 11 documentation sync** | Synced task board, completion review, and handover doc for Wave 11. | `29d99cc` (task `3f547d29` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md), [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md). |
+
 ## Verification run and gate preservation
 
-The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, the restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**), and the Wave 11 test suites (`ReceptionProtectedReadWiringTest` **1/1**, `DoctorStationUiPreservationTest` **3/3**, `DoctorCompositionRootTest` **2/2**). Across the reactor, **472 tests PASS (100 domain + 131 application + 118 infrastructure + 123 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
+The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, the restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**), the Wave 11 test suites (`ReceptionProtectedReadWiringTest` **1/1**, `DoctorStationUiPreservationTest` **3/3**, `DoctorCompositionRootTest` **2/2**), and the restored Wave 12 opt-in suites (`ReceptionSqlServerPersistenceTest`, `ReceptionSqlServerProcessRestartTest`). Across the reactor, **474 tests run (100 domain + 131 application + 118 infrastructure + 125 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
 
 ```sh
 mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
   -pl clinic-desktop,clinic-infrastructure -am \
   -Djava.awt.headless=true -Dsurefire.failIfNoSpecifiedTests=false \
-  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest,MainLookAndFeelTest,ExaminationShortcutMaskTest,DocxManagerTest,DocxDocumentTest,ReceptionProtectedReadWiringTest,DoctorStationUiPreservationTest,DoctorCompositionRootTest \
+  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest,MainLookAndFeelTest,ExaminationShortcutMaskTest,DocxManagerTest,DocxDocumentTest,ReceptionProtectedReadWiringTest,DoctorStationUiPreservationTest,DoctorCompositionRootTest,ReceptionSqlServerPersistenceTest,ReceptionSqlServerProcessRestartTest \
   test
 ```
 
@@ -63,8 +71,8 @@ mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
 
 ## Related Artifacts
 
-- [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md) — Doctor UI invariants and surgical wiring blueprint for PAT-02 (`797cc8c`)
-- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`eb52b71`)
+- [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md) — Doctor UI invariants and surgical wiring blueprint for PAT-02 (`797cc8c`, updated `aa09058`)
+- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`29d99cc`)
 - [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)
 - [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md)
 - [`03-model-task-board.md`](03-model-task-board.md)
