@@ -324,3 +324,14 @@ Kiểm tra lại trên `feature/patient-reception-workflow` tại `674f485` ngà
 - Phương thức `LoginForm.initUI()` trên ứng viên hiện tại giống byte-for-byte với `main` tại source baseline. Các thay đổi ở LoginForm và Dashboard nằm ở luồng xác thực, phiên, khóa màn hình và điều hướng; chưa có xác nhận pixel hoặc thao tác trực quan từ Owner.
 - Luồng Tiếp đón đã được nối lại vào handler ở Application. So sánh trực quan form, ribbon, bảng queue/phòng, hành vi nút và các màn hình gated vẫn cần Owner kiểm tra bằng giao diện chạy thật.
 - Kết quả build và so sánh source không thay thế visual sign-off. Các ô checklist tương tác/hiển thị tiếp tục để trống cho Owner ghi nhận.
+
+---
+
+## 9. Updated Candidate Readiness Snapshot (2026-11-07 — leaderANTI)
+
+- **Candidate branch & commit:** `feature/patient-reception-workflow` at `e663e24` (457 passing reactor tests: 100 domain + 131 application + 118 infrastructure + 108 desktop; freshly packaged shaded jar `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar`).
+- **Newly hardened desktop behaviors ready for Owner visual smoke:**
+  1. `MainDashboardFrame` 'Người Dùng' dialog reads verified `CompletedLoginSession`.
+  2. `ReceptionPanel` F1/F2 shortcuts, active room binding with duplicate room disambiguation (`TenPhong (#id)`), room summary tables with clearing on failure, 50-result search cap, and in-flight save form lock.
+  3. `SEC-01`, `PAT-02`, and `REC-01` remain default-deny pending Owner visual smoke sign-off.
+
