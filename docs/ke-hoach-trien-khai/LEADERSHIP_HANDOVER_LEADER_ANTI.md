@@ -135,13 +135,24 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 69. **`a4cc607`** (`8e014bb6` — `copilot-cli`): `APPT-01: Implemented CancelAppointmentCommand, CancelAppointmentReceipt, CancelAppointmentHandler, and CancelAppointmentHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
 70. **`62ef567`** (`6fa81845` — `copilot-cli`): `VIS-01: Implemented StartExamCommand, StartExamReceipt, StartExamHandler, and StartExamHandlerTest (7/7 PASS) in clinic-application [leaderANTI]`
 71. **`615d01b`** (`2be8f9e3` — `antigravity-cli` + `leaderANTI`): `APPT-01: Implemented GetUpcomingAppointmentsQuery, AppointmentSummaryDto, GetUpcomingAppointmentsHandler, and GetUpcomingAppointmentsHandlerTest (13/13 PASS) in clinic-application [leaderANTI]`
+72. **`d850d7a`** (`5cc65480` — `copilot-cli`): `VIS-01: Implemented CompleteExamCommand, CompleteExamReceipt, CompleteExamHandler, and CompleteExamHandlerTest (9/9 PASS) in clinic-application [leaderANTI]`
+73. **`f00665b`** (`2cc166f2` — `copilot-cli`): `VIS-01: Implemented LockEmrCommand, LockEmrReceipt, LockEmrHandler, and LockEmrHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
 
 ### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
-- **Tổng số bài test tự động:** **812 tests run** (`228` domain + `315` application + `125` infrastructure + `144` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS**.
-- **Tiến độ Phase 3 (Wave 21 Hoàn tất & Tích hợp):**
-  - Đã triển khai đầy đủ use case hủy khám `VIS-01` (`CancelVisitHandler`), chuyển phòng khám `VIS-01` (`TransferVisitHandler`), bắt đầu khám `VIS-01` (`StartExamHandler`), đặt lịch hẹn khám `APPT-01` (`BookAppointmentHandler`), hủy lịch hẹn khám `APPT-01` (`CancelAppointmentHandler`), và truy vấn lịch hẹn sắp tới `APPT-01` (`GetUpcomingAppointmentsHandler`).
-  - Mọi quy tắc an ninh, kiểm tra quyền theo vai trò (`RECEPTIONIST`/`DOCTOR`/`ADMIN`), kiểm tra trùng lặp bác sĩ (zero overbooking) và ghi nhật ký kiểm toán giao dịch (`AuditActionCode.VISIT_TRANSFERRED`, `VISIT_REGISTERED`, `EMR_STARTED`, `PATIENT_VIEW`, `AUTH_ACCESS_DENIED`) đều đạt 100% bằng chứng kiểm thử synthetic.
+- **Tổng số bài test tự động:** **829 tests run** (`228` domain + `332` application + `125` infrastructure + `144` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS**.
+- **Tiến độ Phase 3 (Wave 21 Hoàn tất & Tích hợp Toàn diện):**
+  - Đã triển khai đầy đủ và hoàn tất toàn bộ chu trình khám bệnh ngoại trú `VIS-01`:
+    - Hủy lượt khám (`CancelVisitHandler` - 5/5 PASS)
+    - Chuyển phòng khám (`TransferVisitHandler` - 13/13 PASS)
+    - Bắt đầu khám (`StartExamHandler` - 7/7 PASS)
+    - Kết thúc khám (`CompleteExamHandler` - 9/9 PASS)
+    - Khóa bệnh án điện tử niêm phong số (`LockEmrHandler` - 8/8 PASS)
+  - Đã triển khai đầy đủ và hoàn tất toàn bộ phân hệ quản lý lịch hẹn `APPT-01`:
+    - Đặt lịch hẹn khám với ràng buộc zero-overbooking (`BookAppointmentHandler` - 6/6 PASS)
+    - Hủy lịch hẹn khám (`CancelAppointmentHandler` - 8/8 PASS)
+    - Truy vấn danh sách lịch hẹn sắp tới (`GetUpcomingAppointmentsHandler` - 13/13 PASS)
+  - Mọi quy tắc an ninh, kiểm tra quyền theo vai trò (`RECEPTIONIST`/`DOCTOR`/`ADMIN`), kiểm tra trùng lặp bác sĩ (zero overbooking) và ghi nhật ký kiểm toán giao dịch (`AuditActionCode.VISIT_TRANSFERRED`, `VISIT_REGISTERED`, `EMR_STARTED`, `EMR_COMPLETED`, `EMR_LOCKED`, `PATIENT_VIEW`, `AUTH_ACCESS_DENIED`) đều đạt 100% bằng chứng kiểm thử synthetic.
 - **Gói ứng dụng thực thi:** Fat JAR đã được đóng gói mới nhất tại `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` (không nhúng `db.properties`, hoàn toàn tuân thủ quy tắc bảo mật).
 - **Bảo toàn 100% UI gốc (`6aabb85`) & Cổng an ninh:** Toàn bộ giao diện `LoginForm`, `MainDashboardFrame`, `ReceptionPanel`, `DoctorStationPanel` giữ nguyên 100% bố cục, kích thước, màu sắc và bảng cột gốc; các cổng `SEC-01`, `PAT-02`, `REC-01` giữ nguyên trạng thái `[~] In progress` (`default-deny`) chờ Owner chạy `./run-app.sh` nghiệm thu trực quan.
-- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–3:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) và Phase 3 (`VIS-01`, `APPT-01`) cùng bằng chứng kiểm định 812 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–3:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) và Phase 3 (`VIS-01`, `APPT-01`) cùng bằng chứng kiểm định 829 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 

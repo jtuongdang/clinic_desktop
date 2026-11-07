@@ -6,7 +6,7 @@
 
 ## 1. Reactor and Desktop verification
 
-- **Reactor:** 812 tests run — 228 domain, 315 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
+- **Reactor:** 829 tests run — 228 domain, 332 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
 - **Wave 21 commits recorded:**
   - `e9898b2` (`968221e5` — `copilot-cli`): Implemented `CancelVisitCommand`, `CancelVisitReceipt`, `CancelVisitHandler`, and `CancelVisitHandlerTest` (5/5 PASS) in `clinic-application`.
   - `695c121` (`ebb76355` — `copilot-cli`): Implemented `BookAppointmentCommand`, `AppointmentReceipt`, `BookAppointmentHandler`, and `BookAppointmentHandlerTest` (6/6 PASS) in `clinic-application`.
