@@ -6,6 +6,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
@@ -49,6 +50,29 @@ public class ReceptionFooterBar extends JPanel {
         });
         btnNew.addActionListener(e -> {
             if (onNew != null) onNew.run();
+        });
+
+        InputMap inputMap = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = getActionMap();
+
+        inputMap.put(KeyStroke.getKeyStroke("F1"), "receptionNew");
+        actionMap.put("receptionNew", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (btnNew.isEnabled()) {
+                    btnNew.doClick();
+                }
+            }
+        });
+
+        inputMap.put(KeyStroke.getKeyStroke("F2"), "receptionSave");
+        actionMap.put("receptionSave", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (btnSave.isEnabled()) {
+                    btnSave.doClick();
+                }
+            }
         });
     }
 

@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -205,6 +206,48 @@ class PatientRegistrationFormPanelTest {
         assertNotNull(LocalDateTime.parse(currentTime, DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")));
     }
 
+    @Test
+    void selectingLegacyResidenceCodeAddsAndSelectsOptionAndSwitchingAwayRemovesIt() throws Exception {
+        onEdt(() -> {
+            PatientRegistrationFormPanel panel = createPanelWithRoom();
+
+            BenhNhan patientWithLegacy = syntheticPatient();
+            BaoHiem insuranceWithLegacy = syntheticInsurance();
+            insuranceWithLegacy.setMaNoiSong("K9-LEGACY");
+
+            panel.selectPatient(patientWithLegacy, insuranceWithLegacy);
+
+            JComboBox<?> residenceCombo = findResidenceCombo(panel);
+            assertEquals("K9-LEGACY", residenceCombo.getSelectedItem(),
+                    "Legacy residence code should be selected");
+            assertTrue(comboContains(residenceCombo, "K9-LEGACY"),
+                    "Legacy residence code should be present in combo model");
+
+            // Switch to a patient with no insurance card
+            BenhNhan patientWithoutInsurance = syntheticPatient();
+            patientWithoutInsurance.setId(99);
+            panel.selectPatient(patientWithoutInsurance, null);
+
+            assertFalse(comboContains(residenceCombo, "K9-LEGACY"),
+                    "Legacy residence option should be removed when switching to patient with no insurance");
+            assertTrue(residenceCombo.getSelectedItem() == null || "".equals(residenceCombo.getSelectedItem()),
+                    "Residence combo should reset to default empty option");
+
+            // Select legacy again, then verify clearForm removes it as well
+            panel.selectPatient(patientWithLegacy, insuranceWithLegacy);
+            assertTrue(comboContains(residenceCombo, "K9-LEGACY"),
+                    "Legacy residence code should be present after reselection");
+
+            panel.clearForm();
+            assertFalse(comboContains(residenceCombo, "K9-LEGACY"),
+                    "Legacy residence option should be removed when calling clearForm");
+            assertTrue(residenceCombo.getSelectedItem() == null || "".equals(residenceCombo.getSelectedItem()),
+                    "Residence combo should reset after clearForm");
+
+            return null;
+        });
+    }
+
     private static PatientRegistrationFormPanel createPanelWithRoom() {
         PatientRegistrationFormPanel panel = new PatientRegistrationFormPanel();
         PhongKham room = new PhongKham();
@@ -268,6 +311,23 @@ class PatientRegistrationFormPanelTest {
         return findComponents(container, JComboBox.class).stream()
                 .filter(combo -> firstItem.equals(combo.getItemAt(0)))
                 .findFirst().orElseThrow();
+    }
+
+    private static JComboBox<?> findResidenceCombo(Container container) {
+        return findComponents(container, JComboBox.class).stream()
+                .filter(combo -> comboContains(combo, "K1"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing residence code combo"));
+    }
+
+    private static boolean comboContains(JComboBox<?> combo, Object item) {
+        ComboBoxModel<?> model = combo.getModel();
+        for (int i = 0; i < model.getSize(); i++) {
+            if (Objects.equals(item, model.getElementAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static <T> List<T> findComponents(Container container, Class<T> type) {
