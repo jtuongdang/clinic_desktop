@@ -344,6 +344,32 @@ class RegisterPatientHandlerTest {
     }
 
     @Test
+    void newPatientAndInsuranceWithNullCreatedByPopulatesCreatedByBeforeCallingAdd() {
+        Fixture fixture = new Fixture();
+        BenhNhan patient = validPatient();
+        BaoHiem insurance = validInsurance();
+        assertNull(patient.getCreatedBy());
+        assertNull(insurance.getCreatedBy());
+        fixture.patientInsertId = 41;
+        fixture.visit = visit(91, 7, "Q-007");
+
+        RegisterPatientCommand command = command(patient, insurance);
+        assertEquals(ACTOR.employeeId(), command.createdBy());
+
+        Result<RegistrationReceipt> result = fixture.handler.handle(command);
+
+        assertTrue(result.isSuccess());
+        assertEquals(1, fixture.patientAdds.get());
+        assertEquals(1, fixture.insuranceAdds.get());
+        assertNotNull(fixture.addedPatientMetadata);
+        assertEquals(command.createdBy(), fixture.addedPatientMetadata.createdBy());
+        assertEquals(command.createdBy(), patient.getCreatedBy());
+        assertNotNull(fixture.addedInsuranceMetadata);
+        assertEquals(command.createdBy(), fixture.addedInsuranceMetadata.createdBy());
+        assertEquals(command.createdBy(), insurance.getCreatedBy());
+    }
+
+    @Test
     void existingPatientAndInsuranceMergeFormFieldsAndPreserveStoredData() {
         Fixture fixture = new Fixture();
         LocalDateTime persistedPatientCreatedAt = LocalDateTime.of(2025, 2, 10, 8, 15);

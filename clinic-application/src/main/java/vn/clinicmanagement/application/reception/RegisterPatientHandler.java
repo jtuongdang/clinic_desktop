@@ -94,6 +94,7 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                 } else {
                     patient.setDienThoai(normalizeOptionalPhone(patient.getDienThoai()));
                     patient.setNguoiLienHeDienThoai(normalizeOptionalPhone(patient.getNguoiLienHeDienThoai()));
+                    patient.setCreatedBy(command.createdBy());
                     patients.add(patient);
                 }
 
@@ -113,6 +114,7 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                                 AuditResourceType.INSURANCE, card.getId());
                     } else {
                         submittedCard.setMaBenhNhan(patient.getId());
+                        submittedCard.setCreatedBy(command.createdBy());
                         insuranceCards.add(submittedCard);
                         appendAudit(command.auditActorContext(), context, AuditActionCode.INSURANCE_CREATED,
                                 AuditResourceType.INSURANCE, submittedCard.getId());

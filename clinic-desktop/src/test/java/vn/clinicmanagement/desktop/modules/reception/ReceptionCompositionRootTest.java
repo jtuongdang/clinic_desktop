@@ -2,6 +2,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.authorization.ActiveSessionPort;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
@@ -128,6 +129,33 @@ class ReceptionCompositionRootTest {
 
         Result<?> searchResult = root.searchPatientsHandler().handle(
                 new SearchPatientsQuery("0123456789", invalidContext, null));
+        assertTrue(searchResult.isFailure());
+        assertEquals("AUTHORIZATION_DENIED", searchResult.getError().orElseThrow().code());
+    }
+
+    @Test
+    void defaultRootWithoutActiveSessionPortDeniesProtectedHandlersWithMatchingActorContexts() {
+        ReceptionCompositionRoot root = new ReceptionCompositionRoot();
+
+        UUID sessionId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        AuthorizationContext authContext = new AuthorizationContext(
+                10, 2, "RECEPTIONIST", 1, 1, sessionId);
+        AuditActorContext auditActor = new AuditActorContext(
+                10, 2, "RECEPTIONIST", 1, 1, "synthetic-station", correlationId);
+
+        Result<?> roomsResult = root.getActiveReceptionRoomsHandler().handle(
+                new GetActiveReceptionRoomsQuery(authContext, auditActor));
+        assertTrue(roomsResult.isFailure());
+        assertEquals("AUTHORIZATION_DENIED", roomsResult.getError().orElseThrow().code());
+
+        Result<?> queueResult = root.getReceptionQueueHandler().handle(
+                new GetReceptionQueueQuery(LocalDate.now(), authContext, auditActor));
+        assertTrue(queueResult.isFailure());
+        assertEquals("AUTHORIZATION_DENIED", queueResult.getError().orElseThrow().code());
+
+        Result<?> searchResult = root.searchPatientsHandler().handle(
+                new SearchPatientsQuery("0123456789", authContext, auditActor));
         assertTrue(searchResult.isFailure());
         assertEquals("AUTHORIZATION_DENIED", searchResult.getError().orElseThrow().code());
     }
