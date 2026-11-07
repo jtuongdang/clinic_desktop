@@ -163,16 +163,18 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 97. **`316c7b6`** (`9886531f` — `copilot-cli` + `leaderANTI`): `task: HR-01: Implement Employee Management and Role Assignment use cases (14/14 PASS) in clinic-application [leaderANTI]`
 98. **`84010ed`** (`leaderANTI`): `fix(hr): implement getAssignedRoles and getAssignedWorkScopes in HrHandlerTestSupport (515 app tests pass) [leaderANTI]`
 99. **`fd5baaa`** (`cb8c89c` — `antigravity-cli` + `leaderANTI`): `feat(facility,audit): implement CreateRoomHandler and GetAuditLogsHandler with secret masking (78/78 PASS) [leaderANTI]`
+100. **`fe00372`** (`11cf33e5` — `copilot-cli` + `leaderANTI`): `task: PAYROLL-01: Implement Payroll Calculation and Period Lock use cases (8/8 PASS) in clinic-application [leaderANTI]`
+101. **`3d2cd26`** (`81d49630` — `google-antigravity-cli-claude-sonnet-02507d` + `leaderANTI`): `task: HR-02: Implement Attendance Check-In, Check-Out and Adjustment use cases (14/14 PASS) in clinic-application [leaderANTI]`
 
 ### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
-- **Tổng số bài test tự động:** **1,070 tests run across 158+ test classes** (`235` domain + `548` application + `129` infrastructure + `158` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS** in 17.8s.
+- **Tổng số bài test tự động:** **1,092 tests run across 158+ test classes** (`235` domain + `570` application + `129` infrastructure + `158` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS** in 15.0s.
 - **Tiến độ Phase 8 (Nhân sự, Danh mục Mở rộng & Tiền lương):**
   - **Hợp đồng triển khai Phase 8 đã phê duyệt:** `b69757a4-daff-491c-8152-39dea848d868` (`PHASE-8-HR-EXTENDED-ADMINISTRATION-AND-PAYROLL-FOUNDATION-CONTRACT-LEADERANTI`).
   - **`HR-01` Hoàn tất (Task `9886531f`):** Quản lý hồ sơ nhân viên (`CreateEmployeeHandler` 4/4 PASS, `UpdateEmployeeStatusHandler` 3/3 PASS, `AssignEmployeeRolesHandler` 4/4 PASS, `GetEmployeesHandler` 2/2 PASS, mã hóa mật khẩu PBKDF2, kiểm toán `USER_CREATED`, `USER_UPDATED`, `USER_DEACTIVATED`, `ROLE_ASSIGNMENT_CHANGED`).
   - **`FAC-01 & AUD-01` Hoàn tất (Task `4a7d7cf6`):** Quản trị phòng khám (`CreateRoomHandler` 9/9 PASS, mở rộng `IPhongKhamRepository`), Cổng tra cứu nhật ký kiểm toán (`AuditReadPort`, `GetAuditLogsHandler` 8/8 PASS, che giấu dữ liệu nhạy cảm `SecretMasker` 7/7 PASS).
-  - **Slice 2 Đang chạy song song ngầm:**
-    - **`HR-02 / ATTENDANCE-01` (Task `81d49630`):** Giao cho `google-antigravity-cli-claude-sonnet-02507d` phụ trách (`RecordAttendanceHandler`, `AdjustAttendanceHandler`, `GetAttendanceByPeriodHandler`).
-    - **`PAYROLL-01` (Task `11cf33e5`):** Giao cho `copilot-cli` phụ trách (`CalculatePayrollHandler`, `LockPayrollPeriodHandler`, `GetPayrollByPeriodHandler`).
+  - **`PAYROLL-01` Hoàn tất (Task `11cf33e5`):** Tính toán bảng lương & Chốt kỳ lương (`CalculatePayrollHandler` 3/3 PASS, `LockPayrollPeriodHandler` 2/2 PASS, `GetPayrollByPeriodHandler` 3/3 PASS, kiểm toán `PAYROLL_PERIOD_LOCKED`).
+  - **`HR-02 / ATTENDANCE-01` Hoàn tất (Task `81d49630`):** Chấm công ca trực & Điều chỉnh chấm công (`RecordAttendanceHandler`, `AdjustAttendanceHandler`, `GetAttendanceByPeriodHandler`, kiểm toán `ATTENDANCE_ADJUSTED`).
+  - **Tối ưu hóa dung lượng dự án:** Thu hồi 254 worktree cũ, giải phóng 2,51 GB dung lượng đĩa sạch sẽ; hạ dung lượng ClinicOrchestrator từ 3,4 GB xuống 557 MB (giảm 84%).
 - **Tiến độ Phase 7 (Thu ngân, Viện phí, Hóa đơn & Công nợ - `BILL-01`, `BILL-02` & `BILL-UI`):**
   - **`BILL-01` Hoàn tất:** Mở rộng cổng `IHoaDonRepository`, triển khai use case lập hóa đơn viện phí `CreateInvoiceHandler` (6/6 PASS) với đầy đủ cơ chế tính toán tổng tiền, snapshot dòng chi phí, trừ tạm ứng, tính giảm giá, khấu trừ BHYT; triển khai truy vấn hóa đơn `GetInvoiceByVisitHandler` (3/3 PASS); triển khai adapter JDBC persistence `HoaDonRepositoryImpl` và bộ test synthetic in-memory `HoaDonRepositoryImplTest` (4/4 PASS).
   - **`BILL-02` Hoàn tất:** Triển khai use case thu tiền viện phí `RecordPaymentHandler` (6/6 PASS) với thanh toán toàn bộ/từng phần, phát hành phiếu thu `PhieuThu`, theo dõi và tất toán công nợ `CongNoBenhNhan`, bắn kiểm toán `BILL_PAYMENT_COLLECTED`; triển khai truy vấn công nợ `GetPatientDebtHandler` (3/3 PASS).
