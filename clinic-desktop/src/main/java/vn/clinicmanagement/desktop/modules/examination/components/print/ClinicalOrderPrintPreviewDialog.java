@@ -11,7 +11,13 @@ import java.awt.image.BufferedImage;
  */
 public class ClinicalOrderPrintPreviewDialog extends JDialog {
 
+    private final ClinicalOrderPrintPreviewPanel printPreviewPanel;
+
     public ClinicalOrderPrintPreviewDialog(Window owner) {
+        this(owner, null);
+    }
+
+    public ClinicalOrderPrintPreviewDialog(Window owner, ClinicalOrderPrintPreviewPanel.ClinicalOrderData data) {
         super(owner, "EHC - Bệnh Án Điện Tử  --- Người đăng nhập: bennv --  --- Version: 2022.3.11.1 ---  -- BC11-CDCLSC2223834 - Phiếu chỉ định cận lâm sàng", ModalityType.MODELESS);
 
         setIconImage(createCrossIconImage());
@@ -19,7 +25,12 @@ public class ClinicalOrderPrintPreviewDialog extends JDialog {
         setMinimumSize(new Dimension(1000, 700));
         setLocationRelativeTo(owner);
 
-        setContentPane(new ClinicalOrderPrintPreviewPanel());
+        this.printPreviewPanel = new ClinicalOrderPrintPreviewPanel(data);
+        setContentPane(printPreviewPanel);
+    }
+
+    public ClinicalOrderPrintPreviewPanel getPrintPreviewPanel() {
+        return printPreviewPanel;
     }
 
     private static Image createCrossIconImage() {

@@ -10,11 +10,22 @@ import java.awt.*;
  */
 public class MedicalBillingSlipDialog extends JDialog {
 
+    private final MedicalBillingSlipPanel billingSlipPanel;
+
     public MedicalBillingSlipDialog(Window owner) {
+        this(owner, null);
+    }
+
+    public MedicalBillingSlipDialog(Window owner, MedicalBillingSlipPanel.BillingSlipData data) {
         super(owner, "DHC - Bệnh Án Điện Tử  --- Người đăng nhập: sennv -- ... --- Version: 2022.6.10.2 --- BCS21-VP214332-0 - Bảng kê chi phí khám bệnh, chữa bệnh (CV6156)", ModalityType.MODELESS);
         setSize(1180, 840);
         setMinimumSize(new Dimension(1000, 700));
         setLocationRelativeTo(owner);
-        setContentPane(new MedicalBillingSlipPanel());
+        this.billingSlipPanel = new MedicalBillingSlipPanel(data);
+        setContentPane(billingSlipPanel);
+    }
+
+    public MedicalBillingSlipPanel getBillingSlipPanel() {
+        return billingSlipPanel;
     }
 }

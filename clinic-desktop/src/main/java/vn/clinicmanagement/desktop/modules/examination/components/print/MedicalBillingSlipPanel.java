@@ -14,7 +14,64 @@ import java.awt.*;
  */
 public class MedicalBillingSlipPanel extends JPanel {
 
+    public record BillingSlipData(
+            String patientName,
+            String patientCode,
+            String birthYear,
+            String age,
+            String gender,
+            String feeCode,
+            String bhytCode,
+            String daysLeft,
+            String address,
+            String bhytPercent,
+            java.math.BigDecimal totalAmount,
+            java.math.BigDecimal bhytAmount,
+            java.math.BigDecimal patientAmount) {}
+
+    private BillingSlipData boundData;
+    private String patientName = "";
+    private String patientCode = "";
+    private String patientBirthYear = "";
+    private String patientAge = "";
+    private String patientGender = "";
+    private String feeCode = "";
+    private String bhytCode = "";
+    private String daysLeft = "";
+    private String address = "";
+    private String bhytPercent = "80%";
+
     public MedicalBillingSlipPanel() {
+        this(null);
+    }
+
+    public MedicalBillingSlipPanel(BillingSlipData data) {
+        bindData(data);
+    }
+
+    public void bindData(BillingSlipData data) {
+        this.boundData = data;
+        if (data != null) {
+            this.patientName = data.patientName() != null ? data.patientName() : "";
+            this.patientCode = data.patientCode() != null ? data.patientCode() : "";
+            this.patientBirthYear = data.birthYear() != null ? data.birthYear() : "";
+            this.patientAge = data.age() != null ? data.age() : "";
+            this.patientGender = data.gender() != null ? data.gender() : "";
+            this.feeCode = data.feeCode() != null ? data.feeCode() : "";
+            this.bhytCode = data.bhytCode() != null ? data.bhytCode() : "";
+            this.daysLeft = data.daysLeft() != null ? data.daysLeft() : "";
+            this.address = data.address() != null ? data.address() : "";
+            this.bhytPercent = data.bhytPercent() != null ? data.bhytPercent() : "80%";
+        }
+        rebuildUi();
+    }
+
+    public BillingSlipData getBoundData() {
+        return boundData;
+    }
+
+    private void rebuildUi() {
+        removeAll();
         setLayout(new BorderLayout());
         setBackground(new Color(245, 245, 245));
 
@@ -47,6 +104,8 @@ public class MedicalBillingSlipPanel extends JPanel {
         });
 
         add(layeredPane, BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     private JPanel buildTopToolBar() {
@@ -88,15 +147,23 @@ public class MedicalBillingSlipPanel extends JPanel {
         JPanel textPanel = new JPanel(new GridLayout(3, 1, 0, 0));
         textPanel.setOpaque(false);
 
-        JLabel l1 = new JLabel("NGUYỄN THỊ BÌNH AN | 22000308 | 1995 (23 tuổi) | Nữ", SwingConstants.RIGHT);
+        String line1 = (patientName.isBlank() ? "---" : patientName) + " | " +
+                (patientCode.isBlank() ? "---" : patientCode) + " | " +
+                (patientBirthYear.isBlank() ? "---" : patientBirthYear) +
+                (patientAge.isBlank() ? "" : " (" + patientAge + " tuổi)") + " | " +
+                (patientGender.isBlank() ? "---" : patientGender);
+        JLabel l1 = new JLabel(line1, SwingConstants.RIGHT);
         l1.setFont(AppFonts.SECTION);
         l1.setForeground(new Color(125, 20, 20));
 
-        JLabel l2 = new JLabel("Mã VP : 214332 | DN-4-01-8337377888 | Còn 874 ngày", SwingConstants.RIGHT);
+        String line2 = "Mã VP : " + (feeCode.isBlank() ? "---" : feeCode) + " | " +
+                (bhytCode.isBlank() ? "---" : bhytCode) +
+                (daysLeft.isBlank() ? "" : " | " + daysLeft);
+        JLabel l2 = new JLabel(line2, SwingConstants.RIGHT);
         l2.setFont(AppFonts.BODY);
         l2.setForeground(new Color(125, 20, 20));
 
-        JLabel l3 = new JLabel("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh", SwingConstants.RIGHT);
+        JLabel l3 = new JLabel(address.isBlank() ? "---" : address, SwingConstants.RIGHT);
         l3.setFont(AppFonts.BODY);
         l3.setForeground(new Color(125, 20, 20));
 
@@ -104,7 +171,7 @@ public class MedicalBillingSlipPanel extends JPanel {
         textPanel.add(l2);
         textPanel.add(l3);
 
-        JLabel lblBhyt = new JLabel("<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>80%</b></font></center></html>", SwingConstants.CENTER);
+        JLabel lblBhyt = new JLabel("<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>" + bhytPercent + "</b></font></center></html>", SwingConstants.CENTER);
         lblBhyt.setFont(AppFonts.SECTION);
         lblBhyt.setBorder(new EmptyBorder(0, 10, 0, 4));
 

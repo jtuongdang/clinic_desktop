@@ -36,23 +36,83 @@ import java.awt.image.BufferedImage;
  */
 public class ClinicalOrderPrintPreviewPanel extends JPanel {
 
-    private String patientCode = "22000324";
-    private String patientName = "TEST1";
-    private String patientBirthYear = "2000";
-    private String patientAge = "22";
-    private String patientGender = "Nam";
-    private String patientBhyt = "DN-4-01-2929299222";
-    private String patientExpiry = "01/01/2025";
-    private String patientAddress = "Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh";
-    private String patientDepartment = "PK Nhi 1";
-    private String patientDiagnosis = "A01.1-Bệnh tả do Vibrio cholerae 01, typ sinh học eltor";
-    private String medicalRecordCode = "22000063";
-    private String pidCode = "22001324";
-    private String invoiceCode = "214341";
-    private String daysLeft = "Còn 11 ngày";
-    private String orderDateTime = "11:47, ngày 22 tháng 08 năm 2022";
+    public record OrderItem(String group, String name, String quantity, String unit, String notes) {}
+
+    public record ClinicalOrderData(
+            String patientCode,
+            String patientName,
+            String patientBirthYear,
+            String patientAge,
+            String patientGender,
+            String patientBhyt,
+            String patientExpiry,
+            String patientAddress,
+            String patientDepartment,
+            String patientDiagnosis,
+            String medicalRecordCode,
+            String pidCode,
+            String invoiceCode,
+            String daysLeft,
+            String orderDateTime,
+            java.util.List<OrderItem> items) {
+        public ClinicalOrderData {
+            items = items == null ? java.util.List.of() : java.util.List.copyOf(items);
+        }
+    }
+
+    private ClinicalOrderData boundData;
+    private String patientCode = "";
+    private String patientName = "";
+    private String patientBirthYear = "";
+    private String patientAge = "";
+    private String patientGender = "";
+    private String patientBhyt = "";
+    private String patientExpiry = "";
+    private String patientAddress = "";
+    private String patientDepartment = "";
+    private String patientDiagnosis = "";
+    private String medicalRecordCode = "";
+    private String pidCode = "";
+    private String invoiceCode = "";
+    private String daysLeft = "";
+    private String orderDateTime = "";
 
     public ClinicalOrderPrintPreviewPanel() {
+        this(null);
+    }
+
+    public ClinicalOrderPrintPreviewPanel(ClinicalOrderData data) {
+        bindData(data);
+    }
+
+    public void bindData(ClinicalOrderData data) {
+        this.boundData = data;
+        if (data != null) {
+            this.patientCode = data.patientCode() != null ? data.patientCode() : "";
+            this.patientName = data.patientName() != null ? data.patientName() : "";
+            this.patientBirthYear = data.patientBirthYear() != null ? data.patientBirthYear() : "";
+            this.patientAge = data.patientAge() != null ? data.patientAge() : "";
+            this.patientGender = data.patientGender() != null ? data.patientGender() : "";
+            this.patientBhyt = data.patientBhyt() != null ? data.patientBhyt() : "";
+            this.patientExpiry = data.patientExpiry() != null ? data.patientExpiry() : "";
+            this.patientAddress = data.patientAddress() != null ? data.patientAddress() : "";
+            this.patientDepartment = data.patientDepartment() != null ? data.patientDepartment() : "";
+            this.patientDiagnosis = data.patientDiagnosis() != null ? data.patientDiagnosis() : "";
+            this.medicalRecordCode = data.medicalRecordCode() != null ? data.medicalRecordCode() : "";
+            this.pidCode = data.pidCode() != null ? data.pidCode() : "";
+            this.invoiceCode = data.invoiceCode() != null ? data.invoiceCode() : "";
+            this.daysLeft = data.daysLeft() != null ? data.daysLeft() : "";
+            this.orderDateTime = data.orderDateTime() != null ? data.orderDateTime() : "";
+        }
+        rebuildUi();
+    }
+
+    public ClinicalOrderData getBoundData() {
+        return boundData;
+    }
+
+    private void rebuildUi() {
+        removeAll();
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -76,6 +136,8 @@ public class ClinicalOrderPrintPreviewPanel extends JPanel {
         centerContainer.add(scrollPane, BorderLayout.CENTER);
 
         add(centerContainer, BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     private JPanel buildTopToolBar() {
