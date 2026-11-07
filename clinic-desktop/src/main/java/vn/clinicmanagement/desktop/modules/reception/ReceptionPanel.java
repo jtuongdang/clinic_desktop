@@ -30,7 +30,6 @@ import vn.clinicmanagement.domain.facility.PhongKham;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -70,6 +69,12 @@ public class ReceptionPanel extends BaseViewPanel {
     private final SessionLifecycleService.SessionListener sessionListener;
 
     private final List<SwingWorker<?, ?>> inFlightWorkers = new CopyOnWriteArrayList<>();
+
+    // Headless test seams
+    private volatile String lastErrorMessage;
+    private volatile String lastInfoMessage;
+    private java.util.function.Consumer<String> errorListener;
+    private java.util.function.Consumer<RegisterPatientCommand> commandConsumerForTest;
 
     public ReceptionPanel() {
         this(new ReceptionCompositionRoot(), null);
@@ -217,7 +222,7 @@ public class ReceptionPanel extends BaseViewPanel {
                             snapshot.queueResult.getValue().ifPresent(ReceptionPanel.this::updateQueueAndRoomSummaries);
                         }
                         if (snapshot.roomsResult != null && snapshot.roomsResult.isSuccess()) {
-                            snapshot.roomsResult.getValue().ifPresent(ReceptionPanel.this::updateActiveRooms);
+                            ReceptionPanel.this.updateActiveRooms(snapshot.roomsResult.getValue().orElse(List.of()));
                         }
                     }
                 } catch (InterruptedException ex) {
@@ -341,27 +346,9 @@ public class ReceptionPanel extends BaseViewPanel {
         statusPanel.repaint();
     }
 
-    private void updateActiveRooms(List<PhongKham> rooms) {
-        if (rooms == null || rooms.isEmpty()) return;
-        String[] roomNames = rooms.stream()
-                .map(PhongKham::getTenPhong)
-                .filter(Objects::nonNull)
-                .toArray(String[]::new);
-        if (roomNames.length == 0) return;
-
-        List<MedicalPopupChooser> choosers = findComponents(formPanel, MedicalPopupChooser.class);
-        for (MedicalPopupChooser chooser : choosers) {
-            try {
-                Field listField = MedicalPopupChooser.class.getDeclaredField("list");
-                listField.setAccessible(true);
-                @SuppressWarnings("unchecked")
-                JList<String> list = (JList<String>) listField.get(chooser);
-                if (list != null) {
-                    list.setListData(roomNames);
-                }
-            } catch (Exception ignored) {
-            }
-        }
+    void updateActiveRooms(List<PhongKham> rooms) {
+        List<PhongKham> safeRooms = rooms != null ? rooms : List.of();
+        runOnEdt(() -> formPanel.setClinicRooms(safeRooms));
     }
 
     private AuthorizationContext currentAuthorizationContext() {
@@ -492,9 +479,13 @@ public class ReceptionPanel extends BaseViewPanel {
         final RegisterPatientCommand command;
         try {
             command = formPanel.toRegisterCommand(authzContext, auditContext);
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             showError(ReceptionPanelMessagePolicy.toUserMessage("PATIENT_VALIDATION"));
             return;
+        }
+
+        if (commandConsumerForTest != null) {
+            commandConsumerForTest.accept(command);
         }
 
         footerBar.setSaving(true);
@@ -610,6 +601,9 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     private void handleDuplicateCccd(String cccd) {
+        if (GraphicsEnvironment.isHeadless()) {
+            return;
+        }
         String msg = ReceptionPanelMessagePolicy.toDuplicateCccdMessage(cccd);
         int choice = JOptionPane.showConfirmDialog(this, msg, "Trùng số CCCD", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (choice == JOptionPane.YES_OPTION) {
@@ -619,6 +613,9 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     private PatientSearchItem choosePatient(List<PatientSearchItem> matches) {
+        if (GraphicsEnvironment.isHeadless()) {
+            return matches.isEmpty() ? null : matches.get(0);
+        }
         JOptionPane pane = new JOptionPane("Chọn hồ sơ người bệnh hiện có (Hủy để giữ thông tin đang nhập):",
                 JOptionPane.PLAIN_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
         pane.setWantsInput(true);
@@ -634,11 +631,43 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     private void showMessage(String message, String title, int type) {
+        if (type == JOptionPane.ERROR_MESSAGE) {
+            this.lastErrorMessage = message;
+            if (errorListener != null) {
+                errorListener.accept(message);
+            }
+        } else {
+            this.lastInfoMessage = message;
+        }
+        if (GraphicsEnvironment.isHeadless()) {
+            return;
+        }
         JOptionPane.showMessageDialog(this, message, title, type);
     }
 
     private void showError(String message) {
         showMessage(message, "Thông báo lỗi", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public void setErrorListenerForTest(java.util.function.Consumer<String> listener) {
+        this.errorListener = listener;
+    }
+
+    public void setCommandConsumerForTest(java.util.function.Consumer<RegisterPatientCommand> consumer) {
+        this.commandConsumerForTest = consumer;
+    }
+
+    public String getLastErrorMessage() {
+        return lastErrorMessage;
+    }
+
+    public String getLastInfoMessage() {
+        return lastInfoMessage;
+    }
+
+    public void clearLastMessagesForTest() {
+        this.lastErrorMessage = null;
+        this.lastInfoMessage = null;
     }
 
     public ReceptionFooterBar getFooterBar() {
