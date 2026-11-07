@@ -20,8 +20,10 @@ import java.awt.event.ComponentEvent;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -204,7 +206,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         formContainer.add(columns, BorderLayout.CENTER);
 
         add(formContainer, BorderLayout.CENTER);
-        txtTime.setText(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")));
+        txtTime.setText(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"))
+                .format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")));
     }
 
     /** Cột trái: Thông tin hành chính bệnh nhân */
@@ -638,7 +641,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         txtNoiCap.setText("");
         txtWork.setText("");
         cbDkKham.setSelectedIndex(0);
-        txtTime.setText(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")));
+        txtTime.setText(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"))
+                .format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")));
         txtReason.setText("");
         cbDoiTuong.setSelectedIndex(0);
         chkUuTien.setSelected(false);
@@ -793,7 +797,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         String trimmed = value.trim();
         if (trimmed.isEmpty()) return null;
         try {
-            return LocalDate.parse(trimmed, DateTimeFormatter.ofPattern("d/M/yyyy"));
+            return LocalDate.parse(trimmed, DateTimeFormatter.ofPattern("d/M/uuuu")
+                    .withResolverStyle(ResolverStyle.STRICT));
         } catch (DateTimeParseException exception) {
             throw new IllegalArgumentException("Date must use the day/month/year format.", exception);
         }

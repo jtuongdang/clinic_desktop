@@ -76,6 +76,24 @@ class PatientRegistrationFormPanelTest {
     }
 
     @Test
+    void rejectsImpossibleInsuranceStartAndEndDates() throws Exception {
+        onEdt(() -> {
+            PatientRegistrationFormPanel panel = createPanelWithRoom();
+            panel.selectPatient(syntheticPatient(), syntheticInsurance());
+
+            editText(panel, "01/01/2024", "31/04/2026");
+            assertThrows(IllegalArgumentException.class,
+                    () -> panel.toRegisterCommand(AUTHORIZATION, AUDIT));
+
+            editText(panel, "31/04/2026", "01/01/2024");
+            editText(panel, "31/12/2024", "29/02/2025");
+            assertThrows(IllegalArgumentException.class,
+                    () -> panel.toRegisterCommand(AUTHORIZATION, AUDIT));
+            return null;
+        });
+    }
+
+    @Test
     void mapsOtherGenderAndLegacyComboValuesAndAcceptsExplicitEdits() throws Exception {
         onEdt(() -> {
             PatientRegistrationFormPanel panel = createPanelWithRoom();
