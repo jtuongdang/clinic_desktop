@@ -3,7 +3,6 @@ package vn.clinicmanagement.desktop.modules.reception;
 import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.common.Result;
-import vn.clinicmanagement.application.reception.ClinicRoomQueueSummary;
 import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsHandler;
 import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsQuery;
 import vn.clinicmanagement.application.reception.GetReceptionQueueHandler;
@@ -30,12 +29,13 @@ import vn.clinicmanagement.domain.facility.PhongKham;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,7 +43,6 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 /**
  * Phân hệ Đón Tiếp & Đăng Ký Khám Bệnh (EHC Reception Station).
@@ -54,6 +53,8 @@ import java.util.stream.Collectors;
  * - Thanh phím tắt chân trang: F1 (Mới), F2 (Lưu), F3 (In phiếu), F4 (Thẻ KCB)
  */
 public class ReceptionPanel extends BaseViewPanel {
+
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final ReceptionTopToolbar topToolbar;
     private final PatientRegistrationFormPanel formPanel;
@@ -69,6 +70,7 @@ public class ReceptionPanel extends BaseViewPanel {
     private final SessionLifecycleService.SessionListener sessionListener;
 
     private final List<SwingWorker<?, ?>> inFlightWorkers = new CopyOnWriteArrayList<>();
+    private Clock queueClock = Clock.system(CLINIC_ZONE);
 
     // Headless test seams
     private volatile String lastErrorMessage;
@@ -183,6 +185,10 @@ public class ReceptionPanel extends BaseViewPanel {
         refreshData();
     }
 
+    void setQueueClock(Clock clock) {
+        queueClock = clock.withZone(CLINIC_ZONE);
+    }
+
     @Override
     public void refreshData() {
         if (sessionLifecycleService != null && sessionLifecycleService.evaluate() != SessionLifecycleService.State.ACTIVE) {
@@ -192,6 +198,7 @@ public class ReceptionPanel extends BaseViewPanel {
 
         AuthorizationContext authzContext = currentAuthorizationContext();
         AuditActorContext auditContext = currentAuditActorContext();
+        Clock clock = queueClock;
 
         SwingWorker<RefreshDataSnapshot, Void> worker = new SwingWorker<>() {
             @Override
@@ -199,7 +206,7 @@ public class ReceptionPanel extends BaseViewPanel {
                 Result<ReceptionQueueSnapshot> queueResult = null;
                 if (queueHandler != null) {
                     queueResult = queueHandler.handle(
-                            new GetReceptionQueueQuery(LocalDate.now(), authzContext, auditContext));
+                            new GetReceptionQueueQuery(LocalDate.now(clock), authzContext, auditContext));
                 }
                 Result<List<PhongKham>> roomsResult = null;
                 if (roomsHandler != null) {
@@ -271,20 +278,7 @@ public class ReceptionPanel extends BaseViewPanel {
     }
 
     public void clearForm() {
-        clearFormComponents(formPanel);
-    }
-
-    private void clearFormComponents(Component comp) {
-        if (comp instanceof JTextField tf) {
-            tf.setText("");
-        } else if (comp instanceof JCheckBox cb) {
-            cb.setSelected(false);
-        }
-        if (comp instanceof Container container) {
-            for (Component child : container.getComponents()) {
-                clearFormComponents(child);
-            }
-        }
+        formPanel.clearForm();
     }
 
     private void setComponentsEditable(Component comp, boolean editable) {
@@ -318,30 +312,9 @@ public class ReceptionPanel extends BaseViewPanel {
                     String status = item.status() != null ? item.status() : "Chờ khám";
                     model.addRow(new Object[]{regCol, stt, status, "", "", "", ""});
                 }
-            } else if (table.getColumnCount() == 4 && snapshot.rooms() != null && !snapshot.rooms().isEmpty()) {
-                // Room status tables (Card 2: "Trạng Thái Phòng Khám" columns)
-                DefaultTableModel model = (DefaultTableModel) table.getModel();
-                Map<String, ClinicRoomQueueSummary> summaryMap = snapshot.rooms().stream()
-                        .filter(r -> r.roomName() != null)
-                        .collect(Collectors.toMap(
-                                r -> r.roomName().trim().toLowerCase(Locale.ROOT),
-                                r -> r,
-                                (a, b) -> a));
-
-                for (int r = 0; r < model.getRowCount(); r++) {
-                    Object val = model.getValueAt(r, 0);
-                    if (val != null) {
-                        String roomName = val.toString().trim().toLowerCase(Locale.ROOT);
-                        ClinicRoomQueueSummary summary = summaryMap.get(roomName);
-                        if (summary != null) {
-                            model.setValueAt(summary.registeredCount(), r, 1);
-                            model.setValueAt(summary.waitingCount(), r, 2);
-                            model.setValueAt(summary.examiningCount(), r, 3);
-                        }
-                    }
-                }
             }
         }
+        statusPanel.setRoomSummaries(snapshot.rooms());
         statusPanel.revalidate();
         statusPanel.repaint();
     }
