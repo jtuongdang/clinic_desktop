@@ -14,6 +14,7 @@ import vn.clinicmanagement.application.auth.CompletedLoginSession;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.authorization.AuthorizationService;
 import vn.clinicmanagement.application.reception.ClinicRoomQueueSummary;
+import vn.clinicmanagement.application.reception.GetActiveReceptionRoomsHandler;
 import vn.clinicmanagement.application.reception.GetReceptionQueueHandler;
 import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.application.reception.ReceptionQueuePort;
@@ -35,6 +36,7 @@ import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
+import vn.clinicmanagement.domain.repositories.IPhongKhamRepository;
 import vn.clinicmanagement.domain.repositories.ISystemRepository;
 import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 
@@ -65,6 +67,7 @@ class ReceptionPanelFormResetAndSummaryTest {
     private final UserSession session = UserSession.getInstance();
     private final UUID sessionId = UUID.randomUUID();
     private final SyntheticQueue queue = new SyntheticQueue();
+    private volatile boolean failRoomCatalog;
     private SessionLifecycleService lifecycle;
     private ReceptionPanel panel;
 
@@ -87,8 +90,12 @@ class ReceptionPanelFormResetAndSummaryTest {
                 SESSION_CLOCK, audit, Runnable::run);
         lifecycle.startSession(new CompletedLoginSession(EMPLOYEE_ID, "reception.test", "Nhân viên mẫu",
                 ROLE, SCOPE, sessionId, SESSION_CLOCK.instant()));
-        GetReceptionQueueHandler handler = new GetReceptionQueueHandler(queue, syntheticAuthorization(lifecycle), audit);
-        SwingUtilities.invokeAndWait(() -> panel = new ReceptionPanel(handler, null, null, null, lifecycle));
+        AuthorizationService authorization = syntheticAuthorization(lifecycle);
+        GetReceptionQueueHandler queueHandler = new GetReceptionQueueHandler(queue, authorization, audit);
+        GetActiveReceptionRoomsHandler roomsHandler = new GetActiveReceptionRoomsHandler(
+                syntheticRoomsRepository(), authorization, audit);
+        SwingUtilities.invokeAndWait(() -> panel = new ReceptionPanel(
+                queueHandler, roomsHandler, null, null, lifecycle));
     }
 
     @AfterEach
@@ -149,6 +156,22 @@ class ReceptionPanelFormResetAndSummaryTest {
         queue.rooms = List.of();
         refreshAndWait();
         SwingUtilities.invokeAndWait(() -> roomTables().forEach(table -> assertEquals(0, table.getRowCount())));
+    }
+
+    @Test
+    void refreshReportsSafeMessageWhenQueueResultFails() throws Exception {
+        queue.failQueue = true;
+        refreshAndWait();
+        SwingUtilities.invokeAndWait(() ->
+                assertEquals(ReceptionPanelMessagePolicy.MSG_RECEPTION_QUEUE_FAILED, panel.getLastErrorMessage()));
+    }
+
+    @Test
+    void refreshReportsSafeMessageWhenRoomsResultFails() throws Exception {
+        failRoomCatalog = true;
+        refreshAndWait();
+        SwingUtilities.invokeAndWait(() ->
+                assertEquals(ReceptionPanelMessagePolicy.MSG_ROOM_CATALOG_FAILED, panel.getLastErrorMessage()));
     }
 
     @Test
@@ -304,17 +327,38 @@ class ReceptionPanelFormResetAndSummaryTest {
         grant.setHanhDong(HanhDongQuyen.XEM);
         grant.setPhamViDuLieu(PhamViDuLieu.KHOA_PHONG);
         grant.setDuocPhep(true);
+        MaTranPhanQuyen catalogGrant = new MaTranPhanQuyen();
+        catalogGrant.setMaVaiTro(ROLE.id());
+        catalogGrant.setPhanHe("CATALOG");
+        catalogGrant.setHanhDong(HanhDongQuyen.XEM);
+        catalogGrant.setPhamViDuLieu(PhamViDuLieu.KHOA_PHONG);
+        catalogGrant.setDuocPhep(true);
         ISystemRepository system = new ISystemRepository() {
-            @Override public List<MaTranPhanQuyen> getMatrixByRoleId(int roleId) { return List.of(grant); }
+            @Override public List<MaTranPhanQuyen> getMatrixByRoleId(int roleId) {
+                return List.of(grant, catalogGrant);
+            }
             @Override public Optional<String> getSystemParameterValue(String key) { return Optional.empty(); }
         };
         return new AuthorizationService(lifecycle, employees, system);
+    }
+
+    private IPhongKhamRepository syntheticRoomsRepository() {
+        return (IPhongKhamRepository) Proxy.newProxyInstance(
+                IPhongKhamRepository.class.getClassLoader(), new Class<?>[]{IPhongKhamRepository.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getActiveRoomsInScope" -> {
+                        if (failRoomCatalog) throw new IllegalStateException("Synthetic room catalog failure");
+                        yield List.of();
+                    }
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
     }
 
     private static final class SyntheticQueue implements ReceptionQueuePort {
         private volatile List<ClinicRoomQueueSummary> rooms = List.of();
         private volatile LocalDate queueDate;
         private volatile LocalDate summaryDate;
+        private volatile boolean failQueue;
 
         @Override
         public LuotKham registerVisit(int patientId, int facilityId, int departmentId, int roomId,
@@ -325,6 +369,7 @@ class ReceptionPanelFormResetAndSummaryTest {
 
         @Override
         public List<ReceptionQueueItem> getQueue(LocalDate date, int facilityId, int departmentId) {
+            if (failQueue) throw new IllegalStateException("Synthetic reception queue failure");
             queueDate = date;
             return List.of();
         }

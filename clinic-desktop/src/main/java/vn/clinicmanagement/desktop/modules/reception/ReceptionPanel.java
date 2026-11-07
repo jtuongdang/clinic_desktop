@@ -245,9 +245,13 @@ public class ReceptionPanel extends BaseViewPanel {
                     if (snapshot != null) {
                         if (snapshot.queueResult != null && snapshot.queueResult.isSuccess()) {
                             snapshot.queueResult.getValue().ifPresent(ReceptionPanel.this::updateQueueAndRoomSummaries);
+                        } else if (snapshot.queueResult != null && snapshot.queueResult.isFailure()) {
+                            showError(ReceptionPanelMessagePolicy.toUserMessage(snapshot.queueResult));
                         }
                         if (snapshot.roomsResult != null && snapshot.roomsResult.isSuccess()) {
                             ReceptionPanel.this.updateActiveRooms(snapshot.roomsResult.getValue().orElse(List.of()));
+                        } else if (snapshot.roomsResult != null && snapshot.roomsResult.isFailure()) {
+                            showError(ReceptionPanelMessagePolicy.toUserMessage(snapshot.roomsResult));
                         }
                     }
                 } catch (InterruptedException ex) {
@@ -255,7 +259,7 @@ public class ReceptionPanel extends BaseViewPanel {
                 } catch (CancellationException ex) {
                     // Safe cancellation on session lock or close
                 } catch (ExecutionException ex) {
-                    // Handled safely without leaking internal exception to dialog
+                    showError(ReceptionPanelMessagePolicy.MSG_RECEPTION_QUEUE_FAILED);
                 }
             }
         };
@@ -509,6 +513,7 @@ public class ReceptionPanel extends BaseViewPanel {
         String submittedCccd = formPanel.enteredCccd();
         long epoch = viewSessionEpoch.get();
         footerBar.setSaving(true);
+        setComponentsEditable(formPanel, false);
         SwingWorker<Result<RegistrationReceipt>, Void> worker = new SwingWorker<>() {
             @Override
             protected Result<RegistrationReceipt> doInBackground() {
@@ -520,6 +525,8 @@ public class ReceptionPanel extends BaseViewPanel {
                 inFlightWorkers.remove(this);
                 if (!isCurrentWorker(epoch)) return;
                 footerBar.setSaving(false);
+                setComponentsEditable(formPanel, sessionLifecycleService == null
+                        || sessionLifecycleService.evaluate() == SessionLifecycleService.State.ACTIVE);
                 if (isCancelled()) return;
                 try {
                     Result<RegistrationReceipt> result = get();
