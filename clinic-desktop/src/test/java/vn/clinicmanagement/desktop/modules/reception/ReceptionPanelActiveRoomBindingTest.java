@@ -45,6 +45,9 @@ import vn.clinicmanagement.domain.system.MaTranPhanQuyen;
 
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.JTextField;
+import java.awt.Component;
+import java.awt.Container;
 import java.lang.reflect.Proxy;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -54,6 +57,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -70,6 +74,7 @@ class ReceptionPanelActiveRoomBindingTest {
 
     private final AtomicInteger capturedRoomId = new AtomicInteger(-1);
     private final AtomicInteger visitCallCount = new AtomicInteger(0);
+    private final AtomicBoolean failRoomCatalog = new AtomicBoolean();
     private final List<PhongKham> availableRooms = new ArrayList<>();
 
     private ReceptionQueuePort queuePort;
@@ -98,6 +103,7 @@ class ReceptionPanelActiveRoomBindingTest {
         UserSession.getInstance().clearSession();
         capturedRoomId.set(-1);
         visitCallCount.set(0);
+        failRoomCatalog.set(false);
         availableRooms.clear();
 
         queuePort = new ReceptionQueuePort() {
@@ -179,6 +185,9 @@ class ReceptionPanelActiveRoomBindingTest {
 
             @Override
             public List<PhongKham> getActiveRoomsInScope(int facilityId, int departmentId) {
+                if (failRoomCatalog.get()) {
+                    throw new IllegalStateException("Synthetic room catalog failure");
+                }
                 return new ArrayList<>(availableRooms);
             }
         };
@@ -264,6 +273,44 @@ class ReceptionPanelActiveRoomBindingTest {
                 "Selected real room ID 77 must reach RegisterPatientHandler / ReceptionQueuePort");
         assertEquals(1, visitCallCount.get(),
                 "Exactly one visit registration should have been performed");
+    }
+
+    @Test
+    void duplicateRoomNamesHaveDisambiguatedLabelsAndSubmitSelectedRoomId() throws Exception {
+        PhongKham uniqueRoom = createRoom(100, "Phòng Khám Nhi");
+        PhongKham firstDuplicate = createRoom(101, "Phòng Khám Nội");
+        PhongKham secondDuplicate = createRoom(202, "Phòng Khám Nội");
+        availableRooms.addAll(List.of(uniqueRoom, firstDuplicate, secondDuplicate));
+
+        AtomicReference<RegisterPatientCommand> capturedCommand = new AtomicReference<>();
+        panel.setCommandConsumerForTest(capturedCommand::set);
+
+        SwingUtilities.invokeAndWait(() -> {
+            panel.updateActiveRooms(List.of(uniqueRoom));
+            JTextField chooserField = findTextField(panel.getFormPanel(), uniqueRoom.getTenPhong());
+            assertNotNull(chooserField);
+            assertEquals(uniqueRoom.getTenPhong(), chooserField.getText(),
+                    "Unique room names should keep their unchanged chooser label");
+
+            panel.updateActiveRooms(List.of(firstDuplicate, secondDuplicate));
+            String firstLabel = "Phòng Khám Nội (#101)";
+            String secondLabel = "Phòng Khám Nội (#202)";
+            chooserField = findTextField(panel.getFormPanel(), firstLabel);
+            assertNotNull(chooserField, "First duplicate room should have a disambiguated label");
+            chooserField.setText(secondLabel);
+
+            BenhNhan patient = createSyntheticPatient(14, "Nguyen Van Test", "0901234567", "001094000005");
+            panel.getFormPanel().selectPatient(patient, null);
+            panel.saveRegistration();
+        });
+
+        waitForWorkers(panel);
+
+        assertNotNull(capturedCommand.get(), "RegisterPatientCommand should have been created");
+        assertEquals(202, capturedCommand.get().roomId(),
+                "The second duplicate chooser label must resolve to room ID 202");
+        assertEquals(202, capturedRoomId.get(),
+                "Selected duplicate room ID 202 must reach ReceptionQueuePort");
     }
 
     @Test
@@ -360,6 +407,40 @@ class ReceptionPanelActiveRoomBindingTest {
         });
     }
 
+    @Test
+    void failedRoomCatalogRefreshClearsStaleRoomIdentityAndShowsCatalogMessage() throws Exception {
+        PhongKham initialRoom = createRoom(111, "Phòng 203 - Nội Tổng Quát");
+        availableRooms.add(initialRoom);
+
+        SwingUtilities.invokeAndWait(() -> {
+            panel.updateActiveRooms(List.of(initialRoom));
+            BenhNhan patient = createSyntheticPatient(15, "Le Thi Test", "0965432109", "001095000006");
+            panel.getFormPanel().selectPatient(patient, null);
+            panel.clearLastMessagesForTest();
+        });
+
+        AtomicReference<String> errorReceived = new AtomicReference<>();
+        panel.setErrorListenerForTest(errorReceived::set);
+        failRoomCatalog.set(true);
+
+        SwingUtilities.invokeAndWait(panel::refreshData);
+        waitForWorkers(panel);
+
+        assertEquals(ReceptionPanelMessagePolicy.MSG_ROOM_CATALOG_FAILED, panel.getLastErrorMessage());
+        assertEquals(ReceptionPanelMessagePolicy.MSG_ROOM_CATALOG_FAILED, errorReceived.get());
+
+        AuthorizationContext authzContext = new AuthorizationContext(
+                TEST_USER_ID, TEST_ROLE_ID, TEST_ROLE_CODE, TEST_FACILITY_ID, TEST_DEPARTMENT_ID, UUID.randomUUID());
+        AuditActorContext auditContext = new AuditActorContext(
+                TEST_USER_ID, TEST_ROLE_ID, TEST_ROLE_CODE, TEST_FACILITY_ID, TEST_DEPARTMENT_ID, "RECEPTION-01", UUID.randomUUID());
+        SwingUtilities.invokeAndWait(() -> {
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> panel.getFormPanel().toRegisterCommand(authzContext, auditContext));
+            assertTrue(ex.getMessage().contains("clinic room"),
+                    "Failed room catalog refresh must clear stale room identity");
+        });
+    }
+
     private static PhongKham createRoom(int id, String name) {
         PhongKham r = new PhongKham();
         r.setId(id);
@@ -378,6 +459,21 @@ class ReceptionPanelActiveRoomBindingTest {
         k.setCoSo(c);
         r.setKhoa(k);
         return r;
+    }
+
+    private static JTextField findTextField(Container container, String text) {
+        for (Component component : container.getComponents()) {
+            if (component instanceof JTextField textField && textField.getText().equals(text)) {
+                return textField;
+            }
+            if (component instanceof Container child) {
+                JTextField textField = findTextField(child, text);
+                if (textField != null) {
+                    return textField;
+                }
+            }
+        }
+        return null;
     }
 
     private static BenhNhan createSyntheticPatient(int id, String fullName, String phone, String cccd) {

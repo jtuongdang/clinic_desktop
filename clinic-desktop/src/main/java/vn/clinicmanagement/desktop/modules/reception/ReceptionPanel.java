@@ -251,6 +251,7 @@ public class ReceptionPanel extends BaseViewPanel {
                         if (snapshot.roomsResult != null && snapshot.roomsResult.isSuccess()) {
                             ReceptionPanel.this.updateActiveRooms(snapshot.roomsResult.getValue().orElse(List.of()));
                         } else if (snapshot.roomsResult != null && snapshot.roomsResult.isFailure()) {
+                            ReceptionPanel.this.updateActiveRooms(List.of());
                             showError(ReceptionPanelMessagePolicy.toUserMessage(snapshot.roomsResult));
                         }
                     }

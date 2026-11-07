@@ -25,7 +25,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 
@@ -572,13 +575,29 @@ public class PatientRegistrationFormPanel extends JPanel {
         clinicRooms.clear();
         clinicRooms.addAll(rooms);
         String selectedRoom = chooserClinicRoom.getText();
-        String[] roomNames = rooms.stream().map(PhongKham::getTenPhong).toArray(String[]::new);
-        chooserClinicRoom.setItems(roomNames);
-        if (rooms.stream().anyMatch(room -> room.getTenPhong().equalsIgnoreCase(selectedRoom))) {
+        String[] roomLabels = clinicRoomChooserLabels(rooms);
+        chooserClinicRoom.setItems(roomLabels);
+        if (java.util.Arrays.stream(roomLabels).anyMatch(label -> label.equalsIgnoreCase(selectedRoom))) {
             chooserClinicRoom.setText(selectedRoom);
         } else {
-            chooserClinicRoom.setText(roomNames.length == 0 ? "" : roomNames[0]);
+            chooserClinicRoom.setText(roomLabels.length == 0 ? "" : roomLabels[0]);
         }
+    }
+
+    private static String[] clinicRoomChooserLabels(List<PhongKham> rooms) {
+        Map<String, Long> nameCounts = new HashMap<>();
+        for (PhongKham room : rooms) {
+            nameCounts.merge(normalizedRoomName(room), 1L, Long::sum);
+        }
+        return rooms.stream()
+                .map(room -> nameCounts.get(normalizedRoomName(room)) > 1
+                        ? room.getTenPhong() + " (#" + room.getId() + ")"
+                        : room.getTenPhong())
+                .toArray(String[]::new);
+    }
+
+    private static String normalizedRoomName(PhongKham room) {
+        return room.getTenPhong().trim().toLowerCase(Locale.ROOT);
     }
 
     public void setOnSearch(BiConsumer<String, String> listener) {
@@ -647,7 +666,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         cbDoiTuong.setSelectedIndex(0);
         chkUuTien.setSelected(false);
         chooserService.setText("");
-        chooserClinicRoom.setText(clinicRooms.isEmpty() ? "" : clinicRooms.get(0).getTenPhong());
+        chooserClinicRoom.setText(clinicRooms.isEmpty() ? "" : clinicRoomChooserLabels(clinicRooms)[0]);
         clearInsuranceFields();
     }
 
@@ -682,11 +701,19 @@ public class PatientRegistrationFormPanel extends JPanel {
         patient.setNoiLamViec(txtWork.getText().trim());
 
         BaoHiem insurance = buildInsurance();
-        int roomId = clinicRooms.stream()
-                .filter(room -> room.getTenPhong().equalsIgnoreCase(chooserClinicRoom.getText().trim()))
+        String selectedRoom = chooserClinicRoom.getText();
+        String[] roomLabels = clinicRoomChooserLabels(clinicRooms);
+        int roomId = java.util.stream.IntStream.range(0, clinicRooms.size())
+                .filter(index -> roomLabels[index].equalsIgnoreCase(selectedRoom))
+                .mapToObj(clinicRooms::get)
                 .map(PhongKham::getId)
                 .filter(Objects::nonNull)
                 .findFirst()
+                .or(() -> clinicRooms.stream()
+                        .filter(room -> room.getTenPhong().equalsIgnoreCase(selectedRoom.trim()))
+                        .map(PhongKham::getId)
+                        .filter(Objects::nonNull)
+                        .findFirst())
                 .orElseThrow(() -> new IllegalStateException("A clinic room must be selected."));
         DoiTuongKham payerType = switch (Objects.toString(cbDoiTuong.getSelectedItem(), "")) {
             case "BHYT" -> DoiTuongKham.BHYT;
