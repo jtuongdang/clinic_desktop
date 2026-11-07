@@ -1,16 +1,17 @@
 # Phase 1–3 Readiness and Owner Gate Summary
 
 **For:** Owner  
-**Snapshot:** `11616a7` (`feature/patient-reception-workflow`), 2026-11-07  
-**Decision:** Phase 1–2 code/test evidence is ready for Owner visual acceptance, but `SEC-01`, `REC-01`, and `PAT-02` remain open/default-deny. Phase 3 core application workflow handlers (VIS-01 visit cancellation, VIS-01 room transfer, and APPT-01 appointment booking) have been implemented and verified with 100% synthetic unit test coverage in Wave 21 under leaderANTI orchestration.
+**Snapshot:** `a4cc607` (`feature/patient-reception-workflow`), 2026-11-07  
+**Decision:** Phase 1–2 code/test evidence is ready for Owner visual acceptance, but `SEC-01`, `REC-01`, and `PAT-02` remain open/default-deny. Phase 3 core application workflow handlers (VIS-01 visit cancellation, VIS-01 room transfer, APPT-01 appointment booking, and APPT-01 appointment cancellation) have been implemented and verified with 100% synthetic unit test coverage in Wave 21 under leaderANTI orchestration.
 
 ## 1. Reactor and Desktop verification
 
-- **Reactor:** 791 tests run — 228 domain, 294 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
+- **Reactor:** 799 tests run — 228 domain, 302 application, 125 infrastructure, and 144 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
 - **Wave 21 commits recorded:**
   - `e9898b2` (`968221e5` — `copilot-cli`): Implemented `CancelVisitCommand`, `CancelVisitReceipt`, `CancelVisitHandler`, and `CancelVisitHandlerTest` (5/5 PASS) in `clinic-application`.
   - `695c121` (`ebb76355` — `copilot-cli`): Implemented `BookAppointmentCommand`, `AppointmentReceipt`, `BookAppointmentHandler`, and `BookAppointmentHandlerTest` (6/6 PASS) in `clinic-application`.
   - `11616a7` (`df7f9124` — `antigravity-cli` + `leaderANTI`): Implemented `TransferVisitCommand`, `TransferVisitReceipt`, `TransferVisitHandler`, `TransferVisitHandlerTest` (13/13 PASS), and added `Result.getErrorCode()` convenience method.
+  - `a4cc607` (`8e014bb6` — `copilot-cli`): Implemented `CancelAppointmentCommand`, `CancelAppointmentReceipt`, `CancelAppointmentHandler`, and `CancelAppointmentHandlerTest` (8/8 PASS) in `clinic-application`.
 - **Wave 20 commits recorded:**
   - `6342d46` (`6f659bb1` — `copilot-cli`): Added `HoaDonTest` (17/17 PASS), `ChiTietHoaDonTest` (4/4 PASS), `PhieuThuTest` (5/5 PASS), and `CongNoBenhNhanTest` (6/6 PASS) in `clinic-domain`.
   - `858b863` (`0edf46b7` — `antigravity-cli`): Added `ChiDinhDichVuTest` (5/5 PASS), `DanhMucDichVuTest` (3/3 PASS), and `ChiTietKetQuaXetNghiemTest` (3/3 PASS) in `clinic-domain`.
