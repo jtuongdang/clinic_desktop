@@ -508,6 +508,16 @@ At `feature/patient-reception-workflow` up to commits `1239784` and `644a904`, c
 
 **Reactor test count:** 622 tests run (130 domain + 235 application + 125 infrastructure + 132 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 và Phase 3 đã được củng cố tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 
+## Wave 18 Hardening and Verification — 07/11/2026 [leaderANTI]
+
+| Commit · task | Phân hệ · Thay đổi cụ thể | Bằng chứng kiểm thử tự động | Trạng thái cổng |
+|---|---|---|---|
+| `8c5836f` · `0170d664` (`copilot-cli`) | `clinic-domain`: Bổ sung kiểm thử `NhanVienTest`, `NhanVienWorkScopeTest`, và `VaiTroTest`, mở rộng kiểm thử miền cho nhân viên y tế, phạm vi làm việc của nhân viên và vai trò người dùng. | `5/5` tests PASS trong `NhanVienTest`, `3/3` tests PASS trong `NhanVienWorkScopeTest`, `4/4` tests PASS trong `VaiTroTest`. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `db924db` · `d38e7a83` (`antigravity-cli` + `leaderANTI`) | `clinic-application` & `clinic-desktop`: Bổ sung kiểm thử `ReceptionReadAuditTest` trong `clinic-application` và `DocxExportServiceTest` trong `clinic-desktop`, củng cố kiểm toán truy vết đọc tiếp đón và dịch vụ xuất tài liệu DOCX. | `35/35` tests PASS trong `ReceptionReadAuditTest`, `12/12` tests PASS trong `DocxExportServiceTest`. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+
+**Reactor test count:** 681 tests run (142 domain + 270 application + 125 infrastructure + 144 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 và Phase 3 đã được củng cố tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+
+
 
 
 
