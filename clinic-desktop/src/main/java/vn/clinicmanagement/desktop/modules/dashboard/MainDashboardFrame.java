@@ -386,6 +386,18 @@ public class MainDashboardFrame extends JFrame {
         }
     }
 
+    static void syncLockOverlayForSessionState(SessionLifecycleService.State state,
+                                              SessionLockOverlay lockOverlay) {
+        if (state == SessionLifecycleService.State.ACTIVE) {
+            lockOverlay.setVisible(false);
+            return;
+        }
+        lockOverlay.setAbsoluteExpiry(state == SessionLifecycleService.State.LOCKED_ABSOLUTE);
+        boolean newlyLocked = !lockOverlay.isVisible();
+        lockOverlay.setVisible(true);
+        if (newlyLocked) lockOverlay.focusCredentials();
+    }
+
     private RibbonButton guardedButton(String title, String icon, String key,
                                         java.util.function.Consumer<String> action) {
         RibbonButton button = new RibbonButton(title, icon, key, action == null ? null : selected -> {
@@ -413,17 +425,12 @@ public class MainDashboardFrame extends JFrame {
         if (closing) return;
         SessionLifecycleService.State state = sessionLifecycle.evaluate();
         syncRibbonButtonsForSessionState(sessionLifecycle, navigation, ribbonButtons);
-        if (state == SessionLifecycleService.State.ACTIVE) {
-            lockOverlay.setVisible(false);
-            return;
+        if (state != SessionLifecycleService.State.ACTIVE) {
+            MenuSelectionManager.defaultManager().clearSelectedPath();
+            // No clinical child route is enabled; dismiss any shell dialog before shielding input.
+            if (!closingPrompt) for (Window owned : getOwnedWindows()) if (owned.isShowing()) owned.dispose();
         }
-        MenuSelectionManager.defaultManager().clearSelectedPath();
-        // No clinical child route is enabled; dismiss any shell dialog before shielding input.
-        if (!closingPrompt) for (Window owned : getOwnedWindows()) if (owned.isShowing()) owned.dispose();
-        lockOverlay.setAbsoluteExpiry(state == SessionLifecycleService.State.LOCKED_ABSOLUTE);
-        boolean newlyLocked = !lockOverlay.isVisible();
-        lockOverlay.setVisible(true);
-        if (newlyLocked) lockOverlay.focusCredentials();
+        syncLockOverlayForSessionState(state, lockOverlay);
     }
 
     private void reauthenticate(SessionLockOverlay.Credentials credentials) {

@@ -139,6 +139,28 @@ class DashboardNavigationPolicyTest {
         assertRibbonButtons(ribbonButtons, Set.of("home", "user", "exit"));
     }
 
+    @Test void lockOverlayVisibilityAndInputBlockingTrackSessionLifecycleTransitions() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var lockOverlay = new SessionLockOverlay(credentials -> {}, () -> {});
+
+            MainDashboardFrame.syncLockOverlayForSessionState(SessionLifecycleService.State.ACTIVE, lockOverlay);
+            assertFalse(lockOverlay.isVisible());
+            assertFalse(lockOverlay.isInputBlocked());
+
+            MainDashboardFrame.syncLockOverlayForSessionState(SessionLifecycleService.State.LOCKED_IDLE, lockOverlay);
+            assertTrue(lockOverlay.isVisible());
+            assertTrue(lockOverlay.isInputBlocked());
+
+            MainDashboardFrame.syncLockOverlayForSessionState(SessionLifecycleService.State.ACTIVE, lockOverlay);
+            assertFalse(lockOverlay.isVisible());
+            assertFalse(lockOverlay.isInputBlocked());
+
+            MainDashboardFrame.syncLockOverlayForSessionState(SessionLifecycleService.State.LOCKED_ABSOLUTE, lockOverlay);
+            assertTrue(lockOverlay.isVisible());
+            assertTrue(lockOverlay.isInputBlocked());
+        });
+    }
+
     private void assertRibbonButtons(Map<String, RibbonButton> ribbonButtons, Set<String> enabledKeys) {
         for (var entry : ribbonButtons.entrySet()) {
             assertEquals(enabledKeys.contains(entry.getKey()), entry.getValue().isEnabled(), entry.getKey());
