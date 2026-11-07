@@ -22,6 +22,10 @@ public class DocxManager {
         return exportService;
     }
 
+    static String toUserFacingSaveFailureMessage(IOException ignored) {
+        return "Không thể lưu tài liệu DOCX. Vui lòng chọn thư mục khác hoặc kiểm tra quyền truy cập và dung lượng lưu trữ, rồi thử lại.";
+    }
+
     /**
      * Mở hộp thoại chọn nơi lưu và xuất file DOCX Đơn thuốc
      */
@@ -40,7 +44,7 @@ public class DocxManager {
             return true;
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(parent, 
-                    "Lỗi khi lưu file DOCX: " + ex.getMessage(), 
+                    toUserFacingSaveFailureMessage(ex), 
                     "Lỗi Xuất File", 
                     JOptionPane.ERROR_MESSAGE);
             return false;
@@ -65,7 +69,7 @@ public class DocxManager {
             return true;
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(parent, 
-                    "Lỗi khi lưu file DOCX: " + ex.getMessage(), 
+                    toUserFacingSaveFailureMessage(ex), 
                     "Lỗi Xuất File", 
                     JOptionPane.ERROR_MESSAGE);
             return false;
