@@ -28,6 +28,30 @@ class LoginSessionFlowTest {
 
     @AfterEach void clear() { session.clearSession(); }
 
+    @Test void validateAndScrubIfInvalidRejectsBlankUsernameOrEmptyPasswordAndZerosSecret() {
+        char[] blankUsernamePassword = "secret".toCharArray();
+        assertFalse(LoginForm.validateAndScrubIfInvalid(" \t ", blankUsernamePassword));
+        assertArrayEquals(new char[blankUsernamePassword.length], blankUsernamePassword);
+
+        char[] nullUsernamePassword = "secret".toCharArray();
+        assertFalse(LoginForm.validateAndScrubIfInvalid(null, nullUsernamePassword));
+        assertArrayEquals(new char[nullUsernamePassword.length], nullUsernamePassword);
+
+        assertFalse(LoginForm.validateAndScrubIfInvalid("synthetic.user", new char[0]));
+        assertFalse(LoginForm.validateAndScrubIfInvalid("synthetic.user", null));
+
+        char[] validPassword = "secret".toCharArray();
+        assertTrue(LoginForm.validateAndScrubIfInvalid(" synthetic.user ", validPassword));
+        assertArrayEquals("secret".toCharArray(), validPassword);
+    }
+
+    @Test void toLoginFailureMessageUsesApplicationErrorMessageOrFallback() {
+        assertEquals("Custom message",
+                LoginForm.toLoginFailureMessage(Result.failure("AUTH_FAILED", "Custom message"), "Fallback"));
+        assertEquals("Fallback", LoginForm.toLoginFailureMessage(null, "Fallback"));
+        assertEquals("Fallback", LoginForm.toLoginFailureMessage(Result.success("synthetic"), "Fallback"));
+    }
+
     @Test void onlySingletonChoicesAreAutomaticAndMultipleChoicesRequireAnAssignedObject() {
         assertSame(role, LoginForm.chooseAssigned(List.of(role), ignored -> { fail("No singleton prompt"); return null; }));
         RoleChoice second = new RoleChoice(43, "RECEPTION", "Synthetic second role");

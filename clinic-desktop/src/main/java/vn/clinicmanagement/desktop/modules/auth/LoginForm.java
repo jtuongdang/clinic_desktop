@@ -140,8 +140,7 @@ public class LoginForm extends JFrame {
         String username = txtUsername.getText().trim();
         char[] password = txtPassword.getPassword();
 
-        if (username.isEmpty() || password.length == 0) {
-            java.util.Arrays.fill(password, '\0');
+        if (!validateAndScrubIfInvalid(username, password)) {
             JOptionPane.showMessageDialog(this, "Vui lòng nhập tên đăng nhập và mật khẩu.", "Cảnh báo", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -165,8 +164,7 @@ public class LoginForm extends JFrame {
                 try {
                     Result<AuthenticatedUser> result = get();
                     if (result.isFailure()) {
-                        String message = result.getError().map(Result.ApplicationError::message)
-                                .orElse("Không thể đăng nhập.");
+                        String message = toLoginFailureMessage(result, "Không thể đăng nhập.");
                         JOptionPane.showMessageDialog(LoginForm.this, message, "Đăng nhập thất bại", JOptionPane.ERROR_MESSAGE);
                         return;
                     }
@@ -226,8 +224,7 @@ public class LoginForm extends JFrame {
                     Result<CompletedLoginSession> result = attempt.result();
                     if (result.isFailure()) {
                         UserSession.getInstance().clearSession();
-                        String message = result.getError().map(Result.ApplicationError::message)
-                                .orElse("Không thể hoàn tất đăng nhập.");
+                        String message = toLoginFailureMessage(result, "Không thể hoàn tất đăng nhập.");
                         JOptionPane.showMessageDialog(
                                 LoginForm.this, message, "Đăng nhập thất bại", JOptionPane.ERROR_MESSAGE);
                         return;
@@ -283,6 +280,18 @@ public class LoginForm extends JFrame {
         btnLogin.setEnabled(enabled);
         txtUsername.setEnabled(enabled);
         txtPassword.setEnabled(enabled);
+    }
+
+    static boolean validateAndScrubIfInvalid(String username, char[] password) {
+        if (username == null || username.trim().isEmpty() || password == null || password.length == 0) {
+            if (password != null) java.util.Arrays.fill(password, '\0');
+            return false;
+        }
+        return true;
+    }
+
+    static String toLoginFailureMessage(Result<?> result, String fallback) {
+        return result == null ? fallback : result.getError().map(Result.ApplicationError::message).orElse(fallback);
     }
 
     static FinalizedLoginAttempt prepareSession(
