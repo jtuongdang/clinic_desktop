@@ -167,6 +167,45 @@ class LuotKhamTest {
         assertEquals(eventsBefore, visit.getDomainEvents());
     }
 
+    @Test
+    void reopenEmr_acceptsValidApproverAndReason_andResetsLock() {
+        LuotKham visit = visitInState(TrangThaiLuotKham.DANG_KHAM);
+        visit.completeExam();
+        visit.lockEmr("synthetic-sig", 11);
+        assertTrue(visit.isEmrLocked());
+        assertEquals(TrangThaiLuotKham.HOAN_THANH, visit.getTrangThai());
+
+        visit.reopenEmr(99, "Bo sung ket qua can lam sang theo hoi chan");
+
+        assertFalse(visit.isEmrLocked());
+        assertNull(visit.getEmrSignature());
+        assertNull(visit.getEmrLockedAt());
+        assertNull(visit.getEmrLockedBy());
+        assertEquals(TrangThaiLuotKham.DANG_KHAM, visit.getTrangThai());
+
+        boolean hasReopenedEvent = visit.getDomainEvents().stream()
+                .anyMatch(e -> e instanceof vn.clinicmanagement.domain.common.events.EmrReopenedEvent);
+        assertTrue(hasReopenedEvent);
+    }
+
+    @Test
+    void reopenEmr_rejectsWhenNotLocked() {
+        LuotKham visit = visitInState(TrangThaiLuotKham.HOAN_THANH);
+        assertThrows(IllegalStateException.class, () -> visit.reopenEmr(99, "Reason"));
+    }
+
+    @Test
+    void reopenEmr_rejectsBlankReasonOrNonpositiveApprover() {
+        LuotKham visit = visitInState(TrangThaiLuotKham.DANG_KHAM);
+        visit.completeExam();
+        visit.lockEmr("synthetic-sig", 11);
+
+        assertThrows(IllegalArgumentException.class, () -> visit.reopenEmr(0, "Reason"));
+        assertThrows(IllegalArgumentException.class, () -> visit.reopenEmr(99, ""));
+        assertThrows(IllegalArgumentException.class, () -> visit.reopenEmr(99, "   "));
+        assertThrows(IllegalArgumentException.class, () -> visit.reopenEmr(99, null));
+    }
+
     private static LuotKham visitInState(TrangThaiLuotKham state) {
         LuotKham visit = new LuotKham();
         visit.setId(42);

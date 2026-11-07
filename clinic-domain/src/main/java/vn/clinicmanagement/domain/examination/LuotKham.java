@@ -123,6 +123,28 @@ public class LuotKham extends BaseEntity<Integer> implements IAggregateRoot {
         registerDomainEvent(new EmrLockedEvent(getId() != null ? getId() : 0, doctorId, signature));
     }
 
+    public void reopenEmr(int approverId, String reason) {
+        if (!emrLocked) {
+            throw new IllegalStateException("Hồ sơ bệnh án chưa bị khóa.");
+        }
+        if (this.trangThai != TrangThaiLuotKham.HOAN_THANH) {
+            throw new IllegalStateException("Chỉ có thể mở khóa bệnh án đã hoàn thành khám.");
+        }
+        if (approverId <= 0) {
+            throw new IllegalArgumentException("Mã người phê duyệt phải là số dương.");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Lý do mở khóa bệnh án không được để trống.");
+        }
+        this.emrLocked = false;
+        this.emrSignature = null;
+        this.emrLockedAt = null;
+        this.emrLockedBy = null;
+        this.trangThai = TrangThaiLuotKham.DANG_KHAM;
+        registerDomainEvent(new vn.clinicmanagement.domain.common.events.EmrReopenedEvent(
+                getId() != null ? getId() : 0, approverId, reason));
+    }
+
     public int getMaBenhNhan() { return maBenhNhan; }
     public void setMaBenhNhan(int maBenhNhan) { this.maBenhNhan = maBenhNhan; }
     public Integer getMaBacSi() { return maBacSi; }
@@ -150,6 +172,7 @@ public class LuotKham extends BaseEntity<Integer> implements IAggregateRoot {
     public Integer getMaPhongKham() { return maPhongKham; }
     public void setMaPhongKham(Integer maPhongKham) { this.maPhongKham = maPhongKham; }
     public boolean isEmrLocked() { return emrLocked; }
+    public void setEmrLocked(boolean emrLocked) { this.emrLocked = emrLocked; }
     public String getEmrSignature() { return emrSignature; }
     public LocalDateTime getEmrLockedAt() { return emrLockedAt; }
     public Integer getEmrLockedBy() { return emrLockedBy; }
