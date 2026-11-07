@@ -1,16 +1,16 @@
 # Phase 1–3 Readiness and Owner Gate Summary
 
 **For:** Owner  
-**Snapshot:** `4fe4bf2` (`feature/patient-reception-workflow`), 2026-11-07  
+**Snapshot:** `d10cd04` (`feature/patient-reception-workflow`), 2026-11-07  
 **Decision:** Phase 1–2 code/test evidence is ready for Owner visual acceptance, but `SEC-01`, `REC-01`, and `PAT-02` remain open/default-deny. Phase 3 has useful domain/application building blocks, but Owner policy and implementation decisions remain prerequisites to migrations and handlers.
 
 ## 1. Reactor and Desktop verification
 
-- **Reactor:** 499 tests run — 100 domain, 149 application, 125 infrastructure, and 125 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
-- **Wave 14 commits recorded:**
-  - `de46e71` (`2aec762b` — `copilot-cli`): Added `JdbcUnitOfWorkTest` (`5/5 PASS`) and `JdbcConnectionProviderTest` (`2/2 PASS`) in `clinic-infrastructure` (achieving 100% class-level test coverage across all 16 classes in `clinic-infrastructure`).
-  - `f83a5a9` (`1b882db2` — `google-antigravity-cli-claude-sonnet-02507d`): Cross-linked `phase3-readiness-and-owner-gate-summary.md` across task board and handover docs.
-  - `4fe4bf2` (`d987a612` — `antigravity-cli`): Added `GetActiveReceptionRoomsHandlerTest` (`10/10 PASS`) and `ResultTest` (`8/8 PASS`) in `clinic-application`.
+- **Reactor:** 592 tests run — 100 domain, 235 application, 125 infrastructure, and 132 desktop; **0 failures, 0 errors, 6 expected opt-in SQL Server skips** (4 in infrastructure + 2 in desktop).
+- **Wave 15 commits recorded:**
+  - `4c98449` (`27a6d80c` — `copilot-cli`): Added `DesktopWorkerDiagnosticsTest` (`3/3 PASS`) and `DocxTableTest` (`4/4 PASS`) in `clinic-desktop`.
+  - `bd5db20` (`c2e19e6f` — `antigravity-cli`): Added `AuditMetadataValidatorTest` (`43/43 PASS`) and `ApprovedRoleCodesTest` (`43/43 PASS`) in `clinic-application`.
+  - `d10cd04` (`92979f03` — `google-antigravity-cli-claude-sonnet-02507d`): Synced task board, completion review, and handover docs for Wave 14.
 - **UI preservation:** the `6aabb85` Swing layout is reported **100% preserved**. `DoctorStationUiPreservationTest` guards the 8-column read-only history table, nine action buttons, 250 px split pane, and five tabs.
 - **Package:** the baseline reports the shaded JAR ready at `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar`. The JAR was not present in this isolated worktree when checked, so its presence here is not independently verified.
 - Automated verification is synthetic/headless. This summary did not run the application, run tests, or connect to `localhost:1433` / `clinicDb`.
@@ -104,4 +104,4 @@ These are domain/test foundations, not proof of end-to-end persistence or workfl
 
 ## Evidence basis and limits
 
-This summary consolidates `03-model-task-board.md`, `phase1-rec01-and-sec01-shift-completion-review.md`, `phase1-doctor-ui-preservation-and-wiring-plan.md`, `phase3-visit-lifecycle-owner-decisions.md`, `phase3-visit-transfer-decision-gaps.md`, `phase3-appointment-owner-decisions.md`, and `desktop-owner-visual-smoke-checklist.md`. The requested reactor totals and JAR-ready status are the `4fe4bf2` snapshot (499 tests run, 6 opt-in skips) supplied for this task; the local JAR was absent at inspection, and no new test/build or live-database verification was performed.
+This summary consolidates `03-model-task-board.md`, `phase1-rec01-and-sec01-shift-completion-review.md`, `phase1-doctor-ui-preservation-and-wiring-plan.md`, `phase3-visit-lifecycle-owner-decisions.md`, `phase3-visit-transfer-decision-gaps.md`, `phase3-appointment-owner-decisions.md`, and `desktop-owner-visual-smoke-checklist.md`. The requested reactor totals and JAR-ready status are the `d10cd04` snapshot (592 tests run, 6 opt-in skips) supplied for this task; the local JAR was absent at inspection, and no new test/build or live-database verification was performed.
