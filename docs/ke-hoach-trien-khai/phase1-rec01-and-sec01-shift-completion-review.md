@@ -1,7 +1,7 @@
 # REC-01 and SEC-01 Desktop Hardening Completion Review
 
 **Review date:** 2026-11-07  
-**Reviewed baseline:** `feature/patient-reception-workflow` at `29d99cc`  
+**Reviewed baseline:** `feature/patient-reception-workflow` at `7bcaacc`  
 **Review type:** Read-only source/commit verification and focused synthetic headless tests.
 
 This review verifies the requested REC-01 and SEC-01 hardening slices against the current source, cited commits, focused test classes, and the existing completion reviews. It does not claim Owner visual acceptance or close any gate.
@@ -55,6 +55,14 @@ This review verifies the requested REC-01 and SEC-01 hardening slices against th
 | **Doctor UI preservation plan update with Wave 11 evidence** | Updated `phase1-doctor-ui-preservation-and-wiring-plan.md` with Wave 11 evidence (`f04315d`, `eb52b71`). | `aa09058` (task `335577de` — `antigravity-cli`): [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md). |
 | **Wave 11 documentation sync** | Synced task board, completion review, and handover doc for Wave 11. | `29d99cc` (task `3f547d29` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md), [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md). |
 
+## Wave 13 completion evidence (f0751bd, 56e49ce, 7bcaacc)
+
+| Item | Verified implementation and evidence | Commit and focused tests |
+|---|---|---|
+| **Phase 1–3 readiness and Owner gate summary** | Created [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md) consolidating Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) and Phase 3 (`VIS-01`, `APPT-01`) Owner gate checklists, documenting reactor test verification (474 tests, 6 opt-in skips) and prerequisites before migrations/wiring. | `f0751bd` (task `96bdaaea` — `copilot-cli`): [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md). |
+| **LEADERSHIP_HANDOVER_CODEX_RESUMPTION and visual checklist sync for Wave 12** | Updated `LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md` and `desktop-owner-visual-smoke-checklist.md` for Wave 12 (`474` tests, `6` opt-in skips). | `56e49ce` (task `025052f7` — `antigravity-cli`): [`LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md`](LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md), [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md). |
+| **Wave 12 documentation sync** | Synced task board, completion review, and handover doc for Wave 12. | `7bcaacc` (task `f42ac562` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md), [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md). |
+
 ## Verification run and gate preservation
 
 The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, the restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**), the Wave 11 test suites (`ReceptionProtectedReadWiringTest` **1/1**, `DoctorStationUiPreservationTest` **3/3**, `DoctorCompositionRootTest` **2/2**), and the restored Wave 12 opt-in suites (`ReceptionSqlServerPersistenceTest`, `ReceptionSqlServerProcessRestartTest`). Across the reactor, **474 tests run (100 domain + 131 application + 118 infrastructure + 125 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
@@ -71,8 +79,10 @@ mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
 
 ## Related Artifacts
 
+- [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md) — Consolidated Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`) and Phase 3 (`VIS-01`, `APPT-01`) Owner gate checklists and readiness summary (`f0751bd`)
 - [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md) — Doctor UI invariants and surgical wiring blueprint for PAT-02 (`797cc8c`, updated `aa09058`)
-- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`29d99cc`)
+- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`7bcaacc`)
+- [`LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md`](LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md) — Technical handover for Codex resumption (`56e49ce`)
 - [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)
 - [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md)
 - [`03-model-task-board.md`](03-model-task-board.md)
