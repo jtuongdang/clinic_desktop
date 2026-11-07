@@ -93,6 +93,41 @@ class DonThuocTest {
         assertEquals(eventsBefore, prescription.getDomainEvents());
     }
 
+    @Test
+    void cancel_cancelsPrescriptionInTam_andRegistersCancelEvent() {
+        DonThuoc prescription = prescriptionInState(TrangThaiDonThuoc.TAM);
+
+        prescription.cancel("Doi phac do khang sinh khac");
+
+        assertEquals(TrangThaiDonThuoc.HUY, prescription.getTrangThai());
+        assertTrue(prescription.getGhiChu().contains("Doi phac do khang sinh khac"));
+        assertEquals(1, prescription.getDomainEvents().size());
+        vn.clinicmanagement.domain.common.events.DonThuocCancelledEvent event = assertInstanceOf(
+                vn.clinicmanagement.domain.common.events.DonThuocCancelledEvent.class, prescription.getDomainEvents().get(0));
+        assertEquals(42, event.getPrescriptionId());
+        assertEquals("Doi phac do khang sinh khac", event.getReason());
+    }
+
+    @Test
+    void cancel_rejectsDispensedPrescription() {
+        DonThuoc prescription = prescriptionInState(TrangThaiDonThuoc.DA_XUAT_HET);
+        assertThrows(IllegalStateException.class, () -> prescription.cancel("Ly do"));
+    }
+
+    @Test
+    void cancel_rejectsAlreadyCancelledPrescription() {
+        DonThuoc prescription = prescriptionInState(TrangThaiDonThuoc.HUY);
+        assertThrows(IllegalStateException.class, () -> prescription.cancel("Ly do"));
+    }
+
+    @Test
+    void cancel_rejectsBlankReason() {
+        DonThuoc prescription = prescriptionInState(TrangThaiDonThuoc.TAM);
+        assertThrows(IllegalArgumentException.class, () -> prescription.cancel(""));
+        assertThrows(IllegalArgumentException.class, () -> prescription.cancel("   "));
+        assertThrows(IllegalArgumentException.class, () -> prescription.cancel(null));
+    }
+
     private static DonThuoc prescriptionInState(TrangThaiDonThuoc state) {
         DonThuoc prescription = new DonThuoc();
         prescription.setId(42);
