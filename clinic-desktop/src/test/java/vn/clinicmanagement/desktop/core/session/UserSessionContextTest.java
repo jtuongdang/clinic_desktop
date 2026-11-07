@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.RoleChoice;
 import vn.clinicmanagement.application.auth.AuthenticatedUser.WorkScopeChoice;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class UserSessionContextTest {
@@ -119,7 +122,8 @@ class UserSessionContextTest {
     }
     @Test void authorityCanOnlyBeChangedThroughTypedLifecycleAndNotPublicSetters() {
         java.util.Set<String> forbidden = java.util.Set.of("setSession", "setUserId", "setUsername", "setFullName",
-                "setLoggedOn", "setRole", "setRoleId", "setRoleCode", "setFacilityId", "setFacilityName", "setDepartmentId", "setDepartmentName");
+                "setLoggedOn", "setRole", "setRoleId", "setRoleCode", "setFacilityId", "setFacilityName",
+                "setDepartmentId", "setDepartmentName", "setStationId", "setWorkstationId");
         for (var method : UserSession.class.getMethods()) assertFalse(forbidden.contains(method.getName()), method.getName());
         for (var method : SessionLifecycleService.class.getMethods()) {
             if (method.getName().equals("startSession")) assertArrayEquals(
@@ -127,6 +131,17 @@ class UserSessionContextTest {
         }
         for (var constructor : SessionLifecycleService.class.getConstructors()) assertTrue(
                 java.util.List.of(constructor.getParameterTypes()).contains(vn.clinicmanagement.application.audit.AuditWritePort.class));
+    }
+
+    @Test
+    void stationAndWorkstationSettersArePackagePrivate() throws Exception {
+        for (String methodName : java.util.List.of("setStationId", "setWorkstationId")) {
+            Method m = UserSession.class.getDeclaredMethod(methodName, String.class);
+            assertTrue(!Modifier.isPublic(m.getModifiers()), methodName + " must not be public");
+            assertFalse(Modifier.isPublic(m.getModifiers()), methodName + " must not be public");
+            assertFalse(Modifier.isProtected(m.getModifiers()), methodName + " must not be protected");
+            assertFalse(Modifier.isPrivate(m.getModifiers()), methodName + " must not be private");
+        }
     }
 
 }

@@ -113,9 +113,9 @@ public final class UserSession {
     public int getDepartmentId() { return departmentId; }
     public String getDepartmentName() { return departmentName; }
     public String getStationId() { return stationId; }
-    public void setStationId(String stationId) { this.stationId = stationId; }
+    void setStationId(String stationId) { this.stationId = stationId; }
     public String getWorkstationId() { return workstationId; }
-    public void setWorkstationId(String workstationId) { this.workstationId = workstationId; }
+    void setWorkstationId(String workstationId) { this.workstationId = workstationId; }
     public String getSessionId() { return sessionId; }
     public Instant getIssuedAt() { return issuedAt; }
     public Instant getLastActivityAt() { return lastActivityAt; }

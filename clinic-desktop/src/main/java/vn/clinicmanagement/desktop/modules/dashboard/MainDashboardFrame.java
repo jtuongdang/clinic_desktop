@@ -3,7 +3,6 @@ package vn.clinicmanagement.desktop.modules.dashboard;
 import vn.clinicmanagement.desktop.core.components.RibbonButton;
 import vn.clinicmanagement.desktop.core.components.StatusBarPanel;
 import vn.clinicmanagement.desktop.core.config.UIConstants;
-import vn.clinicmanagement.desktop.core.session.UserSession;
 import vn.clinicmanagement.desktop.core.session.SessionLifecycleService;
 import vn.clinicmanagement.desktop.core.session.SessionLockOverlay;
 import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
@@ -43,6 +42,7 @@ public class MainDashboardFrame extends JFrame {
     private final Map<String, RibbonButton> ribbonButtons = new HashMap<>();
     private final boolean isDoctor;
 
+    private final CompletedLoginSession loginSession;
     private final SessionLifecycleService sessionLifecycle;
     private final DashboardNavigationPolicy navigation;
     private final SessionLockOverlay lockOverlay;
@@ -55,7 +55,7 @@ public class MainDashboardFrame extends JFrame {
 
     public MainDashboardFrame(CompletedLoginSession completed, Set<String> grants,
                               SessionLifecycleService lifecycle) {
-        Objects.requireNonNull(completed, "completed");
+        this.loginSession = Objects.requireNonNull(completed, "completed");
         this.sessionLifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         var context = lifecycle.currentAuthorizationContext().orElseThrow(
                 () -> new IllegalStateException("An active completed session is required."));
@@ -181,9 +181,10 @@ public class MainDashboardFrame extends JFrame {
 
         RibbonButton btnUser = guardedButton("Người Dùng", "👥", "user", k -> {
             JOptionPane.showMessageDialog(this,
-                    "Bác sĩ đang khám: " + UserSession.getInstance().getFullName() + "\n" +
-                    "Khoa phòng: " + UserSession.getInstance().getDepartmentName() + "\n" +
-                    "Mã trạm: " + UserSession.getInstance().getStationId(),
+                    "Bác sĩ đang khám: " + loginSession.fullName() + "\n" +
+                    "Cơ sở: " + loginSession.workScope().facilityName() + "\n" +
+                    "Khoa phòng: " + loginSession.workScope().departmentName() + "\n" +
+                    "Vai trò: " + loginSession.role().name(),
                     "Thông Tin Bác Sĩ Điều Trị", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -335,9 +336,10 @@ public class MainDashboardFrame extends JFrame {
 
         RibbonButton btnUser = guardedButton("Người Dùng", "👤", "user", k -> {
             JOptionPane.showMessageDialog(this,
-                    "Thông tin người dùng: " + UserSession.getInstance().getFullName() + "\n" +
-                    "Khoa phòng: " + UserSession.getInstance().getDepartmentName() + "\n" +
-                    "Vai trò: " + UserSession.getInstance().getRole(),
+                    "Thông tin người dùng: " + loginSession.fullName() + "\n" +
+                    "Cơ sở: " + loginSession.workScope().facilityName() + "\n" +
+                    "Khoa phòng: " + loginSession.workScope().departmentName() + "\n" +
+                    "Vai trò: " + loginSession.role().name(),
                     "Tài Khoản Đang Đăng Nhập", JOptionPane.INFORMATION_MESSAGE);
         });
 
