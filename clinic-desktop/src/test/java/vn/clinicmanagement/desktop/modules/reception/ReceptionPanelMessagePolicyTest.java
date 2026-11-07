@@ -84,6 +84,126 @@ class ReceptionPanelMessagePolicyTest {
     }
 
     @Test
+    void scopeMismatchErrorCodesMapToStandardMessage() {
+        assertEquals(ReceptionPanelMessagePolicy.MSG_SCOPE_MISMATCH,
+                ReceptionPanelMessagePolicy.toUserMessage("SCOPE_MISMATCH"));
+        assertEquals(ReceptionPanelMessagePolicy.MSG_SCOPE_MISMATCH,
+                ReceptionPanelMessagePolicy.toUserMessage("TARGET_MISMATCH"));
+        assertEquals(ReceptionPanelMessagePolicy.MSG_SCOPE_MISMATCH,
+                ReceptionPanelMessagePolicy.toUserMessage("AUTH_SCOPE_MISMATCH"));
+        assertEquals(ReceptionPanelMessagePolicy.MSG_SCOPE_MISMATCH,
+                ReceptionPanelMessagePolicy.toUserMessage("OUT_OF_SCOPE"));
+
+        // Verify via Result.failure
+        Result<?> authScopeFailure = Result.failure("AUTH_SCOPE_MISMATCH", "User facility scope mismatch");
+        assertEquals(ReceptionPanelMessagePolicy.MSG_SCOPE_MISMATCH,
+                ReceptionPanelMessagePolicy.toUserMessage(authScopeFailure));
+
+        Result<?> outOfScopeFailure = Result.failure("OUT_OF_SCOPE", "Target department out of assigned scope");
+        assertEquals(ReceptionPanelMessagePolicy.MSG_SCOPE_MISMATCH,
+                ReceptionPanelMessagePolicy.toUserMessage(outOfScopeFailure));
+    }
+
+    @Test
+    void isSafeMessageBlocksTechnicalCredentialAndIdentifierTokens() {
+        // Credential and secret tokens
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("password"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("User Password Required"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("matkhau"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("MatKhau khong dung"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("token"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("Bearer TOKEN expired"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("secret"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("Invalid client_SECRET"));
+
+        // Identifier tokens
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("cccd"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("cccd 001090000001"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("Kiem tra so CCCD"));
+
+        // Technical / infrastructure tokens
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("jdbc:"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("jdbc:sqlserver://localhost:1433"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("JDBC:mssql connection failed"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("connection"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("database Connection closed"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("stacktrace"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("Error StackTrace at java.lang.Thread"));
+
+        // Existing SQL / database tokens
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("sql"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("select"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("insert"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("update"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("delete"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("table"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("column"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("nhatky"));
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage("exception"));
+
+        // Null check
+        assertFalse(ReceptionPanelMessagePolicy.isSafeMessage(null));
+
+        // Safe message passes
+        assertTrue(ReceptionPanelMessagePolicy.isSafeMessage("Họ và tên bệnh nhân không được để trống."));
+        assertTrue(ReceptionPanelMessagePolicy.isSafeMessage("Ngày sinh không được để trống."));
+        assertTrue(ReceptionPanelMessagePolicy.isSafeMessage("Vui lòng chọn phòng khám hợp lệ."));
+    }
+
+    @Test
+    void patientValidationSanitizesSensitiveAndTechnicalTokens() {
+        String safeValidationMsg = "Số điện thoại phải gồm 10 chữ số.";
+        assertEquals(safeValidationMsg,
+                ReceptionPanelMessagePolicy.toUserMessage("PATIENT_VALIDATION", safeValidationMsg));
+
+        String[] sensitiveDetails = {
+                "jdbc:sqlserver://localhost:1433;db=clinic",
+                "User password is required",
+                "cccd 001090000001 format is invalid",
+                "matkhau chua du manh",
+                "auth token revoked",
+                "app secret invalid",
+                "database connection failed",
+                "full stacktrace in server log",
+                "SQLException: table BenhNhan not found"
+        };
+
+        for (String unsafeDetail : sensitiveDetails) {
+            String sanitized = ReceptionPanelMessagePolicy.toUserMessage("PATIENT_VALIDATION", unsafeDetail);
+            assertEquals("Thông tin đăng ký không hợp lệ. Vui lòng kiểm tra lại.", sanitized,
+                    "Validation detail should be sanitized when containing: " + unsafeDetail);
+            assertFalse(sanitized.contains(unsafeDetail));
+        }
+    }
+
+    @Test
+    void unknownErrorCodeSanitizesSensitiveAndTechnicalTokens() {
+        // Unknown error code with safe detail passes through
+        String safeDetail = "Mã thẻ bảo hiểm không hợp lệ.";
+        assertEquals(safeDetail, ReceptionPanelMessagePolicy.toUserMessage("CUSTOM_WARNING_CODE", safeDetail));
+
+        // Unknown error code with sensitive details gets sanitized to MSG_DEFAULT_ERROR
+        String[] sensitiveDetails = {
+                "jdbc:sqlserver://localhost:1433;databaseName=clinicDb;user=admin",
+                "Invalid password provided for user admin",
+                "Duplicate cccd 001090000001 found in records",
+                "matkhau nguoi dung bi lo",
+                "Bearer token authentication rejected",
+                "client secret verification failed",
+                "HikariCP connection pool exhausted",
+                "NullPointerException stacktrace at vn.clinic.App",
+                "SQL syntax error in select statement"
+        };
+
+        for (String unsafeDetail : sensitiveDetails) {
+            String sanitized = ReceptionPanelMessagePolicy.toUserMessage("UNKNOWN_RUNTIME_ERROR", unsafeDetail);
+            assertEquals(ReceptionPanelMessagePolicy.MSG_DEFAULT_ERROR, sanitized,
+                    "Unknown error detail should be masked to default error when containing: " + unsafeDetail);
+            assertFalse(sanitized.contains(unsafeDetail));
+        }
+    }
+
+    @Test
     void patientValidationSanitization() {
         // Safe field message
         String fieldMsg = "Họ và tên bệnh nhân không được để trống.";

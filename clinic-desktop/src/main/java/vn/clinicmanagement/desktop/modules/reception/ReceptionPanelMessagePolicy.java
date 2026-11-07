@@ -2,6 +2,7 @@ package vn.clinicmanagement.desktop.modules.reception;
 
 import vn.clinicmanagement.application.common.Result;
 
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -86,7 +87,7 @@ public final class ReceptionPanelMessagePolicy {
                     MSG_SEARCH_KEYWORD_REQUIRED;
             case "TRANSACTION_FAILED", "TRANSACTION_ROLLBACK_ONLY" ->
                     MSG_TRANSACTION_FAILED;
-            case "SCOPE_MISMATCH", "TARGET_MISMATCH" ->
+            case "SCOPE_MISMATCH", "TARGET_MISMATCH", "AUTH_SCOPE_MISMATCH", "OUT_OF_SCOPE" ->
                     MSG_SCOPE_MISMATCH;
             case "PATIENT_VALIDATION" -> {
                 if (detailOrIdentifier != null && !detailOrIdentifier.isBlank()) {
@@ -119,9 +120,9 @@ public final class ReceptionPanelMessagePolicy {
         return raw;
     }
 
-    private static boolean isSafeMessage(String text) {
+    static boolean isSafeMessage(String text) {
         if (text == null) return false;
-        String lower = text.toLowerCase();
+        String lower = text.toLowerCase(Locale.ROOT);
         return !lower.contains("exception")
                 && !lower.contains("sql")
                 && !lower.contains("select")
@@ -130,6 +131,14 @@ public final class ReceptionPanelMessagePolicy {
                 && !lower.contains("delete")
                 && !lower.contains("table")
                 && !lower.contains("column")
-                && !lower.contains("nhatky");
+                && !lower.contains("nhatky")
+                && !lower.contains("password")
+                && !lower.contains("matkhau")
+                && !lower.contains("token")
+                && !lower.contains("secret")
+                && !lower.contains("cccd")
+                && !lower.contains("jdbc:")
+                && !lower.contains("connection")
+                && !lower.contains("stacktrace");
     }
 }
