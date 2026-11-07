@@ -37,6 +37,25 @@ public class DatabaseConnection {
                 }
             }
         } catch (Exception ignored) {}
+        if (properties.isEmpty()) {
+            java.nio.file.Path[] candidates = new java.nio.file.Path[]{
+                    java.nio.file.Paths.get("db.properties"),
+                    java.nio.file.Paths.get(System.getProperty("user.dir", "."), "db.properties"),
+                    java.nio.file.Paths.get("clinic-infrastructure/src/main/resources/db.properties")
+            };
+            for (java.nio.file.Path path : candidates) {
+                if (java.nio.file.Files.exists(path)) {
+                    try (InputStream fileInput = java.nio.file.Files.newInputStream(path)) {
+                        properties.load(fileInput);
+                        if (!properties.isEmpty()) {
+                            break;
+                        }
+                    } catch (Exception ignored) {
+                        properties.clear();
+                    }
+                }
+            }
+        }
         return properties;
     }
 

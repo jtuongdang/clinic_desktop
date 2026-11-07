@@ -5,9 +5,16 @@ if [ ! -f "$JAVA_BIN" ]; then
     JAVA_BIN="java"
 fi
 
+# Thiết lập kết nối mặc định tới clinicDb (SQL Server localhost) nếu chưa có biến môi trường
+export DB_URL="${DB_URL:-jdbc:sqlserver://localhost:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=true}"
+export DB_USERNAME="${DB_USERNAME:-sa}"
+export DB_PASSWORD="${DB_PASSWORD:-Password123!}"
+
 if [ -f "$DIR/clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar" ]; then
     echo "=========================================================="
     echo " Khởi động Hệ Thống Quản Lý Bệnh Viện EHC HIS (Desktop)  "
+    echo " CSDL: $DB_URL                                            "
+    echo " Tài khoản: $DB_USERNAME                                  "
     echo " Artifact: clinic-desktop-1.0.0-SNAPSHOT.jar              "
     echo "=========================================================="
     exec "$JAVA_BIN" -jar "$DIR/clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar" "$@"
