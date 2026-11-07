@@ -1,9 +1,10 @@
 # Báo cáo đánh giá độc lập xác thực và phiên làm việc Desktop (SEC-01)
 
 **Mã tài liệu:** `docs/ke-hoach-trien-khai/phase2-sec01-desktop-auth-review.md`  
-**Nhánh kiểm tra:** `feature/patient-reception-workflow` tại HEAD `a01bbc1` (cập nhật hardening tại `b4e29f6`)  
+**Nhánh kiểm tra:** `feature/patient-reception-workflow` tại HEAD `a01bbc1` (cập nhật hardening tại `b4e29f6`, Wave 5 tại `074aa71`)  
 **Ngày thực hiện:** 07/11/2026 (Asia/Ho_Chi_Minh)  
 **Cập nhật Wave 4:** 07/11/2026 (Asia/Ho_Chi_Minh) — Khắc phục FINDING-SEC-01-02 và FINDING-SEC-01-03 tại commit `b4e29f6` (task `bea9a713`)  
+**Cập nhật Wave 5:** 07/11/2026 (Asia/Ho_Chi_Minh) — Bổ sung headless regression tests cho FINDING-SEC-01-01 tại commit `074aa71` (task `c7b085c5` [leaderANTI])  
 **Loại đánh giá:** Đánh giá tĩnh & đối soát kiểm thử độc lập (Read-only static source and focused test review).  
 **Trạng thái cổng SEC-01:** `[~] In progress` — **Không tuyên bố hoàn tất cổng (No gate closure claimed)**; visual acceptance trên màn hình thực tế vẫn còn mở theo Definition A.
 
@@ -147,10 +148,11 @@ Các bài kiểm thử tự động sử dụng hoàn toàn dữ liệu tổng h
 2. **`SessionLockOverlayTest` (36 dòng, 1 ca kiểm thử)** ([`SessionLockOverlayTest.java:1-36`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/core/session/SessionLockOverlayTest.java#L1-L36)):
    - Kiểm tra Glass pane khi `visible` chặn toàn bộ input bên dưới (`isInputBlocked() == true`), bắt sự kiện nút Unlock và Logout.
 
-3. **`DashboardNavigationPolicyTest` (88 dòng, 3 ca kiểm thử)** ([`DashboardNavigationPolicyTest.java:1-88`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/dashboard/DashboardNavigationPolicyTest.java#L1-L88)):
+3. **`DashboardNavigationPolicyTest` (5 ca kiểm thử)** ([`DashboardNavigationPolicyTest.java`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/dashboard/DashboardNavigationPolicyTest.java)):
    - `allSensitiveRoutesStayDeniedEvenWithEveryKnownGrant`: kiểm tra tất cả các route nhạy cảm (`reception`, `treatment`, `examination`, `billing`, `paraclinical`, `pharmacy`, `reports`, `admin`, `system`, `catalog`, `PATIENT`, `AUDIT_READ`) đều bị từ chối tuyệt đối ngay cả khi tập quyền chứa đầy đủ mọi mã grant.
    - `directOpenRetainedTabAndImpersonatedHomePanelAreGuarded`: xác minh `GuardedWorkspace` chặn đứng việc mở panel giả mạo hoặc panel không phải `HomeWelcomePanel`.
    - `dashboardHasNoFabricatedIdentityOrDisplayLabelConstructor`: kiểm tra `MainDashboardFrame` chỉ có đúng một constructor 3 tham số an toàn.
+   - **Bổ sung Wave 5 (commit `074aa71`, task `c7b085c5` [leaderANTI]):** Bổ sung headless regression tests cho `MainDashboardFrame` định dạng thông tin người dùng (`formatDoctorUserInfo`/`formatStaffUserInfo`) và chuyển đổi trạng thái enable/disable của các nút bấm trên Ribbon khi phiên khóa nhàn rỗi / xác thực lại (`syncRibbonButtonsForSessionState`), đạt `5/5` tests PASS trong `DashboardNavigationPolicyTest`.
 
 4. **Các bài kiểm thử tầng Application liên quan trực tiếp:**
    - `CompleteLoginSessionHandlerTest` (342 dòng, 10 ca kiểm thử): kiểm tra tính nguyên tử của giao dịch cập nhật đăng nhập, xác minh vai trò/phạm vi còn hiệu lực, rollback khi audit lỗi, bảo toàn correlation ID.
@@ -169,7 +171,7 @@ Mặc dù tầng core session và logic nghiệp vụ được kiểm thử rấ
 
 | Mã phát hiện | Mức độ ưu tiên | Trạng thái | Thành phần / Tệp nguồn | Mô tả chi tiết phát hiện | Khuyến nghị hành động & Ghi chú khắc phục |
 |---|:---:|:---:|---|---|---|
-| **FINDING-SEC-01-01** | **Medium (P2)** | **Mở (Open)** | `clinic-desktop/src/test/java/vn/clinicmanagement/desktop/` | **Thiếu headless UI interaction tests cho `LoginForm` và `MainDashboardFrame`:** Các bài test hiện tại (`SessionLifecycleServiceTest`, `DashboardNavigationPolicyTest`, `SessionLockOverlayTest`) kiểm tra logic state machine rất tốt, nhưng chưa có test tự động kiểm chứng toàn bộ chu trình SwingWorker trong `LoginForm.onLogin()` và Timer trong `MainDashboardFrame`. | Bổ sung các bài test Swing headless có kiểm soát (sử dụng synthetic mock handler) để kiểm chứng chu trình chuyển trạng thái giao diện của `LoginForm` và `MainDashboardFrame` mà không cần hiển thị màn hình thật. |
+| **FINDING-SEC-01-01** | **Medium (P2)** | **Đang hoàn thiện (In Progress / Partially Hardened)** | `clinic-desktop/src/test/java/vn/clinicmanagement/desktop/` | **Thiếu headless UI interaction tests cho `LoginForm` và `MainDashboardFrame`:** Các bài test ban đầu (`SessionLifecycleServiceTest`, `DashboardNavigationPolicyTest`, `SessionLockOverlayTest`) kiểm tra logic state machine rất tốt, nhưng chưa có test tự động kiểm chứng toàn bộ chu trình SwingWorker trong `LoginForm.onLogin()` và Timer trong `MainDashboardFrame`. | Bổ sung các bài test Swing headless có kiểm soát (sử dụng synthetic mock handler) để kiểm chứng chu trình chuyển trạng thái giao diện của `LoginForm` và `MainDashboardFrame` mà không cần hiển thị màn hình thật.<br>- **Wave 5 hardening (commit `074aa71`, task `c7b085c5` [leaderANTI]):** Đã bổ sung headless regression tests trong `DashboardNavigationPolicyTest` cho `MainDashboardFrame` user info formatting (`formatDoctorUserInfo`/`formatStaffUserInfo`) và idle-lock/reauthentication ribbon button state transitions (`syncRibbonButtonsForSessionState`, `5/5` tests PASS trong `DashboardNavigationPolicyTest`). |
 | **FINDING-SEC-01-02** | **Low (P3)** | **ĐÃ GIẢI QUYẾT (RESOLVED)** | `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/session/UserSession.java` | **Public setter `setStationId` và `setWorkstationId` trên Singleton `UserSession`:** Trong khi các trường danh tính và phạm vi (`userId`, `roleId`, `facilityId`, `departmentId`) đều được bảo vệ chặt chẽ bằng package-private setter, hai trường `stationId` và `workstationId` ban đầu có public setter, cho phép mã UI bên ngoài can thiệp trạm làm việc trong lúc phiên đang mở. | **RESOLVED** trong commit `b4e29f6` (task `bea9a713` [leaderANTI]): `UserSession.setStationId` và `setWorkstationId` đã được thu hẹp phạm vi truy cập về package-private (`UserSession.setStationId`/`setWorkstationId` narrowed to package-private). Kiểm thử: `8/8` tests PASS trong `UserSessionContextTest`. |
 | **FINDING-SEC-01-03** | **Low (P3)** | **ĐÃ GIẢI QUYẾT (RESOLVED)** | `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java` | **Nút "Người Dùng" (User) đọc chuỗi hiển thị trực tiếp từ Singleton `UserSession`:** Khi bấm nút "Người Dùng" trên Ribbon, action handler ban đầu đọc trực tiếp `UserSession.getInstance().getFullName()` thay vì lấy từ `CompletedLoginSession` bất biến được lưu trong phiên. Mặc dù đây chỉ là hộp thoại thông tin tĩnh không ảnh hưởng đến phân quyền, nhưng nên duy trì tính nhất quán về nguồn thông tin tin cậy. | **RESOLVED** trong commit `b4e29f6` (task `bea9a713` [leaderANTI]): `MainDashboardFrame` hộp thoại 'Người Dùng' đã chuyển sang đọc trực tiếp từ `CompletedLoginSession` thay vì `UserSession.getInstance()`. Kiểm thử: `8/8` tests PASS trong `UserSessionContextTest`. |
 | **FINDING-SEC-01-04** | **Informational** | **Mở (Open)** | Toàn bộ phân hệ Desktop | **Kiểm thử trực quan (Manual Visual Smoke) chưa hoàn tất:** Theo Definition A, SEC-01 chưa thể đóng chỉ dựa trên kiểm thử headless và code review tĩnh. Review này không khởi chạy ứng dụng và không có bằng chứng visual sign-off của Owner. | Giữ nguyên trạng thái `SEC-01` là `[~] In progress`. Thực hiện phiên kiểm thử trực quan thủ công theo quy trình [`phase1-doctor-ui-visual-smoke-runbook.md`](phase1-doctor-ui-visual-smoke-runbook.md) trước sự chứng kiến/nghiệm thu của Owner. |
@@ -184,6 +186,13 @@ Mặc dù tầng core session và logic nghiệp vụ được kiểm thử rấ
   - **Trạng thái:** **RESOLVED** trong commit `b4e29f6` (task `bea9a713` [leaderANTI]).
   - **Chi tiết xử lý:** Hộp thoại 'Người Dùng' (`showUserInfoDialog`) trên `MainDashboardFrame` chuyển sang đọc thông tin định danh trực tiếp từ trường bất biến `completedSession` (kiểu `CompletedLoginSession`) được tiêm vào constructor thay vì gọi singleton mutable `UserSession.getInstance()`.
   - **Bằng chứng kiểm thử:** `8/8` tests PASS trong `UserSessionContextTest`.
+
+### 5.2. Nhật ký làm cứng phát hiện Wave 5 (Finding Hardening Log — Wave 5)
+
+- **FINDING-SEC-01-01 (`MainDashboardFrame` headless user info formatting and ribbon button state transitions):**
+  - **Trạng thái:** **PARTIALLY HARDENED** trong commit `074aa71` (task `c7b085c5` [leaderANTI]).
+  - **Chi tiết xử lý:** Bổ sung headless regression tests trong `DashboardNavigationPolicyTest` cho `MainDashboardFrame` định dạng thông tin người dùng (`formatDoctorUserInfo`/`formatStaffUserInfo`) và chuyển đổi trạng thái enable/disable của các nút bấm trên Ribbon khi phiên làm việc bị khóa nhàn rỗi hoặc sau khi tái xác thực thành công (`syncRibbonButtonsForSessionState`).
+  - **Bằng chứng kiểm thử:** `5/5` tests PASS trong `DashboardNavigationPolicyTest`.
 
 ---
 
