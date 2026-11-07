@@ -25,6 +25,7 @@ public final class Result<T> {
     public boolean isFailure() { return !isSuccess(); }
     public Optional<T> getValue() { return Optional.ofNullable(value); }
     public Optional<ApplicationError> getError() { return Optional.ofNullable(error); }
+    public Optional<String> getErrorCode() { return getError().map(ApplicationError::code); }
 
     public T valueOrThrow() {
         if (isFailure()) throw new IllegalStateException(error.code() + ": " + error.message());

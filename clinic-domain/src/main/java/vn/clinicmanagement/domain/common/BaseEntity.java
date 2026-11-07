@@ -54,7 +54,10 @@ public abstract class BaseEntity<TId> {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
     public Integer getUpdatedBy() { return updatedBy; }
-    public void setUpdatedBy(Integer updatedBy) { this.updatedBy = updatedBy; }
+    public void setUpdatedBy(Integer updatedBy) {
+        validateNullableActor(updatedBy, "Người cập nhật bản ghi phải là người dùng hợp lệ.");
+        this.updatedBy = updatedBy;
+    }
 
     public boolean isDeleted() { return isDeleted; }
     public void setDeleted(boolean deleted) { isDeleted = deleted; }
@@ -63,20 +66,23 @@ public abstract class BaseEntity<TId> {
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 
     public Integer getDeletedBy() { return deletedBy; }
-    public void setDeletedBy(Integer deletedBy) { this.deletedBy = deletedBy; }
+    public void setDeletedBy(Integer deletedBy) {
+        validateNullableActor(deletedBy, "Người xóa bản ghi phải là người dùng hợp lệ.");
+        this.deletedBy = deletedBy;
+    }
 
     public void markAsUpdated(int updatedBy) {
+        validateActor(updatedBy, "Người cập nhật bản ghi phải là người dùng hợp lệ.");
         this.updatedAt = LocalDateTime.now();
         this.updatedBy = updatedBy;
-        if (this.version != null) this.version++;
     }
 
     public void softDelete(int deletedBy) {
+        validateActor(deletedBy, "Người xóa bản ghi phải là người dùng hợp lệ.");
         if (this.isDeleted) return;
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
         this.deletedBy = deletedBy;
-        if (this.version != null) this.version++;
     }
 
     public void restore() {
@@ -84,17 +90,34 @@ public abstract class BaseEntity<TId> {
         this.isDeleted = false;
         this.deletedAt = null;
         this.deletedBy = null;
-        if (this.version != null) this.version++;
+    }
+
+    private static void validateNullableActor(Integer actorId, String message) {
+        if (actorId != null) validateActor(actorId, message);
+    }
+
+    private static void validateActor(int actorId, String message) {
+        if (actorId <= 0) throw new IllegalArgumentException(message);
     }
 
     public void registerDomainEvent(IDomainEvent event) {
+        Objects.requireNonNull(event, "event must not be null");
         if (this.domainEvents == null) this.domainEvents = new ArrayList<>();
         this.domainEvents.add(event);
     }
 
     public List<IDomainEvent> getDomainEvents() {
         if (this.domainEvents == null) return Collections.emptyList();
-        return Collections.unmodifiableList(this.domainEvents);
+        return Collections.unmodifiableList(new ArrayList<>(this.domainEvents));
+    }
+
+    public List<IDomainEvent> pullDomainEvents() {
+        if (this.domainEvents == null || this.domainEvents.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<IDomainEvent> events = new ArrayList<>(this.domainEvents);
+        this.domainEvents.clear();
+        return Collections.unmodifiableList(events);
     }
 
     public void clearDomainEvents() {
@@ -106,11 +129,11 @@ public abstract class BaseEntity<TId> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         BaseEntity<?> that = (BaseEntity<?>) o;
-        return Objects.equals(id, that.id);
+        return id != null && Objects.equals(id, that.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id);
+        return getClass().hashCode();
     }
 }

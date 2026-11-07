@@ -1,5 +1,7 @@
 package vn.clinicmanagement.desktop.modules.reception.components;
 
+import vn.clinicmanagement.application.reception.ClinicRoomQueueSummary;
+import vn.clinicmanagement.application.reception.ReceptionQueueItem;
 import vn.clinicmanagement.desktop.core.config.AppFonts;
 import vn.clinicmanagement.desktop.modules.pharmacy.components.PharmacyIcons;
 
@@ -13,6 +15,9 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Khung hiển thị Trạng Thái Phòng Khám & DS Đăng Ký Khám.
@@ -28,6 +33,12 @@ public class ClinicRoomStatusPanel extends JPanel {
     private final CardLayout cardLayout;
     private final JPanel cardsContainer;
     private final JPanel tabStrip;
+    private DefaultTableModel queueModel;
+    private DefaultTableModel firstRoomModel;
+    private DefaultTableModel secondRoomModel;
+    private JTable queueTable;
+    private JTable firstRoomTable;
+    private JTable secondRoomTable;
 
     public ClinicRoomStatusPanel() {
         setLayout(new BorderLayout());
@@ -56,7 +67,57 @@ public class ClinicRoomStatusPanel extends JPanel {
 
     public void setSelectedClinicRoom(String roomName) {
         this.selectedRoomName = roomName;
-        repaint();
+        if (firstRoomTable != null) firstRoomTable.repaint();
+        if (secondRoomTable != null) secondRoomTable.repaint();
+    }
+
+    public void setQueue(List<ReceptionQueueItem> items) {
+        Objects.requireNonNull(items, "items");
+        queueModel.setRowCount(0);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+        for (ReceptionQueueItem item : items) {
+            queueModel.addRow(new Object[]{
+                    item.registeredAt() == null ? "" : item.registeredAt().format(formatter),
+                    item.queueNumberDisplay() == null || item.queueNumberDisplay().isBlank()
+                            ? Integer.toString(item.queueNumber()) : item.queueNumberDisplay(),
+                    item.status(),
+                    "",
+                    "",
+                    "",
+                    ""
+            });
+        }
+    }
+
+    public void setRoomSummaries(List<ClinicRoomQueueSummary> rooms) {
+        Objects.requireNonNull(rooms, "rooms");
+        firstRoomModel.setRowCount(0);
+        secondRoomModel.setRowCount(0);
+        int firstColumnSize = (rooms.size() + 1) / 2;
+        for (int i = 0; i < rooms.size(); i++) {
+            ClinicRoomQueueSummary room = rooms.get(i);
+            Object[] row = {
+                    room.roomName(),
+                    room.registeredCount(),
+                    room.waitingCount(),
+                    room.examiningCount()
+            };
+            (i < firstColumnSize ? firstRoomModel : secondRoomModel).addRow(row);
+        }
+        firstRoomTable.repaint();
+        secondRoomTable.repaint();
+    }
+
+    JTable getQueueTable() {
+        return queueTable;
+    }
+
+    JTable getFirstRoomTable() {
+        return firstRoomTable;
+    }
+
+    JTable getSecondRoomTable() {
+        return secondRoomTable;
     }
 
     private void switchTab(int index) {
@@ -90,11 +151,9 @@ public class ClinicRoomStatusPanel extends JPanel {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
 
-        // Hàng mẫu 1 từ ảnh chụp của người dùng:
-        // 10:39 23/08/2022 | 2 | Chờ khám
-        model.addRow(new Object[]{"10:39 23/08/2022", "2", "Chờ khám", "", "", "", ""});
-
-        JTable table = createGridTable(model);
+        queueModel = model;
+        queueTable = createGridTable(model);
+        JTable table = queueTable;
         table.getColumnModel().getColumn(0).setPreferredWidth(220);
         table.getColumnModel().getColumn(1).setPreferredWidth(80);
         table.getColumnModel().getColumn(2).setPreferredWidth(110);
@@ -125,10 +184,11 @@ public class ClinicRoomStatusPanel extends JPanel {
 
         // --- CỘT 1 (Bên trái): Tên Phòng Khám | ĐK | Chờ | Khám ---
         String[] cols1 = {"Tên Phòng Khám", "ĐK", "Chờ", "Khám"};
-        DefaultTableModel model1 = new DefaultTableModel(getColumn1Data(), cols1) {
+        firstRoomModel = new DefaultTableModel(cols1, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
-        JTable table1 = createGridTable(model1);
+        firstRoomTable = createGridTable(firstRoomModel);
+        JTable table1 = firstRoomTable;
         table1.getColumnModel().getColumn(0).setPreferredWidth(260);
         table1.getColumnModel().getColumn(1).setPreferredWidth(35);
         table1.getColumnModel().getColumn(1).setMaxWidth(40);
@@ -150,10 +210,11 @@ public class ClinicRoomStatusPanel extends JPanel {
 
         // --- CỘT 2 (Ở giữa): Tên Phòng Khám | ĐK | Chờ | Khám (Có phòng Tiêm Chủng màu ĐỎ) ---
         String[] cols2 = {"Tên Phòng Khám", "ĐK", "Chờ", "Khám"};
-        DefaultTableModel model2 = new DefaultTableModel(getColumn2Data(), cols2) {
+        secondRoomModel = new DefaultTableModel(cols2, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
-        JTable table2 = createGridTable(model2);
+        secondRoomTable = createGridTable(secondRoomModel);
+        JTable table2 = secondRoomTable;
         table2.getColumnModel().getColumn(0).setPreferredWidth(260);
         table2.getColumnModel().getColumn(1).setPreferredWidth(35);
         table2.getColumnModel().getColumn(1).setMaxWidth(40);
@@ -162,28 +223,8 @@ public class ClinicRoomStatusPanel extends JPanel {
         table2.getColumnModel().getColumn(3).setPreferredWidth(65);
         table2.getColumnModel().getColumn(3).setMaxWidth(65);
 
-        // Custom Renderer tô màu ĐỎ cho dòng phòng khám được chọn (Phòng Tiêm Chủng: chữ và số đều đỏ)
-        table2.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable t, Object val, boolean isSel, boolean hasFocus, int r, int c) {
-                Component comp = super.getTableCellRendererComponent(t, val, isSel, hasFocus, r, c);
-                String room = String.valueOf(t.getValueAt(r, 0));
-                if (c > 0) setHorizontalAlignment(SwingConstants.CENTER);
-                else setHorizontalAlignment(SwingConstants.LEFT);
-
-                if (!isSel) {
-                    if (selectedRoomName != null && selectedRoomName.equalsIgnoreCase(room)) {
-                        comp.setForeground(new Color(210, 35, 35)); // Màu ĐỎ nổi bật chuẩn ảnh mẫu
-                        comp.setFont(AppFonts.SMALL_BOLD);
-                    } else {
-                        comp.setForeground(new Color(25, 30, 40));
-                        comp.setFont(AppFonts.SMALL);
-                    }
-                    comp.setBackground(Color.WHITE);
-                }
-                return comp;
-            }
-        });
+        table1.setDefaultRenderer(Object.class, createSelectedRoomRenderer());
+        table2.setDefaultRenderer(Object.class, createSelectedRoomRenderer());
 
         JScrollPane sp2 = new JScrollPane(table2);
         sp2.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, new Color(215, 222, 232)));
@@ -366,77 +407,22 @@ public class ClinicRoomStatusPanel extends JPanel {
         return btn;
     }
 
-    private Object[][] getColumn1Data() {
-        return new Object[][]{
-                {"PHÒNG QUẢN LÝ HS", 0, 0, 0},
-                {"PK Sản bệnh lý", 0, 0, 0},
-                {"PK sàng lọc chẩn đoán trước sinh và sơ sinh", 0, 0, 0},
-                {"PK ung bướu Phụ khoa", 0, 0, 0},
-                {"Phòng khám hỗ trợ sinh sản - nam học", 0, 0, 0},
-                {"PK ung bướu Phụ khoa", 0, 0, 0},
-                {"PK sản bệnh lý", 0, 0, 0},
-                {"PK Nhi 3,4,5 [1]", 0, 0, 0},
-                {"PK Nhi 3,4,5 [2]", 0, 0, 0},
-                {"PK Nhi 6,7,8 [2]", 0, 0, 0},
-                {"PK Nhi 6,7,8 [1]", 0, 0, 0},
-                {"PK Sức khỏe cộng đồng", 0, 0, 0},
-                {"PK Hẹn", 0, 0, 0},
-                {"PK Ngoại nhi", 0, 0, 0},
-                {"PK RHM", 0, 0, 0},
-                {"PK Mắt", 0, 0, 0},
-                {"PK TMH", 0, 0, 0},
-                {"PK truyền nhiễm nhi", 0, 0, 0},
-                {"PK Sản", 0, 0, 0},
-                {"PK Phụ nội", 0, 0, 0}
-        };
-    }
-
-    private Object[][] getColumn1DataWithDate() {
-        return new Object[][]{
-                {"PHÒNG QUẢN LÝ HS", "10:39 23/08/2022", 0, 0, 0},
-                {"PK Sản bệnh lý", "", 0, 0, 0},
-                {"PK sàng lọc chẩn đoán trước sinh và sơ sinh", "", 0, 0, 0},
-                {"PK ung bướu Phụ khoa", "", 0, 0, 0},
-                {"Phòng khám hỗ trợ sinh sản - nam học", "", 0, 0, 0},
-                {"PK ung bướu Phụ khoa", "", 0, 0, 0},
-                {"PK sản bệnh lý", "", 0, 0, 0},
-                {"PK Nhi 3,4,5 [1]", "", 0, 0, 0},
-                {"PK Nhi 3,4,5 [2]", "", 0, 0, 0},
-                {"PK Nhi 6,7,8 [2]", "", 0, 0, 0},
-                {"PK Nhi 6,7,8 [1]", "", 0, 0, 0},
-                {"PK Sức khỏe cộng đồng", "", 0, 0, 0},
-                {"PK Hẹn", "", 0, 0, 0},
-                {"PK Ngoại nhi", "", 0, 0, 0},
-                {"PK RHM", "", 0, 0, 0},
-                {"PK Mắt", "", 0, 0, 0},
-                {"PK TMH", "", 0, 0, 0},
-                {"PK truyền nhiễm nhi", "", 0, 0, 0},
-                {"PK Sản", "", 0, 0, 0},
-                {"PK Phụ nội", "", 0, 0, 0}
-        };
-    }
-
-    private Object[][] getColumn2Data() {
-        return new Object[][]{
-                {"PK theo yêu cầu Sản - Phụ khoa", 0, 0, 0},
-                {"PK theo yêu cầu nhi số 2", 0, 0, 0},
-                {"PK theo yêu cầu nhi số 1", 0, 0, 0},
-                {"PK TEST PCR", 0, 0, 0},
-                {"PK TEST COVID", 0, 0, 0},
-                {"PK Nhi 4", 0, 0, 0},
-                {"PK Nhi 3 [T4]", 0, 0, 0},
-                {"PK Nhi 3 [T3,T6]", 0, 0, 0},
-                {"PK Nhi 3 [T2,T5]", 0, 0, 0},
-                {"PK Nhi 3", 0, 0, 0},
-                {"PK Nhi 2", 0, 0, 0},
-                {"PK Nhi 1", 0, 0, 0},
-                {"PK ĐT ngoại trú tâm thần", 0, 0, 0},
-                {"PK cách ly", 0, 0, 0},
-                {"Cấp cứu sản", 0, 0, 0},
-                {"Cấp cứu nhi", 0, 0, 0},
-                {"PK Hỗ trợ Sinh sản - Nam học", 0, 0, 0},
-                {"Phòng khám hỗ trợ sinh sản - nam học_IVF", 0, 0, 0},
-                {"Phòng Tiêm Chủng", 2, 2, 0}
+    private DefaultTableCellRenderer createSelectedRoomRenderer() {
+        return new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean selected,
+                                                           boolean hasFocus, int row, int column) {
+                Component component = super.getTableCellRendererComponent(table, value, selected, hasFocus, row, column);
+                setHorizontalAlignment(column > 0 ? SwingConstants.CENTER : SwingConstants.LEFT);
+                if (!selected) {
+                    String roomName = Objects.toString(table.getValueAt(row, 0), "");
+                    boolean highlighted = selectedRoomName != null && selectedRoomName.equalsIgnoreCase(roomName);
+                    component.setForeground(highlighted ? new Color(210, 35, 35) : new Color(25, 30, 40));
+                    component.setFont(highlighted ? AppFonts.SMALL_BOLD : AppFonts.SMALL);
+                    component.setBackground(Color.WHITE);
+                }
+                return component;
+            }
         };
     }
 }

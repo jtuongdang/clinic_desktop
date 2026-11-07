@@ -299,19 +299,32 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 ---
 
 ### 2.17. `domain.repositories` - Khế ước Lưu trữ Dữ liệu (Repository Interfaces)
-Package chỉ định nghĩa các Interface trừu tượng, hoàn toàn không dính líu đến SQL hay JDBC (Tuân thủ nguyên lý Dependency Inversion Principle - DIP):
-* **`IRepository<T>`:** Generic Repository cung cấp các hàm CRUD chuẩn: `findById(int id)`, `findAll()`, `save(T entity)`, `delete(T entity)`, `find(ISpecification<T> spec)`, `findPaged(...)`.
-* **`ISpecification<T>`:** Định nghĩa tiêu chuẩn lọc dữ liệu nghiệp vụ (Specification Pattern).
-* **`PagedResult<T>`:** Đối tượng đóng gói kết quả phân trang (Danh sách bản ghi `items`, tổng số bản ghi `totalCount`, trang hiện tại `pageIndex`, kích thước trang `pageSize`).
-* **Các Repository chuyên biệt theo Aggregate:**
-  - `IBenhNhanRepository`: Tìm bệnh nhân theo CCCD, số điện thoại, mã thẻ BHYT.
-  - `ILuotKhamRepository`: Lấy hàng đợi khám theo phòng khám, lấy lịch sử khám bệnh nhân.
-  - `IDonThuocRepository`: Lấy danh sách đơn thuốc chờ duyệt hoặc chờ xuất cấp tại kho dược.
-  - `IHoaDonRepository`: Quản lý hóa đơn viện phí, truy vấn công nợ.
-  - `IKhoRepository`: Kế thừa `IUnitOfWork`, xử lý biến động tồn kho và trừ kho FEFO.
-  - `ILichHenRepository`: Lấy lịch hẹn trong ngày theo Bác sĩ hoặc Cơ sở.
-  - `INhanVienRepository`: Tìm nhân viên theo username, xác thực và phân quyền.
-  - `ISystemRepository`: Đọc ghi tham số cấu hình và ghi log kiểm toán.
+Các interface trong package định nghĩa hợp đồng độc lập với SQL/JDBC; chúng không khai báo chi tiết triển khai lưu trữ. Các chữ ký dưới đây phản ánh đúng các method được khai báo:
+
+* **`IRepository<T extends BaseEntity<Integer> & IAggregateRoot>`**:
+  - `Optional<T> getById(int id)`, `List<T> getAll()`.
+  - `PagedResult<T> getPaged(int pageIndex, int pageSize, ISpecification<T> specification)`, `List<T> find(ISpecification<T> specification)`.
+  - `boolean exists(ISpecification<T> specification)`, `int count(ISpecification<T> specification)`.
+  - `void add(T entity)`, `void update(T entity)`, `void delete(T entity)`.
+  - `IUnitOfWork getUnitOfWork()`.
+  Không khai báo `findById`, `findAll` hay `save`.
+* **`ISpecification<T>`** khai báo `boolean isSatisfiedBy(T candidate)` và `Predicate<T> toPredicate()`.
+* **`PagedResult<T>`** chứa `items`, `totalCount`, `pageIndex`, `pageSize`; cung cấp các getter tương ứng, `getTotalPages()`, `hasPreviousPage()` và `hasNextPage()`.
+* **`IBenhNhanRepository extends IRepository<BenhNhan>`**:
+  - `Optional<BenhNhan> getByCCCD(String cccd)`, `Optional<BenhNhan> getByPhone(String phone)`.
+  - `Optional<BenhNhan> getByIdInScope(int patientId, int facilityId, int departmentId)` và `Optional<BenhNhan> getByCCCDInScope(String cccd, int facilityId, int departmentId)` là default methods trả về `Optional.empty()`.
+  - `List<BenhNhan> search(String keyword)`, `List<BenhNhan> searchInScope(String keyword, int facilityId, int departmentId, int limit)`.
+  Các chữ ký này không khai báo tra cứu theo số thẻ BHYT.
+* **`IBaoHiemRepository`** (không kế thừa `IRepository`) khai báo `Optional<BaoHiem> getById(int id)`, `Optional<BaoHiem> getLatestByPatientId(int patientId)`, `List<BaoHiem> getByPatientId(int patientId)`, `void add(BaoHiem insurance)` và `void update(BaoHiem insurance)`.
+* **`ILuotKhamRepository extends IRepository<LuotKham>`** khai báo `List<LuotKham> getVisitsByDoctor(int maBacSi, LocalDate date)` và `int getNextQueueNumber(int maCoSo, int maKhoa, LocalDate date)`.
+* **`IDonThuocRepository extends IRepository<DonThuoc>`** chỉ bổ sung `List<DonThuoc> getByLuotKhamId(int maLuotKham)`; không khai báo truy vấn theo trạng thái duyệt hoặc chờ cấp phát.
+* **`IHoaDonRepository extends IRepository<HoaDon>`** bổ sung `Optional<HoaDon> getBySoHoaDon(String soHoaDon)` và `Optional<HoaDon> getByLuotKham(int maLuotKham)`.
+* **`IKhoRepository extends IUnitOfWork`** (không kế thừa `IRepository`) khai báo `Optional<Item> getItemById(int id)` và `List<TonKho> getAvailableBatches(int maKho, int maItem)`. `IUnitOfWork` khai báo `int saveChanges()` và `boolean saveEntities()`; `IKhoRepository` không khai báo thao tác trừ kho hay phân bổ FEFO.
+* **`ILichHenRepository extends IRepository<LichHen>`** khai báo `List<LichHen> getUpcomingAppointments(int patientId)` và `int countAppointmentsInSlot(int doctorId, LocalDateTime start, LocalDateTime end)`.
+* **`INhanVienRepository extends IRepository<NhanVien>`** khai báo `Optional<NhanVien> getByUsername(String username)`, `List<NhanVien> getActiveDoctors(int maCoSo)`, `List<String> getRoleNames(int employeeId)`, `List<VaiTro> getAssignedRoles(int employeeId)`, `List<NhanVienWorkScope> getAssignedWorkScopes(int employeeId)` và `void recordSuccessfulLogin(int employeeId, LocalDateTime loginAt)`. Các chữ ký này không tự quy định xác thực hay kiểm tra quyền.
+* **`ISystemRepository`** (không kế thừa `IRepository`) khai báo `List<MaTranPhanQuyen> getMatrixByRoleId(int roleId)` và `Optional<String> getSystemParameterValue(String key)`.
+
+Các khai báo trên chỉ xác nhận contract của Domain. Việc có một port được khai báo không chứng minh đã có adapter Infrastructure, use case Application, workflow UI hay persistence test tương ứng; cần kiểm tra riêng từng phần triển khai để đưa ra kết luận về chúng.
 
 ---
 

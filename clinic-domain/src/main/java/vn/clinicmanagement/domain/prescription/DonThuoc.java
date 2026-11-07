@@ -53,6 +53,24 @@ public class DonThuoc extends BaseEntity<Integer> implements IAggregateRoot {
         registerDomainEvent(new DonThuocDispensedEvent(getId() != null ? getId() : 0, maNguoiCapThuoc));
     }
 
+    public void cancel(String reason) {
+        if (this.trangThai == TrangThaiDonThuoc.DA_XUAT_HET) {
+            throw new IllegalStateException("Không thể hủy đơn thuốc đã xuất hết.");
+        }
+        if (this.trangThai == TrangThaiDonThuoc.HUY) {
+            throw new IllegalStateException("Đơn thuốc đã bị hủy trước đó.");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Lý do hủy đơn thuốc không được để trống.");
+        }
+        this.trangThai = TrangThaiDonThuoc.HUY;
+        this.ghiChu = (this.ghiChu != null && !this.ghiChu.isBlank())
+                ? this.ghiChu + "; Lý do hủy: " + reason.trim()
+                : "Lý do hủy: " + reason.trim();
+        registerDomainEvent(new vn.clinicmanagement.domain.common.events.DonThuocCancelledEvent(
+                getId() != null ? getId() : 0, reason.trim()));
+    }
+
     public int getMaLuotKham() { return maLuotKham; }
     public void setMaLuotKham(int maLuotKham) { this.maLuotKham = maLuotKham; }
     public int getMaBacSi() { return maBacSi; }

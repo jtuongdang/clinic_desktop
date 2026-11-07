@@ -1,7 +1,7 @@
 # Phân hệ 08 — Cơ sở, bảo mật và cấu hình hệ thống
 
-**Trạng thái:** `[ ] Chưa đạt điều kiện dùng dữ liệu thật`  
-**Đợt:** bảo mật nền ở Đợt 0; cấu hình đa cơ sở ở Đợt 7.  
+**Trạng thái:** `[~] Đăng nhập nền tảng đã nối; quản trị và bảo mật production chưa hoàn thiện`
+**Đợt:** bảo mật nền ở Đợt 0; cấu hình đa cơ sở ở Đợt 7.
 **Domain:** `facility`, `identity`, `system`.
 
 ## Hiện có
@@ -13,12 +13,15 @@
 
 ## Backlog bảo mật P0
 
-- [ ] Thay login giả bằng xác thực credentials thật; mật khẩu hash/verify ở tầng server/application, không giữ plaintext.
+Đã có ba báo cáo source review cho Phase 2: [`phase2-auth-persistence-review.md`](../phase2-auth-persistence-review.md), [`phase2-desktop-session-review.md`](../phase2-desktop-session-review.md) và [`phase2-domain-audit-review.md`](../phase2-domain-audit-review.md). Bản [`đề xuất chính sách Phase 2`](../phase2-security-policy-proposal.md) ghi hai quyết định chủ dự án đã xác nhận và các lựa chọn còn chờ duyệt. Các báo cáo không phải bằng chứng gate đã đạt.
+
+- [x] Có luồng xác thực application và repository nhân viên nối với `LoginForm` trong source hiện tại.
+- [ ] Kiểm tra chính sách hash/verify, phản hồi lỗi, khóa tài khoản và lưu session; không kết luận đạt bảo mật chỉ vì đăng nhập SQL Server hoạt động.
 - [ ] Không cho người dùng tự chọn role để cấp quyền; role lấy từ tài khoản và giới hạn theo cơ sở/khoa.
 - [ ] Thêm quản lý user: tạo/khóa/mở khóa, reset mật khẩu, đổi mật khẩu, kiểm tra tài khoản hoạt động.
 - [ ] Tạo kiểm tra quyền tập trung cho command/use case; UI chỉ ẩn/disable bổ sung, không là ranh giới bảo mật duy nhất.
 - [ ] Ghi audit cho đăng nhập, xem/sửa EMR, cấp phát, thu tiền, cấu hình và thay đổi quyền.
-- [ ] Thay đổi cấu hình DB mẫu và không đóng gói credentials mặc định; dùng biến môi trường/secret store, cấu hình TLS phù hợp.
+- [ ] Thay cấu hình DB mẫu và không đóng gói credentials mặc định; dùng cấu hình secret an toàn, TLS phù hợp môi trường.
 
 ## Backlog quản trị
 

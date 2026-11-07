@@ -42,7 +42,7 @@ public class LichHen extends BaseEntity<Integer> implements IAggregateRoot {
         this.thoiGianKetThuc = thoiGianKetThuc;
         this.lyDo = lyDo != null ? lyDo : "";
         this.nguonDat = nguonDat != null ? nguonDat : "LE_TAN";
-        setCreatedBy(createdBy != null ? createdBy : 0);
+        setCreatedBy(createdBy);
         this.trangThai = TrangThaiLichHen.CHO_XAC_NHAN;
         registerDomainEvent(new LichHenBookedEvent(getId() != null ? getId() : 0, maBenhNhan, maBacSi, thoiGianBatDau));
     }

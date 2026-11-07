@@ -1,0 +1,42 @@
+# SEC-01 — Baseline acceptance theo Definition A
+
+**Ngày cập nhật:** 06/11/2026
+**Trạng thái hiện tại** `[~]`. Desktop cần nối lại xác thực, phiên và các đường nghiệp vụ đã có sau khi khôi phục từ `main`. Sau khi build và kiểm thử lại các đường nối này, cần thực hiện visual smoke theo Definition A.
+**Gate được Owner duyệt:** Definition A; các workflow tương lai (transfer, appointment, EMR, CLS, pharmacy, inventory, billing, HR/admin) tiếp tục default-deny cho đến khi có acceptance riêng và không phải điều kiện chặn đóng baseline SEC-01.
+
+## Phạm vi baseline
+
+Baseline này xác nhận identity/session, default-deny, grant đã duyệt, các đường đọc/ghi tiếp đón hiện có, audit và giao diện bảo mật trong phạm vi đã triển khai. Không xác nhận transfer, billing, EMR, CLS, pharmacy, inventory, appointment deposit, audit reader hoặc quản trị tài khoản. Những workflow đó phải tiếp tục bị từ chối/không có đường gọi cho tới khi acceptance riêng đạt.
+
+## Bằng chứng trên nhánh sau khôi phục
+
+- `982c1f6` khôi phục `clinic-desktop` từ `main` (`6aabb85`). Domain, Application và Infrastructure giữ nguyên tại lần khôi phục. Các lớp và test Desktop đã bỏ được đối chiếu trong [báo cáo bảo toàn thiết kế](desktop-main-ui-preservation-review.md).
+- `mvn -Djava.awt.headless=true clean test` dừng tại Desktop do lời gọi constructor `AuthenticateUserHandler` cũ và hai lời gọi `AuthenticatedUser.roleName()`. Cần khôi phục luồng hoàn tất đăng nhập với một vai trò và đúng cặp cơ sở/khoa trước khi mở dashboard. [Báo cáo tương thích xác thực Desktop](desktop-main-auth-compatibility-review.md)
+- Bản `main` chạy riêng để Owner kiểm tra thiết kế. Visual smoke nghiệm thu bảo mật phải dùng bản ứng viên có luồng xác thực và phân quyền đã nối, với dữ liệu synthetic theo quy trình chạy UI thủ công. [Hướng dẫn chạy UI](phase1-doctor-ui-visual-smoke-runbook.md)
+
+## Checklist và bằng chứng trước khôi phục
+
+Các dòng PASS bên dưới là snapshot trước `982c1f6`. Đối chiếu lại bằng chứng trên commit ứng viên trước khi áp dụng cho lần nghiệm thu mới.
+
+| Hạng mục | Trạng thái | Bằng chứng / giới hạn |
+|---|---|---|
+| Danh tính, chọn một role và một scope cơ sở+khoa, session idle 15 phút / tối đa 12 giờ | PASS | Implementation và test được theo dõi ở `SEC-DATA-01`, `SEC-LOGIN-01`, `SEC-SESSION-01`; task board ghi bằng chứng theo từng task. |
+| Default-deny, allowlist sáu role và grant `KHOA_PHONG` đã duyệt | PASS | `ApprovedRoleCodes` dùng chung evaluator/navigation; unit tests cho sáu role hợp lệ và role không hỗ trợ; `AUDIT_READ` luôn deny. Không cấp grant cho workflow tương lai. |
+| Đường ghi tiếp đón có authorization đúng scope và audit mutation cùng transaction | PASS | SQL Server opt-in synthetic acceptance ghi ở `SEC-AUTHZ-02B`/`SEC-AUDIT-01D`; audit failure rollback dữ liệu liên quan. |
+| Patient search, queue và room read scope đúng cặp; successful-read audit trước khi trả dữ liệu | PASS | SQL Server synthetic acceptance ghi ở `SEC-AUTHZ-02C`/`SEC-AUDIT-01D`; lỗi audit fail-closed. Queue kiểm tra ngày nghiệp vụ hiện tại, scope cơ sở+khoa, `CHO_KHAM`/`DANG_KHAM`/`CHO_CLS`, loại cancelled/completed và soft-deleted rows. |
+| Login throttle theo policy B được duyệt | PASS (local) | Đã được Owner phê duyệt và triển khai (`SEC-LOCKOUT-IMPLEMENT-01`). Sau 5 sai trong fixed window 15 phút, lần kế tiếp phải chờ trước password verification; mức đầu 30 giây, tăng gấp đôi tới 15 phút. Trong khi delay còn hiệu lực chỉ audit, không tăng delay. Mật khẩu đúng của tài khoản hoạt động reset ngay sau xác minh; account inactive/deleted không reset. SQL Server UTC là nguồn thời gian chuẩn. Snapshot kiểm thử tại thời điểm triển khai: JDK 17 `mvn -Djava.awt.headless=true clean verify` 321 tests, 0 failures/errors, 6 opt-in skips; SQL Server synthetic V1–V11 migration 1/1 và throttle concurrency/audit rollback 1/1. Chi tiết tại `phase2-login-lockout-policy-proposal.md`. |
+| Root Maven baseline | PASS | `mvn -Djava.awt.headless=true clean verify` — **BUILD SUCCESS**, 351 tests, 0 failures, 0 errors, 6 SQL Server opt-in skips, 70 Surefire XML reports. Bằng chứng automated headless baseline; opt-in SQL Server runs được báo riêng, không cộng vào số này. Các số test trước đó (337, 336, 321, 316, 254, 243) là snapshot lịch sử. |
+| Desktop visual smoke: login, role/scope selection, dashboard/menu theo grant, lock/re-auth/logout và lỗi deny an toàn | OPEN | Hạng mục nghiệm thu duy nhất còn lại của Definition A. Ứng dụng đã được mở bằng synthetic DB nhưng CUA không attach được cửa sổ Java; macOS từ chối `osascript` keyboard input. Chưa quan sát dashboard hoặc hoàn tất acceptance trực quan; tuyệt đối không tuyên bố thành công trực quan và không đánh dấu PASS bằng headless test. Cần chạy/quan sát trực tiếp trên desktop có thể tương tác và ghi revision, ngày, thao tác, kết quả. |
+
+## Quyết định giữ nguyên
+
+- Definition A là định nghĩa gate đã được Owner phê duyệt; toàn bộ workflow tương lai tiếp tục default-deny cho đến khi có acceptance riêng.
+- Throttle B đã được Owner duyệt và triển khai; các ghi chú unresolved trước đây là snapshot lịch sử đã được thay thế (superseded).
+- `AUDIT_READ` tiếp tục deny cho mọi role; chưa có quyền tra cứu audit.
+- Retention duration chưa chốt; tự động purge/xóa audit tiếp tục bị nghiêm cấm (audit purge remains prohibited).
+- Workflow ngoài reception chưa được mở quyền bởi policy đã duyệt. Mỗi workflow cần guard, scope, audit, persistence, test và UI acceptance phù hợp trước khi enable.
+- Không push, mở PR hoặc merge được thực hiện trong lần cập nhật này.
+
+## Điều kiện đóng SEC-01
+
+Khôi phục luồng Desktop theo Definition A, chạy lại build và các kiểm thử liên quan trên commit ứng viên, rồi ghi kết quả manual visual smoke cùng revision. Chỉ đóng SEC-01 khi toàn bộ checklist trên commit đó đạt. Không yêu cầu triển khai transfer, billing, CLS, pharmacy, inventory hoặc các workflow tương lai để đóng Definition A; các workflow tương lai tiếp tục default-deny cho đến khi có acceptance riêng.

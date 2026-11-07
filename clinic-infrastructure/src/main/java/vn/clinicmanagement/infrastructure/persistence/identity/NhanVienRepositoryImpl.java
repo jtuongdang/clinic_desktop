@@ -1,7 +1,10 @@
 package vn.clinicmanagement.infrastructure.persistence.identity;
 
+import vn.clinicmanagement.application.auth.AccountLoginThrottleStore;
 import vn.clinicmanagement.domain.common.IUnitOfWork;
 import vn.clinicmanagement.domain.identity.NhanVien;
+import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
+import vn.clinicmanagement.domain.identity.VaiTro;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.repositories.INhanVienRepository;
 import vn.clinicmanagement.domain.repositories.ISpecification;
@@ -24,7 +27,7 @@ import java.util.Optional;
 import java.util.Locale;
 
 /** SQL Server implementation of employee repository. */
-public final class NhanVienRepositoryImpl implements INhanVienRepository {
+public final class NhanVienRepositoryImpl implements INhanVienRepository, AccountLoginThrottleStore {
     private static final String SELECT_COLUMNS = "SELECT id, maNhanVien, ho, ten, soDienThoai, email, diaChi, "
             + "gioiTinh, ngaySinh, maChucVu, username, passwordHash, hoatDong, dangNhapCuoi, "
             + "chungChiHanhNghe, ngayVaoLam, ngayNghiViec, lyDoNghiViec, luongCoBan, heSoLuong, phuCap, "
@@ -93,7 +96,8 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
                 bindEmployee(ps, employee);
                 ps.setObject(21, employee.getCreatedBy(), Types.INTEGER);
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) employee.setId(rs.getInt(1));
+                    if (!rs.next()) throw new IllegalStateException("Không nhận được ID nhân viên sau khi lưu.");
+                    employee.setId(rs.getInt(1));
                 }
             }
             recordChange();
@@ -138,6 +142,7 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
                 int changed = ps.executeUpdate();
                 if (changed == 0) throw new IllegalStateException("Nhân viên không tồn tại hoặc dữ liệu đã được cập nhật bởi người khác.");
             }
+            employee.setVersion((employee.getVersion() == null ? 0L : employee.getVersion()) + 1);
             employee.setDeleted(true);
             employee.setDeletedAt(LocalDateTime.now());
             recordChange();
@@ -178,13 +183,150 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
     }
 
     @Override
+    public List<VaiTro> getAssignedRoles(int employeeId) {
+        String sql = "SELECT vt.id, vt.tenVaiTro, vt.version, vt.createdAt, vt.createdBy, "
+                + "vt.updatedAt, vt.updatedBy, vt.isDeleted, vt.deletedAt, vt.deletedBy FROM NhanVien nv "
+                + "INNER JOIN NhanVienVaiTro nvt ON nvt.maNhanVien=nv.id "
+                + "INNER JOIN VaiTro vt ON vt.id=nvt.maVaiTro "
+                + "WHERE nv.id=? AND nv.hoatDong=1 AND nv.isDeleted=0 "
+                + "AND nvt.isDeleted=0 AND vt.isDeleted=0 ORDER BY vt.id";
+        try (JdbcConnectionProvider.Lease lease = connections.acquire();
+             PreparedStatement ps = lease.connection().prepareStatement(sql)) {
+            ps.setInt(1, employeeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<VaiTro> roles = new ArrayList<>();
+                while (rs.next()) {
+                    VaiTro role = new VaiTro();
+                    role.setId(rs.getInt("id"));
+                    role.setTenVaiTro(rs.getString("tenVaiTro"));
+                    role.setVersion(rs.getLong("version"));
+                    role.setCreatedAt(localDateTime(rs, "createdAt"));
+                    role.setCreatedBy((Integer) rs.getObject("createdBy"));
+                    role.setUpdatedAt(localDateTime(rs, "updatedAt"));
+                    role.setUpdatedBy((Integer) rs.getObject("updatedBy"));
+                    role.setDeleted(rs.getBoolean("isDeleted"));
+                    role.setDeletedAt(localDateTime(rs, "deletedAt"));
+                    role.setDeletedBy((Integer) rs.getObject("deletedBy"));
+                    roles.add(role);
+                }
+                return roles;
+            }
+        } catch (SQLException ex) {
+            throw persistenceFailure(ex);
+        }
+    }
+
+    @Override
+    public List<NhanVienWorkScope> getAssignedWorkScopes(int employeeId) {
+        String sql = "SELECT DISTINCT cs.id AS maCoSo, cs.tenCoSo AS tenCoSo, "
+                + "k.id AS maKhoa, k.tenKhoa AS tenKhoa "
+                + "FROM NhanVien nv "
+                + "INNER JOIN PhanQuyenCoSo pq ON pq.maNhanVien=nv.id "
+                + "INNER JOIN CoSo cs ON cs.id=pq.maCoSo "
+                + "INNER JOIN NhanVienKhoa nk ON nk.maNhanVien=nv.id "
+                + "INNER JOIN Khoa k ON k.id=nk.maKhoa AND k.maCoSo=cs.id AND k.maCoSo=pq.maCoSo "
+                + "WHERE nv.id=? AND nv.hoatDong=1 AND nv.isDeleted=0 "
+                + "AND pq.isDeleted=0 AND cs.hoatDong=1 AND cs.isDeleted=0 "
+                + "AND nk.isDeleted=0 AND k.hoatDong=1 AND k.isDeleted=0 "
+                + "ORDER BY maCoSo, maKhoa";
+        try (JdbcConnectionProvider.Lease lease = connections.acquire();
+             PreparedStatement ps = lease.connection().prepareStatement(sql)) {
+            ps.setInt(1, employeeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<NhanVienWorkScope> scopes = new ArrayList<>();
+                while (rs.next()) {
+                    scopes.add(new NhanVienWorkScope(rs.getInt("maCoSo"), rs.getString("tenCoSo"),
+                            rs.getInt("maKhoa"), rs.getString("tenKhoa")));
+                }
+                return scopes;
+            }
+        } catch (SQLException ex) {
+            throw persistenceFailure(ex);
+        }
+    }
+
+    @Override
     public void recordSuccessfulLogin(int employeeId, LocalDateTime loginAt) {
+        if (employeeId <= 0) throw new IllegalArgumentException("Mã nhân viên không hợp lệ.");
+        if (loginAt == null) throw new IllegalArgumentException("Thời điểm đăng nhập không được để trống.");
+        if (!connections.isTransactionActive()) {
+            throw new IllegalStateException("Cập nhật thời điểm đăng nhập yêu cầu giao dịch đang hoạt động.");
+        }
         withConnection(connection -> {
             try (PreparedStatement ps = connection.prepareStatement(
                     "UPDATE NhanVien SET dangNhapCuoi=? WHERE id=? AND hoatDong=1 AND isDeleted=0")) {
                 ps.setTimestamp(1, Timestamp.valueOf(loginAt));
                 ps.setInt(2, employeeId);
                 if (ps.executeUpdate() != 1) throw new IllegalStateException("Tài khoản không còn hoạt động.");
+            }
+            recordChange();
+            return null;
+        });
+    }
+
+    @Override
+    public Optional<AccountLoginThrottleStore.Snapshot> lockForUpdate(int employeeId) {
+        requireActiveTransaction();
+        String sql = "SELECT SYSUTCDATETIME() AS databaseNow, loginFailureWindowStartedAt, "
+                + "loginFailureCount, loginLastFailureAt, loginDelaySeconds, loginNextAllowedAt "
+                + "FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK) WHERE id=?";
+        try (JdbcConnectionProvider.Lease lease = connections.acquire();
+             PreparedStatement statement = lease.connection().prepareStatement(sql)) {
+            statement.setInt(1, employeeId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return Optional.empty();
+                return Optional.of(new AccountLoginThrottleStore.Snapshot(
+                        localDateTime(result, "databaseNow"),
+                        localDateTime(result, "loginFailureWindowStartedAt"),
+                        result.getInt("loginFailureCount"),
+                        localDateTime(result, "loginLastFailureAt"),
+                        result.getInt("loginDelaySeconds"),
+                        localDateTime(result, "loginNextAllowedAt")));
+            }
+        } catch (SQLException ex) {
+            throw persistenceFailure(ex);
+        }
+    }
+
+    @Override
+    public void recordFailure(
+            int employeeId, LocalDateTime windowStartedAt, int failureCount, int delaySeconds) {
+        requireActiveTransaction();
+        if (employeeId <= 0 || windowStartedAt == null || failureCount < 1
+                || !isAllowedDelay(delaySeconds)) {
+            throw new IllegalArgumentException("Invalid account login throttle state.");
+        }
+        String sql = "UPDATE dbo.NhanVien SET loginFailureWindowStartedAt=?, loginFailureCount=?, "
+                + "loginLastFailureAt=SYSUTCDATETIME(), loginDelaySeconds=?, "
+                + "loginNextAllowedAt=CASE WHEN ?=0 THEN NULL "
+                + "ELSE DATEADD(SECOND, ?, SYSUTCDATETIME()) END "
+                + "WHERE id=? AND hoatDong=1 AND isDeleted=0";
+        withConnection(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, windowStartedAt);
+                statement.setInt(2, failureCount);
+                statement.setInt(3, delaySeconds);
+                statement.setInt(4, delaySeconds);
+                statement.setInt(5, delaySeconds);
+                statement.setInt(6, employeeId);
+                requireSingleThrottleUpdate(statement.executeUpdate());
+            }
+            recordChange();
+            return null;
+        });
+    }
+
+    @Override
+    public void reset(int employeeId) {
+        requireActiveTransaction();
+        if (employeeId <= 0) throw new IllegalArgumentException("Employee ID must be positive.");
+        String sql = "UPDATE dbo.NhanVien SET loginFailureWindowStartedAt=NULL, loginFailureCount=0, "
+                + "loginLastFailureAt=NULL, loginDelaySeconds=0, loginNextAllowedAt=NULL "
+                + "WHERE id=? AND hoatDong=1 AND isDeleted=0";
+        withConnection(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setInt(1, employeeId);
+                requireSingleThrottleUpdate(statement.executeUpdate());
             }
             recordChange();
             return null;
@@ -223,6 +365,23 @@ public final class NhanVienRepositoryImpl implements INhanVienRepository {
 
     private void recordChange() {
         if (connections.isTransactionActive()) unitOfWork.recordChanges(1);
+    }
+
+    private void requireActiveTransaction() {
+        if (!connections.isTransactionActive()) {
+            throw new IllegalStateException("Account login throttle changes require an active transaction.");
+        }
+    }
+
+    private static boolean isAllowedDelay(int delaySeconds) {
+        return delaySeconds == 0 || delaySeconds == 30 || delaySeconds == 60 || delaySeconds == 120
+                || delaySeconds == 240 || delaySeconds == 480 || delaySeconds == 900;
+    }
+
+    private static void requireSingleThrottleUpdate(int updatedRows) {
+        if (updatedRows != 1) {
+            throw new IllegalStateException("Active account login throttle state could not be updated.");
+        }
     }
 
     private static NhanVien mapEmployee(ResultSet rs) throws SQLException {

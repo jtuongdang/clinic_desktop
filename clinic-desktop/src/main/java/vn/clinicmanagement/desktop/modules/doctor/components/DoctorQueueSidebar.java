@@ -169,11 +169,39 @@ public class DoctorQueueSidebar extends JPanel {
         this.onPatientSelected = listener;
     }
 
+    public void setPatients(List<PatientExamDto> newPatients) {
+        this.patients.clear();
+        if (newPatients != null) {
+            this.patients.addAll(newPatients);
+        }
+        queueTableModel.setRowCount(0);
+        for (PatientExamDto p : this.patients) {
+            queueTableModel.addRow(new Object[]{p, "1"});
+        }
+        if (!this.patients.isEmpty()) {
+            selectPatient(0);
+        } else {
+            patientQueueTable.clearSelection();
+            if (onPatientSelected != null) {
+                onPatientSelected.accept(null);
+            }
+        }
+    }
+
+    public List<PatientExamDto> getPatients() {
+        return List.copyOf(patients);
+    }
+
     public void selectPatient(int index) {
         if (index >= 0 && index < patients.size()) {
             patientQueueTable.setRowSelectionInterval(index, index);
             if (onPatientSelected != null) {
                 onPatientSelected.accept(patients.get(index));
+            }
+        } else if (patients.isEmpty()) {
+            patientQueueTable.clearSelection();
+            if (onPatientSelected != null) {
+                onPatientSelected.accept(null);
             }
         }
     }

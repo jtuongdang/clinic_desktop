@@ -5,13 +5,13 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 public final class PhoneNumber implements Serializable {
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[3|5|7|8|9][0-9]{8}$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^(0|\\+84)[35789][0-9]{8}$");
     private final String value;
 
     public PhoneNumber(String rawPhone) {
         if (rawPhone == null || rawPhone.isBlank()) throw new IllegalArgumentException("Số điện thoại không được trống.");
         String cleaned = rawPhone.replaceAll("[\\s.-]", "");
-        if (!PHONE_PATTERN.matcher(cleaned).matches()) throw new IllegalArgumentException("Số điện thoại không hợp lệ: " + rawPhone);
+        if (!PHONE_PATTERN.matcher(cleaned).matches()) throw new IllegalArgumentException("Số điện thoại không hợp lệ.");
         this.value = cleaned;
     }
 

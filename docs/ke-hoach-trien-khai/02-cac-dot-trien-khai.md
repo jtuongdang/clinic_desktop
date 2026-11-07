@@ -1,155 +1,106 @@
-# 02 — Các đợt triển khai
+# 02 — Lộ trình triển khai theo phase
 
-Lộ trình được chia theo dependency để mỗi đợt có thể nghiệm thu thành một vertical slice.
+Lộ trình có **đúng 10 phase, đánh số 0–9**. Thứ tự dưới đây là contract cho roadmap; việc model hoặc UI đã có không đồng nghĩa phase đã nghiệm thu.
 
----
+## Phase 0 — Nền tảng
 
-## Đợt 0 — Nền tảng chạy, CSDL, Migration và Khung giao dịch
-
-**Trạng thái:** `[~] Đang làm (Hoàn thành 70% - Đã xong CSDL, Migration & Core DOCX)`  
+**Trạng thái:** `[~]` Nền tảng và wiring cơ bản có trong source; validation/release chưa hoàn tất.
 **Phụ thuộc:** Không.
+**Phạm vi:** Maven modules, application shell, schema/migrations, JDBC, transaction/unit of work và cấu hình môi trường.
+**Bằng chứng cập nhật (06/11/2026):** Baseline mặc định mới nhất trên JDK 17, lệnh `mvn -Djava.awt.headless=true clean verify`: **BUILD SUCCESS**, 337 tests, 0 failures, 0 errors, 6 SQL Server opt-in skips, trên bốn module có test (70 Surefire XML reports). Snapshot root trước đó 316/0/0/5 (68 reports), 305/0/0/5 (65 reports), 295/0/0/4 (63 reports), 283/0/0/4 (61 reports), 269/0/0/4 (58 reports) được giữ làm lịch sử; snapshot cũ hơn 262/0/0/4 cũng là lịch sử. Cả sáu test skip là SQL Server opt-in, không chạy trong verify mặc định và không lượt SQL opt-in nào được tính vào baseline này. Các lượt SQL Server synthetic opt-in được ghi riêng: `FreshDatabaseMigrationSqlServerTest` pass 1/1 trên `clinic_test_v9_20261106` khi áp dụng V1–V9; lần chạy mới trên database rỗng disposable `clinic_test_v9_preflight_20261106` cũng pass 1/1 với preflight duplicate legacy, bảo toàn rows/tracking/index khi V9 thất bại và retry thành công sau soft delete. Unit tests bao phủ lỗi batch/tracking migration rollback, không commit và giữ exception gốc. `PatientHistorySqlServerPersistenceTest` cũng pass 1/1 trên `clinic_test_patient_history_20261106` sau khi V1–V10 pass fresh-database 1/1; test xác nhận persistence/rollback tiền sử tổng hợp và audit. `PLAT-EVENT-UTC-01` bổ sung 2 synthetic tests cho UTC metadata; `PLAT-EVENT-PUBLISHER-01` có 6 synthetic tests cho publisher in-process. Chưa nối event collection/dispatch vào transaction boundary, consumer/storage hoặc handler nghiệp vụ. Kiểm tra artifact trước đó xác nhận shaded JAR không chứa `db.properties` hay metadata chữ ký dependency và có `db.properties.example`.
+**Còn lại:** Secret delivery/rotation, TLS profile, external configuration/launch, backup/restore và release operations chưa được nghiệm thu; login window đã được quan sát trên DB synthetic; các workflow desktop chưa được thao tác/xác nhận trực quan. Migration failure-safety unit coverage, transaction boundary tests và fresh-database migration không thay cho diễn tập nâng cấp/rollback vận hành hoặc nghiệm thu Phase 0.
+**Tài liệu bằng chứng:** [`00-hien-trang.md`](00-hien-trang.md), [`PROJECT_COMPLETENESS_REPORT.md`](../../PROJECT_COMPLETENESS_REPORT.md), [`phase0-db-config-review.md`](phase0-db-config-review.md), [`phase0-db-config-resolution-contract.md`](phase0-db-config-resolution-contract.md), [`phase0-domain-events-review.md`](phase0-domain-events-review.md), [`phase0-repository-contract-review.md`](phase0-repository-contract-review.md).
+**Gate:** build/migrations/repository transaction có thể tái lập trong môi trường thử nghiệm.
 
-### Việc đã hoàn thành:
-- [x] **CSDL SQL Server:** Khởi tạo thành công 100% CSDL `clinicDb` trên Microsoft SQL Server: **49 bảng**, **80 khóa ngoại (Foreign Keys)**, Non-clustered Indexes.
-- [x] **Migration Runner:** Xây dựng `DatabaseMigrationRunner` và các script `V1__Initial_Clinic_Schema.sql`, `V2__Seed_Initial_Data.sql`, cơ chế idempotent theo dõi qua `__schema_migrations`.
-- [x] **Seed Data Chuẩn:** Nạp dữ liệu danh mục ban đầu (Cơ sở, 5 Khoa, 8 Phòng khám, tài khoản `admin` & `tiennv`, thuốc, ICD-10, dịch vụ).
-- [x] **Nâng cấp Domain:** Đã bổ sung 3 Enums (`KetQuaDieuTri`, `HuongXuTri`, `DoiTuongKham`) và hơn 30 trường y tế chuyên sâu.
-- [x] **Core Xuất Tài Liệu DOCX:** Đã xây dựng trọn vẹn bộ thư viện OpenXML thuần Java (`DocxDocument`, `DocxTable`, `DocxExportService`, `DocxManager`) không phụ thuộc Apache POI cồng kềnh.
+**Quyết định Value Object cập nhật (06/11/2026):** Owner xác nhận số chính/khẩn cấp tùy chọn, validate khi nhập, bỏ separator được hỗ trợ và giữ nguyên prefix `0`/`+84`; BHYT có thể chưa biết ngày bắt đầu, hết hạn inclusive đến hết ngày địa phương và không chặn tiếp đón/adjudicate coverage; `Money` chỉ VND. Không dùng `Money` cho invoice/billing hoặc áp dụng rounding ở bất kỳ invoice boundary nào trước quyết định Owner riêng về rounding point và field scope. `PLAT-VO-01` vẫn `[~]`; các acceptance hẹp không hoàn tất Phase 0, Phase 1 hay visual acceptance. Xem [`03-model-task-board.md`](03-model-task-board.md) và [`phase0-value-object-owner-decisions.md`](phase0-value-object-owner-decisions.md).
 
-### Việc cần hoàn tất để kết thúc Đợt 0:
-- [ ] **Khung Application cơ sở (`clinic-application`):**
-  - Tạo cấu trúc package: `commands/`, `queries/`, `dtos/`, `common/Result.java`.
-- [ ] **Quản lý Giao dịch (Unit of Work):**
-  - Xây dựng `TransactionManager` / `UnitOfWork` bọc `java.sql.Connection` quản lý `setAutoCommit(false)`, `commit()`, `rollback()` qua JDBC thuần.
-- [ ] **Quy chuẩn Concurrency Desktop (SwingWorker):**
-  - Xây dựng lớp trợ giúp `AsyncActionExecutor` hoặc Base SwingWorker xử lý: Bắt đầu ➔ Bật Loading Indicator ➔ Chạy ngầm ➔ Trả kết quả lên EDT ➔ Tắt Loading.
-- [ ] **Xác thực Đăng nhập thật (`LoginForm`):**
-  - Tạo `LoginCommand` và `NhanVienRepositoryImpl` xác thực tài khoản SQL Server bằng mã hóa BCrypt; chấm dứt tình trạng đăng nhập giả lập.
+## Phase 1 — Bệnh nhân và tiếp đón
 
-**Qua đợt khi:** Đăng nhập thành công bằng tài khoản `admin`/`tiennv` lưu trong SQL Server; kết nối và transaction JDBC hoạt động chuẩn.
+**Trạng thái:** `[~]` Persistence E2E và headless form-to-SQL acceptance có bằng chứng trên SQL Server synthetic; Doctor queue/history đã nối với desktop và có test headless. Full `ReceptionPanel`/Doctor station interaction/visual acceptance và các luồng nghiệp vụ còn lại chưa nghiệm thu.
+**Phụ thuộc:** Phase 0.
+**Phạm vi:** `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `TienSuBenh`, lựa chọn `CoSo`/`Khoa`/`PhongKham`, đăng ký/tìm kiếm/queue `LuotKham`.
+**Quyết định Owner:** DEC-PAT-01 xác nhận mỗi cặp bệnh nhân–cơ sở chỉ có **một liên kết đang hoạt động**; một bệnh nhân vẫn có thể liên kết với nhiều cơ sở khác nhau. Quy tắc được cưỡng chế bằng filtered unique index V9 `UX_BenhNhanCoSo_Active_Patient_Facility`; migration preflight dừng nếu phát hiện cặp active trùng legacy thay vì tự sửa dữ liệu. Owner tái xác nhận quyết định ngày 06/11/2026 trong [`phase1-patient-facility-link-contract.md`](phase1-patient-facility-link-contract.md). SQL Server synthetic opt-in xác nhận migration V1–V9 và hành vi unique index (từ chối cặp active trùng, cho phép tạo liên kết mới sau soft delete); không phải lượt verify mặc định.
+**Bằng chứng cập nhật (06/11/2026):** Baseline mặc định mới nhất trên JDK 17, lệnh `mvn -Djava.awt.headless=true clean verify`: **BUILD SUCCESS**, 337 tests, 0 failures, 0 errors, 6 SQL Server opt-in skips (70 Surefire XML reports); snapshot root trước đó 316/0/0/5 (68 reports), 305/0/0/5 (65 reports), 295/0/0/4 (63 reports), 283/0/0/4 (61 reports), 269/0/0/4 (58 reports) được giữ làm lịch sử, snapshot 262/0/0/4 cũ hơn cũng là lịch sử. Các kiểm tra SQL Server opt-in được báo riêng và không thuộc baseline này. `FreshDatabaseMigrationSqlServerTest` opt-in pass **1/1** với lệnh `mvn -pl clinic-infrastructure -am -Djava.awt.headless=true -Dclinic.sqlserver.migration.enabled=true -Dclinic.sqlserver.test.database=clinic_test_v9_preflight_20261106 -Dtest=FreshDatabaseMigrationSqlServerTest -Dsurefire.failIfNoSpecifiedTests=false test` trên database SQL Server rỗng disposable mới `clinic_test_v9_preflight_20261106`. Test áp dụng V1–V9, kiểm tra active uniqueness/soft-delete, thêm duplicate legacy tổng hợp trước V9, xác nhận preflight failure giữ nguyên hai row và không tạo tracking/index, rồi soft-delete một row và retry V9 thành công. Không dùng dữ liệu thật; không database hiện hữu nào bị sửa hoặc drop; đây là runtime acceptance opt-in riêng, không phải production migration rehearsal. Trên database tổng hợp `clinic_test_v9_20261106`, `ReceptionSqlServerPersistenceTest` opt-in pass 1/1; test điền `PatientRegistrationFormPanel` trên EDT, tạo command bằng conversion method thật, gọi composition/handler thật, rồi đọc lại các trường bệnh nhân và BHYT, liên kết cơ sở và hàng đợi. Fixture chỉ dùng dữ liệu tổng hợp và soft-delete các dòng do test tạo. Các kiểm tra SQL synthetic trước đó còn bao gồm second-JVM readback, multi-table rollback và queue/CCCD concurrency. Đây là form-to-persistence headless acceptance, không phải kiểm tra trực quan hay toàn bộ `ReceptionPanel`.
+**Còn lại:** Bản build desktop đã mở được login screen trên `clinic_test_patient_history_20261106`; CUA không attach được cửa sổ Java và macOS từ chối gửi phím qua `osascript`, vì vậy chưa đăng nhập để kiểm tra trực quan Doctor station hoặc `ReceptionPanel`. Test headless Doctor queue/history pass; opt-in SQL Server queue fixture pass 1/1 trên `clinic_test_patient_history_20261106`, kiểm tra scope/date/status và soft-delete filters bằng các row do test tạo rồi soft-delete. Queue lifecycle/transfer chưa hoàn tất. Audit/scope cho patient registration, search và queue có bằng chứng riêng trong Phase 2; không suy rộng thành privacy/audit đầy đủ cho mọi model. `PAT-01` và `PAT-02` vẫn `[~]` theo task board; `PAT-FACILITY-01` và `PAT-V9-PREFLIGHT-01` hoàn tất trong phạm vi test/runtime acceptance của chúng. Phase 1 vẫn `[~]` và exit criteria chưa đạt. `BenhNhanCoSo` không phải quyền truy cập. `TienSuBenh` có application read và create/edit guarded/audited (`PAT-HISTORY-READ-01`, `PAT-HISTORY-WRITE-01`), SQL Server persistence/rollback acceptance pass 1/1 trên `clinic_test_patient_history_20261106` (`PAT-HISTORY-SQL-01`), và Doctor UI read-only đã nối/test headless (`PAT-DOCTOR-UI-01`); login-to-Doctor visual/runtime acceptance còn mở. Contract UI đã ghi tại [`phase1-doctor-history-ui-contract.md`](phase1-doctor-history-ui-contract.md); Owner đã duyệt queue team theo exact facility+department và mặc định ngày nghiệp vụ hiện tại với `CHO_KHAM`, `DANG_KHAM`, `CHO_CLS`. Owner đã duyệt DOCTOR-only read/write cho dị ứng, bệnh nền và phẫu thuật; từng row phải mang đúng cặp facility+department, chỉ cùng cặp được đọc, còn legacy row thiếu provenance vẫn deny và không tự backfill. Cách gắn encounter, hành vi sau khóa, delete và actor cho tiền sử gia đình/thói quen sinh hoạt chưa được quyết định. Giữ workflow default-deny; không suy ra quyền từ `PATIENT:SUA`, liên kết cơ sở hoặc V9. Xem [`phase1-tiensuben-scope-contract.md`](phase1-tiensuben-scope-contract.md).
+**Bằng chứng bổ sung:** [`phase1-pat02-v9-review.md`](phase1-pat02-v9-review.md), [`phase1-tiensuben-review.md`](phase1-tiensuben-review.md), [`phase1-tiensuben-scope-contract.md`](phase1-tiensuben-scope-contract.md), [`phase3-visit-lifecycle-review.md`](phase3-visit-lifecycle-review.md). Phase 1 exit criteria vẫn chưa đạt.
 
----
+**Evidence addendum — BHYT SQL Server date read-back (06/11/2026):** Copilot task `82bcf40f-51c2-43a2-af94-7b68492425e9` tạo commit `27fc7f3` (`test(reception): verify BHYT date persistence`), tích hợp cục bộ thành `eef839f`. Root JDK 17 `mvn -Djava.awt.headless=true clean verify` đạt **BUILD SUCCESS, 337 tests, 0 failures, 0 errors, 6 opt-in skips, 70 Surefire reports**. Lệnh opt-in `mvn -pl clinic-desktop -am -Djava.awt.headless=true -Dclinic.test.sqlserver=true -Dclinic.test.sqlserver.databaseName=clinic_test_patient_history_20261106 -Dtest=ReceptionSqlServerPersistenceTest -Dsurefire.failIfNoSpecifiedTests=false test` đạt **BUILD SUCCESS, 1/1, 0 failures, 0 errors, 0 skips** trên database tổng hợp hiện hữu `clinic_test_patient_history_20261106`; fixture ngẫu nhiên và cleanup hiện có, không tạo hoặc drop database. Luồng form → intake → persistence → scoped CCCD read-back xác nhận start null vẫn null và expiry quá hạn giữ đúng `LocalDate`. Đây chỉ là bằng chứng lưu/đọc lại, không adjudicate eligibility/coverage. Expiry-inclusive hết ngày địa phương là policy cho workflow coverage tương lai, chưa được kiểm chứng bởi bài test này. Visual smoke và phone-equivalent search còn mở; `PLAT-VO-01`, Phase 0/1 và `SEC-01` không hoàn tất; các gate còn lại vẫn default-deny. Orchestrator vẫn ghi task Copilot `failed` / `Agent completed without producing a change`, trái với commit và root evidence; discrepancy báo cáo còn mở.
 
-## Đợt 1 — Định danh, danh mục nền và đăng ký bệnh nhân
+## Phase 2 — Baseline identity, access checks và audit
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 0.
+**Trạng thái:** `[~]` Identity/session, default-deny evaluator, approved grants và một số protected reception paths đã được triển khai, nhưng `SEC-01` vẫn in progress và gate chưa đạt.
+**Phụ thuộc:** Phase 0; phải hoàn tất trước khi mở các workflow nhạy cảm.
+**Phạm vi tối thiểu bắt buộc:** định danh actor/session tin cậy; role và data scope lấy từ tài khoản; kiểm tra quyền tại application/use case và persistence boundary phù hợp; audit truy cập/thay đổi nhạy cảm; kiểm thử allow/deny và truy vết.
+**Gate bắt buộc:** Phase 2 là prerequisite trực tiếp của Phase 4 (EMR), Phase 6 (prescription/inventory/pharmacy) và Phase 7 (billing). UI ẩn/disable không thay thế authorization ở backend. Không bật các luồng nhạy cảm với dữ liệu thật khi gate chưa đạt.
 
-**Model:** `NhanVien`, `VaiTro`, `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `CoSo`, `Khoa`, `PhongKham`, `DanhMucDichVu`, `ICD`, `DoiTuongKham`.  
-**UI:** `LoginForm`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `CatalogPanel`.
+**Bằng chứng triển khai hiện có (06/11/2026):**
+- Xác thực thông tin đăng nhập đã băm; sau đăng nhập, người dùng chọn một role và một cặp cơ sở/khoa đã gán trước khi tạo session. Session lifecycle thực thi idle lock 15 phút, absolute expiry 12 giờ, logout/re-auth và revalidation assignment theo policy đã duyệt.
+- `AuthorizationService` kiểm tra active session, employee, role/scope assignment, grant duy nhất và target pair; thiếu/sai dữ liệu, scope rộng legacy, lỗi dependency và `AUDIT_READ` đều default-deny. V8 seed 57 approved ALLOW tuples theo `KHOA_PHONG`; không suy rộng quyền ngoài allowlist.
+- Đăng ký/cập nhật reception bảo vệ patient, insurance và visit writes ở Application boundary, ràng buộc exact facility+department, audit mutation trong transaction và audit denial độc lập. Patient search, queue và room reads được scope theo cặp phiên; successful-read audit commit độc lập trước khi trả dữ liệu, lỗi audit thì fail closed. SQL Server synthetic opt-in `clinic_test_audit_20261105` pass 1/1 cho grant lookup, protected registration/rollback và protected search/queue audit; đây là evidence riêng, không thuộc default verify.
+- `SEC-UI-01` permission-aware navigation có headless validation; visual acceptance trực tiếp vẫn chưa thực hiện. Login screen đã mở trên DB synthetic `clinic_test_patient_history_20261106`; CUA không attach được cửa sổ Java, còn macOS từ chối gửi phím qua `osascript`, nên chưa xác nhận dashboard sau đăng nhập. Bằng chứng và phân rã task hiện hành nằm trong [`03-model-task-board.md`](03-model-task-board.md), [`phase2-implementation-contract.md`](phase2-implementation-contract.md), [`phase2-role-permission-matrix-approval.md`](phase2-role-permission-matrix-approval.md) và các contract/review Phase 2.
+- **Evidence refresh (06/11/2026):** JDK 17 root default `mvn -Djava.awt.headless=true clean verify`: **BUILD SUCCESS**, 337 tests, 0 failures, 0 errors, 6 SQL Server opt-in skips across four tested modules (70 Surefire XML reports). The previous 316/0/0/5 (68 reports), 305/0/0/5 snapshot (65 reports), 295/0/0/4 snapshot (63 reports), 283/0/0/4 snapshot (61 reports), and 269/0/0/4 snapshot (58 reports) are historical; the earlier 262/0/0/4 snapshot is also historical. Neither SQL Server opt-in evidence nor visual smoke is part of this default baseline. The current role boundary uses the six-code `ApprovedRoleCodes` allowlist in both `AuthorizationService` and `NavigationPermissionsHandler`; evaluator unit tests cover all six approved roles and unsupported-role rejection before grant lookup.
+- SQL Server opt-in command: `mvn -pl clinic-desktop -am -Djava.awt.headless=true -Dclinic.test.sqlserver=true -Dclinic.test.sqlserver.databaseName=clinic_test_sec_reception_20261106 -Dtest=ReceptionSqlServerPersistenceTest -Dsurefire.failIfNoSpecifiedTests=false test` — **pass 1/1** on newly created empty synthetic database `clinic_test_sec_reception_20261106`. It applied migrations, created a synthetic `RECEPTIONIST` with assigned facility/department, verified the seeded `CATALOG:XEM` grant and `AuthorizationService` allow for the exact assigned scope, and exercised real registration, patient search and queue through composition. A separate synthetic SQL Server queue fixture passed 1/1 on `clinic_test_patient_history_20261106`, verifying selected business date, exact facility/department, the approved three active statuses, and exclusion of cancelled/completed, soft-deleted visit, and soft-deleted patient rows. These do not prove SQL-runtime denial for unimplemented roles/workflows; those denials are covered by evaluator unit tests. Owner approved Definition A on 06/11/2026 and confirmed future workflows remain disabled/default-deny until their own acceptance. Login throttle B is implemented and locally accepted under `SEC-LOCKOUT-IMPLEMENT-01`; `SEC-01` stays `[~]` pending manual visual smoke only. Downstream workflows remain default-deny until their separate acceptance and do not block Definition A; the consolidated checklist is [`phase2-sec01-baseline-acceptance.md`](phase2-sec01-baseline-acceptance.md). Login throttle B is locally accepted; its latest Owner-confirmed rules are in [`phase2-login-lockout-policy-proposal.md`](phase2-login-lockout-policy-proposal.md). Full test commands/results remain in [`phase2-security-exit-gate-review.md`](phase2-security-exit-gate-review.md#evidence-addendum--06112026).
 
-### Chi tiết công việc:
-- [ ] **Tầng Repository (`clinic-infrastructure`):**
-  - `NhanVienRepositoryImpl`, `BenhNhanRepositoryImpl`, `BaoHiemRepositoryImpl`, `DanhMucDichVuRepositoryImpl`, `ICDRepositoryImpl`, `PhongKhamRepositoryImpl`.
-- [ ] **Tầng Use Cases (`clinic-application`):**
-  - `RegisterPatientCommand` & `UpdatePatientCommand`: Lưu trọn vẹn **15 trường thông tin y tế thực chiến** (Đối tượng, BHYT 5 năm, người liên hệ, địa chỉ 3 cấp, nghề nghiệp,...).
-  - `SearchPatientsQuery`: Tra cứu tức thì theo CCCD / Số điện thoại / Mã BN / Họ tên; thuật toán cảnh báo trùng hồ sơ.
-  - `GetActiveRoomsQuery` & `GetCatalogsQuery`: Nạp danh mục phòng khám và bảng giá dịch vụ vào Cache bộ nhớ khi app khởi động.
-- [ ] **Tích hợp Desktop Swing (`clinic-desktop`):**
-  - Nối `PatientRegistrationFormPanel` vào `RegisterPatientCommand` qua `SwingWorker`.
-  - Thay thế danh sách phòng khám fix cứng bằng dữ liệu từ bảng `PhongKham` SQL Server.
+**Đối chiếu task board:** `SEC-AUDIT-01D` hiện `[x]` sau khi root chạy lại đúng opt-in `AuditSqlServerPersistenceTest` và xác nhận 1/1 pass trên `clinic_test_audit_20261105`; phạm vi chỉ gồm migration/audit append-only và rollback registration khi audit insert bị từ chối. Điều này không đóng toàn bộ `SEC-01` hay cấp quyền đọc audit. Các số test trong từng task row là snapshot tại thời điểm task; baseline root mới nhất ngày 06/11/2026 là **337/0/0/6** trên 70 Surefire XML report; JDK 17, `mvn -Djava.awt.headless=true clean verify`, BUILD SUCCESS. Snapshot trước đó 334/0/0/6, 326/0/0/6, 325/0/0/6, 323/0/0/6, 321/0/0/6, 316/0/0/5, 305/0/0/5, 269/0/0/4 và 262/0/0/4 là lịch sử. Throttle SQL Server opt-in (migration 1/1 và concurrency/audit rollback 1/1) được ghi tại `SEC-LOCKOUT-IMPLEMENT-01`; không nằm trong baseline mặc định.
 
-**Qua đợt khi:** Đăng ký bệnh nhân mới từ form Desktop, khởi động lại ứng dụng dữ liệu vẫn hiển thị chính xác trên danh sách tìm kiếm.
+**Còn lại theo `SEC-01` trên task board:** visual smoke; các workflow ngoài reception hiện được bảo vệ/kiểm chứng chưa đồng đều; onboarding/assignment administration; triển khai DEC-AUTHZ-04b transfer workflow và DEC-AUTHZ-05 billing exception workflow theo policy đã chốt; các DEC-AUTHZ-06/07/08 policy đã chốt nhưng vẫn deny tới khi guard/grant/workflow và test đạt. Thu cọc lịch hẹn chưa có actor/flow được duyệt và vẫn deny. Owner đã duyệt phương án B cho throttle đăng nhập; triển khai đang được theo dõi tại [`phase2-login-lockout-policy-proposal.md`](phase2-login-lockout-policy-proposal.md). Retention duration còn mở trong khi policy đã duyệt vẫn là không purge tự động. Theo DEC-AUTHZ-10, `AUDIT_READ` đã được quyết định là DENY cho mọi role; không có quyền tra cứu audit được cấp. `EMR-01`, `RX-01`, `INV-01` và `BILL-01` chưa mở. Các thao tác ngoài protected reception slice không được coi là đã được bật an toàn.
 
----
+Các policy đã duyệt vẫn giữ nguyên: đúng một role và một cặp scope mỗi phiên; thông thường phải khớp cả facility lẫn department; `KHOA_PHONG` là scope được phép; DEC-AUTHZ-01 DOCTOR-only ghi sinh hiệu; DEC-AUTHZ-02 mở khóa EMR cần DOCTOR thứ hai cùng khoa; DEC-AUTHZ-04a/04b hủy và điều chuyển theo guard/role đã chốt; DEC-AUTHZ-05 CASHIER thu theo giá, ngoại lệ cần CASHIER khác duyệt. Chốt policy không đồng nghĩa workflow/grant đã triển khai. `SEC-01` không hoàn tất cho đến khi các gate, kiểm thử và UI acceptance còn mở được nghiệm thu.
 
-## Đợt 2 — Tiếp đón, lịch hẹn và hàng đợi lượt khám
+## Phase 3 — Lịch hẹn và vòng đời lượt khám
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 1.
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 1 và Phase 2.
+**Phạm vi:** `LichHen`, `NguonLich`, `LuotKham`, `SinhHieu`; đặt/đổi/hủy, check-in/no-show, queue lifecycle, vitals.
+**Còn lại:** chống tạo lượt khám trùng; ghi người/thời điểm đo; chuyển trạng thái hợp lệ; authorization/audit riêng cho cancel, transfer và vitals; persist/reload/concurrency tests. Reception registration, queue reads, room reads và audit đã được nối cho slice hiện có, nhưng không cung cấp các lifecycle use cases này.
+**Review hoàn tất:** [`phase3-visit-lifecycle-review.md`](phase3-visit-lifecycle-review.md), task `VIS-REVIEW-01` (`fbe75a15-9ad0-4956-aa29-ea101c1fd714`, Codex, commit `8358d67`). Policy hủy/chuyển/sinh hiệu đã duyệt nhưng chưa có workflow; implementation cần bổ sung guard, persistence, audit và tests. Các luồng Phase 3 vẫn đóng tới khi security gate và các dependency nghiệp vụ được hoàn tất.
 
-**Model:** `LichHen`, `LuotKham`, `SinhHieu`, `NguonLich`, `TrangThaiLuotKham`.  
-**UI:** `ReceptionPanel`, `ClinicRoomStatusPanel`, dialog Lịch hẹn.
+## Phase 4 — Clinical EMR
 
-- [ ] `CreateEncounterCommand`: Tiếp nhận bệnh nhân (Walk-in hoặc từ Lịch hẹn), cấp số thứ tự khám an toàn (Thread-safe sequence).
-- [ ] `RecordVitalSignsCommand`: Nhập mạch, nhiệt độ, huyết áp, nhịp thở, SpO2, chiều cao, cân nặng.
-- [ ] Nối bảng hàng đợi phòng khám với cơ chế tự động làm mới (Periodic Refresh hoặc Trigger Event).
-- [ ] Chuyển trạng thái lượt khám: `CHO_KHAM` ➔ `DANG_KHAM` ➔ `CHUYEN_PHONG` ➔ `HOAN_TAT`.
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 2 security gate và Phase 3.
+**Phạm vi:** `ChanDoan`, `ICD`, `TienSuBenh`, phần lâm sàng của `LuotKham`, hoàn tất/khóa/mở EMR, `NhatKyHoSoBenhAn`.
+**Còn lại:** lưu nháp/đọc lại, workflow ký/khóa, kiểm soát quyền theo actor/scope, audit và kiểm thử khóa/mở; tài liệu chỉ lấy từ dữ liệu đã persist. `EMR-LOCK-INPUT-01` chỉ hoàn tất invariant đầu vào ở domain `LuotKham`; không cấp quyền cho người khóa, không bật `EMR-01`, và không chứng minh workflow EMR, persistence, UI, audit hay visual smoke.
 
-**Qua đợt khi:** Tạo lượt khám mới tại bàn tiếp đón, bệnh nhân xuất hiện ngay lập tức trong danh sách chờ của Bàn khám chuyên khoa tương ứng.
+## Phase 5 — Catalogs, services và CLS
 
----
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 3; các thao tác truy cập hồ sơ/kết quả phải dùng Phase 2.
+**Phạm vi:** `ICD`, `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu`; catalog và quy trình kết quả.
+**Còn lại:** CRUD/hiệu lực danh mục, tạo/hủy chỉ định, nhập/duyệt kết quả, audit/version, quyết định lưu metadata hình ảnh.
 
-## Đợt 3 — Khám lâm sàng, EMR và kê đơn
+## Phase 6 — Prescription, inventory và pharmacy
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 2.
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 2 security gate, Phase 4; nguồn dịch vụ Phase 5 khi có tiêu hao.
+**Phạm vi:** `DonThuoc`, `ChiTietDonThuoc`, `Item`, `Kho`, `TonKho`, nhập/xuất, supplier, FEFO, kiểm kê và transaction kho.
+**Còn lại:** kiểm tra an toàn thuốc theo nghiệp vụ; duyệt/cấp phát; FEFO; chứng từ/audit; atomicity, concurrency và không âm kho.
 
-**Model:** `LuotKham`, `ChanDoan`, `ICD`, `SinhHieu`, `TienSuBenh`, `DonThuoc`, `ChiTietDonThuoc`, `KetQuaDieuTri`, `HuongXuTri`.  
-**UI:** `DoctorStationPanel`, `ExaminationPanel`, `MedicalRecordTabPanel`, `PrescriptionOrderPanel`.
+## Phase 7 — Billing
 
-- [ ] Nạp thông tin bệnh nhân đang được gọi khám lên giao diện Bác sĩ.
-- [ ] `SaveDraftEmrCommand`: Lưu nháp diễn tiến bệnh, tiền sử, triệu chứng lâm sàng.
-- [ ] Tìm kiếm và chọn mã chẩn đoán chính / chẩn đoán phụ từ bảng `ICD`.
-- [ ] Kê đơn thuốc: Tìm kiếm thuốc từ kho thật, kiểm tra an toàn qua `ClinicalDrugSafetyService` (cảnh báo dị ứng, tương tác).
-- [ ] `SignAndLockEmrCommand`: Ký số / Hoàn thành khám, cập nhật `KetQuaDieuTri`, `HuongXuTri`, khóa bệnh án chống sửa đổi trái phép.
-- [ ] **Gắn nút xuất tài liệu DOCX:** Tích hợp `DocxExportService` cho phép in Đơn thuốc điện tử và Bệnh án ngoại trú ra file `.docx`.
+**Trạng thái:** `[ ]` Chưa có bằng chứng nghiệm thu end-to-end.
+**Phụ thuộc:** Phase 2 security gate, Phase 3; nguồn thu từ Phase 5 và Phase 6.
+**Phạm vi:** `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`; lập hóa đơn, thu/hoàn/điều chỉnh, đối soát.
+**Còn lại:** xác nhận quy tắc nghiệp vụ giá/BHYT/đồng chi trả; snapshot giá; giao dịch thu nhiều lần; chứng từ/audit; đối soát và retry/idempotency tests.
 
-**Qua đợt khi:** Bác sĩ khám xong, kê đơn, khóa bệnh án, xuất file đơn thuốc `.docx` chuẩn Bộ Y Tế và lưu thành công vào CSDL.
+## Phase 8 — HR/payroll và extended administration
 
----
+**Trạng thái:** `[ ]` CRUD/admin/payroll chưa có bằng chứng nghiệm thu hoàn chỉnh.
+**Phụ thuộc:** Phase 2 cho quyền quản trị; Phase 7 và dữ liệu nhân sự/chấm công cho payroll.
+**Phạm vi:** `NhanVien`, `VaiTro`, `ChucVu`, lịch ca/chấm công/nghỉ phép, payroll, cơ sở/khoa/phòng mở rộng, phân quyền quản trị, cấu hình và audit administration.
+**Còn lại:** user/HR CRUD, role/scope administration, attendance/leave, payroll rules/approval/close, cấu hình, backup/restore. Phase này mở rộng quản trị; không trì hoãn security gate tối thiểu ở Phase 2.
 
-## Đợt 4 — Chỉ định dịch vụ, CLS và kết quả
+## Phase 9 — Reports, documents, integrations và release hardening
 
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 3 và danh mục dịch vụ của Đợt 1.
+**Trạng thái:** `[ ]` Chưa có bằng chứng phát hành được nghiệm thu.
+**Phụ thuộc:** các phase cung cấp dữ liệu; Phase 2 cho mọi truy vấn/tài liệu nhạy cảm; Phase 8 cho cấu hình quản trị.
+**Phạm vi:** báo cáo, DOCX/print/export, notification/payment/external integrations, hardening, CI/release/operations.
+**Còn lại:** định nghĩa chỉ số và đối soát; kiểm tra mẫu tài liệu; quản lý secrets; contract/integration tests; build/release và hướng dẫn vận hành.
+**CI:** `REL-CI-01` đã thêm `.github/workflows/maven-verify.yml`: push/PR sẽ chạy headless Maven verify trên JDK 17 bằng action major hiện hành; quyền `contents: read`, không secrets/SQL Server opt-in. YAML và Maven đã kiểm tra local. GitHub-hosted run chưa có vì branch chưa push; task được đánh dấu complete-local, không phải CI run đã nghiệm thu.
 
-**Model:** `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu`.  
-**UI:** `ServiceOrderPanel`, `LabOrderTabPanel`, `ParaclinicalOrderPanel`.
+## Quy tắc chuyển phase
 
-- [ ] Bác sĩ chỉ định các dịch vụ kỹ thuật (Xét nghiệm máu, X-Quang, Siêu âm).
-- [ ] Màn hình phòng xét nghiệm/CĐHA tiếp nhận chỉ định, cập nhật trạng thái `DANG_THUC_HIEN`.
-- [ ] Nhập trị số xét nghiệm, kết luận chẩn đoán hình ảnh và đính kèm đường dẫn ảnh chụp.
-- [ ] Duyệt kết quả và đẩy ngược trở lại màn hình Bác sĩ điều trị.
-
-**Qua đợt khi:** Bác sĩ nhận được thông báo có kết quả CLS và xem được kết quả xét nghiệm ngay trên hồ sơ khám bệnh.
-
----
-
-## Đợt 5 — Kho Dược, cấp phát thuốc (FEFO) và quản lý tồn kho
-
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 3, danh mục thuốc/vật tư và Unit of Work của Đợt 0.
-
-**Model:** `Item`, `Kho`, `TonKho`, `PhieuNhapKho`, `ChiTietNhapKho`, `PhieuXuatKho`, `ChiTietXuatKho`, `InventoryTransaction`, `FefoAllocationService`.  
-**UI:** `PharmacyDispensePanel`, `PharmacyTicketTablePanel`.
-
-- [ ] Nhà thuốc tiếp nhận đơn thuốc đã được bác sĩ duyệt hoặc hóa đơn đã thanh toán.
-- [ ] Thực thi thuật toán **FEFO** tự động trừ số lượng từ các lô có hạn dùng gần nhất trước.
-- [ ] Quản lý giao dịch nguyên tử (Atomic): Cập nhật `TonKho` + Tạo `PhieuXuatKho` + Ghi `InventoryTransaction` trong cùng một Transaction JDBC.
-- [ ] Cảnh báo thuốc hết hạn hoặc tồn kho dưới định mức an toàn.
-
-**Qua đợt khi:** Cấp phát đơn thuốc thành công, tồn kho trong bảng `TonKho` bị trừ chính xác theo từng lô và không xảy ra bán âm kho.
-
----
-
-## Đợt 6 — Viện phí, thu ngân, hóa đơn và công nợ
-
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 3, 4, 5.
-
-**Model:** `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`.  
-**UI:** `BillingInvoicePanel`, `MedicalBillingSlipPanel`.
-
-- [ ] Tự động gom toàn bộ chi phí (Tiền khám + Tiền CLS + Tiền thuốc) thành Hóa đơn viện phí `HoaDon`.
-- [ ] Tính toán tự động quyền lợi BHYT (ví dụ: đúng tuyến 80%, 100%) và số tiền bệnh nhân cùng chi trả.
-- [ ] Thu ngân xác nhận thu tiền, ghi nhận `PhieuThu`, in hóa đơn viện phí.
-- [ ] Quản lý số dư tạm ứng và ghi nhận nợ vào `CongNoBenhNhan`.
-
-**Qua đợt khi:** Thu ngân in được phiếu thu chuẩn, doanh thu và công nợ đối soát khớp 100% với các dịch vụ đã thực hiện.
-
----
-
-## Đợt 7 — Quản trị nhân sự, payroll, báo cáo tổng hợp và đóng gói
-
-**Trạng thái:** `[ ] Chưa làm`  
-**Phụ thuộc:** Đợt 0–6.
-
-**Model:** `NhanVien`, `ChamCong`, `KyLuong`, `BangLuong`, `NhatKyHeThong`.  
-**UI:** `SystemConfigPanel`, `ClinicReportPanel`, phân hệ chấm công.
-
-- [ ] Chấm công nhân sự theo ca làm việc, tính toán bảng lương tự động từ ngày công và hoa hồng dịch vụ.
-- [ ] Báo cáo hoạt động khám chữa bệnh: Lượt khám, cơ cấu bệnh tật ICD-10.
-- [ ] Báo cáo tài chính doanh thu, viện phí, BHYT.
-- [ ] Báo cáo kho dược: Báo cáo Nhập - Xuất - Tồn, thẻ kho chi tiết.
-- [ ] Đóng gói cài đặt ứng dụng Desktop (.jar / native installer) kèm hướng dẫn vận hành.
+- Chỉ chuyển sang trạng thái hoàn tất khi workflow có bằng chứng theo tiêu chí phase, gồm quyền/audit khi dữ liệu nhạy cảm.
+- Phase 2 là gate trước mọi thao tác EMR, prescription/pharmacy và billing; Phase 8 chỉ chứa quản trị nhân sự và mở rộng.
+- Task-level status và bằng chứng theo từng model được theo dõi tại [03 — Model task board](03-model-task-board.md).
+- Test task có thể hoàn tất khi đúng phạm vi test đã có kết quả xác nhận; việc đó không tự hoàn tất phase hoặc workflow.

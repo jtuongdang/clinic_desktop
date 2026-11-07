@@ -571,12 +571,9 @@ public class ExaminationPanel extends BaseViewPanel {
         cardContainer.add(serviceOrderPanel, "SERVICE_ORDER");
 
         // Đăng ký phím tắt Ctrl+T (hoặc Cmd+T trên Mac) chuyển nhanh đến Chỉ Định Thuốc
-        int shortcutMask = java.awt.event.InputEvent.CTRL_DOWN_MASK;
-        try {
-            if (!GraphicsEnvironment.isHeadless()) {
-                shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
-            }
-        } catch (Throwable ignored) {}
+        int shortcutMask = resolveShortcutMask(
+                GraphicsEnvironment.isHeadless(),
+                () -> Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx());
         KeyStroke ctrlT = KeyStroke.getKeyStroke('T', shortcutMask);
         this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(ctrlT, "openPrescriptionOrder");
         this.getActionMap().put("openPrescriptionOrder", new AbstractAction() {
@@ -587,6 +584,17 @@ public class ExaminationPanel extends BaseViewPanel {
         });
 
         add(cardContainer, BorderLayout.CENTER);
+    }
+
+    static int resolveShortcutMask(boolean headless, java.util.function.IntSupplier platformMaskSupplier) {
+        if (headless) {
+            return java.awt.event.InputEvent.CTRL_DOWN_MASK;
+        }
+        try {
+            return platformMaskSupplier.getAsInt();
+        } catch (RuntimeException unavailablePlatformMask) {
+            return java.awt.event.InputEvent.CTRL_DOWN_MASK;
+        }
     }
 
     private JPanel buildPatientFormPanel() {

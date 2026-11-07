@@ -4,6 +4,8 @@ import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -19,50 +21,35 @@ import java.util.Properties;
  */
 public class DatabaseConnection {
     private static String CUSTOM_CONNECTION_STRING = "";
-
-    // Cấu hình mặc định đọc từ file cấu hình hoặc biến môi trường
-    private static String dbUrl;
-    private static String dbUser;
-    private static String dbPassword;
-    private static String dbDriver;
-
-    static {
-        loadConfiguration();
-    }
+    private static final DatabaseConfiguration CONFIGURATION =
+            new DatabaseConfiguration(DatabaseConnection::loadProperties, DatabaseConnection::loadEnvironment);
 
     private DatabaseConnection() {}
 
-    /**
-     * Nạp cấu hình từ file db.properties hoặc biến môi trường hệ thống
-     */
-    private static void loadConfiguration() {
+    private static Properties loadProperties() {
+        Properties properties = new Properties();
         try (InputStream input = DatabaseConnection.class.getClassLoader().getResourceAsStream("db.properties")) {
-            Properties prop = new Properties();
             if (input != null) {
-                prop.load(input);
-                dbUrl = prop.getProperty("db.url");
-                dbUser = prop.getProperty("db.username");
-                dbPassword = prop.getProperty("db.password");
-                dbDriver = prop.getProperty("db.driver");
+                try {
+                    properties.load(input);
+                } catch (Exception ignored) {
+                    properties.clear();
+                }
             }
         } catch (Exception ignored) {}
-
-        // Biến môi trường ghi đè cấu hình file; không lưu secret trong source/artifact.
-        overrideFromEnvironment("DB_URL", value -> dbUrl = value);
-        overrideFromEnvironment("DB_USERNAME", value -> dbUser = value);
-        overrideFromEnvironment("DB_PASSWORD", value -> dbPassword = value);
-        overrideFromEnvironment("DB_DRIVER", value -> dbDriver = value);
-
-        // Chuỗi đầy đủ có ưu tiên cao nhất.
-        String envUrl = System.getenv("DB_CONNECTION_STRING");
-        if (envUrl != null && !envUrl.trim().isEmpty()) {
-            CUSTOM_CONNECTION_STRING = envUrl;
-        }
+        return properties;
     }
 
-    private static void overrideFromEnvironment(String key, java.util.function.Consumer<String> setter) {
-        String value = System.getenv(key);
-        if (value != null && !value.isBlank()) setter.accept(value.trim());
+    private static Map<String, String> loadEnvironment() {
+        Map<String, String> environment = new HashMap<>();
+        for (String key : new String[]{
+                "DB_URL", "DB_USERNAME", "DB_PASSWORD", "DB_DRIVER", "DB_CONNECTION_STRING"}) {
+            String value = System.getenv(key);
+            if (value != null) {
+                environment.put(key, value);
+            }
+        }
+        return environment;
     }
 
     /**
@@ -71,15 +58,14 @@ public class DatabaseConnection {
      */
     public static void setConnectionString(String connectionString) {
         CUSTOM_CONNECTION_STRING = connectionString != null ? connectionString.trim() : "";
+        CONFIGURATION.setConnectionString(CUSTOM_CONNECTION_STRING);
     }
 
     /**
      * Gán thông tin kết nối tách rời
      */
     public static void configure(String url, String username, String password) {
-        dbUrl = url;
-        dbUser = username;
-        dbPassword = password;
+        CONFIGURATION.configure(url, username, password);
     }
 
     /**
@@ -88,22 +74,39 @@ public class DatabaseConnection {
      * @throws SQLException nếu kết nối thất bại
      */
     public static Connection getConnection() throws SQLException {
-        // 1. Ưu tiên sử dụng chuỗi kết nối gán trực tiếp
-        if (CUSTOM_CONNECTION_STRING != null && !CUSTOM_CONNECTION_STRING.isEmpty()) {
-            autoRegisterDriver(CUSTOM_CONNECTION_STRING);
-            return DriverManager.getConnection(CUSTOM_CONNECTION_STRING);
+        CONFIGURATION.setConnectionString(CUSTOM_CONNECTION_STRING);
+        DatabaseConfiguration.ConnectionTarget target =
+                CONFIGURATION.getConfiguration().connectionTarget();
+        if (target.mode() == DatabaseConfiguration.ConnectionMode.UNCONFIGURED) {
+            throw new SQLException("Chưa cấu hình CSDL. Hãy đặt DB_CONNECTION_STRING hoặc DB_URL/DB_USERNAME/DB_PASSWORD, hoặc tạo db.properties từ file mẫu.");
         }
 
-        // 2. Nếu không có chuỗi trực tiếp, dùng cấu hình từ db.properties
-        if (dbUrl != null && !dbUrl.isEmpty()) {
-            autoRegisterDriver(dbUrl);
-            if (dbUser != null && !dbUser.isEmpty()) {
-                return DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-            }
-            return DriverManager.getConnection(dbUrl);
+        autoRegisterDriver(target.value());
+        return openConnection(target, new DriverManagerConnectionFactory());
+    }
+
+    static Connection openConnection(
+            DatabaseConfiguration.ConnectionTarget target,
+            ConnectionFactory connectionFactory) throws SQLException {
+        return switch (target.mode()) {
+            case FULL_CONNECTION_STRING, URL_ONLY -> connectionFactory.getConnection(target.value());
+            case URL_WITH_CREDENTIALS ->
+                    connectionFactory.getConnection(target.value(), target.username(), target.password());
+            case UNCONFIGURED -> throw new SQLException(
+                    "Chưa cấu hình CSDL. Hãy đặt DB_CONNECTION_STRING hoặc DB_URL/DB_USERNAME/DB_PASSWORD, hoặc tạo db.properties từ file mẫu.");
+        };
+    }
+
+    private static final class DriverManagerConnectionFactory implements ConnectionFactory {
+        @Override
+        public Connection getConnection(String connectionString) throws SQLException {
+            return DriverManager.getConnection(connectionString);
         }
 
-        throw new SQLException("Chưa cấu hình CSDL. Hãy đặt DB_CONNECTION_STRING hoặc DB_URL/DB_USERNAME/DB_PASSWORD, hoặc tạo db.properties từ file mẫu.");
+        @Override
+        public Connection getConnection(String url, String username, String password) throws SQLException {
+            return DriverManager.getConnection(url, username, password);
+        }
     }
 
     /**
@@ -130,24 +133,40 @@ public class DatabaseConnection {
      * @return true nếu kết nối thành công, false nếu lỗi
      */
     public static boolean testConnection() {
+        return testConnection(DatabaseConnection::getConnection);
+    }
+
+    static boolean testConnection(ConnectionSupplier connectionSupplier) {
         System.out.println("--------------------------------------------------");
         System.out.println("Đang kiểm tra kết nối tới cơ sở dữ liệu...");
-        try (Connection conn = getConnection()) {
+        try (Connection conn = connectionSupplier.get()) {
             if (conn != null && !conn.isClosed()) {
                 System.out.println(" KẾT NỐI THÀNH CÔNG!");
-                System.out.println("  • Database Product: " + conn.getMetaData().getDatabaseProductName());
-                System.out.println("  • Database Version: " + conn.getMetaData().getDatabaseProductVersion());
-                System.out.println("  • Connected User   : " + conn.getMetaData().getUserName());
                 System.out.println("--------------------------------------------------");
                 return true;
             }
-        } catch (SQLException e) {
-            System.err.println(" KẾT NỐI THẤT BẠI!");
-            System.err.println("  • Mã lỗi : " + e.getErrorCode());
-            System.err.println("  • Chi tiết: " + e.getMessage());
-            System.out.println("--------------------------------------------------");
+        } catch (SQLException exception) {
+            printConnectionFailure();
+            return false;
         }
+        printConnectionFailure();
         return false;
+    }
+
+    private static void printConnectionFailure() {
+        System.err.println(" KẾT NỐI THẤT BẠI!");
+        System.out.println("--------------------------------------------------");
+    }
+
+    @FunctionalInterface
+    interface ConnectionSupplier {
+        Connection get() throws SQLException;
+    }
+
+    interface ConnectionFactory {
+        Connection getConnection(String connectionString) throws SQLException;
+
+        Connection getConnection(String url, String username, String password) throws SQLException;
     }
 
     /**

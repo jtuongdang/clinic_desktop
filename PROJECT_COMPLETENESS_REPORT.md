@@ -1,121 +1,102 @@
-# Báo cáo đánh giá mức độ hoàn thiện project
+# Báo cáo hiện trạng và mức độ hoàn thiện project
 
-**Project:** Clinic Management Desktop (Java Swing / Maven)  
-**Ngày rà soát:** 04/11/2026  
-**Phạm vi:** Mã nguồn, cấu trúc module, cấu hình, migration, tài liệu và các điểm nối giữa UI–nghiệp vụ–CSDL. Đây là đánh giá tĩnh; trong lượt rà soát này không chạy build hoặc test.
+**Project:** Clinic Management Desktop (Java 17, Maven multi-module, Swing, JDBC/SQL Server)
+**Ngày rà soát:** 06/11/2026
+**Phạm vi:** Source hiện có trong checkout, hướng dẫn chạy, kế hoạch theo phase/task và bằng chứng kiểm định được ghi nhận đến ngày rà soát. Báo cáo tách riêng trạng thái triển khai trong source, kiểm định Maven mặc định, kiểm tra SQL Server opt-in trên dữ liệu tổng hợp và những phần chưa được quan sát/nghiệm thu. Đây không phải tuyên bố phase hoàn tất hay đánh giá sẵn sàng production.
+
+> Báo cáo 04/11/2026 là snapshot lịch sử, rà soát tĩnh và không chạy build/test. Các kết luận trong snapshot đó về việc không có test, không có persistence, thiếu README onboarding và chỉ có login demo đã lỗi thời; nội dung dưới đây thay thế chúng theo source và bằng chứng mới.
 
 ## 1. Kết luận điều hành
 
-Project đang ở mức **prototype giao diện có mô hình nghiệp vụ và schema tương đối rộng**, chưa đạt mức ứng dụng quản lý phòng khám có thể vận hành với dữ liệu thật.
+Project đã vượt qua trạng thái “chỉ có UI tĩnh”: có kiểm thử tự động, xác thực tài khoản, nền tảng role/scope/authorization/audit một phần, và luồng tiếp đón có lưu/đọc dữ liệu bệnh nhân, BHYT, liên kết cơ sở, lượt khám và hàng đợi. Mức độ hoàn thiện còn khác biệt lớn giữa các phân hệ. Lượt kiểm định Maven xác nhận build và test mặc định; task board ghi nhận riêng các lượt SQL Server opt-in có phạm vi migration, persistence và audit trên database tổng hợp. Các bằng chứng này không xác nhận toàn bộ desktop UI, mọi luồng nghiệp vụ, hoặc khả năng vận hành với dữ liệu thật.
 
-| Khía cạnh | Đánh giá | Nhận xét |
-|---|---:|---|
-| Phạm vi UI/UX | Khá | Có nhiều màn hình và thành phần cho các luồng tiếp đón, khám, dược, viện phí, CLS, quản trị. |
-| Mô hình Domain | Khá | Có nhiều entity, enum, exception và một số domain service chuyên biệt. |
-| CSDL và migration | Trung bình | Có migration SQL Server, seed data và `DatabaseMigrationRunner`; chưa có persistence repository để ứng dụng đọc ghi domain model. |
-| Nghiệp vụ Application | Thấp | Đã có khung Result/Command/Query và use case xác thực; các use case nghiệp vụ khác chưa có. |
-| Truy cập dữ liệu | Thấp | Có transaction manager/unit of work và repository nhân viên; các repository còn lại chưa triển khai. |
-| Xác thực và phân quyền | Đang hoàn thiện | Login kiểm tra tài khoản seed và role từ DB; chưa có quản lý tài khoản/mật khẩu và kiểm tra quyền toàn hệ thống. |
-| Kiểm thử tự động | Chưa có | Bốn thư mục `src/test` chỉ chứa `.gitkeep`. |
-| Sẵn sàng production | Chưa đạt | Dữ liệu giả, thông tin đăng nhập mẫu, thiếu nối nghiệp vụ–CSDL và kiểm chứng vận hành. |
+| Khía cạnh | Hiện trạng đã xác minh | Giới hạn chính |
+|---|---|---|
+| Nền tảng và build | Baseline ngày 06/11/2026: JDK 17 `mvn -Djava.awt.headless=true clean verify` kết thúc `BUILD SUCCESS`. | Chưa có nghiệm thu phát hành/vận hành; không suy ra sẵn sàng production. |
+| Xác thực, phiên và quyền | Có kiểm tra thông tin đăng nhập, role/scope được gán, hoàn tất phiên, evaluator fail-closed và một số luồng tiếp đón có kiểm tra quyền/audit. | Authorization chưa phủ toàn hệ thống; policy/runtime grant và các quyết định còn mở vẫn chặn những luồng nhạy cảm. |
+| Tiếp đón và bệnh nhân | Có handlers, JDBC repositories, giao diện nối qua composition root, tìm kiếm có scope, ghi/đọc bệnh nhân, BHYT và lượt khám/hàng đợi. | Chỉ là vertical slice đang tiến hành; UI-to-database E2E đầy đủ và nghiệm thu Phase 1 còn thiếu. |
+| Tiền sử và EMR | Có query đọc và command tạo/sửa ba loại tiền sử đã duyệt; cả hai được giới hạn theo DOCTOR/scope và audit. SQL Server opt-in persistence/rollback acceptance đã pass. | Doctor UI chưa nối; EMR chưa có luồng end-to-end được chấp nhận. |
+| Các phân hệ khác | Có nhiều model, migration, panel, dialog hoặc bản xem trước. | Khám, CLS, kê đơn/kho, viện phí, danh mục, báo cáo, HR/quản trị chủ yếu chưa có application-to-database workflow được nghiệm thu; một số UI dùng dữ liệu tĩnh. |
+| Kiểm thử | Baseline mặc định mới nhất JDK 17 ngày 06/11/2026: **305 tests, 0 failures, 0 errors, 5 SQL Server opt-in skips** (65 Surefire XML reports). | Năm test SQL Server opt-in không chạy trong lượt mặc định; UI chưa được quan sát trực tiếp. |
 
-**Ước lượng tổng thể:** khoảng **35% hoàn thiện nếu mục tiêu là bản demo UI**, và **15–20% nếu mục tiêu là hệ thống nghiệp vụ có thể triển khai thực tế**. Đây là ước lượng định tính dựa trên phạm vi code hiện có, không phải phép đo tiến độ chính thức.
+## 2. Bằng chứng và cách diễn giải
 
-## 2. Quy mô và cấu trúc hiện có
+### Kiểm định mặc định
 
-- Maven multi-module gồm `clinic-domain`, `clinic-application`, `clinic-infrastructure`, `clinic-desktop`, chạy trên Java 17.
-- Rà soát đếm được khoảng **137 file Java trong Domain** và **82 file Java trong Desktop**.
-- Domain đã chia các miền bệnh nhân, khám bệnh, dịch vụ, đơn thuốc, kho, viện phí, nhân sự, payroll, cơ sở và hệ thống; có repository interfaces, event contracts, domain exceptions và một số service nghiệp vụ.
-- UI có 12 nhóm module chính; riêng `examination` có nhiều panel, tab, dialog và print preview.
-- Migration `V1__Initial_Clinic_Schema.sql` khai báo schema rộng (43 nhóm bảng/khối theo chú thích), `V2__Seed_Initial_Data.sql` tạo dữ liệu mẫu.
-- Có tài liệu phân tích Domain, ERD, chuẩn UI và mapping UI–Domain. Tuy nhiên, một số kết luận trong tài liệu mô tả trạng thái mục tiêu như thể đã triển khai; cần đọc đối chiếu với mã thực tế.
+Baseline root mới nhất được ghi nhận ngày 06/11/2026 trên JDK 17, lệnh `mvn -Djava.awt.headless=true clean verify`: **BUILD SUCCESS**, 305 tests, 0 failures, 0 errors, 5 SQL Server opt-in skips, trên bốn module có test (`clinic-domain`, `clinic-application`, `clinic-infrastructure`, `clinic-desktop`; 65 Surefire XML reports). Snapshot root trước đó 295/0/0/4 (63 reports), 283/0/0/4 (61 reports) và 269/0/0/4 (58 reports) được giữ làm bằng chứng lịch sử; snapshot cũ hơn 262/0/0/4 cũng là lịch sử. Năm test bị skip là `FreshDatabaseMigrationSqlServerTest`, `AuditSqlServerPersistenceTest`, `ReceptionSqlServerPersistenceTest`, `ReceptionSqlServerProcessRestartTest` và `PatientHistorySqlServerPersistenceTest`; chúng **không chạy** trong Maven verify mặc định. Các lượt SQL Server opt-in được ghi riêng và không thuộc baseline này. Bảy focused tests của `VIS-STATE-START-TEST-01` kiểm tra một transition `CHO_KHAM` → `DANG_KHAM` hợp lệ và sáu trạng thái enum còn lại bị từ chối mà không mutation. Sáu test tổng hợp của `InProcessDomainEventPublisher` kiểm tra dispatcher độc lập; hai test `AbstractDomainEvent` kiểm tra UTC timestamp conversion từ clock không UTC và null-clock rejection. Tám invocation mới của `EMR-LOCK-INPUT-01` kiểm tra invariant đầu vào domain cho `LuotKham.lockEmr()` trong task boundary 23 test `clinic-domain`; chúng không xác nhận quyền người khóa hoặc workflow. Không có event consumer/storage wiring, aggregate event collection, transaction-bound dispatch, real handler wiring, retry hay outbox. Kết quả này xác nhận build/test suite mặc định, không xác nhận toàn bộ SQL Server hay giao diện desktop đang hiển thị đúng.
 
-## 3. Điểm đã làm tốt
+### SQL Server opt-in riêng trên dữ liệu tổng hợp
 
-1. **Phạm vi nghiệp vụ được phác thảo rộng:** cấu trúc Domain và schema bao phủ nhiều khái niệm thường gặp như bệnh nhân, BHYT, lượt khám, chỉ định, kho theo lô, hóa đơn, nhân sự và quyền.
-2. **Tổ chức giao diện có chủ đích:** dùng Maven module, chia panel theo phân hệ, có khung dashboard/MDI, component tái sử dụng và nhiều form chuyên biệt.
-3. **Có một số quy tắc miền cụ thể:** ví dụ `FefoAllocationService`, `ClinicalDrugSafetyService`, exception tồn kho và khóa EMR. Cần thêm kiểm thử và tích hợp các quy tắc này vào use case thực tế.
-4. **Có migration, seed data và migration runner:** `DatabaseMigrationRunner` theo dõi các script V1/V2 và áp dụng script chưa chạy. Cần bổ sung kiểm chứng trên DB sạch/DB đã có dữ liệu, chính sách lỗi/khôi phục và quản lý version khi thêm migration.
+- `FreshDatabaseMigrationSqlServerTest` pass **1/1** trên database tổng hợp mới `clinic_test_v9_20261106`, áp dụng migration V1–V9 và kiểm tra ràng buộc liên kết bệnh nhân–cơ sở của V9. Lượt legacy-duplicate preflight runtime mới cũng pass **1/1** trên database SQL Server rỗng disposable mới `clinic_test_v9_preflight_20261106` bằng lệnh `mvn -pl clinic-infrastructure -am -Djava.awt.headless=true -Dclinic.sqlserver.migration.enabled=true -Dclinic.sqlserver.test.database=clinic_test_v9_preflight_20261106 -Dtest=FreshDatabaseMigrationSqlServerTest -Dsurefire.failIfNoSpecifiedTests=false test`. Cùng lượt này áp dụng V1–V9; kiểm tra active uniqueness và soft-delete; tạo duplicate legacy tổng hợp trước V9; xác nhận preflight failure giữ nguyên hai row và không tạo tracking/index; rồi soft-delete một row và retry V9 thành công. Đây là SQL Server opt-in độc lập, không thuộc 304 test của default verify và không phải production migration rehearsal. Chỉ dùng synthetic data; không database hiện hữu nào bị sửa hoặc drop.
+- `FreshDatabaseMigrationSqlServerTest` V10 acceptance pass **1/1** trên disposable `clinic_test_v10_history_scope_final_20261106`: chạy V1–V10, giữ row tiền sử legacy ở null/null, từ chối insert mới thiếu scope (SQL error 51010), từ chối pair khoa/cơ sở không khớp và nhận pair đúng. Synthetic fixtures được cleanup. Hai database disposable từ các lần thử assertion trước (`clinic_test_v10_history_scope_20261106`, `clinic_test_v10_history_scope_retry_20261106`) được giữ nguyên, không drop; các lượt đó dừng ở assertion và không còn fixture bệnh nhân/tiền sử. Đây là opt-in riêng, ngoài default verify; không dùng `clinicDb` hay dữ liệu thật.
+- `PatientHistorySqlServerPersistenceTest` pass **1/1** trên database tổng hợp mới `clinic_test_patient_history_20261106`. V1–V10 được áp dụng và xác nhận trước khi test chạy. Acceptance bao phủ insert qua trigger V10 với identity trả về, `createdAt` UTC, lọc theo bệnh nhân+cặp cơ sở/khoa+3 loại đang hoạt động, update/version, audit đọc `PATIENT_VIEW`/`PATIENT` và rollback cập nhật khi trigger tổng hợp từ chối audit. Fixture bệnh nhân/lượt khám/tiền sử và trigger test được dọn; database được giữ nguyên. Không dùng `clinicDb` hay dữ liệu bệnh nhân thật.
+- `ReceptionSqlServerPersistenceTest` pass **1/1** riêng trên database tổng hợp nói trên. Bài test mới điền `PatientRegistrationFormPanel` trên Swing EDT, tạo lệnh qua converter thật, gọi composition/handler thật, rồi tìm và đọc lại toàn bộ trường bệnh nhân/BHYT được form hỗ trợ, liên kết cơ sở và lượt trong queue. Fixture dọn các dòng do nó tạo bằng soft delete.
+- `AuditSqlServerPersistenceTest` pass **1/1** trên database tổng hợp `clinic_test_audit_20261105`: task board ghi nhận kiểm tra append-only V6 và rollback các ghi patient/insurance/visit khi audit insert bị từ chối. Đây là scope hẹp, không cấp quyền `AUDIT_READ`.
+- Các lượt trên là kiểm tra opt-in độc lập được ghi nhận trong `docs/ke-hoach-trien-khai/03-model-task-board.md`, không thuộc 283 test mặc định và không được chạy lại trong lần cập nhật tài liệu này. Chúng không xác minh toàn bộ `ReceptionPanel` hoặc mọi trường hợp nghiệp vụ; database được nêu đều là database tổng hợp, không phải `clinicDb`. Lần cập nhật này không kết nối database.
 
-## 4. Khoảng trống và rủi ro chính
+### UI và nghiệm thu
 
-### P0 — Chưa an toàn để dùng với dữ liệu hoặc người dùng thật
+Các test Swing/headless có bằng chứng opt-in nối form đăng ký với handler/persistence trên SQL Server tổng hợp; bằng chứng preflight V9 ở trên là test migration riêng, không thay thế UI acceptance. Chúng không chứng minh cửa sổ thực tế đã được nhìn thấy, layout hiển thị đúng, hay `ReceptionPanel` button/worker/dialog chạy trọn vẹn. Kế hoạch hiện trạng ghi cửa sổ Swing chưa được quan sát trực tiếp; full UI visual/interaction acceptance còn mở. Không có kết luận thị giác về UI trong báo cáo này.
 
-1. **Tài khoản seed dùng mật khẩu mặc định.** `admin` và `tiennv` xác thực bằng PBKDF2 sau khi áp dụng V2/V3; mật khẩu demo ban đầu là `Password123!`. Đổi mật khẩu trước khi dùng với dữ liệu thật. Tham khảo [V2__Seed_Initial_Data.sql](clinic-infrastructure/src/main/resources/migrations/V2__Seed_Initial_Data.sql) và [LoginForm.java](clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java).
-2. **Thông tin CSDL mẫu được để trong resource.** `db.properties` chứa user `sa` và mật khẩu mẫu dễ đoán; cấu hình JDBC bật `trustServerCertificate=true`. Chỉ phù hợp môi trường phát triển cô lập; không đóng gói cấu hình này vào bản phát hành. Tham khảo [db.properties](clinic-infrastructure/src/main/resources/db.properties).
-3. **Seed chứa tài khoản mẫu và thông tin nhận diện giả lập.** Cần xác định rõ seed chỉ chạy ở môi trường demo và thay đổi/loại bỏ trước khi triển khai. Tham khảo [V2__Seed_Initial_Data.sql](clinic-infrastructure/src/main/resources/migrations/V2__Seed_Initial_Data.sql).
-4. **Phân quyền nghiệp vụ toàn hệ thống chưa hoàn tất.** Login lấy role từ DB và không cho người dùng tự chọn role; tuy vậy chưa có kiểm tra quyền ở mọi use case nhạy cảm.
+## 3. Hiện trạng theo lớp và luồng
 
-### P1 — Thiếu phần nối để trở thành ứng dụng nghiệp vụ
+### Nền tảng, xác thực và phân quyền
 
-1. **Application layer mới có nền tảng và xác thực.** Đã có `Result<T>`, Command/Query contracts, password verification và use case đăng nhập; phần lớn luồng khám, tiếp đón, kho và viện phí vẫn thiếu application service.
-2. **Persistence mới nối model nhân viên.** Có `DatabaseConnection`, migration runner, JDBC transaction manager/unit of work và `NhanVienRepositoryImpl`; repository implementations cho bệnh nhân, lượt khám, đơn thuốc, kho, viện phí vẫn chưa có.
-3. **UI đang hiển thị/nhận dữ liệu tĩnh.** Có dữ liệu bệnh nhân mẫu ở `DoctorStationPanel`, dữ liệu mẫu ở `CatalogPanel`, `ParaclinicalOrderPanel`, `BillingInvoicePanel`, và bảng dược/khám nạp dòng mẫu. Do đó, hình thức UI không phản ánh độ hoàn thiện xử lý nghiệp vụ.
-4. **Thiếu vòng đời nghiệp vụ được lưu và phục hồi.** Chưa thấy đường đi hoàn chỉnh từ thao tác UI → application use case → repository → CSDL → cập nhật lại UI cho các luồng chính.
-5. **Báo cáo, BHYT và tích hợp thiết bị/cổng ngoài** chủ yếu mới có mô tả hoặc UI; chưa thấy client tích hợp, hợp đồng trao đổi, retry, log, hoặc kiểm thử liên thông.
+- Có application handler xác thực mật khẩu đã băm, tải role và work scope đã gán; hoàn tất login kiểm tra lại lựa chọn/assignment và ghi audit. Repository JDBC đọc nhân viên, role và scope.
+- Có `AuthorizationService` ở application layer với nguyên tắc default-deny, kiểm tra phiên/nhân viên/role/scope và grant theo module/action. Một số luồng đọc/ghi tiếp đón được bảo vệ bằng evaluator và audit; UI có điều hướng nhận biết quyền nhưng visual smoke chưa thực hiện.
+- Các error boundary của workflow hiện được nối đã được audit; diagnostics chỉ ghi operation/result code, exception type và stack giới hạn, không ghi exception message hay dữ liệu nghiệp vụ. Application authorization, login và dashboard worker failures giữ nguyên default-deny/result hoặc thông báo an toàn. Đây không chứng nhận các workflow chưa triển khai; mapping/error test tiếp tục là acceptance bắt buộc cho task mới.
+- Đây là nền tảng đang triển khai, không phải authorization hoàn chỉnh. Theo task board, các luồng còn lại chưa được bảo vệ/kiểm chứng đồng đều; các policy như quyền audit-read, lockout, retention, một số phân quyền theo nghiệp vụ và quyền hậu khóa còn chờ quyết định hoặc implementation. Gate Phase 2 chưa đạt; không coi các thao tác EMR, prescription/pharmacy hay billing là đã mở an toàn.
+- Cấu hình môi trường và đóng gói có cải thiện, song quy trình cung cấp/luân chuyển secrets, chính sách TLS, backup/restore và release operations chưa được nghiệm thu. Báo cáo không đọc cấu hình database local hoặc giá trị môi trường.
 
-### P2 — Độ tin cậy, bảo trì và hoàn thiện sản phẩm
+### Bệnh nhân và tiếp đón
 
-1. **Chưa có test case thực chất.** Các thư mục test của 4 module chỉ chứa `.gitkeep`; không có kiểm thử cho rule Domain, repository, login, migration hay luồng Swing.
-2. **Chưa có hướng dẫn chạy dự án ở mức onboarding.** Ở root có tài liệu phân tích/thiết kế nhưng chưa thấy README mô tả yêu cầu môi trường, cấu hình CSDL, chạy migration, chạy ứng dụng và tài khoản demo.
-3. **Tài liệu có chỗ lệch giữa tuyên bố và hiện thực.** `DOMAIN_ANALYSIS.md` và `docs/UI_DOMAIN_MAPPING_ANALYSIS.md` mô tả khá nhiều service, repository, chức năng và độ tương thích như đã hoàn tất; mã hiện tại lại thiếu application/persistence và có dữ liệu mẫu. Cần phân biệt rõ “đã triển khai”, “UI prototype” và “đề xuất”.
-4. **Một số chuẩn UI chưa nhất quán với mã.** `UI_CODING_STANDARDS.md` cấm emoji làm icon chính và yêu cầu tác vụ dài chạy ngoài EDT, nhưng mã dashboard/ribbon có emoji; cần rà lại mọi handler để bảo đảm truy vấn/in ấn không làm treo giao diện.
-5. **Chưa xác định rõ trạng thái build hiện tại.** Có thư mục `target` được tạo trước đó, nhưng báo cáo này không chạy build nên không kết luận project biên dịch thành công ở phiên bản hiện tại.
+- `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler` và `ReceptionCompositionRoot` nối UI, application, transaction, audit và JDBC adapters.
+- Có lưu/cập nhật và đọc lại hồ sơ bệnh nhân, BHYT, liên kết bệnh nhân–cơ sở, lượt khám/hàng đợi; truy vấn tiếp đón được giới hạn theo cặp cơ sở/khoa trong các luồng đã nối. Có tests unit/headless và bằng chứng SQL Server opt-in nêu ở trên.
+- Đây là slice có persistence thực, khác với các panel chỉ hiển thị mẫu. Phase 1 vẫn `[~]`: headless form-to-SQL acceptance và các audit/scope cụ thể đã có; full `ReceptionPanel` visual/interaction workflow, queue lifecycle/chuyển phòng, tiền sử có guard/audit và nghiệm thu nghiệp vụ còn mở. Bằng chứng opt-in không đóng phase.
 
-## 5. Ma trận mức độ hoàn thiện theo luồng
+### Tiền sử bệnh và khám/EMR
 
-| Luồng | UI | Domain/schema | Nghiệp vụ + lưu trữ | Nhận định |
-|---|---:|---:|---:|---|
-| Đăng nhập / phiên / quyền | Có form | Có entity và bảng | Không có xác thực thực | Demo; ưu tiên xử lý đầu tiên. |
-| Tiếp đón / hồ sơ bệnh nhân | Nhiều component | Có entity và trường dữ liệu | Chưa có use case/repository | UI và mô hình có nền tảng, chưa dùng dữ liệu thật. |
-| Khám / EMR / chỉ định | Nhiều màn hình | Khá rộng | Chưa thấy luồng lưu/khóa EMR hoàn chỉnh | Prototype UI; rủi ro cao vì dữ liệu y tế. |
-| Cận lâm sàng | Có panel | Có service/result models và bảng | Chưa thấy kết nối máy/cSDL | Mới thể hiện quy trình. |
-| Kê đơn / cấp phát / FEFO | Có màn hình; có rule FEFO | Có entity và service miền | Chưa có transaction kho thực tế | Chưa dùng trong vận hành. |
-| Viện phí / thanh toán | Có panel và mẫu in | Có entity và schema | Chưa thấy tích hợp thu tiền/hóa đơn thực | Demo dữ liệu. |
-| Danh mục / báo cáo / cấu hình | Có màn hình | Một phần entity/schema | Thiếu CRUD và truy vấn thật | Khung chức năng. |
-| In/xuất tài liệu | Có preview và mã DOCX | Có export service | Chưa thấy nút UI gọi `DocxManager` | Có thành phần nhưng chưa tích hợp vào luồng chính. |
+- `TienSuBenh`, trường EMR trong `LuotKham`, schema và một số màn hình/model hiện diện không đồng nghĩa workflow đã triển khai.
+- `EMR-LOCK-INPUT-01` chỉ xác nhận domain invariant: `LuotKham.lockEmr` từ chối chữ ký null/blank và `doctorId <= 0` mà không mutation/event, nhận chữ ký nonblank cùng ID dương tổng hợp một lần, rồi từ chối khóa lặp. Đây không xác nhận ai được phép khóa, không bật `EMR-01` và không nối persistence/UI/audit/workflow.
+- Có application query/JDBC read và command/JDBC create-update cho ba loại tiền sử đã duyệt. DOCTOR, active exact facility+department, patient-in-scope và audit được kiểm soát; read audit commit-before-response, write audit cùng transaction. SQL Server persistence/rollback acceptance đã pass riêng trên DB tổng hợp mới. Doctor UI chưa được nối; legacy rows không có provenance vẫn bị chặn. Encounter binding, post-lock edits, delete và loại tiền sử khác vẫn chưa được duyệt.
+- Lưu nháp, chẩn đoán, sinh hiệu, ký/khóa/mở EMR và lịch sử audit chưa có bằng chứng end-to-end được nghiệm thu; Phase 3 và Phase 4 chưa hoàn tất.
 
-## 6. Lộ trình đề xuất
+### Các phân hệ sau và prototype UI
 
-### Giai đoạn 1 — Làm an toàn môi trường demo
+- CLS, pharmacy/inventory, billing, catalogs, reports, HR/payroll và extended administration có thể có domain models, schema, panel hoặc dialog; mức hiện diện đó không chứng minh CRUD, transaction hoặc truy vấn thật.
+- Task board ghi các luồng này phần lớn planned/blocked hoặc chưa có acceptance. Ví dụ panel CLS, báo cáo và bàn khám bác sĩ còn dùng nội dung mẫu/tĩnh; không xem các mẫu đó là dữ liệu lưu trong hệ thống. DOCX/print preview cũng chưa được xác nhận nối với dữ liệu persist và biểu mẫu nghiệp vụ được duyệt.
+- Phase 5–9 không được tuyên bố hoàn tất. CI workflow có source local nhưng chưa có bằng chứng GitHub-hosted run; release/operations và tích hợp ngoài còn mở.
 
-- Tách cấu hình dev/demo/prod; bỏ mật khẩu mặc định khỏi resource, ưu tiên biến môi trường hoặc secret store.
-- Gỡ tài khoản/mật khẩu điền sẵn trên login; không cho phép vào hệ thống nếu chưa xác thực.
-- Gắn nhãn rõ dữ liệu giả; không dùng dữ liệu bệnh nhân thật trong seed hoặc ảnh chụp demo.
-- Ghi rõ điều kiện chỉ chạy trên dữ liệu giả cho đến khi hoàn tất xác thực và lưu trữ.
+## 4. README và hướng dẫn sử dụng
 
-### Giai đoạn 2 — Dựng vertical slice đầu tiên
+Root `README.md` có hướng dẫn onboarding và hiện chỉ rõ lệnh build artifact desktop, chạy migration runner từ shaded JAR và mở ứng dụng bằng `java -jar`. Cấu hình local qua IntelliJ hoặc biến môi trường được phân biệt; artifact đã được kiểm tra có `Main-Class`, có migration runner và chỉ chứa `db.properties.example` (không chứa `db.properties`). Đây là kiểm tra cấu trúc artifact, không phải một lượt khởi động ứng dụng hoặc migration trên database. README không thay thế runbook triển khai/vận hành. Tài liệu README có nhắc tài khoản/mật khẩu seed demo; báo cáo này không sao chép giá trị đó.
 
-- Chọn một luồng nhỏ, chẳng hạn **đăng nhập → tra cứu bệnh nhân → đăng ký lượt khám**.
-- Viết application use case và validation, repository interface phù hợp, JDBC repository implementation và transaction handling.
-- Nối UI vào use case; xóa dữ liệu mock tương ứng sau khi có nguồn dữ liệu thật.
-- Thêm test cho validation/domain rule và repository trên CSDL test.
+## 5. Trạng thái roadmap
 
-### Giai đoạn 3 — Hoàn chỉnh các luồng cốt lõi
+Roadmap hiện có 10 phase, đánh số 0–9. Phase 0 nền tảng và Phase 1 tiếp đón đang ở trạng thái tiến hành; Phase 2 authorization/audit baseline đang tiến hành nhưng là gate chưa đạt cho luồng nhạy cảm; Phase 3–9 chưa có đủ bằng chứng nghiệm thu end-to-end. Status của task cụ thể không đồng nghĩa phase tương ứng đã hoàn tất. Chi tiết dependency, quyết định và tiêu chí còn lại nằm trong [lộ trình phase](docs/ke-hoach-trien-khai/02-cac-dot-trien-khai.md) và [model task board](docs/ke-hoach-trien-khai/03-model-task-board.md).
 
-- Lần lượt hoàn thiện EMR/khóa hồ sơ, chỉ định và kết quả CLS, kê đơn/cấp phát FEFO, hóa đơn/phiếu thu.
-- Bổ sung kiểm tra quyền ở tầng application, audit log, xử lý lỗi/timeout và đồng bộ trạng thái UI.
-- Xác nhận schema, constraint/index, tính idempotent của migration; thiết lập sao lưu và phục hồi dữ liệu.
+## 6. Giới hạn của đánh giá
 
-### Giai đoạn 4 — Chất lượng phát hành
+- Báo cáo đối chiếu source và các tài liệu/bằng chứng được dẫn trong kế hoạch tính đến 06/11/2026 trên checkout local của nhánh `feature/patient-reception-workflow`; task worktrees đã được tích hợp cục bộ. Không có bằng chứng push, phát hành hoặc GitHub-hosted CI run.
+- Maven verify được phân biệt với các lượt SQL Server opt-in được task board ghi nhận; không kết nối database trong lần cập nhật báo cáo này.
+- Không quan sát cửa sổ Swing trực tiếp; không đánh giá trực quan layout hay thao tác toàn desktop.
+- Không đánh giá tuân thủ pháp lý/nghiệp vụ y tế, BHYT, hóa đơn, an toàn thuốc, tích hợp ngoài hoặc khả năng vận hành production. Không có kết luận “production ready”.
 
-- Bổ sung test tự động, quy trình build/release, cấu hình môi trường, hướng dẫn cài đặt/vận hành và logging.
-- Đánh giá khả năng chạy nhiều người dùng đồng thời, kiểm soát giao dịch tồn kho/thu tiền và tác vụ SwingWorker.
-- Kiểm tra UI theo độ phân giải và chuẩn đã nêu trong `UI_CODING_STANDARDS.md`; xác nhận mẫu in với bên nghiệp vụ trước khi dùng thực tế.
+## 7. Nguồn đối chiếu chính
 
-## 7. Tiêu chí tối thiểu trước khi coi là MVP dùng dữ liệu thật
+- [Hiện trạng ngày 06/11/2026](docs/ke-hoach-trien-khai/00-hien-trang.md)
+- [Lộ trình theo phase](docs/ke-hoach-trien-khai/02-cac-dot-trien-khai.md)
+- [Model task board và bằng chứng](docs/ke-hoach-trien-khai/03-model-task-board.md)
+- `docs/ke-hoach-trien-khai/phase1-tiensuben-review.md`, `phase2-authz-enforcement-review.md`, `phase2-read-audit-decision.md` và các review/policy được các tài liệu trên dẫn chiếu
+- `README.md`, `clinic-application` authentication/authorization/reception handlers, `clinic-infrastructure` JDBC repositories/migrations, và `clinic-desktop` reception composition/UI/tests
 
-- Đăng nhập xác thực bằng nguồn danh tính thật; role/quyền được kiểm tra ở tầng nghiệp vụ.
-- Có cấu hình triển khai an toàn, không chứa thông tin mặc định/secret trong artifact.
-- Tối thiểu một luồng end-to-end ghi/đọc CSDL có transaction và test.
-- Không còn dữ liệu giả trong các màn hình được đưa vào MVP.
-- Migration có quy trình chạy, versioning và kiểm chứng trên CSDL mới cũng như CSDL đã có dữ liệu.
-- Có audit log tối thiểu cho thao tác hồ sơ, đơn thuốc, kho và viện phí; có sao lưu/khôi phục được xác nhận.
-- Có hướng dẫn cài đặt, cấu hình, chạy, khôi phục lỗi và giới hạn đã biết.
+## 8. Guidance đã đọc cho lần cập nhật này
 
-## 8. Giới hạn của đánh giá
-
-- Đánh giá dựa trên file hiện có trong workspace; không có lịch sử commit vì thư mục làm việc không phải Git repository.
-- Không chạy build, test, khởi động ứng dụng hoặc kết nối tới SQL Server.
-- Không đánh giá tính đúng pháp lý của biểu mẫu y tế, BHYT, hóa đơn điện tử hoặc tích hợp cơ quan bên ngoài; các phần này cần đối chiếu quy định và kiểm thử nghiệp vụ riêng trước khi triển khai.
-
+- Orchestrator baseline `docs/PROJECT_CONVENTIONS.md` (nội dung được cung cấp trong task; không có bản sao tại repository path đó)
+- `README.md`
+- `DOMAIN_ANALYSIS.md`
+- `ERD_DIAGRAM.md`
+- `UI_CODING_STANDARDS.md`
+- `docs/ke-hoach-trien-khai/README.md`
+- `docs/ke-hoach-trien-khai/02-cac-dot-trien-khai.md`
+- `docs/ke-hoach-trien-khai/03-model-task-board.md`

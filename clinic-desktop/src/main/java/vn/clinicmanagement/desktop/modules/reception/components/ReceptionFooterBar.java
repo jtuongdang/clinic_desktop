@@ -6,6 +6,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
@@ -19,14 +20,19 @@ import java.awt.geom.RoundRectangle2D;
  */
 public class ReceptionFooterBar extends JPanel {
 
+    private JButton btnNew;
+    private JButton btnSave;
+    private Runnable onSave;
+    private Runnable onNew;
+
     public ReceptionFooterBar() {
         setLayout(new FlowLayout(FlowLayout.RIGHT, 6, 3));
         setBackground(new Color(238, 242, 247));
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(205, 215, 226)));
         setPreferredSize(new Dimension(1000, 40));
 
-        JButton btnNew = createFooterButton("Bệnh Nhân Mới\n(F1)", ReceptionIcons.createNewPatientIcon());
-        JButton btnSave = createFooterButton("Lưu Lại\n(F2)", ReceptionIcons.createSaveDiskIcon());
+        btnNew = createFooterButton("Bệnh Nhân Mới\n(F1)", ReceptionIcons.createNewPatientIcon());
+        btnSave = createFooterButton("Lưu Lại\n(F2)", ReceptionIcons.createSaveDiskIcon());
         JButton btnPrint = createFooterButton("In Phiếu Khám\n(F3)", ReceptionIcons.createPrintIcon());
         JButton btnCard = createFooterButton("Thẻ KCB\n(F4)", ReceptionIcons.createMedicalCardIcon());
         btnNew.setPreferredSize(new Dimension(120, 28));
@@ -40,13 +46,46 @@ public class ReceptionFooterBar extends JPanel {
         add(btnCard);
 
         btnSave.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this,
-                    "Lưu thành công hồ sơ đăng ký khám cho bệnh nhân NGUYỄN THỊ LIÊN!\n" +
-                    "- Mã BN: 22000326\n" +
-                    "- Phòng khám: PK Nhi 1\n" +
-                    "- Số thứ tự cấp: 02",
-                    "Đăng Ký Khám Thành Công", JOptionPane.INFORMATION_MESSAGE);
+            if (onSave != null) onSave.run();
         });
+        btnNew.addActionListener(e -> {
+            if (onNew != null) onNew.run();
+        });
+
+        InputMap inputMap = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = getActionMap();
+
+        inputMap.put(KeyStroke.getKeyStroke("F1"), "receptionNew");
+        actionMap.put("receptionNew", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (btnNew.isEnabled()) {
+                    btnNew.doClick();
+                }
+            }
+        });
+
+        inputMap.put(KeyStroke.getKeyStroke("F2"), "receptionSave");
+        actionMap.put("receptionSave", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (btnSave.isEnabled()) {
+                    btnSave.doClick();
+                }
+            }
+        });
+    }
+
+    public void setOnSave(Runnable listener) {
+        this.onSave = listener;
+    }
+
+    public void setOnNew(Runnable listener) {
+        this.onNew = listener;
+    }
+
+    public void setSaving(boolean saving) {
+        btnSave.setEnabled(!saving);
     }
 
     private JButton createFooterButton(String text, Icon icon) {

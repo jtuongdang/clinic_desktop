@@ -10,11 +10,17 @@ import java.util.function.Supplier;
 /** JDBC transaction boundary shared by repository calls on the current thread. */
 public final class JdbcTransactionManager implements TransactionBoundary {
     private final JdbcUnitOfWork unitOfWork;
+    private final ConnectionSupplier connectionSupplier;
     private final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
     private final ThreadLocal<Boolean> rollbackOnly = ThreadLocal.withInitial(() -> false);
 
     public JdbcTransactionManager(JdbcUnitOfWork unitOfWork) {
+        this(unitOfWork, DatabaseConnection::getConnection);
+    }
+
+    JdbcTransactionManager(JdbcUnitOfWork unitOfWork, ConnectionSupplier connectionSupplier) {
         this.unitOfWork = unitOfWork;
+        this.connectionSupplier = connectionSupplier;
     }
 
     @Override
@@ -30,12 +36,23 @@ public final class JdbcTransactionManager implements TransactionBoundary {
             }
         }
 
-        try (Connection connection = DatabaseConnection.getConnection()) {
+        try (Connection connection = connectionSupplier.get()) {
             connection.setAutoCommit(false);
             currentConnection.set(connection);
             rollbackOnly.set(false);
             unitOfWork.beginTransaction();
-            Result<T> result = operation.get();
+            Result<T> result;
+            try {
+                result = operation.get();
+            } catch (RuntimeException ex) {
+                rollbackOnly.set(true);
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    // Keep the operation failure generic even when rollback also fails.
+                }
+                return Result.failure("TRANSACTION_FAILED", "Không thể hoàn tất giao dịch cơ sở dữ liệu.");
+            }
             if (result == null || result.isFailure() || rollbackOnly.get()) {
                 connection.rollback();
                 if (result == null) return Result.failure("TRANSACTION_FAILED", "Giao dịch không trả về kết quả.");
@@ -57,4 +74,9 @@ public final class JdbcTransactionManager implements TransactionBoundary {
     }
 
     Connection currentConnection() { return currentConnection.get(); }
+
+    @FunctionalInterface
+    interface ConnectionSupplier {
+        Connection get() throws SQLException;
+    }
 }

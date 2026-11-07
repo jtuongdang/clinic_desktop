@@ -46,6 +46,16 @@ public class HoaDon extends BaseEntity<Integer> implements IAggregateRoot {
 
     public HoaDon() {}
 
+    public void addChiTiet(ChiTietHoaDon item) {
+        if (item != null) {
+            item.setHoaDon(this);
+            if (this.getId() != null) {
+                item.setMaHoaDon(this.getId());
+            }
+            this.chiTietHoaDons.add(item);
+        }
+    }
+
     public void recordPayment(BigDecimal amount, PhuongThucThanhToan phuongThuc, int nguoiThu, String ghiChu) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Số tiền thanh toán phải > 0.");

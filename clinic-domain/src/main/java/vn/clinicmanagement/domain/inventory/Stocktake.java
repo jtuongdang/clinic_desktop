@@ -24,4 +24,11 @@ public class Stocktake extends BaseEntity<Integer> implements IAggregateRoot {
     public void setGhiChu(String ghiChu) { this.ghiChu = ghiChu; }
     public List<StocktakeCount> getCounts() { return counts; }
     public void setCounts(List<StocktakeCount> counts) { this.counts = counts; }
+
+    public void approve() {
+        if (this.trangThai != TrangThaiKiemKe.DA_NOP && this.trangThai != TrangThaiKiemKe.MOI_TAO) {
+            throw new IllegalStateException("Phiếu kiểm kê không ở trạng thái hợp lệ để duyệt.");
+        }
+        this.trangThai = TrangThaiKiemKe.DA_DUYET;
+    }
 }

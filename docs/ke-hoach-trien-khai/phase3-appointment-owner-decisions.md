@@ -1,0 +1,129 @@
+# Phase 3 — Quyết định Owner cho lịch hẹn
+
+**Task:** `APPT-OWNER-DECISIONS-01`
+**Trạng thái:** Đề xuất để Owner quyết định; workflow vẫn chưa triển khai.
+**Gate:** Giữ `APPT-01` mặc định DENY cho đến khi SEC-01 đạt baseline gate và task acceptance riêng.
+
+## Phạm vi và các quyết định đã có
+
+Các model, bảng SQL V1, enum trạng thái và grant `APPOINTMENT` đã tồn tại; chưa có handler lịch hẹn, repository adapter, persistence acceptance hay màn hình đặt lịch được nối. Xem [readiness review](phase3-appointment-readiness-review.md) và [task board APPT-01](03-model-task-board.md).
+
+Các chính sách đã duyệt tiếp tục có hiệu lực: mỗi phiên có một role và đúng một cặp cơ sở+khoa; technical metadata UTC, giờ nghiệp vụ `Asia/Ho_Chi_Minh`; `AUDIT_READ` bị từ chối. Thu cọc lịch hẹn vẫn `DENY`. Các grant `APPOINTMENT` hiện có không tự xác định transition hoặc actor cho từng thao tác. Không có patient self-service được duyệt.
+
+## Đề xuất MVP để Owner xem xét
+
+**Đề xuất:** giai đoạn đầu chỉ cho nhân viên đặt lịch thủ công trong cặp cơ sở+khoa đang chọn; không gửi thông báo, không nhận cọc/thanh toán, không cho bệnh nhân tự đặt. Lịch được đọc/ghi qua Application boundary, audit fail-closed, lưu ngày giờ nghiệp vụ ở `Asia/Ho_Chi_Minh`; mỗi booking có kiểm soát xung đột nguyên tử trong SQL Server. Đề xuất này không phải quyết định cho tới khi Owner duyệt.
+
+| Câu hỏi Owner | Lựa chọn cần chốt | Khuyến nghị |
+|---|---|---|
+| Ai được tạo/sửa/hủy? | A. RECEPTIONIST quản lý lịch; DOCTOR xem lịch được phân công. B. DOCTOR và RECEPTIONIST cùng được tạo/sửa. C. Chia quyền theo thao tác khác. | A cho MVP; hiện grant chung chưa đủ để suy ra quyền từng transition. |
+| Lịch thuộc resource nào? | A. Bác sĩ. B. Phòng. C. Cả bác sĩ và phòng. D. Khung giờ/dịch vụ có sức chứa. | Chọn đúng resource sẽ được nghiệp vụ dùng để tránh xếp trùng; không giả định phòng vì model V1 chưa có `maPhongKham`. |
+| Thời lượng và overbooking? | Chọn thời lượng cố định hay theo dịch vụ; capacity mỗi slot; có cho phép vượt capacity và ai duyệt. | Không cho overbooking trong MVP; không đặt duration mặc định trước khi xác nhận lịch thực tế của cơ sở. |
+| Trạng thái sau khi đặt? | A. Tạo thành `CHO_XAC_NHAN`, nhân viên/bác sĩ xác nhận. B. Tạo thành `DA_XAC_NHAN` ngay sau khi lưu. | A giữ đúng nghĩa của trạng thái mặc định hiện có; cần chỉ định actor và điều kiện xác nhận. |
+| Hủy/đổi lịch? | Chốt actor, hạn chót, lý do bắt buộc, trạng thái nào được hủy, ai nhận chỗ trống và liệu lịch đã đến/hoàn tất có sửa được không. | RECEPTIONIST xử lý trước giờ hẹn, yêu cầu lý do và audit; sau check-in/hoàn tất thì không xóa hoặc viết lại lịch sử. |
+| Check-in, trễ và no-show? | Chốt khoảng check-in trước/sau giờ, grace period, thời điểm thành no-show, khả năng phục hồi. | Không tự gán no-show theo timer cho tới khi có quy trình nhân viên xác nhận; no-show không tự sinh lượt khám. |
+| Chuyển thành lượt khám? | Chốt ai check-in, có cho chuyển từ trạng thái nào, và kết quả gọi lại khi request lặp/đồng thời. | Chỉ check-in thủ công từ lịch đủ điều kiện; tạo `LuotKham` và chuyển trạng thái lịch trong một transaction; idempotent theo appointment ID. Không chuyển lịch `DA_HUY`/no-show. |
+| Nhắc hẹn? | Chốt có gửi hay không, kênh, người nhận, consent, thời điểm, nội dung và retry. | Tắt gửi ngoài hệ thống cho MVP; chỉ bật sau consent, outbox/idempotency và privacy review. |
+| Đặt cọc? | Có cần tiền cọc, actor, hoàn/miễn/đối soát? | Giữ DENY theo quyết định hiện tại; không dùng default `100000` trong entity hoặc `0` trong SQL làm chính sách. |
+
+## Rủi ro và điều kiện trước code
+
+- `ILichHenRepository.countAppointmentsInSlot` chỉ nhận bác sĩ và khoảng thời gian; thao tác count-then-insert có thể race và không mô hình hóa phòng/sức chứa. Phải chốt resource/capacity rồi chọn một transaction/constraint có thể kiểm chứng dưới concurrent booking.
+- V1 `LichHen.maKhoa` nullable, không có room ID, không có no-show/cancellation actor/time, và `LuotKham.maLichHen` là FK không unique dù ERD mô tả tối đa một lượt khám cho một lịch. Chỉ thêm migration mới sau khi contract chứng minh dữ liệu nào cần lưu.
+- Trường `nguonDat` là string trong entity, trong khi `NguonLich` là enum; cần chốt mapping trước khi nhận source values mới.
+- `LichHen.chiPhiGiuCho` mặc định `100000` trong entity nhưng SQL mặc định `0`; đây là mismatch kỹ thuật, không phải căn cứ chọn chính sách cọc.
+- Read phải giới hạn đúng scope và audit trước khi trả dữ liệu; mutation và audit cùng transaction. Không trả danh sách hẹn của khoa khác khi điều hướng.
+
+## Acceptance gates sau Owner approval
+
+1. Domain/Application allow/deny theo role, session và đúng pair cơ sở+khoa; không tự thêm grant.
+2. Đặt/đổi/hủy và kiểm soát xung đột có optimistic version hoặc serialization; SQL Server synthetic test đồng thời chứng minh capacity không vượt mức đã duyệt.
+3. Check-in/conversion atomic và idempotent; kiểm thử request lặp, concurrent conversion, rollback và đọc lại qua process khác.
+4. Lưu/reload business time đúng `Asia/Ho_Chi_Minh` khi JVM dùng zone khác; metadata/audit sử dụng UTC.
+5. Audit read-before-return, audit mutation trong cùng transaction, fail-closed; không ghi nội dung lâm sàng hay thông tin liên hệ vào log.
+6. Swing calendar/form dùng dữ liệu đã persist, loading/I/O ngoài EDT, phản hồi lỗi rõ ràng; smoke test hiển thị thực tế trước khi tuyên bố hoàn tất.
+7. Dùng dữ liệu tổng hợp; không gửi notification hoặc payment thật.
+
+## Nguồn
+
+- [`phase3-appointment-readiness-review.md`](phase3-appointment-readiness-review.md)
+- [`phase2-implementation-contract.md`](phase2-implementation-contract.md)
+- [`phase2-role-permission-matrix-approval.md`](phase2-role-permission-matrix-approval.md)
+- [`phase2-session-implementation-contract.md`](phase2-session-implementation-contract.md)
+- `clinic-domain/src/main/java/vn/clinicmanagement/domain/appointment/LichHen.java`
+- `clinic-domain/src/main/java/vn/clinicmanagement/domain/repositories/ILichHenRepository.java`
+- `clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql`
+
+## Addendum — Owner choice proposal (2026-11-06, non-binding)
+
+**Status:** Proposal only; no Owner decision or acceptance is implied. Existing grants and approved policy are unchanged. `SEC-01` remains **OPEN / default-deny**; no appointment workflow is authorized for implementation or runtime enablement by this addendum.
+
+**Evidence labels:** **FACT** is present in reviewed sources; **INFERENCE** is a technical consequence; **RECOMMENDATION** is a safe MVP option; **OWNER DECISION** remains unresolved. Source references below point to the readiness review's evidence map and the inspected current model/grant sources.
+
+| Area | Facts and gap | Owner choices, recommended MVP, and impact |
+|---|---|---|
+| Grant-to-action mapping | **FACT:** V8 grants `APPOINTMENT:XEM/TAO/SUA` to `DOCTOR` and `RECEPTIONIST`, and `XEM` to `CASHIER`, with `KHOA_PHONG` scope. **INFERENCE:** grant names alone do not define a lifecycle transition. | **OWNER DECISION:** choose eligible role(s) from the existing grantees for every action. **RECOMMENDATION:** require `XEM` to read; `TAO` to create; `SUA` to edit/reschedule and, only if explicitly mapped by Owner, cancel/confirm/check-in/no-show/convert. Do not treat `CASHIER:XEM` as mutation authority. Alternatively keep any unmapped action denied. Restricting actors within the existing grants is possible; adding or broadening a grant is not. |
+| Create | **FACT:** constructor starts at `CHO_XAC_NHAN`; it does not validate required IDs, interval, or relationships. | **OWNER DECISION:** which already-granted role(s) may create, and whether an appointment begins pending or confirmed. **RECOMMENDATION:** use existing `TAO` only, start `CHO_XAC_NHAN`, and require an explicitly selected actor policy. Immediate confirmation removes a separate confirmation step; pending state requires an owner-defined confirmer/guard. |
+| Edit / reschedule | **FACT:** public setters permit changing fields; no guarded reschedule operation or reschedule history is present. | **OWNER DECISION:** who may edit which fields and the number of reschedules (unlimited, fixed limit, or approval-required). **RECOMMENDATION:** require existing `SUA`, preserve old/new interval in audit, and require an explicit limit before release. Unlimited reschedules are simpler but can destabilize schedules; a limit needs a defined count and exception path. |
+| Cancel | **FACT:** `huyLichHen` rejects only `DA_DEN` and `HOAN_THANH`; `ghiChuHuy` exists, but no cancellation actor/time is modeled. | **OWNER DECISION:** eligible role(s), allowed statuses, cutoff (no cutoff, fixed lead time, or staff exception), and whether reason is required/free-text/coded. **RECOMMENDATION:** existing `SUA` plus explicit action mapping; require a reason and audit actor/time; prohibit cancellation after check-in/completion. A cutoff or exception policy affects capacity release and must be specified. |
+| Confirm | **FACT:** default is `CHO_XAC_NHAN`; the current `xacNhanThuTienMat` couples confirmation to deposit recording, while deposit collection is approved `DENY`. | **OWNER DECISION:** manual confirmation or confirm-on-create, eligible existing role(s), and whether confirmation expires. **RECOMMENDATION:** keep confirmation separate from payment and leave confirmation denied until mapped to existing `SUA`; never call the cash/deposit method as a confirmation shortcut. Manual confirmation adds a queue; confirm-on-create removes it but makes errors immediately committed. |
+| Check-in | **FACT:** `DA_DEN` exists but there is no check-in method or appointment UI. | **OWNER DECISION:** eligible existing role(s), earliest/latest check-in, and treatment of early/late arrivals. **RECOMMENDATION:** manual, same-day check-in only after mapping to existing `SUA`; specify a late window rather than assuming one. A narrow window controls queues but can reject legitimate late arrivals; a wider window affects capacity and flow. |
+| No-show / reversal | **FACT:** no no-show status, timestamp, actor, or transition exists. | **OWNER DECISION:** grace period, manual vs automatic marking, allowed starting statuses, and whether/how a no-show may be reversed. **RECOMMENDATION:** no automatic marking and no reversal until policy and persisted audit/history are defined; no-show remains denied/unimplemented meanwhile. Manual marking is reviewable but operationally burdensome; automation needs an agreed cutoff and race-safe job. |
+| Conversion to visit | **FACT:** ERD intends at most one visit per appointment, but V1 `LuotKham.maLichHen` is a non-unique FK; appointment has no conversion method. | **OWNER DECISION:** eligible existing role(s), source statuses (recommend checked-in only), and whether cancelled/no-show appointments are ever eligible (recommend no). **RECOMMENDATION:** require an explicit existing `SUA` mapping, enforce one visit per appointment, and atomically create/link visit and update appointment; repeated/concurrent requests return the same result. Without uniqueness and atomicity duplicate visits remain possible. |
+| Required fields and source | **FACT:** entity fields include patient, doctor, facility, nullable department, start/end, reason and string `nguonDat` defaulting to `LE_TAN`; `NguonLich` separately defines `TU_DONG_THEO_LICH_MAU`, `PHAT_SINH_THU_CONG`, `DOI_CA`. The string and enum are not aligned. | **OWNER DECISION:** requiredness of reason and whether source is a legacy string or the enum's three values. **RECOMMENDATION:** require patient, doctor, facility, department, start/end and an explicitly validated source; reason required only if Owner chooses it. Define an explicit mapping/rejection policy for `LE_TAN` before accepting values; silently mapping it to an enum could misstate provenance. |
+| Facility / department / doctor / room | **FACT:** approved session scope is exactly one facility+department pair; appointment department is nullable and there is no room ID. | **OWNER DECISION:** whether room is mandatory and whether capacity is assigned to doctor, room, or both. **RECOMMENDATION:** require appointment facility/department to match the active pair and validate doctor assignment there; keep room optional for MVP unless Owner selects it. Room-based scheduling requires a resource source and schema support; doctor-only scheduling cannot prevent room conflicts. |
+| Duration, working hours, overlap | **FACT:** only start/end are stored; reviewed sources identify no appointment duration catalog or working-hours calendar. | **OWNER DECISION:** fixed duration vs service/appointment-type duration; source of working hours, breaks and exceptions; whether adjacent intervals conflict. **RECOMMENDATION:** reject non-positive intervals, use half-open `[start,end)` boundaries (back-to-back is allowed), and enforce the approved working-hours calendar. Do not invent a default duration or hours; without these choices availability cannot be computed reliably. |
+| Capacity and concurrent requests | **FACT:** repository count accepts doctor+interval only; V1 has no overlap uniqueness/reservation constraint. **INFERENCE:** count-then-insert alone can race. | **OWNER DECISION:** capacity per doctor, room, or both; any capacity above one; and whether exceptions/waitlist exist. **RECOMMENDATION:** MVP capacity one per selected scheduling resource and no overbooking. Treat `CHO_XAC_NHAN`, `DA_XAC_NHAN`, `DA_DEN` as occupying capacity; `DA_HUY` releases it; `HOAN_THANH` is historical; decide explicitly how future no-show and soft-deleted rows count. Use an atomic SQL Server transaction/serialization strategy, not a preflight count. Higher capacity needs an atomic counter/slot design; an exception path can oversubscribe unless guarded. |
+| Reschedule/cancel cutoff and refunds | **FACT:** entity/SQL deposit defaults disagree (`100000` vs `0`); approved policy keeps appointment deposits `DENY`. No cutoff or refund rule is established. | **OWNER DECISION:** cutoff values and exceptions, cancellation/reschedule reason categories, and refund/waiver policy if deposits are ever separately approved. **RECOMMENDATION:** no payment, deposit, refund, or billing behavior in MVP; keep the existing `DENY`. Resolve default mismatch only through a separately approved contract/change, never by inferring an amount. |
+| Business time and metadata | **APPROVED POLICY:** business time is `Asia/Ho_Chi_Minh`; technical/audit timestamps are UTC. **FACT:** appointment uses `LocalDateTime` and SQL `DATETIME2`, neither storing zone/offset. | **RECOMMENDATION:** keep the approved zone, explicitly convert at persistence boundaries, and store/compare audit metadata in UTC; test under a non-UTC JVM. No new time-zone policy is needed for this clinic. Without explicit conversion, host-zone defaults can shift appointment instants. |
+| Read audit and mutation transaction | **APPROVED POLICY:** scoped sensitive reads are audited before data is returned; mutations and audit share a transaction and fail closed; `AUDIT_READ` remains denied. | **RECOMMENDATION:** apply the existing policies to every appointment read/mutation, exact active facility+department scope, and do not return data before successful read-audit commit. Do not add an audit-read screen or grant. A failed audit must fail the read/write, not return success. |
+| Notification and privacy | **FACT:** notification ports exist but no adapter, consent, retry, deduplication or delivery contract was found. | **OWNER DECISION:** whether reminders/notices are allowed, recipient/consent, channel, timing, approved content and retry behavior. **RECOMMENDATION:** no external notification in MVP. If later approved, require consent/default-deny, idempotent outbox/retry and minimal payload; otherwise duplicate delivery or disclosure of patient/contact data is possible. |
+| Synthetic SQL Server and UI acceptance | **FACT:** no appointment persistence acceptance or dedicated booking/check-in UI was found. | **RECOMMENDATION:** before implementation acceptance, use synthetic-only SQL Server tests for overlapping and concurrent bookings at selected capacities, resource/scope separation, status release, stale edit, cancellation race, conversion repeat/concurrency/rollback/uniqueness, audit failure rollback/read-before-return, and time-zone round-trip. UI acceptance should prove persisted create/edit/cancel/check-in/conversion, clear conflict/errors and scoped reads; loading/I/O stays off Swing EDT. No live patient data, real notification/payment, or production connection. Failure leaves `APPT-01` unaccepted. |
+
+### Evidence and retrieval record
+
+- **FACT sources:** [appointment readiness review](phase3-appointment-readiness-review.md), especially its source map, lifecycle/concurrency, scope, conversion, time, audit/privacy, notification, and acceptance sections; `LichHen.java`, `TrangThaiLichHen.java`, `NguonLich.java`, `ILichHenRepository.java`, V1 appointment/visit DDL, and V8 approved-grants seed. These sources identify gaps; they do not supply the unresolved policy values.
+- **RAG-first record:** attempted project RAG retrieval before opening repository sources, but the sandbox denied permission to run the external RAG script and returned no excerpts. This addendum therefore uses the task-supplied guidance, the readiness review, and inspected source facts; it does not claim successful task-specific RAG retrieval. No cache/index workaround or database access was attempted.
+- This dated proposal is not an approval, grant change, schema/code change, or authorization to implement or enable appointments. Keep `SEC-01` **OPEN / default-deny**.
+
+## Addendum — Owner-approved action and capacity decisions (2026-11-06)
+
+**Contract:** `APPT-OWNER-DECISION-RECON-02` (`84c00d27-e4e1-463b-9964-67543c9ccb28`), Owner-confirmed 2026-11-06.
+
+**Status and effect:** The following decisions supersede the corresponding unresolved choices and recommendations in the historical proposal above. The original proposal text is retained as a historical snapshot; it is not itself approval. This addendum records policy decisions only: no grant, schema, runtime, patient-facing access, payment behavior, or workflow implementation is authorized. `SEC-01` remains **OPEN / default-deny**, and appointment implementation remains gated by the baseline and separate APPT workflow acceptance.
+
+### Approved action mapping
+
+- Existing `APPOINTMENT:XEM` means read only.
+- Existing `APPOINTMENT:TAO` allows creation only; a newly created appointment starts at `CHO_XAC_NHAN`.
+- Existing `APPOINTMENT:SUA` allows editing and rescheduling only.
+- Cancellation, confirmation, check-in, no-show/reversal, and conversion to `LuotKham` remain **DENY / unimplemented** until a separate action-specific policy, guard, and acceptance are approved.
+- `CASHIER:XEM` remains read only. No grant is added or broadened. All actions remain within the exact selected facility/department session scope. Patient self-service remains **DENY / unimplemented**.
+
+### Approved capacity basis
+
+- Capacity is one appointment per doctor at a time within the selected facility/department pair. Any overlapping interval for that doctor conflicts. Interpret intervals as half-open `[start,end)`: a booking ending exactly when the next starts is allowed.
+- A room is not required as an appointment capacity resource for this MVP basis; do not implicitly add room scheduling.
+- Overbooking is denied. No waitlist or exception role is approved.
+
+### Still unresolved before implementation
+
+These values and acceptance conditions are expressly not decided by this addendum and must not be inferred from the current schema, grants, or historical recommendations:
+
+- Required fields and source mapping.
+- Positive duration policy and appointment types; working hours, breaks, and holidays.
+- Which appointment statuses and soft-deleted records occupy capacity, and when capacity is released.
+- Reschedule limit; cancellation reason and cutoff policy.
+- Check-in window and late-arrival handling; no-show policy.
+- Conversion preconditions and idempotency.
+- Notifications, consent, and content.
+- Time-zone persistence details.
+- Audit and schema decisions, concurrency controls, and UI workflow acceptance.
+
+Appointment deposits, payments, refunds, and billing remain **DENY**.
+
+### Evidence and retrieval record
+
+- **FACT:** The inspected `LichHen` model defaults new appointments to `CHO_XAC_NHAN`; it has doctor, facility, nullable department, start/end, and payment-related fields. Its existing confirmation method is coupled to cash-deposit recording. `ILichHenRepository.countAppointmentsInSlot` accepts doctor and interval only; the status enum has no no-show status. These are source facts, not authorization or implementation.
+- **INFERENCE:** Existing model/repository shapes do not establish action guards, selected-pair enforcement, conflict serialization, or lifecycle acceptance. The approved capacity policy does not settle the explicitly open status/soft-delete capacity semantics.
+- **RAG-first:** Attempted project RAG retrieval before opening repository sources in this task. The sandbox denied permission to run the external retrieval script in non-interactive mode, so no task-specific excerpts were returned. This record uses the supplied approved contract and retrieved project evidence, plus read-only inspection of the appointment model, repository interface, status enum, and readiness review. No cache/index workaround or database access was attempted.

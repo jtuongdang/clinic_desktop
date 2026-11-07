@@ -3,6 +3,7 @@ package vn.clinicmanagement.infrastructure.persistence;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -13,6 +14,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * ============================================================================
@@ -24,6 +26,15 @@ import java.util.List;
  * 2. Tự động quét và thực thi tuần tự các file migration trong `migrations/`:
  *    - V1__Initial_Clinic_Schema.sql (Khởi tạo toàn bộ cấu trúc bảng, PK, FK, Index)
  *    - V2__Seed_Initial_Data.sql (Nạp dữ liệu danh mục ban đầu)
+ *    - V3__Repair_Demo_Account_Passwords.sql (Sửa hash tài khoản demo)
+ *    - V4__Enforce_Active_Patient_CCCD_Uniqueness.sql (Định danh CCCD duy nhất cho hồ sơ hoạt động)
+ *    - V5__Seed_Session_Timeout_Parameters.sql (Nạp tham số thời hạn phiên mặc định nếu chưa tồn tại)
+ *    - V6__Enhance_Audit_Tables_Append_Only.sql (Bổ sung metadata và bảo vệ audit append-only)
+ *    - V7__Harden_Permission_Matrix_Defaults.sql (Default-deny và scope khoa cho ma trận phân quyền)
+ *    - V8__Seed_Approved_Permission_Grants.sql (Nạp allowlist quyền đã được duyệt)
+ *    - V9__Enforce_Active_Patient_Facility_Uniqueness.sql (Mỗi cặp bệnh nhân-cơ sở chỉ có một liên kết đang hoạt động)
+ *    - V10__Add_TienSuBenh_Facility_Department_Scope.sql (Lưu cặp cơ sở-khoa cho tiền sử bệnh)
+ *    - V11__Add_Account_Login_Throttle.sql (Lưu trạng thái trì hoãn đăng nhập theo tài khoản)
  * 3. Đảm bảo tính Idempotent: Chỉ chạy những script chưa được áp dụng.
  */
 public class DatabaseMigrationRunner {
@@ -33,7 +44,15 @@ public class DatabaseMigrationRunner {
     private static final String[] MIGRATION_FILES = {
             "migrations/V1__Initial_Clinic_Schema.sql",
             "migrations/V2__Seed_Initial_Data.sql",
-            "migrations/V3__Repair_Demo_Account_Passwords.sql"
+            "migrations/V3__Repair_Demo_Account_Passwords.sql",
+            "migrations/V4__Enforce_Active_Patient_CCCD_Uniqueness.sql",
+            "migrations/V5__Seed_Session_Timeout_Parameters.sql",
+            "migrations/V6__Enhance_Audit_Tables_Append_Only.sql",
+            "migrations/V7__Harden_Permission_Matrix_Defaults.sql",
+            "migrations/V8__Seed_Approved_Permission_Grants.sql",
+            "migrations/V9__Enforce_Active_Patient_Facility_Uniqueness.sql",
+            "migrations/V10__Add_TienSuBenh_Facility_Department_Scope.sql",
+            "migrations/V11__Add_Account_Login_Throttle.sql"
     };
 
     /**
@@ -68,11 +87,8 @@ public class DatabaseMigrationRunner {
                     return false;
                 }
 
-                executeSqlScript(conn, sqlContent);
-
                 long duration = System.currentTimeMillis() - startTime;
-                recordMigration(conn, scriptName, duration);
-                conn.commit();
+                executeMigration(conn, scriptName, sqlContent, duration);
                 System.out.println("  HOÀN THÀNH: " + scriptName + " (" + duration + " ms)");
             }
 
@@ -83,8 +99,7 @@ public class DatabaseMigrationRunner {
             return true;
 
         } catch (Exception ex) {
-            System.err.println(" LỖI MIGRATION: " + ex.getMessage());
-            ex.printStackTrace();
+            printSafeMigrationFailure(System.err);
             return false;
         }
     }
@@ -153,22 +168,35 @@ public class DatabaseMigrationRunner {
                 sb.append(line).append("\n");
             }
         } catch (Exception ex) {
-            ex.printStackTrace();
             return null;
         }
         return sb.toString();
     }
 
-    private static void executeSqlScript(Connection conn, String sqlContent) throws SQLException {
-        // Tách các lệnh theo từ khóa GO (nếu có trong script T-SQL)
-        String[] batches = sqlContent.split("(?i)^\\s*GO\\s*$");
+    static void executeSqlScript(Connection conn, String sqlContent) throws SQLException {
+        // GO là dấu phân tách batch của sqlcmd, không phải cú pháp T-SQL gửi qua JDBC.
+        // Chỉ tách khi GO đứng riêng trên một dòng; hỗ trợ cả LF và CRLF.
+        List<String> batches = SqlServerBatchSplitter.split(sqlContent);
         try (Statement stmt = conn.createStatement()) {
             for (String batch : batches) {
-                String trimmed = batch.trim();
-                if (!trimmed.isEmpty()) {
-                    stmt.execute(trimmed);
-                }
+                stmt.execute(batch);
             }
+        }
+    }
+
+    static void executeMigration(Connection conn, String scriptName, String sqlContent, long duration)
+            throws SQLException {
+        try {
+            executeSqlScript(conn, sqlContent);
+            recordMigration(conn, scriptName, duration);
+            conn.commit();
+        } catch (SQLException migrationFailure) {
+            try {
+                conn.rollback();
+            } catch (SQLException rollbackFailure) {
+                migrationFailure.addSuppressed(rollbackFailure);
+            }
+            throw migrationFailure;
         }
     }
 
@@ -179,6 +207,19 @@ public class DatabaseMigrationRunner {
     }
 
     public static void main(String[] args) {
-        runMigrations();
+        System.exit(runMigrationsForCli(DatabaseMigrationRunner::runMigrations, System.err));
+    }
+
+    static int runMigrationsForCli(Supplier<Boolean> migration, PrintStream errorOutput) {
+        try {
+            return Boolean.TRUE.equals(migration.get()) ? 0 : 1;
+        } catch (Exception ex) {
+            printSafeMigrationFailure(errorOutput);
+            return 1;
+        }
+    }
+
+    private static void printSafeMigrationFailure(PrintStream errorOutput) {
+        errorOutput.println(" LỖI MIGRATION: Không thể hoàn tất quá trình migration.");
     }
 }

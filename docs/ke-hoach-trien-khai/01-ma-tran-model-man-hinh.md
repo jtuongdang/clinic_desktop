@@ -1,57 +1,41 @@
 # 01 — Ma trận Domain model → Màn hình Desktop → Phần còn thiếu
 
-**Cập nhật:** 04/11/2026 (Đồng bộ Domain nâng cấp & Bảng 49 CSDL SQL Server)  
-**Mức ưu tiên:** P0 = chặn dùng dữ liệu thật/an toàn; P1 = luồng vận hành cốt lõi; P2 = mở rộng quản trị và báo cáo.  
-**Ghi chú:** Trạng thái “đã có UI” chỉ nói có panel/component trong source; cần nối use case qua tầng Application và Repository thay vì dùng Mock data.
+**Cập nhật:** 06/11/2026
+**Quy ước:** “Có UI/model” chỉ xác nhận source có lớp tương ứng; không đồng nghĩa đã nối dữ liệu, kiểm thử hay nghiệm thu nghiệp vụ.
 
----
-
-## 1. Ma trận Phân hệ & Ánh xạ Chi tiết
-
-| Phân hệ | Domain Models chính (Đã nâng cấp) | Màn hình/component hiện có | Màn hình & Chức năng cần hoàn thiện | Ưu tiên |
+| Phân hệ | Model chính | UI trong source | Trạng thái / phần còn thiếu | Ưu tiên |
 |---|---|---|---|---|
-| **Xác thực & Bảo mật** | `NhanVien`, `VaiTro`, `NhanVienVaiTro`, `MaTranPhanQuyen`, `PhanQuyenCoSo`, `NhatKyHeThong` | `LoginForm`, `SystemConfigPanel`, `UserSession` | • Xác thực BCrypt hash từ CSDL SQL Server thật<br>• Lưu phiên làm việc (`UserSession`) an toàn<br>• Đổi mật khẩu lần đầu<br>• Phân quyền hiển thị Menu theo Vai trò | **P0** |
-| **Bệnh nhân & BHYT** | `BenhNhan`, `BenhNhanCoSo`, `BaoHiem`, `TienSuBenh`, `DoiTuongKham` | `ReceptionPanel`, `PatientRegistrationFormPanel`, `MedicalPopupChooser` | • Bổ sung **15 trường thực chiến** trên form tiếp nhận (xem mục 2)<br>• Tìm kiếm CCCD/SĐT/Mã BN trực tiếp từ DB<br>• Quản lý thẻ BHYT (Mã ĐKBĐ, Mức hưởng, Hạn dùng)<br>• Cảnh báo hồ sơ trùng lặp | **P1** |
-| **Tiếp đón & Hàng đợi** | `LuotKham`, `SinhHieu`, `ChanDoan`, `DoiTuongKham` | `ReceptionPanel`, `ClinicRoomStatusPanel`, `ReceptionTopToolbar` | • Sinh mã lượt khám & Cấp số thứ tự hàng đợi theo phòng<br>• Hàng đợi thời gian thực (Chờ khám, Đang khám, Hoàn tất)<br>• Ghi nhận chỉ số sinh hiệu (Huyết áp, Mạch, SpO2, BMI)<br>• Chuyển phòng khám chuyên khoa | **P1** |
-| **Khám bệnh & EMR** | `LuotKham`, `ChanDoan`, `ICD`, `SinhHieu`, `TienSuBenh`, `KetQuaDieuTri`, `HuongXuTri` | `DoctorStationPanel`, `ExaminationPanel`, `MedicalRecordTabPanel`, dialog khóa EMR | • Nạp dữ liệu bệnh nhân từ hàng đợi vào bàn khám<br>• Lưu nháp quá trình khám bệnh (Auto-save/Draft)<br>• Chẩn đoán ICD-10 chính & phụ từ bảng `ICD`<br>• Ghi nhận `KetQuaDieuTri` & `HuongXuTri`<br>• Ký số / Khóa bệnh án EMR (chống chỉnh sửa trái phép) | **P1** |
-| **Kê đơn thuốc & Cảnh báo an toàn** | `DonThuoc`, `ChiTietDonThuoc`, `ClinicalDrugSafetyService`, `Item` | `PrescriptionOrderPanel`, `PrescriptionOrderTabPanel`, print preview | • Tìm kiếm thuốc thực từ bảng `Item` và `TonKho`<br>• Cảnh báo tương tác thuốc, quá liều, dị ứng bệnh nhân<br>• Ghi nhận cách dùng chi tiết: Sáng/Trưa/Chiều/Tối, Đường dùng<br>• Duyệt đơn thuốc ngoại trú | **P1** |
-| **Chỉ định & Kết quả CLS** | `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu` | `ServiceOrderPanel`, `LabOrderTabPanel`, `ParaclinicalOrderPanel` | • Chọn dịch vụ khám/xét nghiệm/CĐHA từ bảng `DanhMucDichVu`<br>• Quản lý trạng thái thực hiện (`CHO_THUC_HIEN` ➔ `HOAN_TAT`)<br>• Nhập chỉ số xét nghiệm và kết luận CĐHA<br>• Đính kèm kết quả trả về bàn khám bác sĩ | **P1** |
-| **Kho Dược & Nhà thuốc** | `Item`, `Kho`, `TonKho`, `PhieuNhapKho`, `ChiTietNhapKho`, `PhieuXuatKho`, `ChiTietXuatKho`, `InventoryTransaction`, `FefoAllocationService` | `PharmacyDispensePanel`, `PharmacyTicketTablePanel`, `PharmacyCategoryTreePanel` | • Xuất bán / Cấp phát thuốc theo đơn bác sĩ<br>• Áp dụng thuật toán **FEFO** (First Expired, First Out) tự động trừ lô cận hạn nhất<br>• Ghi thẻ kho `InventoryTransaction` nguyên tử (Atomic)<br>• Cảnh báo hạn dùng và ngưỡng tồn kho an toàn | **P1** |
-| **Viện phí & Thu ngân** | `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan` | `BillingInvoicePanel`, `MedicalBillingSlipPanel` | • Tự động tổng hợp chi phí khám, CLS, tiền thuốc<br>• Áp dụng tỷ lệ đồng chi trả BHYT theo quyền lợi<br>• Xuất phiếu thu tiền, in hóa đơn viện phí<br>• Quản lý tạm ứng và theo dõi công nợ bệnh nhân | **P1** |
-| **Nhân sự & Chấm công** | `NhanVien`, `ChucVu`, `Khoa`, `CaTruc`, `ChamCong`, `LichLamViec` | Một phần trong `SystemConfigPanel` | • Quản lý hồ sơ bác sĩ/nhân viên y tế<br>• Phân ca làm việc và lịch trực theo tuần<br>• Chấm công hàng ngày và xét duyệt nghỉ phép | **P2** |
-| **Tiền lương (Payroll)** | `KyLuong`, `BangLuong`, `ChiTietBangLuong` | Chưa có form chuyên biệt | • Cấu hình kỳ lương tháng và mức hoa hồng thủ thuật<br>• Tính lương tự động từ dữ liệu chấm công và chỉ định<br>• Duyệt, chốt bảng lương và xuất báo cáo | **P2** |
-| **Cơ sở & Danh mục** | `CoSo`, `Khoa`, `PhongKham`, `ICD`, `DanhMucDichVu` | `CatalogPanel`, `SystemConfigPanel` | • CRUD danh mục ICD-10, dịch vụ kỹ thuật, thuốc<br>• Quản lý danh mục phòng khám, phân bổ bác sĩ trực<br>• Quản lý thông tin liên cơ sở | **P1/P2** |
-| **Báo cáo & Thống kê** | Giao dịch từ Khám bệnh, Kho, Viện phí, Nhân sự | `ClinicReportPanel` | • Thống kê lượt khám theo bác sĩ/khoa/ngày<br>• Báo cáo doanh thu viện phí và BHYT<br>• Báo cáo tồn kho dược, thuốc cận hạn, xuất nhập tồn | **P2** |
-| **Xuất tài liệu (DOCX / In ấn)** | `BenhNhan`, `LuotKham`, `DonThuoc`, `HoaDon` | Core DOCX engine trong `core/docx`, các Print Dialog | • **ĐÃ XONG ENGINE THUẦN JAVA:** `DocxDocument`, `DocxTable`, `DocxExportService`, `DocxManager`<br>• Nối các nút "In Đơn Thuốc", "In Bệnh Án", "In Giấy Hẹn" từ UI sang `DocxExportService` | **P1** |
+| Xác thực và access baseline (Phase 2) | `NhanVien`, `VaiTro`, `NhanVienVaiTro`, `PhanQuyenCoSo`, `MaTranPhanQuyen`, audit | `LoginForm`, `UserSession`, `SystemConfigPanel` | Credential/role/scope selection, lifecycle phiên, evaluator default-deny, approved grants và audit cho các luồng tiếp đón đã có unit/SQL evidence; permission-aware navigation có headless tests. Gate Phase 2 vẫn mở vì workflow bảo vệ khác, lockout policy và visual smoke chưa hoàn tất. Bắt buộc trước EMR, prescription/pharmacy và billing. | P0, gate |
+| Bệnh nhân & BHYT (Phase 1) | `BenhNhan`, `BaoHiem`, `BenhNhanCoSo`, `TienSuBenh` | `ReceptionPanel`, `PatientRegistrationFormPanel`, `MedicalPopupChooser` | `REC-UI-DB-01` opt-in dùng form thật trên EDT → command → handler/composition → SQL Server synthetic; test xác nhận toàn bộ trường bệnh nhân/BHYT được form hỗ trợ, facility link, search/reload. Audit/scope cho đăng ký/tìm kiếm có evidence riêng ở Phase 2. Còn full `ReceptionPanel` interaction/visual smoke và workflow tiền sử được bảo vệ; Phase 1 chưa nghiệm thu. | P1 |
+| Tiếp đón & hàng đợi (Phase 1) | `LuotKham`, `PhongKham`, `CoSo`, `Khoa` | `ReceptionPanel`, `ClinicRoomStatusPanel` | Handler ghi visit và queue repository đọc/ghi đã nối; duplicate CCCD hướng tìm hồ sơ, giữ form, queue/search/save dùng `SwingWorker`. SQL Server synthetic xác nhận form-to-SQL registration, queue reload, cross-process readback, rollback và concurrency. Trạng thái queue, polling/freshness, chuyển phòng/khoa và full `ReceptionPanel` visual/interaction test còn mở. | P1 |
+| Lịch hẹn & vòng đời lượt khám (Phase 3) | `LichHen`, `NguonLich`, `LuotKham`, `SinhHieu` | Chưa xác nhận màn hình lịch hẹn chuyên biệt | Đặt/đổi/hủy, chống trùng, check-in/no-show, sinh hiệu và chuyển thành lượt khám; phụ thuộc Phase 1 và security baseline Phase 2. | P1 |
+| Khám bệnh & EMR (Phase 4) | `ChanDoan`, `ICD`, `SinhHieu`, `TienSuBenh`, `KetQuaDieuTri`, `HuongXuTri`, audit | `DoctorStationPanel`, `ExaminationPanel`, clinical tabs/dialogs | Cần nối use cases, quyền theo actor/scope, lưu nháp, ký/khóa và audit. Không mở workflow trước Phase 2 gate. | P1 |
+| Catalogs, dịch vụ & CLS (Phase 5) | `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu`, `ICD` | `ServiceOrderPanel`, `LabOrderTabPanel`, `ParaclinicalOrderPanel` | Cần nối danh mục, trạng thái thực hiện, nhập/duyệt kết quả, audit/version và thiết kế lưu kết quả hình ảnh. | P1 |
+| Kê đơn, kho & nhà thuốc (Phase 6) | `DonThuoc`, `ChiTietDonThuoc`, `Item`, `Kho`, `TonKho`, phiếu nhập/xuất, `InventoryTransaction` | `PrescriptionOrderPanel`, `PrescriptionOrderTabPanel`, `PharmacyDispensePanel` | Cần nạp thuốc/tồn kho thật, kiểm tra an toàn, duyệt/cấp phát, FEFO persistence, kiểm kê, audit và transaction ngăn âm kho. Bị chặn bởi Phase 2 gate. | P1 |
+| Viện phí (Phase 7) | `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan` | `BillingInvoicePanel`, print panels | Cần chốt quy tắc giá/BHYT/đồng chi trả; thu/hoàn/điều chỉnh; đối soát giao dịch. Bị chặn bởi Phase 2 gate. | P1 |
+| HR/payroll và extended administration (Phase 8) | Nhân sự, lịch ca, chấm công, nghỉ phép, payroll, `CoSo`/`Khoa`/`PhongKham`, cấu hình | `SystemConfigPanel` | Panel hệ thống không thay thế CRUD/admin/payroll; quản trị mở rộng sau security baseline Phase 2. | P1/P2 |
+| Báo cáo, tài liệu, tích hợp và release hardening (Phase 9) | Giao dịch từ khám, CLS, kho, viện phí, HR; DOCX/integrations | `ClinicReportPanel`, core `desktop/core/docx`, print preview dialogs | Có engine DOCX và một số preview. Cần xác nhận truy vấn theo quyền, đối soát, nội dung/mẫu, encoding, dữ liệu persist và hardening release. | P2 |
 
----
+## Nguyên tắc triển khai UI
 
-## 2. Bảng Ánh xạ 15 Trường Y Tế Cần Bổ Sung Trên Màn Tiếp Đón / Đăng Ký
+1. Swing UI gọi Application use case; không truy cập JDBC trực tiếp.
+2. I/O chạy nền (ví dụ `SwingWorker`); cập nhật thành phần giao diện trên EDT.
+3. Với mỗi trường form, ghi rõ nguồn model/DTO/schema, nullable, validation và cách xử lý khi cập nhật hồ sơ cũ.
+4. Màn hình cần trạng thái loading, empty, error và retry phù hợp; không để lỗi kỹ thuật lộ nguyên văn cho nhân viên.
+5. Mức ưu tiên không phải kết luận tuân thủ y tế/pháp lý. Quy tắc BHYT, thuốc, tài chính và biểu mẫu phải được xác nhận nghiệp vụ.
 
-Đối chiếu giữa giao diện `PatientRegistrationFormPanel` và các thực thể Domain:
+## Bằng chứng lịch sử tại code snapshot `0d91903`
 
-| STT | Trường thông tin trên Giao diện | Thuộc tính Domain Entity tương ứng | Kiểu dữ liệu / Ghi chú |
-| :---: | :--- | :--- | :--- |
-| 1 | **Đối tượng khám** | `LuotKham.doiTuongKham` | Enum `DoiTuongKham` (`BHYT`, `VIEN_PHI`, `YEU_CAU`, `MIEN_PHI`) |
-| 2 | **Lý do đến khám** | `LuotKham.lyDoKham` | `String` (Ví dụ: Đau ngực, Sốt cao 3 ngày) |
-| 3 | **Mã ĐKBĐ (Nơi ĐK ban đầu)** | `BaoHiem.maDkbd` | `String` (Mã KCB ban đầu theo quy chuẩn BHXH) |
-| 4 | **Mức hưởng BHYT (%)** | `BaoHiem.mucHuong` | `Integer` (100%, 95%, 80%) |
-| 5 | **Ngày miễn cùng chi trả** | `BaoHiem.ngayDu5Nam` | `LocalDate` (Thời điểm đủ 5 năm liên tục) |
-| 6 | **Tuyến khám chữa bệnh** | `BaoHiem.dungTuyen` | `Boolean` (`true`: Đúng tuyến, `false`: Trái tuyến) |
-| 7 | **Họ tên người liên hệ** | `BenhNhan.nguoiLienHe` | `String` (Thân nhân khi cấp cứu hoặc trẻ nhỏ) |
-| 8 | **Mối quan hệ thân nhân** | `BenhNhan.moiQuanHeNguoiLienHe` | `String` (Bố, Mẹ, Vợ, Chồng, Con) |
-| 9 | **SĐT người liên hệ** | `BenhNhan.soDienThoaiNguoiLienHe`| `String` |
-| 10 | **Nghề nghiệp** | `BenhNhan.ngheNghiep` | `String` |
-| 11 | **Dân tộc** | `BenhNhan.danToc` | `String` (Mặc định: "Kinh") |
-| 12 | **Quốc tịch** | `BenhNhan.quocTich` | `String` (Mặc định: "Việt Nam") |
-| 13 | **Địa chỉ chi tiết** | `BenhNhan.diaChi` | `String` (Số nhà, đường phố) |
-| 14 | **Xã/Phường, Quận/Huyện, Tỉnh**| `BenhNhan.phuongXa`, `quanHuyen`, `tinhThanh` | Phục vụ báo cáo chuẩn Bộ Y Tế |
-| 15 | **Số thẻ BHYT** | `BaoHiem.maThe` | Chuỗi 15 ký tự theo quy định BHXH VN |
+- **Điện thoại:** `PhoneNumber` chấp nhận prefix di động Việt Nam được hỗ trợ với `0` hoặc `+84`, loại bỏ dấu cách/chấm/gạch nối; `PhoneNumberTest` bao phủ các trường hợp này và các đầu vào sai. Đây là bằng chứng validation domain, không phải nghiệm thu toàn bộ form/persistence.
+- **UI trùng bệnh nhân:** `ReceptionPanel` nhận diện lỗi duplicate CCCD, hiển thị hướng dẫn tra cứu và gọi search bằng CCCD nhập; `PatientRegistrationFormPanel` giữ form khi báo lỗi. `PatientRegistrationFormPanelTest` chạy headless kiểm tra form, validation và chọn phòng theo fixture deterministic; đây không phải UI/database E2E.
+- **CCCD:** migration V4 dừng nếu phát hiện CCCD trùng trên hồ sơ active trước khi tạo unique key/index. `BenhNhanRepositoryImpl` chỉ ánh xạ vi phạm `UX_BenhNhan_Active_CCCD`; test infrastructure dùng dữ liệu tổng hợp xác nhận không nhầm index khác và không để lộ giá trị trùng. Application test xác nhận nhánh duplicate xảy ra trước bước lưu BHYT/lượt khám.
+- **Branch/test:** Code snapshot `0d91903`; 18 test source/78 discovered: domain 4/21, application 5/26, infrastructure 5/21, desktop 4/10. JDK 17 `mvn clean verify` pass: 75 passed, 0 failures/errors and 3 SQL Server opt-in skips. Registration/update E2E and JVM child-process readback pass separately; manual SQL checks covered rollback and queue/CCCD concurrency. Fresh-database migration bootstrap and migration failure safety belong to Phase 0. Staff role/scope assignment reads are now available but not yet connected to Login.
+- **Packaging:** commit `df5a8da` strips dependency signature metadata and local `db.properties` from the shaded JAR; environment configuration remains supported.
+- **Publication/acceptance:** commits remained local. Distinct JVM probe confirmed cross-process persistence, but did not launch the Swing desktop. These counts and claims are historical and are superseded by the current evidence below.
 
----
+## Bằng chứng cập nhật (06/11/2026)
 
-## 3. Quy Tắc Kỹ Thuật Khi Triển Khai Màn Hình
-
-1. **Không truy cập DB trực tiếp từ Swing:** Giao diện chỉ gọi các Use Case trong `clinic-application` thông qua Facade / Command Bus.
-2. **Luồng bất đồng bộ bắt buộc (SwingWorker):** Tất cả các thao tác gọi Repository / SQL Server phải được đặt trong `SwingWorker.doInBackground()` để tránh treo giao diện người dùng. Cập nhật kết quả lên UI qua phương thức `done()` trên EDT.
-3. **Cơ chế Cache Danh mục:** Các danh mục tĩnh hoặc ít thay đổi (`ICD`, `DanhMucDichVu`, `Khoa`, `PhongKham`) cần được nạp sẵn vào bộ nhớ Cache khi ứng dụng khởi động để tối ưu tốc độ mở màn hình tiếp đón và bàn khám.
+- Root JDK 17 `mvn -Djava.awt.headless=true clean verify`: **243 tests, 0 failures, 0 errors, 4 skipped**. Four skipped tests require SQL Server opt-in; this is separate from the default Maven run.
+- `REC-UI-DB-01` (`aa54c35`) extends the SQL Server synthetic reception acceptance: the real `PatientRegistrationFormPanel` is populated on the EDT, converted to a command, passed to the real handler/composition, then searched and reloaded from `clinic_test_v9_20261106`. All form-backed patient and BHYT fields, active facility link and queue row are asserted. The opt-in test passed 1/1; its fixture only soft-deletes rows it created.
+- Protected reception registration/search/queue audit and exact facility+department scope have separate SQL Server and application-test evidence in Phase 2 tasks. This does not extend authorization to `TienSuBenh` or another phase.
+- Full visible `ReceptionPanel` button/worker/dialog flow and visual smoke remain open because the desktop host is locked. Phase 1 remains in progress; queue lifecycle/transfer and guarded medical-history workflow remain incomplete.

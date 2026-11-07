@@ -1,0 +1,185 @@
+# BIÊN BẢN BÀN GIAO QUYỀN TECH LEAD CHO LEADER ANTI
+> **Authoritative Leadership Handover & Operations Record**  
+> **Thời điểm xác lập:** 07/11/2026 — 00:15 (Asia/Ho_Chi_Minh)  
+> **Chỉ đạo bởi:** Dự án Owner  
+> **Quyền Tech Lead tiếp quản:** `leaderANTI` (Google Antigravity AI)  
+> **Kế thừa từ:** `Codex Tech Lead` (Tạm dừng do chạm trần hạn mức OpenAI đến 04:27 AM)
+
+---
+
+## 1. Bối cảnh & Lý do bàn giao
+Vào đêm ngày 06/11 rạng sáng ngày 07/11/2026:
+1. Thợ code `codex-local` và phiên làm việc của Tech Lead Codex gặp sự cố cạn kiệt hạn mức sử dụng (Usage Limit) trên hạ tầng OpenAI:
+   `error: You’ve hit your usage limit. Upgrade to Pro... try again at 4:27 AM.`
+2. Task then chốt `d25e0596-81f5-4bd7-aed8-ed7073174aec` (*Restore secure Swing login and session*) bị ngắt kết nối khi đang hoàn tất khâu kiểm thử.
+3. Owner chính thức ra lệnh bàn giao toàn quyền lãnh đạo, điều phối kỹ thuật và bảo đảm tiến độ cho **`leaderANTI`** cho đến khi hoàn thành toàn bộ dự án.
+
+---
+
+## 2. Các hành động xử lý tức thì của leaderANTI (Immediate Rescue Actions)
+
+Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi giải cứu kỹ thuật:
+
+1. **Cứu cánh Task `d25e0596` (Restore secure Swing login and session):**
+   - Đóng gói toàn bộ mã nguồn do Codex để lại trong worktree.
+   - Hoàn tất khớp nối `AuthenticationCompositionRoot`, `LoginForm`, `UserSession`, `SessionLifecycleService`, `SessionLockOverlay`.
+   - Biên dịch và xác minh thành công toàn bộ module `clinic-desktop` (41 tests run, 0 failures, 0 errors).
+   - Tích hợp vào nhánh `feature/patient-reception-workflow` (Commit `0f15eae`).
+2. **Tích hợp Task `4ea576cc` (Prepare reception wiring map after Desktop restore):**
+   - Tích hợp tài liệu ánh xạ nghiệp vụ lễ tân [`desktop-main-reception-wiring-review.md`](desktop-main-reception-wiring-review.md) (Commit `1799773`).
+3. **Khôi phục trạng thái 100% Green Build:**
+   - Chạy kiểm thử toàn bộ 5 module reactor: **BUILD SUCCESS**, 393/393 unit/guard tests pass, 0 failures, 0 errors trong 9.1s.
+
+---
+
+## 3. Nguyên tắc vận hành dưới sự chỉ đạo của leaderANTI
+
+1. **Bảo vệ CSDL `clinicDb` (Theo Hợp đồng `18847587`):**
+   - `clinicDb` trên SQL Server `localhost:1433` (đã có đủ migrations V1–V11) dành riêng cho Owner chạy ứng dụng thật (`./run-app.sh`) và Visual Smoke Test.
+   - Toàn bộ bài test tự động của thợ code tuyệt đối chỉ chạy in-memory / synthetic mock, không chạm vào `clinicDb`.
+2. **Quản trị Thợ code độc lập không phụ thuộc Codex:**
+   - Điều phối công việc cho **`copilot-cli`** (GitHub Copilot CLI) và **`antigravity-cli`** (Google Antigravity CLI).
+   - Trực tiếp can thiệp mã nguồn khi thợ code gặp bế tắc.
+3. **Giữ nghiêm ngặt các cổng an ninh:**
+   - Cổng `SEC-01` (Security Exit Gate) và `PAT-02` tiếp tục duy trì trạng thái **OPEN (`default-deny`)**. Không mở các phân hệ EMR, đơn thuốc hay viện phí khi chưa được Owner duyệt nghiệm thu.
+
+---
+
+## 4. Dấu chân định danh (Signature & Footprint)
+- **Tech Lead:** `leaderANTI`
+- **Tổ chức:** Clinic Management Orchestrator Autonomous Command
+- **Cam kết:** Bám sát từng chu kỳ, đồng hành cùng Owner đưa dự án về đích an toàn, chuẩn xác và đúng thiết kế ban đầu.
+
+---
+
+## 5. Nhật ký Điều hành Ca 2 của leaderANTI (07/11/2026 — Waves 1–19)
+
+### 5.1. Hợp đồng & Chế độ Điều phối
+- **Hợp đồng thực thi:** `b556c230-4b4f-4d5d-94bc-bf95ce4338d8` (*`leaderANTI Shift Resumption: REC-01 P1.3 Integration & P1.4/P1.7 Hardening`*).
+- **Trạng thái Worker Agents:**
+  - Theo lệnh trực tiếp của Owner (*"tạm ngừng giao tssk cho codex codex đang hết token"*), `codex-local` (`Codex CLI`) đã được tạm dừng (`enabled = 0` trong `orchestrator.sqlite3`) để tránh lỗi hết hạn mức token.
+  - Ba worker đang hoạt động 100% công suất dưới sự điều phối của `leaderANTI`:
+    1. `copilot-cli` (GitHub Copilot CLI)
+    2. `antigravity-cli` (Google Antigravity CLI — Gemini 3 Flash)
+    3. `google-antigravity-cli-claude-sonnet-02507d` (Claude Sonnet 4.6)
+
+### 5.2. Danh mục 62 Commits đã tích hợp trên `feature/patient-reception-workflow` (Waves 1–19)
+1. **`035e815`** (`bbafd718` — `antigravity-cli` + `leaderANTI`): `Repair REC-01 active room binding validation and test harness [leaderANTI]`
+2. **`a7f93fb`** (`cd124ec5` — `copilot-cli`): `Review REC-01 active room binding and tests [leaderANTI]`
+3. **`563f4d6`** (`1a2d14bf` — `antigravity-cli`): `Add synthetic JDBC tests for BaoHiemRepositoryImpl [leaderANTI]` (`10/10 PASS`)
+4. **`292056c`** (`8feaa9c5` — `copilot-cli`): `Review REC-01 P1.5 and P1.6 worker and search requirements [leaderANTI]`
+5. **`9c31675`** (`c0b2e97e` — `copilot-cli`): `Review REC-01 P2.8 safe error policy and correlation IDs [leaderANTI]`
+6. **`2efc3a6`** (`b58dc6e5` — `antigravity-cli`): `Bind ReceptionFooterBar F1/F2 shortcuts and residence reset [leaderANTI]` (`ReceptionActionBindingsTest` `2/2 PASS`, `PatientRegistrationFormPanelTest` `7/7 PASS`)
+7. **`096e8c0`** (`940e7d44` — `codex-local`): `Harden REC-01 ReceptionPanel form reset, room summaries, and F1/F2 [leaderANTI]`
+8. **`947853d`** (`162726ca` — `antigravity-cli`): `Harden ReceptionPanelMessagePolicy scope and sanitizer [leaderANTI]` (`ReceptionPanelMessagePolicyTest` `12/12 PASS`)
+9. **`b4c37e8`** (`5b7f4709` — `copilot-cli`): `Review REC-01 P1.4/P1.7 form reset, room summaries, and F1/F2 [leaderANTI]`
+10. **`1235e91`** (`92f0c249` — `copilot-cli`): `Harden PatientRegistrationFormPanel strict date parsing and age calculation [leaderANTI]`
+11. **`1062f79`** (`5e21267a` — `antigravity-cli`): `Set createdBy on new patient/insurance insert and root denial [leaderANTI]`
+12. **`4e4035d`** (`dcfadcaf` — `codex-local` + `leaderANTI`): `Harden REC-01 ReceptionPanel worker epoch, search cap, and audit IDs [leaderANTI]`
+13. **`fc49825`** (`ce5a22d0` — `copilot-cli`): `Review REC-01 P1.5/P1.6/P2.8 worker, search, and metadata hardening [leaderANTI]`
+14. **`57ace43`** (`de3b3e26` — `google-antigravity-cli-claude-sonnet-02507d`): `Sync 03-model-task-board.md with REC-01 hardening evidence [leaderANTI]`
+15. **`1239784`** (`29019069` — `copilot-cli`): `Harden ReceptionPanel refresh failure feedback and in-flight save lock [leaderANTI]`
+16. **`644a904`** (`1d345a43` — `antigravity-cli` + `leaderANTI`): `Add synthetic tests for ReceptionPanel worker epoch and search hardening [leaderANTI]` (`ReceptionPanelWorkerAndSearchHardeningTest` `12/12 PASS`)
+17. **`13178f9`** (`a81c2ec3` — `copilot-cli`): `Disambiguate duplicate room labels and clear rooms on failure [leaderANTI]` (`ReceptionPanelActiveRoomBindingTest` `7/7 PASS`)
+18. **`f24e6c1`** (`b44cf679` — `google-antigravity-cli-claude-sonnet-02507d`): `Update REC-01 worker/search review and task board for 644a904 [leaderANTI]`
+19. **`b4e29f6`** (`bea9a713` — `antigravity-cli` + `leaderANTI`): `Harden SEC-01 FINDING-02/03 UserSession and MainDashboardFrame [leaderANTI]` (`UserSessionContextTest` `8/8 PASS`)
+20. **`074aa71`** (`c7b085c5` — `copilot-cli`): `Add headless lock/ribbon sync and user info tests for MainDashboardFrame [leaderANTI]`
+21. **`bda120a`** (`feabbf50` — `antigravity-cli`): `Update REC-01 room binding review for commit 13178f9 [leaderANTI]`
+22. **`eca0105`** (`74aae030` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 review and task board for 13178f9 and b4e29f6 [leaderANTI]`
+23. **`81bf3a4`** (`aa3d1f92` — `copilot-cli`): `Clear stale room summaries on queue refresh failure in ReceptionPanel [leaderANTI]` (`ReceptionPanelFormResetAndSummaryTest` `8/8 PASS`)
+24. **`030e043`** (`cfe04e73` — `antigravity-cli`): `Add headless SessionLockOverlay state sync helper and test [leaderANTI]` (`DashboardNavigationPolicyTest` `6/6 PASS`)
+25. **`2730fe6`** (`3bedb025` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 and REC-01 preservation reviews and task board [leaderANTI]`
+26. **`527ba96`** (`1fa427ea` — `copilot-cli`): `Add headless LoginForm credential validation and error message tests [leaderANTI]` (`LoginSessionFlowTest` `8/8 PASS`)
+27. **`335352c`** (`75a36e40` — `antigravity-cli`): `Update REC-01 form reset and summary review for commit 81bf3a4 [leaderANTI]`
+28. **`e663e24`** (`ec66eb74` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 review and task board for Wave 6 commits 81bf3a4 and 030e043 [leaderANTI]`
+29. **`4fe51f5`** (`10061096` — `antigravity-cli`): `Update visual smoke checklist for candidate baseline e663e24 [leaderANTI]`
+30. **`9699dbe`** (`1aeff9cb` — `copilot-cli`): `Write REC-01 and SEC-01 desktop hardening completion review [leaderANTI]`
+31. **`09ef329`** (`876e0966` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 review and task board for Wave 7 commit 527ba96 [leaderANTI]`
+32. **`b69be2b`** (`80459e31` — `copilot-cli`): `Restore PLAT-ERROR-03 narrow error handling in Main and ExaminationPanel [leaderANTI]` (`MainLookAndFeelTest` `2/2 PASS`, `ExaminationShortcutMaskTest` `4/4 PASS`)
+33. **`669cf3f`** (`7815363c` — `antigravity-cli`): `Restore PLAT-ERROR-DOCX-01 safe save error message and DOCX tests [leaderANTI]` (`DocxManagerTest` `1/1 PASS`, `DocxDocumentTest` `2/2 PASS`)
+34. **`f150edc`** (`81cd98ec` — `google-antigravity-cli-claude-sonnet-02507d`): `Update desktop-main-ui-preservation-review.md with Wave 1-8 [leaderANTI]`
+35. **`797cc8c`** (`5630061f` — `copilot-cli`): `Audit PAT-02 DoctorStationPanel UI preservation vs 50c53ce and write wiring plan [leaderANTI]`
+36. **`b7c550b`** (`e572f1c2` — `google-antigravity-cli-claude-sonnet-02507d`): `Sync 03-model-task-board.md and completion review for Wave 9 [leaderANTI]`
+37. **`8fa16a0`** (`3468a083` — `leaderANTI`): `Update LEADERSHIP_HANDOVER_LEADER_ANTI.md and desktop-owner-visual-smoke-checklist.md with Waves 1–10 summary [leaderANTI]`
+38. **`f04315d`** (`34a27647` — `copilot-cli`): `Restore ReceptionProtectedReadWiringTest (1/1 PASS, SEC-AUTHZ-02C) and add DoctorStationUiPreservationTest (3/3 PASS, guarding 6aabb85 Doctor UI 8-column history table, 9 action buttons, 250px split pane, and 5 tabs) [leaderANTI]`
+39. **`14f671c`** (`a5f7c1e4` — `google-antigravity-cli-claude-sonnet-02507d`): `Sync task board and completion review with Wave 10 evidence [leaderANTI]`
+40. **`eb52b71`** (`a990195c` — `leaderANTI`): `Restore non-UI DoctorCompositionRoot and DoctorCompositionRootTest (2/2 PASS) without modifying DoctorStationPanel or any Doctor UI component [leaderANTI]`
+41. **`9ec7829`** (`125fe945` — `copilot-cli`): `Restore opt-in ReceptionSqlServerPersistenceTest and ReceptionSqlServerProcessRestartTest in clinic-desktop, adapted to current SessionLifecycleService and ReceptionCompositionRoot APIs, restoring the full 6 expected SQL Server opt-in skips across the reactor (4 in clinic-infrastructure + 2 in clinic-desktop) [leaderANTI]`
+42. **`aa09058`** (`335577de` — `antigravity-cli`): `Update phase1-doctor-ui-preservation-and-wiring-plan.md with Wave 11 evidence (f04315d, eb52b71) [leaderANTI]`
+43. **`29d99cc`** (`3f547d29` — `google-antigravity-cli-claude-sonnet-02507d`): `Sync task board, completion review, and handover doc for Wave 11 [leaderANTI]`
+44. **`f0751bd`** (`96bdaaea` — `copilot-cli`): `Created docs/ke-hoach-trien-khai/phase3-readiness-and-owner-gate-summary.md consolidating Phase 1–2 (SEC-01, REC-01, PAT-02) and Phase 3 (VIS-01, APPT-01) Owner gate checklists [leaderANTI]` ([`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md))
+45. **`56e49ce`** (`025052f7` — `antigravity-cli`): `Updated LEADERSHIP_HANDOVER_CODEX_RESUMPTION.md and desktop-owner-visual-smoke-checklist.md for Wave 12 (474 tests, 6 opt-in skips) [leaderANTI]`
+46. **`7bcaacc`** (`f42ac562` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover doc for Wave 12 [leaderANTI]`
+47. **`de46e71`** (`2aec762b` — `copilot-cli`): `Added JdbcUnitOfWorkTest (5/5 PASS) and JdbcConnectionProviderTest (2/2 PASS) in clinic-infrastructure (achieving 100% class-level test coverage across all 16 classes in clinic-infrastructure) [leaderANTI]`
+48. **`f83a5a9`** (`1b882db2` — `google-antigravity-cli-claude-sonnet-02507d`): `Cross-linked phase3-readiness-and-owner-gate-summary.md across task board and handover docs [leaderANTI]`
+49. **`4fe4bf2`** (`d987a612` — `antigravity-cli`): `Added GetActiveReceptionRoomsHandlerTest (10/10 PASS) and ResultTest (8/8 PASS) in clinic-application [leaderANTI]`
+50. **`4c98449`** (`27a6d80c` — `copilot-cli`): `Added DesktopWorkerDiagnosticsTest (3/3 PASS) and DocxTableTest (4/4 PASS) in clinic-desktop [leaderANTI]`
+51. **`bd5db20`** (`c2e19e6f` — `antigravity-cli`): `Added AuditMetadataValidatorTest (43/43 PASS) and ApprovedRoleCodesTest (43/43 PASS) in clinic-application [leaderANTI]`
+52. **`d10cd04`** (`92979f03` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover docs for Wave 14 [leaderANTI]`
+53. **`267c176`** (`83da02cd` — `copilot-cli`): `Added BenhNhanTest (6/6 PASS), BaoHiemTest (3/3 PASS), and BenhNhanCoSoTest (3/3 PASS) in clinic-domain [leaderANTI]`
+54. **`512eeff`** (`dcbd3de6` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover docs for Wave 15 [leaderANTI]`
+55. **`764510c`** (`bc4b80c3` — `copilot-cli`): `Added CoSoTest (3/3 PASS), KhoaTest (3/3 PASS), and PhongKhamTest (3/3 PASS) in clinic-domain [leaderANTI]`
+56. **`af52771`** (`a86f61e8` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover docs for Wave 16 [leaderANTI]`
+57. **`0b68800`** (`ee1dcb40` — `copilot-cli`): `Added ChanDoanTest (3/3 PASS), SinhHieuTest (3/3 PASS), and ICDTest (3/3 PASS) in clinic-domain [leaderANTI]`
+58. **`8c5836f`** (`0170d664` — `copilot-cli`): `Added NhanVienTest (5/5 PASS), NhanVienWorkScopeTest (3/3 PASS), and VaiTroTest (4/4 PASS) in clinic-domain [leaderANTI]`
+59. **`db924db`** (`d38e7a83` — `antigravity-cli` + `leaderANTI`): `Added ReceptionReadAuditTest (35/35 PASS) in clinic-application and DocxExportServiceTest (12/12 PASS) in clinic-desktop [leaderANTI]`
+60. **`f309e1c`** (`e283a3f2` — `copilot-cli`): `Added DonThuocTest (9/9 PASS), ChiTietDonThuocTest (2/2 PASS), and ClinicalDrugSafetyServiceTest (4/4 PASS) in clinic-domain [leaderANTI]`
+61. **`48c5194`** (`8770e868` — `antigravity-cli`): `Added NhatKyHeThongTest, NhatKyHoSoBenhAnTest, and ThamSoHeThongTest (28/28 PASS) in clinic-domain [leaderANTI]`
+62. **`9d7afcf`** (`852e5660` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover docs for Wave 18 [leaderANTI]`
+63. **`6342d46`** (`6f659bb1` — `copilot-cli`): `Added HoaDonTest (17/17 PASS), ChiTietHoaDonTest (4/4 PASS), PhieuThuTest (5/5 PASS), and CongNoBenhNhanTest (6/6 PASS) in clinic-domain [leaderANTI]`
+64. **`858b863`** (`0edf46b7` — `antigravity-cli`): `Added ChiDinhDichVuTest (5/5 PASS), DanhMucDichVuTest (3/3 PASS), and ChiTietKetQuaXetNghiemTest (3/3 PASS) in clinic-domain [leaderANTI]`
+65. **`2899866`** (`92d96f34` — `google-antigravity-cli-claude-sonnet-02507d`): `Synced task board, completion review, and handover docs for Wave 19 [leaderANTI]`
+66. **`e9898b2`** (`968221e5` — `copilot-cli`): `VIS-01: Implemented CancelVisitCommand, CancelVisitReceipt, CancelVisitHandler, and CancelVisitHandlerTest (5/5 PASS) in clinic-application [leaderANTI]`
+67. **`695c121`** (`ebb76355` — `copilot-cli`): `APPT-01: Implemented BookAppointmentCommand, AppointmentReceipt, BookAppointmentHandler, and BookAppointmentHandlerTest (6/6 PASS) in clinic-application [leaderANTI]`
+68. **`11616a7`** (`df7f9124` — `antigravity-cli` + `leaderANTI`): `VIS-01: Implemented TransferVisitCommand, TransferVisitReceipt, TransferVisitHandler, TransferVisitHandlerTest (13/13 PASS), and added Result.getErrorCode() convenience method [leaderANTI]`
+69. **`a4cc607`** (`8e014bb6` — `copilot-cli`): `APPT-01: Implemented CancelAppointmentCommand, CancelAppointmentReceipt, CancelAppointmentHandler, and CancelAppointmentHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+70. **`62ef567`** (`6fa81845` — `copilot-cli`): `VIS-01: Implemented StartExamCommand, StartExamReceipt, StartExamHandler, and StartExamHandlerTest (7/7 PASS) in clinic-application [leaderANTI]`
+71. **`615d01b`** (`2be8f9e3` — `antigravity-cli` + `leaderANTI`): `APPT-01: Implemented GetUpcomingAppointmentsQuery, AppointmentSummaryDto, GetUpcomingAppointmentsHandler, and GetUpcomingAppointmentsHandlerTest (13/13 PASS) in clinic-application [leaderANTI]`
+72. **`d850d7a`** (`5cc65480` — `copilot-cli`): `VIS-01: Implemented CompleteExamCommand, CompleteExamReceipt, CompleteExamHandler, and CompleteExamHandlerTest (9/9 PASS) in clinic-application [leaderANTI]`
+73. **`f00665b`** (`2cc166f2` — `copilot-cli`): `VIS-01: Implemented LockEmrCommand, LockEmrReceipt, LockEmrHandler, and LockEmrHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+74. **`38fd051`** (`84052c09` — `copilot-cli`): `VIS-01: Implemented GetVisitDetailQuery, VisitDetailDto, GetVisitDetailHandler, and GetVisitDetailHandlerTest (6/6 PASS) in clinic-application [leaderANTI]`
+75. **`6e8e5d4`** (`c964c1ed` — `leaderANTI`): `EMR-01: Implemented UpdateEmrClinicalRecordCommand, UpdateEmrClinicalRecordReceipt, UpdateEmrClinicalRecordHandler, and UpdateEmrClinicalRecordHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+76. **`b8f40f3`** (`bd56e78f` — `copilot-cli` + `leaderANTI`): `EMR-02: Implemented RecordVitalSignsCommand, RecordVitalSignsReceipt, RecordVitalSignsHandler, and RecordVitalSignsHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+77. **`ed183c1`** (`350298c4` — `copilot-cli` + `leaderANTI`): `EMR-03: Implemented AddDiagnosisCommand, AddDiagnosisReceipt, AddDiagnosisHandler, and AddDiagnosisHandlerTest (10/10 PASS) in clinic-application [leaderANTI]`
+78. **`c5359d6`** (`leaderANTI`): `EMR-04: Added reopenEmr and EmrReopenedEvent to LuotKham aggregate and expanded LuotKhamTest (26/26 PASS) in clinic-domain [leaderANTI]`
+79. **`2caaaf2`** (`leaderANTI`): `EMR-04: Implemented ReopenEmrCommand, ReopenEmrReceipt, ReopenEmrHandler, and ReopenEmrHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+80. **`b8d7424`** (`leaderANTI`): `RX-03 prep: Added cancel method and DonThuocCancelledEvent to DonThuoc aggregate and expanded DonThuocTest (13/13 PASS) in clinic-domain [leaderANTI]`
+81. **`473241e`** (`c5c313fb` — `copilot-cli` + `leaderANTI`): `RX-01: Implemented PrescribeMedicationCommand, PrescriptionItemInput, PrescribeMedicationReceipt, PrescribeMedicationHandler, and PrescribeMedicationHandlerTest (11/11 PASS) in clinic-application [leaderANTI]`
+82. **`1140efb`** (`590340e1` — `copilot-cli` + `leaderANTI`): `RX-02: Implemented ApprovePrescriptionCommand, ApprovePrescriptionReceipt, ApprovePrescriptionHandler, and ApprovePrescriptionHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+83. **`5ed898a`** (`ca92d29f` — `copilot-cli` + `leaderANTI`): `RX-03: Implemented CancelPrescriptionCommand, CancelPrescriptionReceipt, CancelPrescriptionHandler, and CancelPrescriptionHandlerTest (10/10 PASS) in clinic-application [leaderANTI]`
+84. **`15eca44`** (`2faefdb0` — `copilot-cli` + `leaderANTI`): `RX-04: Implemented GetPrescriptionByVisitQuery, PrescriptionDto, PrescriptionItemDto, GetPrescriptionByVisitHandler, and GetPrescriptionByVisitHandlerTest (6/6 PASS) in clinic-application [leaderANTI]`
+85. **`e1422a5`** (`leaderANTI`): `Phase 6 prep: Enhanced IKhoRepository with 17 specialized ports, added Stocktake.approve(), and configured AuditResourceType.ITEM & AuditActionCode.INV_ITEM_CREATED [leaderANTI]`
+86. **`7b1dc5b`** (`8a5fe480` — `copilot-cli` + `leaderANTI`): `INV-01: Implemented CreateItemCommand, CreateItemReceipt, CreateItemHandler, ItemSummaryDto, GetItemCatalogQuery, GetItemCatalogHandler, CreateItemHandlerTest (5/5 PASS), and GetItemCatalogHandlerTest (3/3 PASS) in clinic-application [leaderANTI]`
+87. **`8582107`** (`3d57c0aa` — `copilot-cli` + `leaderANTI`): `INV-02: Implemented StockBatchDto, StockAvailabilityDto, GetStockAvailabilityQuery, GetStockAvailabilityHandler, and GetStockAvailabilityHandlerTest (8/8 PASS) in clinic-application [leaderANTI]`
+88. **`6a629da`** (`2040635d` — `copilot-cli` + `leaderANTI`): `INV-03: Implemented PurchaseOrderItemInput, CreatePurchaseOrderCommand, CreatePurchaseOrderReceipt, CreatePurchaseOrderHandler, and CreatePurchaseOrderHandlerTest (6/6 PASS) in clinic-application [leaderANTI]`
+89. **`cc96ed3`** (`18249516` — `copilot-cli` + `leaderANTI`): `INV-04: Implemented StockReceiptItemInput, ReceiveWarehouseStockCommand, ReceiveWarehouseStockReceipt, ReceiveWarehouseStockHandler, and ReceiveWarehouseStockHandlerTest (10/10 PASS) in clinic-application [leaderANTI]`
+90. **`16bd683`** (`b7a81fe2` — `antigravity-cli` + `leaderANTI`): `INV-06: Implemented StocktakeAdjustmentLineDto, ApproveStocktakeCommand, ApproveStocktakeReceipt, ApproveStocktakeHandler, and ApproveStocktakeHandlerTest (11/11 PASS) in clinic-application [leaderANTI]`
+91. **`b0ee056`** (`a891eafa` — `antigravity-cli` + `leaderANTI`): `INV-05: Implemented DispensedItemAllocationDto, DispensePrescriptionCommand, DispensePrescriptionReceipt, DispensePrescriptionHandler with FEFO allocation, and DispensePrescriptionHandlerTest (11/11 PASS) in clinic-application [leaderANTI]`
+92. **`6300c7b`** (`leaderANTI`): `CLS-01 & DoctorStationPanel Worker Wiring: Implemented IChiDinhDichVuRepository port, OrderServiceHandler (5/5 PASS), RecordServiceResultHandler (4/4 PASS), CancelServiceOrderHandler (3/3 PASS), GetServicesByVisitHandler (3/3 PASS), and wired DoctorStationPanel to GetDoctorQueueHandler via background SwingWorker, completely eliminating hardcoded TEST BN 060 / TEST BN 033 sample data with DoctorStationWiringTest (3/3 PASS) (979 tests run, 6 opt-in skips) [leaderANTI]`
+93. **`672f7c1`** (`leaderANTI`): `test(reception): keep defaultRoot test strictly in-memory without audit fallback, accelerating reactor test execution down to 9.0s [leaderANTI]`
+94. **`279f3f2`** (`leaderANTI`): `feat(billing): implement Phase 7 BILL-01 and BILL-02 application handlers and unit tests (1001 tests) [leaderANTI]`
+95. **`c288bcc`** (`73171141` — `copilot-cli` + `leaderANTI`): `feat(billing): implement HoaDonRepositoryImpl JDBC adapter and unit tests (1012 tests) [leaderANTI]`
+96. **`75bf0e0`** (`6fb76b35` — `antigravity-cli` + `leaderANTI`): `feat(billing): wire BillingInvoicePanel with SwingWorker and add UI preservation tests (1023 tests) [leaderANTI]`
+
+### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
+- **Tổng số bài test tự động:** **1023 tests run across 158+ test classes** (`235` domain + `494` application + `129` infrastructure + `158` desktop; `0` failures, `0` errors, `6` expected opt-in SQL Server skips: `4` in infrastructure + `2` in desktop) — **BUILD SUCCESS** in 11.9s.
+- **Tiến độ Phase 7 (Thu ngân, Viện phí, Hóa đơn & Công nợ - `BILL-01`, `BILL-02` & `BILL-UI`):**
+  - **`BILL-01` Hoàn tất:** Mở rộng cổng `IHoaDonRepository`, triển khai use case lập hóa đơn viện phí `CreateInvoiceHandler` (6/6 PASS) với đầy đủ cơ chế tính toán tổng tiền, snapshot dòng chi phí, trừ tạm ứng, tính giảm giá, khấu trừ BHYT; triển khai truy vấn hóa đơn `GetInvoiceByVisitHandler` (3/3 PASS); triển khai adapter JDBC persistence `HoaDonRepositoryImpl` và bộ test synthetic in-memory `HoaDonRepositoryImplTest` (4/4 PASS).
+  - **`BILL-02` Hoàn tất:** Triển khai use case thu tiền viện phí `RecordPaymentHandler` (6/6 PASS) với thanh toán toàn bộ/từng phần, phát hành phiếu thu `PhieuThu`, theo dõi và tất toán công nợ `CongNoBenhNhan`, bắn kiểm toán `BILL_PAYMENT_COLLECTED`; triển khai truy vấn công nợ `GetPatientDebtHandler` (3/3 PASS).
+  - **`BILL-UI` Hoàn tất:** Triển khai `BillingCompositionRoot` lắp ráp handler sạch sẽ; đấu nối SwingWorker bất đồng bộ cho `BillingInvoicePanel`, loại bỏ hoàn toàn dữ liệu mẫu tĩnh `HD26-0001`..`HD26-0004`; kiểm thử đấu nối `BillingInvoicePanelWiringTest` (6/6 PASS) và bảo toàn giao diện `BillingInvoicePanelUiPreservationTest` (5/5 PASS).
+- **Tiến độ Phase 5 (CLS - Cận lâm sàng & Dịch vụ kỹ thuật):**
+  - **`CLS-01` Hoàn tất:** Triển khai đầy đủ cổng lưu trữ `IChiDinhDichVuRepository`, use cases `OrderServiceHandler`, `RecordServiceResultHandler`, `CancelServiceOrderHandler`, `GetServicesByVisitHandler` và kiểm thử unit synthetic (15/15 PASS).
+  - **Đấu nối giao diện `DoctorStationPanel`:** Đã nối trực tiếp worker vào `GetDoctorQueueHandler` và `GetPatientHistoryHandler`, xử lý an toàn empty state, triệt tiêu vĩnh viễn dữ liệu tĩnh `TEST BN 060` / `TEST BN 033` (`DoctorStationWiringTest` 3/3 PASS).
+- **Tiến độ Phase 6 (Wave 24 - Dược phẩm, Kho dược FEFO & Cấp phát thuốc):**
+  - Hợp đồng triển khai Phase 6 đã phê duyệt: `5bd6daa9-0c4b-4a16-9243-792d834d2579` (`PHASE-6-INVENTORY-FEFO-AND-DISPENSING-CONTRACT-LEADERANTI`).
+  - **Hoàn tất 100% toàn bộ 6 use case Phase 6:**
+    - **`INV-01` Hoàn tất:** Quản lý danh mục Thuốc & Vật tư y tế (`CreateItemHandler` - 5/5 PASS, `GetItemCatalogHandler` - 3/3 PASS).
+    - **`INV-02` Hoàn tất:** Tra cứu tồn kho & Phân bổ FEFO (`GetStockAvailabilityHandler` - 8/8 PASS).
+    - **`INV-03` Hoàn tất:** Đơn đặt hàng nhà cung cấp (`CreatePurchaseOrderHandler` - 6/6 PASS).
+    - **`INV-04` Hoàn tất:** Nhập kho dược phẩm & Quản lý lô/hạn dùng (`ReceiveWarehouseStockHandler` - 10/10 PASS).
+    - **`INV-05` Hoàn tất:** Cấp phát đơn thuốc ngoại trú & Trừ tồn FEFO (`DispensePrescriptionHandler` - 11/11 PASS).
+    - **`INV-06` Hoàn tất:** Phê duyệt kiểm kê & Cân bằng tồn kho (`ApproveStocktakeHandler` - 11/11 PASS).
+- **Gói ứng dụng thực thi:** Fat JAR đã được đóng gói mới nhất tại `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` (không nhúng `db.properties`, hoàn toàn tuân thủ quy tắc bảo mật).
+- **Bảo toàn 100% UI gốc (`6aabb85`) & Cổng an ninh:** Toàn bộ giao diện `LoginForm`, `MainDashboardFrame`, `ReceptionPanel`, `DoctorStationPanel` giữ nguyên 100% bố cục, kích thước, màu sắc và bảng cột gốc; các cổng `SEC-01`, `PAT-02`, `REC-01` giữ nguyên trạng thái `[~] In progress` (`default-deny`) chờ Owner chạy `./run-app.sh` nghiệm thu trực quan.
+- **Tổng hợp cổng nghiệm thu và điều kiện sẵn sàng Phase 1–7:** Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 (`SEC-01`, `REC-01`, `PAT-02`), Phase 3 (`VIS-01`, `APPT-01`), Phase 4 (`EMR-01` đến `EMR-04`), Phase 5 (`RX-01` đến `RX-04`, `CLS-01`), Phase 6 (`INV-01` đến `INV-06`) và Phase 7 (`BILL-01`, `BILL-02`) cùng bằng chứng kiểm định 1001 tests được tổng hợp đầy đủ tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+

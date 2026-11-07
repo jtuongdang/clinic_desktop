@@ -5,7 +5,11 @@ public enum HanhDongQuyen {
     TAO(2, "Tạo"),
     SUA(3, "Sửa"),
     XOA(4, "Xóa"),
-    DUYET(5, "Duyệt");
+    DUYET(5, "Duyệt"),
+    IN(6, "In"),
+    XUAT_FILE(7, "Xuất file"),
+    MO_KHOA_EMR(8, "Mở khóa EMR"),
+    AUDIT_READ(9, "Đọc nhật ký kiểm toán");
 
     private final int value;
     private final String description;

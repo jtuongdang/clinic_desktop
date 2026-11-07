@@ -169,6 +169,10 @@ public class MedicalPopupChooser extends JPanel {
         textField.setText(text);
     }
 
+    public void setItems(String[] items) {
+        list.setListData(items);
+    }
+
     public JTextField getTextField() {
         return textField;
     }
