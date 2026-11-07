@@ -1,7 +1,7 @@
 # REC-01 and SEC-01 Desktop Hardening Completion Review
 
 **Review date:** 2026-11-07  
-**Reviewed baseline:** `feature/patient-reception-workflow` at `e663e24`  
+**Reviewed baseline:** `feature/patient-reception-workflow` at `f150edc`  
 **Review type:** Read-only source/commit verification and focused synthetic headless tests.
 
 This review verifies the requested REC-01 and SEC-01 hardening slices against the current source, cited commits, focused test classes, and the existing completion reviews. It does not claim Owner visual acceptance or close any gate.
@@ -23,15 +23,23 @@ This review verifies the requested REC-01 and SEC-01 hardening slices against th
 | **FINDING-SEC-01-01 — Headless LoginForm/MainDashboardFrame helpers** | Headless tests cover LoginForm credential validation, error-message selection and login/session helper behavior ([`LoginForm`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java)); dashboard helper tests cover verified user-info formatting, Ribbon state synchronization and lock-overlay visibility/input blocking ([`MainDashboardFrame`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java)). | `527ba96` (task `1fa427ea`), `074aa71` (task `c7b085c5`) and `030e043` (task `cfe04e73`); [`LoginSessionFlowTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/auth/LoginSessionFlowTest.java), **8/8**, and [`DashboardNavigationPolicyTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/dashboard/DashboardNavigationPolicyTest.java), **6/6**. |
 | **FINDING-SEC-01-02 / 03 — Session mutation and user-dialog context source** | `UserSession.setStationId` and `setWorkstationId` are package-private; `MainDashboardFrame` reads user-dialog identity from the immutable `CompletedLoginSession` rather than the mutable singleton ([`UserSession`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/session/UserSession.java), [`MainDashboardFrame`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java)). | `b4e29f6` (task `bea9a713`); [`UserSessionContextTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/core/session/UserSessionContextTest.java), **8/8**. |
 
+## Wave 9 completion evidence (b69be2b, 669cf3f, f150edc)
+
+| Item | Verified implementation and evidence | Commit and focused tests |
+|---|---|---|
+| **`PLAT-ERROR-03` / `PLAT-ERROR-SWING-01` — LookAndFeel fallback logging & examination shortcut mask** | Restored narrow error handling in `Main.java` (`PLAT-ERROR-03` `installLookAndFeel` logging with `FlatLightLaf` fallback, catching specific reflective/ClassNotFound exceptions and rethrowing fatal JVM errors) ([`Main`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/Main.java)). Restored `ExaminationPanel.java` shortcut resolution helper `getMenuShortcutKeyMaskEx(Toolkit)` with safe headless fallback ([`ExaminationPanel`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/ExaminationPanel.java)). | `b69be2b` (task `80459e31` — `copilot-cli`): [`MainLookAndFeelTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/MainLookAndFeelTest.java), **2/2 PASS**; [`ExaminationShortcutMaskTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/examination/ExaminationShortcutMaskTest.java), **4/4 PASS**. |
+| **`PLAT-ERROR-DOCX-01` — Safe non-leaking DOCX save error handling** | Restored safe non-leaking save error handling in `DocxManager.java` (`PLAT-ERROR-DOCX-01`, utilizing static `toUserFacingSaveFailureMessage` returning fixed safe message without appending raw exception details or `ex.getMessage()` to prevent OS/path disclosure) ([`DocxManager`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/docx/DocxManager.java)). | `669cf3f` (task `7815363c` — `antigravity-cli`): [`DocxManagerTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/core/docx/DocxManagerTest.java), **1/1 PASS**; [`DocxDocumentTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/core/docx/DocxDocumentTest.java), **2/2 PASS**. |
+| **Desktop Main UI Preservation Review (Wave 1–8)** | Updated `desktop-main-ui-preservation-review.md` with Wave 1–8 preservation verification, confirming 100% adherence to `6aabb85` UI geometry, component hierarchy, and design standards across login, shell, reception, and doctor screens. | `f150edc` (task `81cd98ec` — `google-antigravity-cli-claude-sonnet-02507d`): [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md). |
+
 ## Verification run and gate preservation
 
-The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**) and the Application registration-handler tests above. Across the selected classes, **117 tests passed** (32 Application, 10 infrastructure, 75 desktop); **0 failures, 0 errors, 0 skipped**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
+The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, and the newly restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**). Across the reactor, **466 tests PASS (100 domain + 131 application + 118 infrastructure + 117 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
 
 ```sh
 mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
   -pl clinic-desktop,clinic-infrastructure -am \
   -Djava.awt.headless=true -Dsurefire.failIfNoSpecifiedTests=false \
-  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest \
+  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest,MainLookAndFeelTest,ExaminationShortcutMaskTest,DocxManagerTest,DocxDocumentTest \
   test
 ```
 
@@ -43,3 +51,4 @@ mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
 - [`phase2-sec01-desktop-auth-review.md`](phase2-sec01-desktop-auth-review.md)
 - [`03-model-task-board.md`](03-model-task-board.md)
 - [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)
+- [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md)
