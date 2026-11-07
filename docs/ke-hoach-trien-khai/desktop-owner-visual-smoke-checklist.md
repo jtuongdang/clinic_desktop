@@ -329,9 +329,11 @@ Kiểm tra lại trên `feature/patient-reception-workflow` tại `674f485` ngà
 
 ## 9. Updated Candidate Readiness Snapshot (2026-11-07 — leaderANTI)
 
-- **Candidate branch & commit:** `feature/patient-reception-workflow` at `e663e24` (457 passing reactor tests: 100 domain + 131 application + 118 infrastructure + 108 desktop; freshly packaged shaded jar `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar`).
+- **Candidate branch & commit:** `feature/patient-reception-workflow` at `b7c550b` (incorporating Waves 1–10 through `f150edc`, `797cc8c`, and `b7c550b`; **466 passing reactor tests**: 100 domain + 131 application + 118 infrastructure + 117 desktop, 0 failures, 0 errors, 4 opt-in SQL Server skips; freshly packaged shaded jar `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar`).
 - **Newly hardened desktop behaviors ready for Owner visual smoke:**
-  1. `MainDashboardFrame` 'Người Dùng' dialog reads verified `CompletedLoginSession`.
-  2. `ReceptionPanel` F1/F2 shortcuts, active room binding with duplicate room disambiguation (`TenPhong (#id)`), room summary tables with clearing on failure, 50-result search cap, and in-flight save form lock.
-  3. `SEC-01`, `PAT-02`, and `REC-01` remain default-deny pending Owner visual smoke sign-off.
+  1. `MainDashboardFrame` 'Người Dùng' dialog reads verified `CompletedLoginSession`, with headless lock/ribbon state sync helpers and `SessionLockOverlay` verification (`b4e29f6`, `074aa71`, `030e043`, `527ba96`).
+  2. `ReceptionPanel` F1/F2 shortcuts, active room binding with duplicate room disambiguation (`TenPhong (#id)`), room summary tables with clearing on failure, 50-result search cap, worker epoch guards, safe message sanitizer with correlation IDs, and in-flight save form lock (`035e815`, `2efc3a6`, `096e8c0`, `947853d`, `1235e91`, `4e4035d`, `1239784`, `13178f9`, `81bf3a4`).
+  3. Narrow platform error handling restored in `Main.java` (`PLAT-ERROR-03` `installLookAndFeel` fallback + `MainLookAndFeelTest`), `ExaminationPanel.java` (`getMenuShortcutKeyMaskEx(Toolkit)` + `ExaminationShortcutMaskTest`), and `DocxManager.java` (`PLAT-ERROR-DOCX-01` safe non-leaking save error message + `DocxManagerTest` / `DocxDocumentTest`) (`b69be2b`, `669cf3f`).
+  4. `SEC-01`, `PAT-02`, and `REC-01` remain default-deny (`[~] In progress`) pending Owner visual smoke sign-off.
+
 

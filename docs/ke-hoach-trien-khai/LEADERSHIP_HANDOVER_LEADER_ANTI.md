@@ -49,3 +49,60 @@ Ngay sau khi tiếp nhận bàn giao, `leaderANTI` đã thực thi ngay chuỗi 
 - **Tech Lead:** `leaderANTI`
 - **Tổ chức:** Clinic Management Orchestrator Autonomous Command
 - **Cam kết:** Bám sát từng chu kỳ, đồng hành cùng Owner đưa dự án về đích an toàn, chuẩn xác và đúng thiết kế ban đầu.
+
+---
+
+## 5. Nhật ký Điều hành Ca 2 của leaderANTI (07/11/2026 — Waves 1–10)
+
+### 5.1. Hợp đồng & Chế độ Điều phối
+- **Hợp đồng thực thi:** `b556c230-4b4f-4d5d-94bc-bf95ce4338d8` (*`leaderANTI Shift Resumption: REC-01 P1.3 Integration & P1.4/P1.7 Hardening`*).
+- **Trạng thái Worker Agents:**
+  - Theo lệnh trực tiếp của Owner (*"tạm ngừng giao tssk cho codex codex đang hết token"*), `codex-local` (`Codex CLI`) đã được tạm dừng (`enabled = 0` trong `orchestrator.sqlite3`) để tránh lỗi hết hạn mức token.
+  - Ba worker đang hoạt động 100% công suất dưới sự điều phối của `leaderANTI`:
+    1. `copilot-cli` (GitHub Copilot CLI)
+    2. `antigravity-cli` (Google Antigravity CLI — Gemini 3 Flash)
+    3. `google-antigravity-cli-claude-sonnet-02507d` (Claude Sonnet 4.6)
+
+### 5.2. Danh mục 36 Commits đã tích hợp trên `feature/patient-reception-workflow` (Waves 1–10)
+1. **`035e815`** (`bbafd718` — `antigravity-cli` + `leaderANTI`): `Repair REC-01 active room binding validation and test harness [leaderANTI]`
+2. **`a7f93fb`** (`cd124ec5` — `copilot-cli`): `Review REC-01 active room binding and tests [leaderANTI]`
+3. **`563f4d6`** (`1a2d14bf` — `antigravity-cli`): `Add synthetic JDBC tests for BaoHiemRepositoryImpl [leaderANTI]` (`10/10 PASS`)
+4. **`292056c`** (`8feaa9c5` — `copilot-cli`): `Review REC-01 P1.5 and P1.6 worker and search requirements [leaderANTI]`
+5. **`9c31675`** (`c0b2e97e` — `copilot-cli`): `Review REC-01 P2.8 safe error policy and correlation IDs [leaderANTI]`
+6. **`2efc3a6`** (`b58dc6e5` — `antigravity-cli`): `Bind ReceptionFooterBar F1/F2 shortcuts and residence reset [leaderANTI]` (`ReceptionActionBindingsTest` `2/2 PASS`, `PatientRegistrationFormPanelTest` `7/7 PASS`)
+7. **`096e8c0`** (`940e7d44` — `codex-local`): `Harden REC-01 ReceptionPanel form reset, room summaries, and F1/F2 [leaderANTI]`
+8. **`947853d`** (`162726ca` — `antigravity-cli`): `Harden ReceptionPanelMessagePolicy scope and sanitizer [leaderANTI]` (`ReceptionPanelMessagePolicyTest` `12/12 PASS`)
+9. **`b4c37e8`** (`5b7f4709` — `copilot-cli`): `Review REC-01 P1.4/P1.7 form reset, room summaries, and F1/F2 [leaderANTI]`
+10. **`1235e91`** (`92f0c249` — `copilot-cli`): `Harden PatientRegistrationFormPanel strict date parsing and age calculation [leaderANTI]`
+11. **`1062f79`** (`5e21267a` — `antigravity-cli`): `Set createdBy on new patient/insurance insert and root denial [leaderANTI]`
+12. **`4e4035d`** (`dcfadcaf` — `codex-local` + `leaderANTI`): `Harden REC-01 ReceptionPanel worker epoch, search cap, and audit IDs [leaderANTI]`
+13. **`fc49825`** (`ce5a22d0` — `copilot-cli`): `Review REC-01 P1.5/P1.6/P2.8 worker, search, and metadata hardening [leaderANTI]`
+14. **`57ace43`** (`de3b3e26` — `google-antigravity-cli-claude-sonnet-02507d`): `Sync 03-model-task-board.md with REC-01 hardening evidence [leaderANTI]`
+15. **`1239784`** (`29019069` — `copilot-cli`): `Harden ReceptionPanel refresh failure feedback and in-flight save lock [leaderANTI]`
+16. **`644a904`** (`1d345a43` — `antigravity-cli` + `leaderANTI`): `Add synthetic tests for ReceptionPanel worker epoch and search hardening [leaderANTI]` (`ReceptionPanelWorkerAndSearchHardeningTest` `12/12 PASS`)
+17. **`13178f9`** (`a81c2ec3` — `copilot-cli`): `Disambiguate duplicate room labels and clear rooms on failure [leaderANTI]` (`ReceptionPanelActiveRoomBindingTest` `7/7 PASS`)
+18. **`f24e6c1`** (`b44cf679` — `google-antigravity-cli-claude-sonnet-02507d`): `Update REC-01 worker/search review and task board for 644a904 [leaderANTI]`
+19. **`b4e29f6`** (`bea9a713` — `antigravity-cli` + `leaderANTI`): `Harden SEC-01 FINDING-02/03 UserSession and MainDashboardFrame [leaderANTI]` (`UserSessionContextTest` `8/8 PASS`)
+20. **`074aa71`** (`c7b085c5` — `copilot-cli`): `Add headless lock/ribbon sync and user info tests for MainDashboardFrame [leaderANTI]`
+21. **`bda120a`** (`feabbf50` — `antigravity-cli`): `Update REC-01 room binding review for commit 13178f9 [leaderANTI]`
+22. **`eca0105`** (`74aae030` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 review and task board for 13178f9 and b4e29f6 [leaderANTI]`
+23. **`81bf3a4`** (`aa3d1f92` — `copilot-cli`): `Clear stale room summaries on queue refresh failure in ReceptionPanel [leaderANTI]` (`ReceptionPanelFormResetAndSummaryTest` `8/8 PASS`)
+24. **`030e043`** (`cfe04e73` — `antigravity-cli`): `Add headless SessionLockOverlay state sync helper and test [leaderANTI]` (`DashboardNavigationPolicyTest` `6/6 PASS`)
+25. **`2730fe6`** (`3bedb025` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 and REC-01 preservation reviews and task board [leaderANTI]`
+26. **`527ba96`** (`1fa427ea` — `copilot-cli`): `Add headless LoginForm credential validation and error message tests [leaderANTI]` (`LoginSessionFlowTest` `8/8 PASS`)
+27. **`335352c`** (`75a36e40` — `antigravity-cli`): `Update REC-01 form reset and summary review for commit 81bf3a4 [leaderANTI]`
+28. **`e663e24`** (`ec66eb74` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 review and task board for Wave 6 commits 81bf3a4 and 030e043 [leaderANTI]`
+29. **`4fe51f5`** (`10061096` — `antigravity-cli`): `Update visual smoke checklist for candidate baseline e663e24 [leaderANTI]`
+30. **`9699dbe`** (`1aeff9cb` — `copilot-cli`): `Write REC-01 and SEC-01 desktop hardening completion review [leaderANTI]`
+31. **`09ef329`** (`876e0966` — `google-antigravity-cli-claude-sonnet-02507d`): `Update SEC-01 review and task board for Wave 7 commit 527ba96 [leaderANTI]`
+32. **`b69be2b`** (`80459e31` — `copilot-cli`): `Restore PLAT-ERROR-03 narrow error handling in Main and ExaminationPanel [leaderANTI]` (`MainLookAndFeelTest` `2/2 PASS`, `ExaminationShortcutMaskTest` `4/4 PASS`)
+33. **`669cf3f`** (`7815363c` — `antigravity-cli`): `Restore PLAT-ERROR-DOCX-01 safe save error message and DOCX tests [leaderANTI]` (`DocxManagerTest` `1/1 PASS`, `DocxDocumentTest` `2/2 PASS`)
+34. **`f150edc`** (`81cd98ec` — `google-antigravity-cli-claude-sonnet-02507d`): `Update desktop-main-ui-preservation-review.md with Wave 1-8 [leaderANTI]`
+35. **`797cc8c`** (`5630061f` — `copilot-cli`): `Audit PAT-02 DoctorStationPanel UI preservation vs 50c53ce and write wiring plan [leaderANTI]`
+36. **`b7c550b`** (`e572f1c2` — `google-antigravity-cli-claude-sonnet-02507d`): `Sync 03-model-task-board.md and completion review for Wave 9 [leaderANTI]`
+
+### 5.3. Trạng thái Kiểm thử & Sẵn sàng Nghiệm thu (`mvn -Djava.awt.headless=true clean verify`)
+- **Tổng số bài test tự động:** **466 tests PASS** (`100` domain + `131` application + `118` infrastructure + `117` desktop; `0` failures, `0` errors, `4` opt-in SQL Server skips).
+- **Gói ứng dụng thực thi:** Fat JAR đã được đóng gói mới nhất tại `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar` (không nhúng `db.properties`, hoàn toàn tuân thủ quy tắc bảo mật).
+- **Bảo toàn 100% UI gốc (`6aabb85`) & Cổng an ninh:** Toàn bộ giao diện `LoginForm`, `MainDashboardFrame`, `ReceptionPanel`, `DoctorStationPanel` giữ nguyên 100% bố cục, kích thước, màu sắc và bảng cột gốc; các cổng `SEC-01`, `PAT-02`, `REC-01` giữ nguyên trạng thái `[~] In progress` (`default-deny`) chờ Owner chạy `./run-app.sh` nghiệm thu trực quan.
+
