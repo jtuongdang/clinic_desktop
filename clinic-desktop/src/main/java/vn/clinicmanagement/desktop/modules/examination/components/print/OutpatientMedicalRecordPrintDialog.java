@@ -12,15 +12,28 @@ import java.awt.image.BufferedImage;
  */
 public class OutpatientMedicalRecordPrintDialog extends JDialog {
 
+    private final OutpatientMedicalRecordPrintPanel previewPanel;
+
     public OutpatientMedicalRecordPrintDialog(Window owner) {
-        super(owner, "EHC - Bệnh án điện tử  --- Người đăng nhập: bennv --  --- Version: 2022.3.11.1 ---  -- BC11-MVJ17690 - Bệnh án khám khám bệnh viện", ModalityType.MODELESS);
+        this(owner, null);
+    }
+
+    public OutpatientMedicalRecordPrintDialog(
+            Window owner,
+            MedicalRecordPrintPreviewPanel.MedicalRecordData data) {
+        super(owner, "Bệnh án ngoại trú - Bản xem trước", ModalityType.MODELESS);
 
         setIconImage(createCrossIconImage());
         setSize(1200, 840);
         setMinimumSize(new Dimension(1000, 700));
         setLocationRelativeTo(owner);
 
-        setContentPane(new OutpatientMedicalRecordPrintPanel());
+        previewPanel = new OutpatientMedicalRecordPrintPanel(data);
+        setContentPane(previewPanel);
+    }
+
+    public void bindData(MedicalRecordPrintPreviewPanel.MedicalRecordData data) {
+        previewPanel.bindData(data);
     }
 
     private static Image createCrossIconImage() {

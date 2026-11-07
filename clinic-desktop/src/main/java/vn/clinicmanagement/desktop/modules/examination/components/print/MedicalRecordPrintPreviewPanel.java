@@ -10,6 +10,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
+import java.util.Objects;
 
 /**
  * Giao diện Xem và In: "BỆNH ÁN KHÁM BỆNH - CHUYÊN KHOA TAI - MŨI - HỌNG" (EHC EMR Print Station).
@@ -22,18 +23,47 @@ import java.awt.geom.RoundRectangle2D;
  *   + [✕ Hủy Tài Liệu] (disabled)
  *   + Xuất file... [📄 PDF] [☰ ▾]
  *   + Dòng chữ đỏ chân trang: "Chưa Ký !"
- * - Thanh công cụ đỉnh:
- *   + Cụm trái: [🖨 In Tài Liệu], Loại chữ ký : ---, Hiệu lực : ---, [✔ Kiểm Tra]
- *   + Cụm phải: Banner bệnh nhân TEST1 | 22000324 | 2000 (22 tuổi) | Nam | BHYT 80%
- * - Vùng trung tâm: Trang giấy A4 mô phỏng chuẩn xác mẫu bệnh án chuyên khoa Tai - Mũi - Họng
- *   + Phần I. HÀNH CHÍNH (Đầy đủ các ô mã số, hộp tích, số thẻ BHYT, địa chỉ)
- *   + Phần II. LÝ DO VÀO VIỆN
- *   + Phần III. HỎI BỆNH
- *   + Phần IV. KHÁM XÉT (Toàn thân, Bệnh chuyên khoa: TAI, MŨI, HỌNG)
  */
 public class MedicalRecordPrintPreviewPanel extends JPanel {
 
+    public record MedicalRecordData(
+            String patientName,
+            String patientCode,
+            String birthYear,
+            String gender,
+            String bhyt,
+            String address,
+            String recordNumber,
+            String reason,
+            String illnessHistory,
+            String personalHistory,
+            String familyHistory,
+            String examination,
+            String diagnosis,
+            String treatmentPlan) {}
+
+    private MedicalRecordData data;
+
     public MedicalRecordPrintPreviewPanel() {
+        rebuildUi();
+    }
+
+    public MedicalRecordPrintPreviewPanel(MedicalRecordData data) {
+        this.data = data;
+        rebuildUi();
+    }
+
+    public void bindData(MedicalRecordData data) {
+        this.data = data;
+        rebuildUi();
+    }
+
+    public MedicalRecordData getBoundData() {
+        return data;
+    }
+
+    private void rebuildUi() {
+        removeAll();
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -56,6 +86,8 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
         centerContainer.add(scrollPane, BorderLayout.CENTER);
 
         add(centerContainer, BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     private JPanel buildTopToolBar() {
@@ -80,10 +112,7 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
         ));
         btnPrint.addActionListener(e -> {
             JOptionPane.showMessageDialog(this,
-                    "Hệ thống đang gửi lệnh in tài liệu tới máy in mặc định:\n" +
-                    "▶ Mẫu in: BỆNH ÁN KHÁM BỆNH (CHUYÊN KHOA TAI - MŨI - HỌNG)\n" +
-                    "▶ Bệnh nhân: TEST1 (Mã BN: 22000324)\n" +
-                    "▶ Số khám bệnh: 22/000063",
+                    hasRecordData() ? "Hồ sơ bệnh án đã sẵn sàng để in." : "Chưa có dữ liệu bệnh án để in.",
                     "In Tài Liệu", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -122,15 +151,15 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
         bannerText.setOpaque(false);
         bannerText.setBorder(new EmptyBorder(0, 0, 0, 8));
 
-        JLabel l1 = new JLabel("TEST1 | 22000324 | 2000 (22 tuổi) | Nam", SwingConstants.RIGHT);
+        JLabel l1 = new JLabel(patientBannerText(), SwingConstants.RIGHT);
         l1.setFont(AppFonts.SMALL_BOLD);
         l1.setForeground(new Color(130, 20, 20));
 
-        JLabel l2 = new JLabel("Mã VP : 214348 | DN-4-01-2929299222 | Còn 864 ngày", SwingConstants.RIGHT);
+        JLabel l2 = new JLabel(value(data == null ? null : data.bhyt()), SwingConstants.RIGHT);
         l2.setFont(AppFonts.SMALL);
         l2.setForeground(new Color(130, 20, 20));
 
-        JLabel l3 = new JLabel("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh", SwingConstants.RIGHT);
+        JLabel l3 = new JLabel(value(data == null ? null : data.address()), SwingConstants.RIGHT);
         l3.setFont(AppFonts.SMALL);
         l3.setForeground(new Color(130, 20, 20));
 
@@ -202,8 +231,7 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
         btnPdf.setBorder(new LineBorder(new Color(185, 195, 210), 1));
         btnPdf.addActionListener(e -> {
             JOptionPane.showMessageDialog(this,
-                    "Đang xuất hồ sơ bệnh án ra tệp định dạng PDF:\n" +
-                    "▶ Tệp: BenhAn_TaiMuiHong_TEST1_22000324.pdf",
+                    hasRecordData() ? "Hồ sơ bệnh án đã sẵn sàng để xuất PDF." : "Chưa có dữ liệu bệnh án để xuất PDF.",
                     "Xuất PDF", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -273,17 +301,45 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
         return wrapper;
     }
 
+    private boolean hasRecordData() {
+        return data != null && (!value(data.patientName()).isEmpty()
+                || !value(data.patientCode()).isEmpty()
+                || !value(data.illnessHistory()).isEmpty()
+                || !value(data.diagnosis()).isEmpty()
+                || !value(data.treatmentPlan()).isEmpty());
+    }
+
+    private String patientBannerText() {
+        if (data == null) return "";
+        return String.join(" | ", java.util.stream.Stream.of(
+                value(data.patientName()), value(data.patientCode()), value(data.birthYear()), value(data.gender())
+        ).filter(text -> !text.isEmpty()).toList());
+    }
+
+    private String recordAccessibleText() {
+        if (data == null) return "Chưa có dữ liệu bệnh án.";
+        return (patientBannerText() + " " + value(data.bhyt()) + " "
+                + value(data.illnessHistory()) + " " + value(data.personalHistory()) + " "
+                + value(data.familyHistory()) + " " + value(data.examination()) + " "
+                + value(data.diagnosis()) + " " + value(data.treatmentPlan())).trim();
+    }
+
+    private static String value(String text) {
+        return Objects.requireNonNullElse(text, "");
+    }
+
     // =========================================================================
     // TRANG GIẤY IN A4: BỆNH ÁN TAI - MŨI - HỌNG (VẼ ĐỒ HỌA CHÍNH XÁC 1:1)
     // =========================================================================
 
-    private static class ENTMedicalRecordSheet extends JPanel {
+    private class ENTMedicalRecordSheet extends JPanel {
         private final int sheetW = 760;
         private final int sheetH = 1060;
 
         public ENTMedicalRecordSheet() {
             setPreferredSize(new Dimension(sheetW, sheetH));
             setBackground(Color.WHITE);
+            getAccessibleContext().setAccessibleName(recordAccessibleText());
             setBorder(BorderFactory.createCompoundBorder(
                     new LineBorder(new Color(140, 150, 165), 1),
                     new EmptyBorder(28, 36, 28, 36)
@@ -299,6 +355,13 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
             // Nền giấy trắng
             g2.setColor(Color.WHITE);
             g2.fillRect(0, 0, getWidth(), getHeight());
+            if (!hasRecordData()) {
+                g2.setColor(new Color(90, 98, 110));
+                g2.setFont(new Font("SansSerif", Font.PLAIN, 16));
+                g2.drawString("Chưa có dữ liệu bệnh án.", 40, 80);
+                g2.dispose();
+                return;
+            }
 
             Font fSerif = new Font("Times New Roman", Font.PLAIN, 12);
             Font fSerifBold = new Font("Times New Roman", Font.BOLD, 12);
@@ -319,7 +382,7 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
             g2.drawString("BỆNH VIỆN SẢN NHI", xL, y + 15);
 
             g2.setFont(fSerif);
-            String strSoKB = "Số khám bệnh: 22/000063";
+            String strSoKB = "Số khám bệnh: " + value(data.recordNumber());
             g2.drawString(strSoKB, xR - g2.getFontMetrics().stringWidth(strSoKB), y);
 
             // 2. TIÊU ĐỀ CHÍNH GIỮA TRANG
@@ -350,56 +413,44 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
             g2.setFont(fSerif);
             g2.drawString("1. Họ và tên (In hoa):", xL, y);
             g2.setFont(fSerifBold);
-            g2.drawString("TEST1", xL + 120, y);
+            g2.drawString(value(data.patientName()), xL + 120, y);
 
             g2.setFont(fSerif);
             g2.drawString("2. Sinh ngày:", xL + 290, y);
             drawCodeBox(g2, xL + 360, y - 12, new String[]{"", ""});
             drawCodeBox(g2, xL + 400, y - 12, new String[]{"", ""});
-            drawCodeBox(g2, xL + 440, y - 12, new String[]{"2", "0", "0", "0"});
+            drawCodeBox(g2, xL + 440, y - 12, value(data.birthYear()).chars()
+                    .mapToObj(character -> String.valueOf((char) character)).toArray(String[]::new));
 
             g2.drawString("Tuổi", xL + 560, y - 14);
-            drawCodeBox(g2, xL + 555, y - 12, new String[]{"2", "2"});
+            drawCodeBox(g2, xL + 555, y - 12, new String[2]);
 
-            // Hàng 2: Giới: 1. Nam [X] 2. Nữ [ ] | Nghề nghiệp: Nhân dân [1][3]
             y += 24;
             g2.drawString("3. Giới:", xL, y);
             g2.drawString("1. Nam", xL + 55, y);
-            drawCheckSquare(g2, xL + 95, y - 11, true);
+            drawCheckSquare(g2, xL + 95, y - 11, "Nam".equalsIgnoreCase(value(data.gender())));
             g2.drawString("2. Nữ", xL + 125, y);
-            drawCheckSquare(g2, xL + 155, y - 11, false);
+            drawCheckSquare(g2, xL + 155, y - 11, "Nữ".equalsIgnoreCase(value(data.gender())));
 
-            g2.drawString("4. Nghề nghiệp: Nhân dân", xL + 215, y);
-            drawCodeBox(g2, xL + 555, y - 12, new String[]{"1", "3"});
+            g2.drawString("4. Nghề nghiệp:", xL + 215, y);
 
-            // Hàng 3: Dân tộc: Kinh [2][5] | Ngoại kiều: Việt nam [V][N]
             y += 24;
-            g2.drawString("5. Dân tộc: Kinh", xL, y);
-            drawCodeBox(g2, xL + 140, y - 12, new String[]{"2", "5"});
+            g2.drawString("5. Dân tộc:", xL, y);
 
-            g2.drawString("6. Ngoại kiều: Việt nam", xL + 215, y);
-            drawCodeBox(g2, xL + 555, y - 12, new String[]{"V", "N"});
+            g2.drawString("6. Ngoại kiều:", xL + 215, y);
 
-            // Hàng 4: Địa chỉ: Số nhà: ... Thôn, phố: ... Xã, phường: Thị trấn Phố Mới
             y += 24;
-            g2.drawString("7. Địa chỉ: Số nhà:", xL, y);
-            g2.drawString("Thôn, phố:", xL + 180, y);
-            g2.drawString("Xã, phường: Thị trấn Phố Mới", xL + 340, y);
+            g2.drawString("7. Địa chỉ: " + value(data.address()), xL, y);
 
-            // Hàng 5: Huyện (Q. Tx): H. Quế Võ [0][3] | Tỉnh, thành phố: Bắc Ninh [2]
             y += 24;
-            g2.drawString("Huyện (Q. Tx): H. Quế Võ", xL, y);
-            drawCodeBox(g2, xL + 145, y - 12, new String[]{"0", "3"});
-
-            g2.drawString("Tỉnh, thành phố: Bắc Ninh", xL + 215, y);
-            drawCodeBox(g2, xL + 568, y - 12, new String[]{"2"});
+            g2.drawString("Số thẻ BHYT: " + value(data.bhyt()), xL, y);
 
             // Hàng 6: Nơi làm việc | Đối tượng: 1.BHYT [X] 2.Thu phí [ ] 3.Miễn [ ] 4.Khác [ ]
             y += 24;
             g2.drawString("8. Nơi làm việc:", xL, y);
 
             g2.drawString("9. Đối tượng:  1.BHYT", xL + 215, y);
-            drawCheckSquare(g2, xL + 330, y - 11, true);
+            drawCheckSquare(g2, xL + 330, y - 11, !value(data.bhyt()).isEmpty());
             g2.drawString("2.Thu phí", xL + 355, y);
             drawCheckSquare(g2, xL + 405, y - 11, false);
             g2.drawString("3.Miễn", xL + 430, y);
@@ -407,12 +458,8 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
             g2.drawString("4.Khác", xL + 495, y);
             drawCheckSquare(g2, xL + 535, y - 11, false);
 
-            // Hàng 7: BHYT giá trị đến ngày 01 tháng 01 năm 2025 | Số thẻ BHYT [DN][4][01][29][292][99222]
             y += 24;
-            g2.drawString("10. BHYT giá trị đến ngày 01 tháng 01 năm 2025", xL, y);
-
-            g2.drawString("Số thẻ BHYT", xL + 310, y);
-            drawCardBox(g2, xL + 380, y - 12, new String[]{"DN", "4", "01", "29", "292", "99222"}, new int[]{22, 16, 20, 20, 28, 38});
+            g2.drawString("10. Thời hạn BHYT:", xL, y);
 
             // Hàng 8: Họ tên, địa chỉ người nhà khi cần báo tin
             y += 24;
@@ -430,30 +477,39 @@ public class MedicalRecordPrintPreviewPanel extends JPanel {
             y += 30;
             g2.setFont(fSerifBold);
             g2.drawString("II. LÝ DO VÀO VIỆN:", xL, y);
+            y += 18;
+            g2.setFont(fSerif);
+            g2.drawString(value(data.reason()), xL, y);
 
             // 5. PHẦN III. HỎI BỆNH
             y += 28;
+            g2.setFont(fSerifBold);
             g2.drawString("III. HỎI BỆNH:", xL, y);
             y += 20;
             g2.setFont(fSerif);
-            g2.drawString("1. Quá trình bệnh lý:", xL, y);
+            g2.drawString("1. Quá trình bệnh lý: " + value(data.illnessHistory()), xL, y);
+            y += 18;
+            g2.drawString("2. Tiền sử bản thân: " + value(data.personalHistory()), xL, y);
+            y += 18;
+            g2.drawString("3. Tiền sử gia đình: " + value(data.familyHistory()), xL, y);
 
             // 6. PHẦN IV. KHÁM XÉT
             y += 34;
             g2.setFont(fSerifBold);
-            g2.drawString("IV. KHÁM XÉT: 1. Toàn thân:", xL, y);
+            g2.drawString("IV. KHÁM XÉT:", xL, y);
 
             y += 30;
-            g2.drawString("2. Bệnh chuyên khoa:", xL, y);
+            g2.setFont(fSerif);
+            g2.drawString("Khám lâm sàng: " + value(data.examination()), xL, y);
 
             y += 28;
-            g2.drawString("TAI:", xL + 120, y);
+            g2.drawString("Chẩn đoán: " + value(data.diagnosis()), xL, y);
 
             y += 48;
-            g2.drawString("MŨI:", xL + 120, y);
+            g2.drawString("Hướng điều trị: " + value(data.treatmentPlan()), xL, y);
 
             y += 48;
-            g2.drawString("HỌNG:", xL + 120, y);
+            g2.drawString("TAI - MŨI - HỌNG:", xL + 120, y);
 
             g2.dispose();
         }

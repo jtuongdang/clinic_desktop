@@ -4,17 +4,26 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Cửa sổ Dialog Xem và In Bệnh Án Khám Bệnh (Chuyên khoa Tai - Mũi - Họng).
- * Khớp 100% tiêu đề và giao diện trong ảnh chụp thực tế:
- * "EHC - Bệnh Án Điện Tử  --- Người đăng nhập: tiennv --  --- Version: 2022.8.17.1 ---  -- BC23-MR317707 - Bệnh an Tai Mũi Họng"
+ * Cửa sổ xem và in bệnh án khám bệnh.
  */
 public class MedicalRecordPrintPreviewDialog extends JDialog {
 
+    private final MedicalRecordPrintPreviewPanel previewPanel;
+
     public MedicalRecordPrintPreviewDialog(Window owner) {
-        super(owner, "EHC - Bệnh Án Điện Tử  --- Người đăng nhập: tiennv --  --- Version: 2022.8.17.1 ---  -- BC23-MR317707 - Bệnh an Tai Mũi Họng", ModalityType.MODELESS);
+        this(owner, null);
+    }
+
+    public MedicalRecordPrintPreviewDialog(Window owner, MedicalRecordPrintPreviewPanel.MedicalRecordData data) {
+        super(owner, "Bệnh án khám bệnh - Bản xem trước", ModalityType.MODELESS);
         setSize(1200, 840);
         setMinimumSize(new Dimension(1000, 700));
         setLocationRelativeTo(owner);
-        setContentPane(new MedicalRecordPrintPreviewPanel());
+        previewPanel = new MedicalRecordPrintPreviewPanel(data);
+        setContentPane(previewPanel);
+    }
+
+    public void bindData(MedicalRecordPrintPreviewPanel.MedicalRecordData data) {
+        previewPanel.bindData(data);
     }
 }

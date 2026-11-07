@@ -12,15 +12,26 @@ import java.awt.image.BufferedImage;
  */
 public class PrescriptionPrintPreviewDialog extends JDialog {
 
+    private final PrescriptionPrintPreviewPanel previewPanel;
+
     public PrescriptionPrintPreviewDialog(Window owner) {
-        super(owner, "EHC - Bệnh Án Điện Tử  --- Người đăng nhập: henvv --  --- Version: 2022.8.11.1 ---  -- BC505 DONTHUOC2614 - Đơn Thuốc", ModalityType.MODELESS);
+        this(owner, null);
+    }
+
+    public PrescriptionPrintPreviewDialog(Window owner, PrescriptionPrintPreviewPanel.PrescriptionData data) {
+        super(owner, "Đơn thuốc - Bản xem trước", ModalityType.MODELESS);
 
         setIconImage(createCrossIconImage());
         setSize(1200, 840);
         setMinimumSize(new Dimension(1000, 700));
         setLocationRelativeTo(owner);
 
-        setContentPane(new PrescriptionPrintPreviewPanel());
+        previewPanel = new PrescriptionPrintPreviewPanel(data);
+        setContentPane(previewPanel);
+    }
+
+    public void bindData(PrescriptionPrintPreviewPanel.PrescriptionData data) {
+        previewPanel.bindData(data);
     }
 
     private static Image createCrossIconImage() {

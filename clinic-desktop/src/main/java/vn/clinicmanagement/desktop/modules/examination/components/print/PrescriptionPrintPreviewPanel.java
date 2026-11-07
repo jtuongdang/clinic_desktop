@@ -9,55 +9,53 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Path2D;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Giao diện Xem và In: "ĐƠN THUỐC" (BC505 DONTHUOC2614 - Đơn Thuốc).
  * Kích hoạt khi người dùng nhấn nút [🖨 Đơn Thuốc (F3)] trên tab Thuốc.
- * Khớp 100% media_1793381314310_56e47612.jpg:
- * - Cột chức năng bên trái (Bệnh án điện tử):
- *   + [✍ Ký Tài Liệu]
- *   + [☑ Duyệt Tài Liệu] (disabled)
- *   + [💾 Lưu Tài Liệu]
- *   + [✕ Hủy Tài Liệu] (disabled)
- *   + Xuất file... [📄 PDF] [☰ ▾]
- *   + Dòng chữ đỏ chân trang: "Chưa ký 1"
- * - Thanh công cụ đỉnh:
- *   + Cụm trái: [🖨 In Tài Liệu], Loại chữ ký : ---, Hiệu lực : ---, [✔ Kiểm tra]
- *   + Cụm phải: Banner thông tin bệnh nhân:
- *     TEST1 | 22000324 | 2000 (22 tuổi) | Nam | BHYT 80%
- *     Mã VP : 214348 | DN-4-01-2929299222 | Còn 864 ngày
- *     Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh
- * - Vùng trung tâm: Trang giấy A4 mô phỏng bản in "ĐƠN THUỐC"
- *   + Đơn vị: BỆNH VIỆN SẢN NHI / PK Nhi 1 / Kho thuốc ngoại trú
- *   + Mã BN: 22000324
- *   + Tiêu đề: ĐƠN THUỐC
- *   + Thông tin bệnh nhân: Họ tên, Tuổi, Cân nặng, Giới tính, Đối tượng, Số thẻ BHYT, Hạn thẻ, Địa chỉ, Chẩn đoán
- *   + Danh mục thuốc kê đơn:
- *     1. Lactulose (Duphalac) 10g/15ml - 02 Gói (Uống (...))
- *     2. Aciclovir (Aciclovir 5%) 5%/5g - 01 Tuýp (Dùng ngoài (...))
- *   + Tổng khoản: 02, Lời dặn
- *   + Chữ ký BÁC SỸ KHÁM (chữ ký mực xanh vector + tên BS: tiennv)
- *   + Dòng ghi chú chân trang: "Khám lại xin mang theo đơn này."
  */
 public class PrescriptionPrintPreviewPanel extends JPanel {
 
-    private String patientCode = "22000324";
-    private String patientName = "TEST1";
-    private String patientBirthYear = "2000";
-    private String patientAge = "22";
-    private String patientGender = "Nam";
-    private String patientBhyt = "DN-4-01-2929299222";
-    private String patientExpiry = "01/01/2025";
-    private String patientAddress = "Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh";
-    private String patientDiagnosis = "A00.1-Bệnh tả do Vibrio cholerae 01, typ sinh học eltor";
-    private String invoiceCode = "214348";
-    private String daysLeft = "Còn 864 ngày";
-    private String clinicName = "PK Nhi 1";
-    private String pharmacyName = "Kho thuốc ngoại trú";
-    private String orderDateStr = "14:20 Ngày 22 tháng 08 năm 2022";
-    private String doctorName = "tiennv";
+    public record PrescriptionItem(String name, String quantity, String unit, String instructions) {}
+
+    public record PrescriptionData(
+            String patientName,
+            String patientCode,
+            String birthYear,
+            String gender,
+            String bhyt,
+            String diagnosis,
+            List<PrescriptionItem> medicines,
+            String doctorName) {
+        public PrescriptionData {
+            medicines = medicines == null ? List.of() : List.copyOf(medicines);
+        }
+    }
+
+    private PrescriptionData data;
 
     public PrescriptionPrintPreviewPanel() {
+        rebuildUi();
+    }
+
+    public PrescriptionPrintPreviewPanel(PrescriptionData data) {
+        this.data = data;
+        rebuildUi();
+    }
+
+    public void bindData(PrescriptionData data) {
+        this.data = data;
+        rebuildUi();
+    }
+
+    public PrescriptionData getBoundData() {
+        return data;
+    }
+
+    private void rebuildUi() {
+        removeAll();
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -81,6 +79,8 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
         centerContainer.add(scrollPane, BorderLayout.CENTER);
 
         add(centerContainer, BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     private JPanel buildTopToolBar() {
@@ -105,10 +105,7 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
         ));
         btnPrint.addActionListener(e -> {
             JOptionPane.showMessageDialog(this,
-                    "Hệ thống đang gửi lệnh in đơn thuốc tới máy in mặc định:\n" +
-                    "▶ Mẫu in: ĐƠN THUỐC BÁC SĨ (BC505 DONTHUOC2614)\n" +
-                    "▶ Bệnh nhân: " + patientName + " (Mã BN: " + patientCode + ")\n" +
-                    "▶ Khoa/Kho: " + clinicName + " - " + pharmacyName,
+                    hasPrescriptionData() ? "Đơn thuốc đã sẵn sàng để in." : "Chưa có dữ liệu đơn thuốc để in.",
                     "In Đơn Thuốc", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -145,22 +142,22 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
 
         JPanel line1 = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         line1.setOpaque(false);
-        JLabel lblPtName = new JLabel(patientName + " | " + patientCode + " | " + patientBirthYear + " (" + patientAge + " tuổi) | " + patientGender);
+        JLabel lblPtName = new JLabel(patientBannerText());
         lblPtName.setFont(AppFonts.SMALL_BOLD);
         lblPtName.setForeground(new Color(140, 20, 20));
 
-        JLabel lblBhyt = new JLabel("BHYT 80%");
+        JLabel lblBhyt = new JLabel(value(data == null ? null : data.bhyt()));
         lblBhyt.setFont(AppFonts.SMALL_BOLD);
         lblBhyt.setForeground(new Color(180, 20, 20));
 
         line1.add(lblPtName);
         line1.add(lblBhyt);
 
-        JLabel lblLine2 = new JLabel("Mã VP : " + invoiceCode + " | " + patientBhyt + " | " + daysLeft, SwingConstants.RIGHT);
+        JLabel lblLine2 = new JLabel(value(data == null ? null : data.patientCode()), SwingConstants.RIGHT);
         lblLine2.setFont(new Font("Segoe UI", Font.PLAIN, 10));
         lblLine2.setForeground(new Color(60, 65, 75));
 
-        JLabel lblLine3 = new JLabel(patientAddress, SwingConstants.RIGHT);
+        JLabel lblLine3 = new JLabel(value(data == null ? null : data.birthYear()), SwingConstants.RIGHT);
         lblLine3.setFont(new Font("Segoe UI", Font.PLAIN, 10));
         lblLine3.setForeground(new Color(60, 65, 75));
 
@@ -233,8 +230,7 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
         btnPdf.setBorder(new LineBorder(new Color(185, 195, 210), 1));
         btnPdf.addActionListener(e -> {
             JOptionPane.showMessageDialog(this,
-                    "Đang xuất đơn thuốc ra tệp định dạng PDF:\n" +
-                    "▶ Tệp: DonThuoc_TEST1_22000324.pdf",
+                    hasPrescriptionData() ? "Đơn thuốc đã sẵn sàng để xuất PDF." : "Chưa có dữ liệu đơn thuốc để xuất PDF.",
                     "Xuất PDF", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -295,6 +291,35 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
         return btn;
     }
 
+    private boolean hasPrescriptionData() {
+        return data != null && (!value(data.patientName()).isEmpty()
+                || !value(data.patientCode()).isEmpty() || !data.medicines().isEmpty());
+    }
+
+    private String patientBannerText() {
+        if (data == null) return "";
+        return String.join(" | ", List.of(
+                value(data.patientName()),
+                value(data.patientCode()),
+                value(data.birthYear()),
+                value(data.gender())
+        ).stream().filter(text -> !text.isEmpty()).toList());
+    }
+
+    private String prescriptionAccessibleText() {
+        if (data == null) return "Chưa có dữ liệu đơn thuốc.";
+        String medicines = data.medicines().stream()
+                .map(item -> value(item.name()) + " " + value(item.quantity()) + " " + value(item.unit())
+                        + " " + value(item.instructions()))
+                .reduce("", (all, item) -> all + " " + item);
+        return (patientBannerText() + " " + value(data.bhyt()) + " "
+                + value(data.diagnosis()) + medicines).trim();
+    }
+
+    private static String value(String text) {
+        return Objects.requireNonNullElse(text, "");
+    }
+
     /**
      * Tờ giấy A4 mô phỏng "ĐƠN THUỐC"
      */
@@ -307,6 +332,7 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
             setOpaque(true);
             setBackground(new Color(105, 115, 128));
             setPreferredSize(new Dimension(PAGE_W + 60, PAGE_H + 50));
+            getAccessibleContext().setAccessibleName(prescriptionAccessibleText());
         }
 
         @Override
@@ -333,21 +359,25 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
 
             int padX = x + 40;
             int topY = y + 30;
+            if (!hasPrescriptionData()) {
+                g2.setColor(new Color(90, 98, 110));
+                g2.setFont(new Font("SansSerif", Font.PLAIN, 16));
+                g2.drawString("Chưa có dữ liệu đơn thuốc.", padX, topY + 40);
+                g2.dispose();
+                return;
+            }
 
             // --- HEADER ---
-            // Góc trái: BỆNH VIỆN SẢN NHI / PK Nhi 1 / Kho thuốc ngoại trú
             g2.setColor(Color.BLACK);
             g2.setFont(new Font("Times New Roman", Font.BOLD, 12));
             g2.drawString("BỆNH VIỆN SẢN NHI", padX, topY + 12);
 
             g2.setFont(new Font("Times New Roman", Font.PLAIN, 11));
-            g2.drawString(clinicName, padX, topY + 28);
-            g2.drawString(pharmacyName, padX, topY + 44);
+            g2.drawString("", padX, topY + 28);
 
-            // Góc phải: Mã BN: 22000324
             int rightX = x + PAGE_W - 160;
             g2.setFont(new Font("Times New Roman", Font.BOLD, 11));
-            g2.drawString("Mã BN: " + patientCode, rightX, topY + 14);
+            g2.drawString("Mã BN: " + value(data.patientCode()), rightX, topY + 14);
 
             // Tiêu đề giữa: ĐƠN THUỐC
             int curY = topY + 80;
@@ -363,10 +393,10 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
             int lineH = 18;
 
             // Dòng 1: Họ tên, Tuổi, Cân nặng, Giới tính
-            g2.drawString("- Họ tên: " + patientName, padX, curY);
-            g2.drawString("Tuổi: " + patientAge, padX + 260, curY);
+            g2.drawString("- Họ tên: " + value(data.patientName()), padX, curY);
+            g2.drawString("Năm sinh: " + value(data.birthYear()), padX + 260, curY);
             g2.drawString("Cân nặng:", padX + 360, curY);
-            g2.drawString(patientGender, padX + 480, curY);
+            g2.drawString(value(data.gender()), padX + 480, curY);
 
             // Dòng 2: Đối tượng
             curY += lineH;
@@ -374,52 +404,38 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
 
             // Dòng 3: Số thẻ BHYT, Hạn thẻ
             curY += lineH;
-            g2.drawString("- Số thẻ BHYT: " + patientBhyt, padX, curY);
-            g2.drawString("- Hạn thẻ đến: " + patientExpiry, padX + 270, curY);
+            g2.drawString("- Số thẻ BHYT: " + value(data.bhyt()), padX, curY);
 
-            // Dòng 4: Địa chỉ
             curY += lineH;
-            g2.drawString("- Địa chỉ: " + patientAddress, padX, curY);
-
-            // Dòng 5: Chẩn đoán
-            curY += lineH;
-            g2.drawString("- Chẩn đoán: " + patientDiagnosis, padX, curY);
-
-            // Dòng 6: Chẩn đoán kèm theo
-            curY += lineH;
-            g2.drawString("- Chẩn đoán kèm theo:", padX, curY);
+            g2.drawString("- Chẩn đoán: " + value(data.diagnosis()), padX, curY);
 
             // --- DANH SÁCH THUỐC KÊ ĐƠN ---
             curY += 28;
             int rightColX = x + PAGE_W - 110;
 
-            // Thuốc 1: Lactulose (Duphalac) 10g/15ml
             g2.setFont(new Font("Times New Roman", Font.PLAIN, 11));
-            g2.drawString("1.     Lactulose (Duphalac) 10g/15ml", padX, curY);
-            g2.setFont(new Font("Times New Roman", Font.BOLD, 11));
-            g2.drawString("02", rightColX - 35, curY);
-            g2.drawString("Gói", rightColX, curY);
-
-            curY += 16;
-            g2.setFont(new Font("Times New Roman", Font.ITALIC, 11));
-            g2.drawString("Uống (...)", padX + 30, curY);
-
-            // Thuốc 2: Aciclovir (Aciclovir 5%) 5%/5g
-            curY += 22;
-            g2.setFont(new Font("Times New Roman", Font.PLAIN, 11));
-            g2.drawString("2.     Aciclovir (Aciclovir 5%) 5%/5g", padX, curY);
-            g2.setFont(new Font("Times New Roman", Font.BOLD, 11));
-            g2.drawString("01", rightColX - 35, curY);
-            g2.drawString("Tuýp", rightColX, curY);
-
-            curY += 16;
-            g2.setFont(new Font("Times New Roman", Font.ITALIC, 11));
-            g2.drawString("Dùng ngoài (...)", padX + 30, curY);
+            if (data.medicines().isEmpty()) {
+                g2.drawString("Chưa có thuốc được kê.", padX, curY);
+                curY += 18;
+            } else {
+                for (int i = 0; i < data.medicines().size(); i++) {
+                    PrescriptionItem item = data.medicines().get(i);
+                    g2.setFont(new Font("Times New Roman", Font.PLAIN, 11));
+                    g2.drawString((i + 1) + ".     " + value(item.name()), padX, curY);
+                    g2.setFont(new Font("Times New Roman", Font.BOLD, 11));
+                    g2.drawString(value(item.quantity()), rightColX - 35, curY);
+                    g2.drawString(value(item.unit()), rightColX, curY);
+                    curY += 16;
+                    g2.setFont(new Font("Times New Roman", Font.ITALIC, 11));
+                    g2.drawString(value(item.instructions()), padX + 30, curY);
+                    curY += 22;
+                }
+            }
 
             // --- TỔNG KHOẢN & LỜI DẶN ---
-            curY += 28;
+            curY += 6;
             g2.setFont(new Font("Times New Roman", Font.PLAIN, 11));
-            g2.drawString("* Tổng khoản: 02", padX, curY);
+            g2.drawString("* Tổng khoản: " + data.medicines().size(), padX, curY);
 
             curY += 18;
             g2.drawString("Lời dặn:", padX, curY);
@@ -429,8 +445,6 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
             int docY = curY + 45;
 
             g2.setFont(new Font("Times New Roman", Font.ITALIC, 11));
-            g2.drawString(orderDateStr, docX - 10, docY);
-
             docY += 18;
             g2.setFont(new Font("Times New Roman", Font.BOLD, 12));
             g2.drawString("BÁC SỸ KHÁM", docX + 30, docY);
@@ -443,19 +457,13 @@ public class PrescriptionPrintPreviewPanel extends JPanel {
             docY += 10;
             paintBlueSignature(g2, docX + 25, docY, 85, 35);
 
-            // Tên bác sĩ: tiennv
             docY += 45;
             g2.setFont(new Font("Times New Roman", Font.PLAIN, 11));
-            g2.drawString(doctorName, docX + 50, docY);
+            g2.drawString(value(data.doctorName()), docX + 50, docY);
 
             // --- GHI CHÚ CHÂN TRANG ---
             int footY = y + PAGE_H - 60;
             g2.setFont(new Font("Times New Roman", Font.ITALIC, 10));
-            g2.drawString("* Khám lại xin mang theo đơn này.", padX, footY);
-
-            footY += 16;
-            g2.drawString("- Tên bố hoặc mẹ của trẻ hoặc người đưa trẻ đến khám bệnh, chữa bệnh: *", padX, footY);
-
             g2.dispose();
         }
 
