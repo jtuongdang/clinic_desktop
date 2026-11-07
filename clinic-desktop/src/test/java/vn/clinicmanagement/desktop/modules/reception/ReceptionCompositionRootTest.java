@@ -138,24 +138,21 @@ class ReceptionCompositionRootTest {
         ReceptionCompositionRoot root = new ReceptionCompositionRoot();
 
         UUID sessionId = UUID.randomUUID();
-        UUID correlationId = UUID.randomUUID();
         AuthorizationContext authContext = new AuthorizationContext(
                 10, 2, "RECEPTIONIST", 1, 1, sessionId);
-        AuditActorContext auditActor = new AuditActorContext(
-                10, 2, "RECEPTIONIST", 1, 1, "synthetic-station", correlationId);
 
         Result<?> roomsResult = root.getActiveReceptionRoomsHandler().handle(
-                new GetActiveReceptionRoomsQuery(authContext, auditActor));
+                new GetActiveReceptionRoomsQuery(authContext, null));
         assertTrue(roomsResult.isFailure());
         assertEquals("AUTHORIZATION_DENIED", roomsResult.getError().orElseThrow().code());
 
         Result<?> queueResult = root.getReceptionQueueHandler().handle(
-                new GetReceptionQueueQuery(LocalDate.now(), authContext, auditActor));
+                new GetReceptionQueueQuery(LocalDate.now(), authContext, null));
         assertTrue(queueResult.isFailure());
         assertEquals("AUTHORIZATION_DENIED", queueResult.getError().orElseThrow().code());
 
         Result<?> searchResult = root.searchPatientsHandler().handle(
-                new SearchPatientsQuery("0123456789", authContext, auditActor));
+                new SearchPatientsQuery("0123456789", authContext, null));
         assertTrue(searchResult.isFailure());
         assertEquals("AUTHORIZATION_DENIED", searchResult.getError().orElseThrow().code());
     }
