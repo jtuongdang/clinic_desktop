@@ -69,6 +69,10 @@ public class PatientRegistrationFormPanel extends JPanel {
             "PK Phụ nội"
     };
 
+    private static final String[] ETHNICITIES = {"Kinh", "Tày", "Thái", "Mường", "Khác"};
+    private static final String[] NATIONALITIES = {"Việt nam", "Khác"};
+    private static final String[] INSURANCE_RESIDENCE_CODES = {"", "K1", "K2", "K3"};
+
     private MedicalPopupChooser chooserService;
     private MedicalPopupChooser chooserClinicRoom;
     private final List<PhongKham> clinicRooms = new ArrayList<>();
@@ -224,7 +228,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         // Dòng 2: Giới tính, Ngày sinh (3 ô), 22 tuổi, Nơi sinh
         JPanel r2 = createRowPanel();
         r2.add(createLabel("Giới tính:", 65));
-        cbGioiTinh = new JComboBox<>(new String[]{"Nữ", "Nam"});
+        cbGioiTinh = new JComboBox<>(new String[]{"Nữ", "Nam", "Khác"});
         cbGioiTinh.setFont(AppFonts.BODY);
         cbGioiTinh.setPreferredSize(new Dimension(100, 20));
         r2.add(cbGioiTinh);
@@ -282,13 +286,13 @@ public class PatientRegistrationFormPanel extends JPanel {
         r4.add(txtEmail);
         r4.add(Box.createHorizontalStrut(10));
         r4.add(createLabel("Dân tộc:", 50));
-        cbDanToc = new JComboBox<>(new String[]{"Kinh", "Tày", "Thái", "Mường", "Khác"});
+        cbDanToc = new JComboBox<>(ETHNICITIES);
         cbDanToc.setFont(AppFonts.BODY);
         cbDanToc.setPreferredSize(new Dimension(109, 20));
         r4.add(cbDanToc);
         r4.add(Box.createHorizontalStrut(3));
         r4.add(createLabel("Quốc tịch:", 61));
-        cbQuocTich = new JComboBox<>(new String[]{"Việt nam", "Khác"});
+        cbQuocTich = new JComboBox<>(NATIONALITIES);
         cbQuocTich.setFont(AppFonts.BODY);
         cbQuocTich.setPreferredSize(new Dimension(212, 20));
         r4.add(cbQuocTich);
@@ -432,7 +436,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         insuranceNumberFields.add(this.insuranceNumberFields[3]);
         r1.add(insuranceNumberFields);
         r1.add(createLabel("Nơi sống:", 58));
-        cbNoiSong = new JComboBox<>(new String[]{"", "K1", "K2", "K3"});
+        cbNoiSong = new JComboBox<>(INSURANCE_RESIDENCE_CODES);
         cbNoiSong.setFont(AppFonts.BODY);
         cbNoiSong.setPreferredSize(new Dimension(50, 20));
         r1.add(cbNoiSong);
@@ -589,7 +593,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         patientId = patient.getId();
         txtMaBn.setText(nullToEmpty(patient.getMaBenhNhanFormat()));
         txtHoTen.setText(patient.getHoTen());
-        cbGioiTinh.setSelectedItem(patient.getGioiTinh() == GioiTinh.F ? "Nữ" : "Nam");
+        GioiTinh gender = patient.getGioiTinh();
+        cbGioiTinh.setSelectedItem(gender == null ? null : gender.getDescription());
         setDateFields(patient.getNgaySinh(), txtDay, txtMonth, txtYear);
         txtNoiSinh.setText(nullToEmpty(patient.getNoiSinh()));
         txtSoNhaThonPho.setText(nullToEmpty(patient.getSoNhaThonPho()));
@@ -598,8 +603,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         txtJob.setText(nullToEmpty(patient.getNgheNghiep()));
         txtPhone.setText(nullToEmpty(patient.getDienThoai()));
         txtEmail.setText(nullToEmpty(patient.getEmail()));
-        selectComboValue(cbDanToc, patient.getDanToc());
-        selectComboValue(cbQuocTich, patient.getQuocTich());
+        selectComboValue(cbDanToc, ETHNICITIES, patient.getDanToc());
+        selectComboValue(cbQuocTich, NATIONALITIES, patient.getQuocTich());
         txtCccd.setText(nullToEmpty(patient.getSoCCCD()));
         setDateFields(patient.getNgayCapCCCD(), txtCccdD, txtCccdM, txtCccdY);
         txtNoiCap.setText(nullToEmpty(patient.getNoiCapCCCD()));
@@ -626,8 +631,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         txtJob.setText("");
         txtPhone.setText("");
         txtEmail.setText("");
-        cbDanToc.setSelectedIndex(0);
-        cbQuocTich.setSelectedIndex(0);
+        cbDanToc.setModel(new DefaultComboBoxModel<>(ETHNICITIES));
+        cbQuocTich.setModel(new DefaultComboBoxModel<>(NATIONALITIES));
         txtCccd.setText("");
         clearDateFields(txtCccdD, txtCccdM, txtCccdY);
         txtNoiCap.setText("");
@@ -651,7 +656,12 @@ public class PatientRegistrationFormPanel extends JPanel {
         int lastSpace = fullName.lastIndexOf(' ');
         patient.setHo(lastSpace < 0 ? "" : fullName.substring(0, lastSpace).trim());
         patient.setTen(lastSpace < 0 ? fullName : fullName.substring(lastSpace + 1).trim());
-        patient.setGioiTinh("Nữ".equals(cbGioiTinh.getSelectedItem()) ? GioiTinh.F : GioiTinh.M);
+        patient.setGioiTinh(switch (Objects.toString(cbGioiTinh.getSelectedItem(), "")) {
+            case "Nữ" -> GioiTinh.F;
+            case "Nam" -> GioiTinh.M;
+            case "Khác" -> GioiTinh.O;
+            default -> null;
+        });
         patient.setNgaySinh(dateFromFields(txtDay, txtMonth, txtYear));
         patient.setNoiSinh(txtNoiSinh.getText().trim());
         patient.setSoNhaThonPho(txtSoNhaThonPho.getText().trim());
@@ -660,8 +670,8 @@ public class PatientRegistrationFormPanel extends JPanel {
         patient.setNgheNghiep(txtJob.getText().trim());
         patient.setDienThoai(txtPhone.getText().trim());
         patient.setEmail(txtEmail.getText().trim());
-        patient.setDanToc(Objects.toString(cbDanToc.getSelectedItem(), ""));
-        patient.setQuocTich(Objects.toString(cbQuocTich.getSelectedItem(), ""));
+        patient.setDanToc((String) cbDanToc.getSelectedItem());
+        patient.setQuocTich((String) cbQuocTich.getSelectedItem());
         patient.setSoCCCD(txtCccd.getText().trim());
         patient.setNgayCapCCCD(dateFromFields(txtCccdD, txtCccdM, txtCccdY));
         patient.setNoiCapCCCD(txtNoiCap.getText().trim());
@@ -690,7 +700,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         if (insuranceNumber.isBlank() && txtInsuranceFacilityCode.getText().isBlank()
                 && txtInsuranceFacilityName.getText().isBlank()
                 && txtInsuranceStartDate.getText().isBlank() && txtInsuranceEndDate.getText().isBlank()
-                && txtDiaChiThe.getText().isBlank() && cbNoiSong.getSelectedIndex() == 0
+                && txtDiaChiThe.getText().isBlank() && Objects.toString(cbNoiSong.getSelectedItem(), "").isBlank()
                 && cbTuyen.getSelectedIndex() == 0 && "0%".equals(lblRate.getText())
                 && textFromFields(insuranceExemptionDateFields).isBlank()
                 && textFromFields(insuranceFiveYearDateFields).isBlank()
@@ -701,7 +711,7 @@ public class PatientRegistrationFormPanel extends JPanel {
         BaoHiem insurance = new BaoHiem();
         insurance.setMaBenhNhan(patientId == null ? 0 : patientId);
         insurance.setSoBaoHiem(insuranceNumber);
-        insurance.setMaNoiSong(Objects.toString(cbNoiSong.getSelectedItem(), ""));
+        insurance.setMaNoiSong((String) cbNoiSong.getSelectedItem());
         insurance.setMaNoiDangKyKCB(txtInsuranceFacilityCode.getText().trim());
         insurance.setNoiDangKyKCB(txtInsuranceFacilityName.getText().trim());
         insurance.setNgayBatDau(parseDate(txtInsuranceStartDate.getText()));
@@ -719,7 +729,7 @@ public class PatientRegistrationFormPanel extends JPanel {
 
     private void setInsuranceFields(BaoHiem insurance) {
         setTextFields(insuranceNumberFields, insurance.getSoBaoHiem(), new int[]{2, 1, 2});
-        selectComboValue(cbNoiSong, insurance.getMaNoiSong());
+        selectComboValue(cbNoiSong, INSURANCE_RESIDENCE_CODES, insurance.getMaNoiSong());
         txtInsuranceFacilityCode.setText(nullToEmpty(insurance.getMaNoiDangKyKCB()));
         txtInsuranceFacilityName.setText(nullToEmpty(insurance.getNoiDangKyKCB()));
         txtInsuranceStartDate.setText(formatDate(insurance.getNgayBatDau()));
@@ -736,7 +746,7 @@ public class PatientRegistrationFormPanel extends JPanel {
 
     private void clearInsuranceFields() {
         for (JTextField field : insuranceNumberFields) field.setText("");
-        cbNoiSong.setSelectedIndex(0);
+        cbNoiSong.setModel(new DefaultComboBoxModel<>(INSURANCE_RESIDENCE_CODES));
         txtInsuranceFacilityCode.setText("");
         txtInsuranceFacilityName.setText("");
         txtInsuranceStartDate.setText("");
@@ -812,15 +822,13 @@ public class PatientRegistrationFormPanel extends JPanel {
         return digits.isEmpty() ? 0 : Integer.parseInt(digits);
     }
 
-    private static void selectComboValue(JComboBox<String> combo, String value) {
-        if (value == null || value.isBlank()) return;
-        for (int i = 0; i < combo.getItemCount(); i++) {
-            if (value.equalsIgnoreCase(combo.getItemAt(i))) {
-                combo.setSelectedIndex(i);
-                return;
-            }
+    private static void selectComboValue(JComboBox<String> combo, String[] options, String value) {
+        DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>(options);
+        if (value != null && model.getIndexOf(value) == -1) {
+            model.addElement(value);
         }
-        combo.setSelectedItem(value);
+        model.setSelectedItem(value);
+        combo.setModel(model);
     }
 
     private static String nullToEmpty(String value) {

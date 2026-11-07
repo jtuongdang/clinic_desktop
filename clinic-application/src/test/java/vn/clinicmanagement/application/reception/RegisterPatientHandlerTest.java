@@ -15,7 +15,9 @@ import vn.clinicmanagement.application.common.Result;
 import vn.clinicmanagement.application.common.TransactionBoundary;
 import vn.clinicmanagement.domain.common.BaseEntity;
 import vn.clinicmanagement.domain.common.enums.DoiTuongKham;
+import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.common.enums.HanhDongQuyen;
+import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
 import vn.clinicmanagement.domain.common.enums.PhamViDuLieu;
 import vn.clinicmanagement.domain.examination.LuotKham;
 import vn.clinicmanagement.domain.facility.CoSo;
@@ -24,6 +26,7 @@ import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
 import vn.clinicmanagement.domain.patient.PatientIdentityConflictException;
+import vn.clinicmanagement.domain.patient.TienSuBenh;
 import vn.clinicmanagement.domain.identity.NhanVien;
 import vn.clinicmanagement.domain.identity.NhanVienWorkScope;
 import vn.clinicmanagement.domain.identity.VaiTro;
@@ -48,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegisterPatientHandlerTest {
@@ -80,10 +84,13 @@ class RegisterPatientHandlerTest {
                     Fixture fixture = new Fixture();
                     BenhNhan patient = validPatient();
                     patient.setDienThoai(primary);
-                    patient.setNguoiLienHeDienThoai(emergency);
                     if (existing) {
                         patient.setId(52);
-                        fixture.duplicatePatient = patient;
+                        fixture.duplicatePatient = validPatient();
+                        fixture.duplicatePatient.setId(52);
+                        fixture.duplicatePatient.setNguoiLienHeDienThoai(emergency);
+                    } else {
+                        patient.setNguoiLienHeDienThoai(emergency);
                     }
 
                     Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
@@ -95,24 +102,26 @@ class RegisterPatientHandlerTest {
                     assertEquals(primary, fixture.savedPatientPhone);
                     assertEquals(emergency, fixture.savedEmergencyPhone);
                     assertEquals(primary, patient.getDienThoai());
-                    assertEquals(emergency, patient.getNguoiLienHeDienThoai());
                 }
             }
         }
     }
 
     @Test
-    void persistsCleanedPhonesWithNationalOrInternationalPrefixesOnInsertAndUpdate() {
+    void normalizesEditablePhonesAndPreservesStoredEmergencyPhoneOnUpdate() {
         for (boolean existing : List.of(false, true)) {
             for (boolean internationalPrimary : List.of(false, true)) {
                 Fixture fixture = new Fixture();
                 BenhNhan patient = validPatient();
                 patient.setDienThoai(internationalPrimary ? " +84 3.123-456\t78 " : " 03 123.456-78 ");
-                patient.setNguoiLienHeDienThoai(internationalPrimary ? " 09 123.456-78 " : " +84 9.123-456\t78 ");
+                String emergency = internationalPrimary ? " 09 123.456-78 " : " +84 9.123-456\t78 ";
                 if (existing) {
                     patient.setId(52);
                     fixture.duplicatePatient = validPatient();
                     fixture.duplicatePatient.setId(52);
+                    fixture.duplicatePatient.setNguoiLienHeDienThoai(emergency);
+                } else {
+                    patient.setNguoiLienHeDienThoai(emergency);
                 }
 
                 Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, null,
@@ -122,9 +131,8 @@ class RegisterPatientHandlerTest {
                 assertEquals(existing ? 0 : 1, fixture.patientAdds.get());
                 assertEquals(existing ? 1 : 0, fixture.patientUpdates.get());
                 assertEquals(internationalPrimary ? "+84312345678" : "0312345678", fixture.savedPatientPhone);
-                assertEquals(internationalPrimary ? "0912345678" : "+84912345678", fixture.savedEmergencyPhone);
-                assertEquals(fixture.savedPatientPhone, patient.getDienThoai());
-                assertEquals(fixture.savedEmergencyPhone, patient.getNguoiLienHeDienThoai());
+                String normalizedEmergency = internationalPrimary ? "0912345678" : "+84912345678";
+                assertEquals(existing ? emergency : normalizedEmergency, fixture.savedEmergencyPhone);
             }
         }
     }
@@ -336,25 +344,70 @@ class RegisterPatientHandlerTest {
     }
 
     @Test
-    void existingPatientIsUpdatedAndNotInsertedAgain() {
+    void existingPatientAndInsuranceMergeFormFieldsAndPreserveStoredData() {
         Fixture fixture = new Fixture();
         LocalDateTime persistedPatientCreatedAt = LocalDateTime.of(2025, 2, 10, 8, 15);
         LocalDateTime persistedInsuranceCreatedAt = LocalDateTime.of(2025, 2, 10, 8, 20);
         BenhNhan patient = validPatient();
         patient.setId(52);
-        patient.setMaBenhNhanFormat("SYNTH-EXISTING-52");
+        patient.setMaBenhNhanFormat("SYNTH-SUBMITTED-52");
+        patient.setHo("Updated Synthetic");
+        patient.setTen("Record");
+        patient.setNgaySinh(LocalDate.of(1991, 3, 4));
+        patient.setGioiTinh(GioiTinh.O);
+        patient.setNoiSinh("Synthetic birthplace");
+        patient.setSoNhaThonPho("Synthetic street");
+        patient.setMaXa("XA-UPDATED");
+        patient.setDiaChi("Synthetic updated address");
+        patient.setNgheNghiep("Synthetic job");
+        patient.setDienThoai(" 03 123.456-78 ");
+        patient.setEmail("");
+        patient.setDanToc("Legacy ethnicity");
+        patient.setQuocTich("Legacy nationality");
+        patient.setSoCCCD("synthetic-cccd-edited");
+        patient.setNgayCapCCCD(LocalDate.of(2020, 5, 6));
+        patient.setNoiCapCCCD("Synthetic issuing authority");
+        patient.setNoiLamViec("Synthetic workplace");
         patient.setCreatedAt(LocalDateTime.of(2026, 6, 1, 9, 0));
         patient.setCreatedBy(99);
-        fixture.duplicatePatient = validPatient();
-        fixture.duplicatePatient.setId(52);
-        fixture.duplicatePatient.setVersion(4L);
-        fixture.duplicatePatient.setCreatedAt(persistedPatientCreatedAt);
-        fixture.duplicatePatient.setCreatedBy(2);
+        BenhNhan storedPatient = validPatient();
+        storedPatient.setId(52);
+        storedPatient.setMaBenhNhanFormat("SYNTH-EXISTING-52");
+        storedPatient.setGioiTinh(GioiTinh.O);
+        storedPatient.setDanToc("Legacy ethnicity");
+        storedPatient.setQuocTich("Legacy nationality");
+        storedPatient.setEmail("stored@example.test");
+        storedPatient.setMaTinh("TINH-01");
+        storedPatient.setMaHuyen("HUYEN-01");
+        storedPatient.setNguoiLienHeTen("Synthetic Contact");
+        storedPatient.setNguoiLienHeDienThoai("legacy extension 42");
+        storedPatient.setUsername("synthetic-account");
+        storedPatient.setPasswordHash("synthetic-hash-marker");
+        TienSuBenh history = new TienSuBenh();
+        storedPatient.setTienSuBenhs(List.of(history));
+        storedPatient.setVersion(4L);
+        storedPatient.setCreatedAt(persistedPatientCreatedAt);
+        storedPatient.setCreatedBy(2);
+        fixture.duplicatePatient = storedPatient;
         BaoHiem insurance = validInsurance();
+        insurance.setNgayBatDau(LocalDate.of(2029, 1, 1));
+        insurance.setMaNoiSong("K2");
+        insurance.setMaNoiDangKyKCB("SYNTH-KCB");
+        insurance.setNoiDangKyKCB("Synthetic facility");
+        insurance.setDiaChiThe("Synthetic card address");
+        insurance.setDungTuyen(false);
+        insurance.setCoGiayKhaiSinh(true);
+        insurance.setKhongGiuThe(true);
+        insurance.setMienCungChiTra(true);
+        insurance.setNgayMienCungChiTra(LocalDate.of(2029, 2, 1));
+        insurance.setNgayDu5NamLienTuc(LocalDate.of(2029, 3, 1));
         insurance.setCreatedAt(LocalDateTime.of(2026, 6, 1, 9, 5));
         insurance.setCreatedBy(98);
         BaoHiem currentInsurance = new BaoHiem();
         currentInsurance.setId(8);
+        currentInsurance.setMaBenhNhan(52);
+        currentInsurance.setLoaiBaoHiem(LoaiBaoHiem.BAO_HIEM_TAI_NAN);
+        currentInsurance.setBenhNhan(storedPatient);
         currentInsurance.setVersion(3L);
         currentInsurance.setCreatedAt(persistedInsuranceCreatedAt);
         currentInsurance.setCreatedBy(3);
@@ -376,22 +429,55 @@ class RegisterPatientHandlerTest {
         assertEquals(persistedPatientCreatedAt, fixture.updatedPatientMetadata.createdAt());
         assertEquals(2, fixture.updatedPatientMetadata.createdBy());
         assertEquals(ACTOR.employeeId(), fixture.updatedPatientMetadata.updatedBy());
-        assertEquals(4L, patient.getVersion());
-        assertEquals(persistedPatientCreatedAt, patient.getCreatedAt());
-        assertEquals(2, patient.getCreatedBy());
-        assertEquals(ACTOR.employeeId(), patient.getUpdatedBy());
-        assertEquals(52, insurance.getMaBenhNhan());
+        BenhNhan savedPatient = fixture.updatedPatient;
+        assertEquals("TINH-01", savedPatient.getMaTinh());
+        assertEquals("HUYEN-01", savedPatient.getMaHuyen());
+        assertEquals("Synthetic Contact", savedPatient.getNguoiLienHeTen());
+        assertEquals("legacy extension 42", savedPatient.getNguoiLienHeDienThoai());
+        assertEquals("synthetic-account", savedPatient.getUsername());
+        assertEquals("synthetic-hash-marker", savedPatient.getPasswordHash());
+        assertEquals(List.of(history), savedPatient.getTienSuBenhs());
+        assertEquals(patient.getHo(), savedPatient.getHo());
+        assertEquals(patient.getTen(), savedPatient.getTen());
+        assertEquals(patient.getNgaySinh(), savedPatient.getNgaySinh());
+        assertEquals(GioiTinh.O, savedPatient.getGioiTinh());
+        assertEquals(patient.getNoiSinh(), savedPatient.getNoiSinh());
+        assertEquals(patient.getSoNhaThonPho(), savedPatient.getSoNhaThonPho());
+        assertEquals(patient.getMaXa(), savedPatient.getMaXa());
+        assertEquals(patient.getDiaChi(), savedPatient.getDiaChi());
+        assertEquals(patient.getNgheNghiep(), savedPatient.getNgheNghiep());
+        assertEquals("0312345678", savedPatient.getDienThoai());
+        assertEquals("", savedPatient.getEmail());
+        assertEquals("Legacy ethnicity", savedPatient.getDanToc());
+        assertEquals("Legacy nationality", savedPatient.getQuocTich());
+        assertEquals(patient.getSoCCCD(), savedPatient.getSoCCCD());
+        assertEquals(patient.getNgayCapCCCD(), savedPatient.getNgayCapCCCD());
+        assertEquals(patient.getNoiCapCCCD(), savedPatient.getNoiCapCCCD());
+        assertEquals(patient.getNoiLamViec(), savedPatient.getNoiLamViec());
         assertNotNull(fixture.updatedInsuranceMetadata);
         assertEquals(8, fixture.updatedInsuranceMetadata.id());
         assertEquals(3L, fixture.updatedInsuranceMetadata.version());
         assertEquals(persistedInsuranceCreatedAt, fixture.updatedInsuranceMetadata.createdAt());
         assertEquals(3, fixture.updatedInsuranceMetadata.createdBy());
         assertEquals(ACTOR.employeeId(), fixture.updatedInsuranceMetadata.updatedBy());
-        assertEquals(8, insurance.getId());
-        assertEquals(3L, insurance.getVersion());
-        assertEquals(persistedInsuranceCreatedAt, insurance.getCreatedAt());
-        assertEquals(3, insurance.getCreatedBy());
-        assertEquals(ACTOR.employeeId(), insurance.getUpdatedBy());
+        BaoHiem savedCard = fixture.updatedInsurance;
+        assertEquals(52, savedCard.getMaBenhNhan());
+        assertEquals(LoaiBaoHiem.BAO_HIEM_TAI_NAN, savedCard.getLoaiBaoHiem());
+        assertSame(storedPatient, savedCard.getBenhNhan());
+        assertEquals(insurance.getSoBaoHiem(), savedCard.getSoBaoHiem());
+        assertEquals(insurance.getNgayBatDau(), savedCard.getNgayBatDau());
+        assertEquals(insurance.getNgayHetHan(), savedCard.getNgayHetHan());
+        assertEquals(insurance.getMucHuong(), savedCard.getMucHuong());
+        assertEquals(insurance.getMaNoiSong(), savedCard.getMaNoiSong());
+        assertEquals(insurance.getMaNoiDangKyKCB(), savedCard.getMaNoiDangKyKCB());
+        assertEquals(insurance.getNoiDangKyKCB(), savedCard.getNoiDangKyKCB());
+        assertEquals(insurance.getDiaChiThe(), savedCard.getDiaChiThe());
+        assertFalse(savedCard.isDungTuyen());
+        assertTrue(savedCard.isCoGiayKhaiSinh());
+        assertTrue(savedCard.isKhongGiuThe());
+        assertTrue(savedCard.isMienCungChiTra());
+        assertEquals(insurance.getNgayMienCungChiTra(), savedCard.getNgayMienCungChiTra());
+        assertEquals(insurance.getNgayDu5NamLienTuc(), savedCard.getNgayDu5NamLienTuc());
         assertEquals(1, fixture.visitCalls.get());
         assertEquals(1, fixture.patientFacilityCalls.get());
         assertEquals(List.of(52, FACILITY_ID, ACTOR.employeeId()), fixture.patientFacilityArguments);
@@ -401,6 +487,33 @@ class RegisterPatientHandlerTest {
                 AuditActionCode.PATIENT_UPDATED, AuditResourceType.PATIENT, 52,
                 AuditActionCode.INSURANCE_UPDATED, AuditResourceType.INSURANCE, 8,
                 AuditActionCode.VISIT_REGISTERED, AuditResourceType.VISIT, 92);
+    }
+
+    @Test
+    void existingInsuranceIsRetainedWhenFormOmitsCardOrCardNumber() {
+        for (BaoHiem insurance : new BaoHiem[]{null, new BaoHiem()}) {
+            Fixture fixture = new Fixture();
+            BenhNhan patient = validPatient();
+            patient.setId(52);
+            fixture.duplicatePatient = validPatient();
+            fixture.duplicatePatient.setId(52);
+            fixture.currentInsurance = validInsurance();
+            fixture.currentInsurance.setId(8);
+            fixture.currentInsurance.setMaBenhNhan(52);
+            fixture.currentInsurance.setLoaiBaoHiem(LoaiBaoHiem.KHAC);
+
+            Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, insurance,
+                    DoiTuongKham.THU_PHI));
+
+            assertTrue(result.isSuccess());
+            assertEquals(0, fixture.insuranceAdds.get());
+            assertEquals(0, fixture.insuranceUpdates.get());
+            assertEquals("synthetic-insurance-001", fixture.currentInsurance.getSoBaoHiem());
+            assertEquals(LoaiBaoHiem.KHAC, fixture.currentInsurance.getLoaiBaoHiem());
+            assertAuditEvents(fixture.auditEntries,
+                    AuditActionCode.PATIENT_UPDATED, AuditResourceType.PATIENT, 52,
+                    AuditActionCode.VISIT_REGISTERED, AuditResourceType.VISIT, 93);
+        }
     }
 
     @Test
@@ -622,18 +735,28 @@ class RegisterPatientHandlerTest {
     }
 
     @Test
-    void databaseCccdConflictReturnsStableErrorWithoutInsuranceOrVisit() {
-        Fixture fixture = new Fixture();
-        fixture.identityConflictOnInsert = true;
+    void databaseCccdConflictOnInsertOrUpdateReturnsStableErrorWithoutInsuranceOrVisit() {
+        for (boolean existing : List.of(false, true)) {
+            Fixture fixture = new Fixture();
+            fixture.identityConflictOnWrite = true;
+            BenhNhan patient = validPatient();
+            if (existing) {
+                patient.setId(52);
+                fixture.duplicatePatient = validPatient();
+                fixture.duplicatePatient.setId(52);
+            }
 
-        Result<RegistrationReceipt> result = fixture.handler.handle(command(validPatient(), validInsurance()));
+            Result<RegistrationReceipt> result = fixture.handler.handle(command(patient, validInsurance()));
 
-        assertFailure(result, "PATIENT_REGISTRATION_FAILED");
-        assertEquals(1, fixture.patientAdds.get());
-        assertEquals(0, fixture.insuranceAdds.get());
-        assertEquals(0, fixture.insuranceUpdates.get());
-        assertEquals(0, fixture.visitCalls.get());
-        assertEquals(1, fixture.transactions.failures);
+            assertFailure(result, "PATIENT_REGISTRATION_FAILED");
+            assertEquals(existing ? 0 : 1, fixture.patientAdds.get());
+            assertEquals(existing ? 1 : 0, fixture.patientUpdates.get());
+            assertEquals(0, fixture.insuranceAdds.get());
+            assertEquals(0, fixture.insuranceUpdates.get());
+            assertEquals(0, fixture.visitCalls.get());
+            assertTrue(fixture.auditEntries.isEmpty());
+            assertEquals(1, fixture.transactions.failures);
+        }
     }
 
     @Test
@@ -889,10 +1012,12 @@ class RegisterPatientHandlerTest {
         private MetadataSnapshot updatedPatientMetadata;
         private MetadataSnapshot addedInsuranceMetadata;
         private MetadataSnapshot updatedInsuranceMetadata;
+        private BenhNhan updatedPatient;
+        private BaoHiem updatedInsurance;
         private String savedPatientPhone;
         private String savedEmergencyPhone;
         private int patientInsertId = 41;
-        private boolean identityConflictOnInsert;
+        private boolean identityConflictOnWrite;
         private RuntimeException insuranceFailure;
         private RuntimeException queueFailure;
         private RuntimeException patientFacilityFailure;
@@ -909,7 +1034,7 @@ class RegisterPatientHandlerTest {
                     case "getByIdInScope" -> Optional.ofNullable(duplicatePatient);
                     case "add" -> {
                         patientAdds.incrementAndGet();
-                        if (identityConflictOnInsert) throw new PatientIdentityConflictException();
+                        if (identityConflictOnWrite) throw new PatientIdentityConflictException();
                         BenhNhan patient = (BenhNhan) args[0];
                         addedPatientMetadata = MetadataSnapshot.of(patient);
                         savedPatientPhone = patient.getDienThoai();
@@ -921,7 +1046,9 @@ class RegisterPatientHandlerTest {
                     }
                     case "update" -> {
                         patientUpdates.incrementAndGet();
+                        if (identityConflictOnWrite) throw new PatientIdentityConflictException();
                         BenhNhan patient = (BenhNhan) args[0];
+                        updatedPatient = patient;
                         updatedPatientMetadata = MetadataSnapshot.of(patient);
                         savedPatientPhone = patient.getDienThoai();
                         savedEmergencyPhone = patient.getNguoiLienHeDienThoai();
@@ -956,7 +1083,8 @@ class RegisterPatientHandlerTest {
                     case "update" -> {
                         insuranceUpdates.incrementAndGet();
                         if (insuranceFailure != null) throw insuranceFailure;
-                        updatedInsuranceMetadata = MetadataSnapshot.of((BaoHiem) args[0]);
+                        updatedInsurance = (BaoHiem) args[0];
+                        updatedInsuranceMetadata = MetadataSnapshot.of(updatedInsurance);
                         transactions.stage("insurance");
                         yield null;
                     }

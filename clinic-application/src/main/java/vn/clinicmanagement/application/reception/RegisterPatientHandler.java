@@ -61,7 +61,7 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
         if (validationError != null) return Result.failure("PATIENT_VALIDATION", validationError);
 
         AuthorizationContext context = command.authorizationContext();
-        boolean existing = command.patient().getId() != null && command.patient().getId() > 0;
+        boolean existing = isExistingPatient(command.patient());
         HanhDongQuyen patientAction = existing ? HanhDongQuyen.SUA : HanhDongQuyen.TAO;
         if (!isAuthorized(context, "PATIENT", patientAction)
                 || !isAuthorized(context, "RECEPTION", HanhDongQuyen.TAO)) {
@@ -82,47 +82,40 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                     return deny(context, command.auditActorContext(), AuditReasonCode.SCOPE_MISMATCH);
                 }
 
-                var scopedPatient = existing
-                        ? patients.getByIdInScope(patient.getId(), context.facilityId(), context.departmentId())
-                        : java.util.Optional.<BenhNhan>empty();
                 if (existing) {
+                    var scopedPatient = patients.getByIdInScope(patient.getId(), context.facilityId(), context.departmentId());
                     if (scopedPatient.isEmpty()) {
                         return deny(context, command.auditActorContext(), AuditReasonCode.SCOPE_MISMATCH);
                     }
-                    BenhNhan persistedPatient = scopedPatient.get();
-                    patient.setVersion(persistedPatient.getVersion());
-                    patient.setCreatedAt(persistedPatient.getCreatedAt());
-                    patient.setCreatedBy(persistedPatient.getCreatedBy());
+                    patient = scopedPatient.get();
+                    applyPatientForm(patient, command.patient());
                     patient.setUpdatedBy(command.createdBy());
+                    patients.update(patient);
+                } else {
+                    patient.setDienThoai(normalizeOptionalPhone(patient.getDienThoai()));
+                    patient.setNguoiLienHeDienThoai(normalizeOptionalPhone(patient.getNguoiLienHeDienThoai()));
+                    patients.add(patient);
                 }
 
-                patient.setDienThoai(normalizeOptionalPhone(patient.getDienThoai()));
-                patient.setNguoiLienHeDienThoai(normalizeOptionalPhone(patient.getNguoiLienHeDienThoai()));
-
-                if (existing) patients.update(patient);
-                else patients.add(patient);
                 appendAudit(command.auditActorContext(), context,
                         existing ? AuditActionCode.PATIENT_UPDATED : AuditActionCode.PATIENT_CREATED,
                         AuditResourceType.PATIENT, patient.getId());
 
-                if (hasInsuranceNumber(command.insurance())) {
-                    BaoHiem card = command.insurance();
-                    card.setMaBenhNhan(patient.getId());
+                BaoHiem submittedCard = command.insurance();
+                if (hasInsuranceNumber(submittedCard)) {
                     var currentCard = insuranceCards.getLatestByPatientId(patient.getId());
                     if (currentCard.isPresent()) {
-                        BaoHiem persistedCard = currentCard.get();
-                        card.setId(persistedCard.getId());
-                        card.setVersion(persistedCard.getVersion());
-                        card.setCreatedAt(persistedCard.getCreatedAt());
-                        card.setCreatedBy(persistedCard.getCreatedBy());
+                        BaoHiem card = currentCard.get();
+                        applyInsuranceForm(card, submittedCard);
                         card.setUpdatedBy(command.createdBy());
                         insuranceCards.update(card);
                         appendAudit(command.auditActorContext(), context, AuditActionCode.INSURANCE_UPDATED,
                                 AuditResourceType.INSURANCE, card.getId());
                     } else {
-                        insuranceCards.add(card);
+                        submittedCard.setMaBenhNhan(patient.getId());
+                        insuranceCards.add(submittedCard);
                         appendAudit(command.auditActorContext(), context, AuditActionCode.INSURANCE_CREATED,
-                                AuditResourceType.INSURANCE, card.getId());
+                                AuditResourceType.INSURANCE, submittedCard.getId());
                     }
                 }
 
@@ -144,6 +137,44 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
                 return Result.failure("PATIENT_REGISTRATION_FAILED", "Không thể lưu đăng ký. Dữ liệu chưa được ghi; hãy thử lại.");
             }
         });
+    }
+
+    private static void applyPatientForm(BenhNhan patient, BenhNhan form) {
+        // The patient code is assigned on creation and is not part of the repository update.
+        patient.setHo(form.getHo());
+        patient.setTen(form.getTen());
+        patient.setNgaySinh(form.getNgaySinh());
+        patient.setGioiTinh(form.getGioiTinh());
+        patient.setNoiSinh(form.getNoiSinh());
+        patient.setSoNhaThonPho(form.getSoNhaThonPho());
+        patient.setMaXa(form.getMaXa());
+        patient.setDiaChi(form.getDiaChi());
+        patient.setNgheNghiep(form.getNgheNghiep());
+        patient.setDienThoai(normalizeOptionalPhone(form.getDienThoai()));
+        patient.setEmail(form.getEmail());
+        patient.setDanToc(form.getDanToc());
+        patient.setQuocTich(form.getQuocTich());
+        patient.setSoCCCD(form.getSoCCCD());
+        patient.setNgayCapCCCD(form.getNgayCapCCCD());
+        patient.setNoiCapCCCD(form.getNoiCapCCCD());
+        patient.setNoiLamViec(form.getNoiLamViec());
+    }
+
+    private static void applyInsuranceForm(BaoHiem card, BaoHiem form) {
+        card.setSoBaoHiem(form.getSoBaoHiem());
+        card.setMaNoiSong(form.getMaNoiSong());
+        card.setMaNoiDangKyKCB(form.getMaNoiDangKyKCB());
+        card.setNoiDangKyKCB(form.getNoiDangKyKCB());
+        card.setNgayBatDau(form.getNgayBatDau());
+        card.setNgayHetHan(form.getNgayHetHan());
+        card.setDiaChiThe(form.getDiaChiThe());
+        card.setDungTuyen(form.isDungTuyen());
+        card.setMucHuong(form.getMucHuong());
+        card.setCoGiayKhaiSinh(form.isCoGiayKhaiSinh());
+        card.setKhongGiuThe(form.isKhongGiuThe());
+        card.setMienCungChiTra(form.isMienCungChiTra());
+        card.setNgayMienCungChiTra(form.getNgayMienCungChiTra());
+        card.setNgayDu5NamLienTuc(form.getNgayDu5NamLienTuc());
     }
 
     private boolean isAuthorized(AuthorizationContext context, String module, HanhDongQuyen action) {
@@ -192,7 +223,7 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
             return "Ngày sinh không hợp lệ.";
         if (patient.getGioiTinh() == null) return "Vui lòng chọn giới tính.";
         if (!isValidOptionalPhone(patient.getDienThoai())
-                || !isValidOptionalPhone(patient.getNguoiLienHeDienThoai())) {
+                || (!isExistingPatient(patient) && !isValidOptionalPhone(patient.getNguoiLienHeDienThoai()))) {
             return "Số điện thoại người bệnh hoặc liên hệ khẩn cấp không hợp lệ.";
         }
         if (command.roomId() <= 0) return "Vui lòng chọn phòng khám.";
@@ -212,6 +243,10 @@ public final class RegisterPatientHandler implements CommandHandler<RegisterPati
             return "Đối tượng BHYT cần có số thẻ và hạn thẻ.";
         }
         return null;
+    }
+
+    private static boolean isExistingPatient(BenhNhan patient) {
+        return patient.getId() != null && patient.getId() > 0;
     }
 
     private static boolean hasInsuranceNumber(BaoHiem insurance) {

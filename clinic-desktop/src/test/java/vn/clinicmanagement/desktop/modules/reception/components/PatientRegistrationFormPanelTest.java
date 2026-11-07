@@ -5,6 +5,7 @@ import vn.clinicmanagement.application.audit.AuditActorContext;
 import vn.clinicmanagement.application.authorization.AuthorizationContext;
 import vn.clinicmanagement.application.reception.RegisterPatientCommand;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
+import vn.clinicmanagement.domain.common.enums.LoaiBaoHiem;
 import vn.clinicmanagement.domain.facility.PhongKham;
 import vn.clinicmanagement.domain.patient.BaoHiem;
 import vn.clinicmanagement.domain.patient.BenhNhan;
@@ -53,6 +54,7 @@ class PatientRegistrationFormPanelTest {
         assertEquals("PATIENT-ADDRESS", command.patient().getDiaChi());
         assertEquals("0912345678", command.patient().getDienThoai());
         assertEquals("patient@example.test", command.patient().getEmail());
+        assertEquals("Việt Nam", command.patient().getQuocTich());
         assertEquals("123456789012345", command.patient().getSoCCCD());
         assertEquals(LocalDate.of(2020, 2, 3), command.patient().getNgayCapCCCD());
         assertEquals("Công an", command.patient().getNoiCapCCCD());
@@ -70,6 +72,94 @@ class PatientRegistrationFormPanelTest {
         assertTrue(command.insurance().isMienCungChiTra());
         assertEquals(LocalDate.of(2024, 2, 1), command.insurance().getNgayMienCungChiTra());
         assertEquals(LocalDate.of(2024, 3, 1), command.insurance().getNgayDu5NamLienTuc());
+    }
+
+    @Test
+    void mapsOtherGenderAndLegacyComboValuesAndAcceptsExplicitEdits() throws Exception {
+        onEdt(() -> {
+            PatientRegistrationFormPanel panel = createPanelWithRoom();
+            BenhNhan patient = syntheticPatient();
+            patient.setGioiTinh(GioiTinh.O);
+            patient.setDanToc("Legacy ethnicity");
+            patient.setQuocTich("Legacy nationality");
+            patient.setMaTinh("TINH-01");
+            patient.setMaHuyen("HUYEN-01");
+            patient.setNguoiLienHeTen("Synthetic Contact");
+            patient.setNguoiLienHeDienThoai("legacy extension 42");
+            BaoHiem insurance = syntheticInsurance();
+            insurance.setLoaiBaoHiem(LoaiBaoHiem.BAO_HIEM_TAI_NAN);
+            insurance.setMaNoiSong("K-legacy");
+            panel.selectPatient(patient, insurance);
+
+            JComboBox<?> gender = comboStartingWith(panel, "Nữ");
+            JComboBox<?> ethnicity = comboStartingWith(panel, "Kinh");
+            JComboBox<?> nationality = comboStartingWith(panel, "Việt nam");
+            assertEquals("Khác", gender.getSelectedItem());
+            assertEquals("Legacy ethnicity", ethnicity.getSelectedItem());
+            assertEquals("Legacy nationality", nationality.getSelectedItem());
+            RegisterPatientCommand roundTrip = panel.toRegisterCommand(AUTHORIZATION, AUDIT);
+            assertEquals(GioiTinh.O, roundTrip.patient().getGioiTinh());
+            assertEquals("Legacy ethnicity", roundTrip.patient().getDanToc());
+            assertEquals("Legacy nationality", roundTrip.patient().getQuocTich());
+            assertEquals("K-legacy", roundTrip.insurance().getMaNoiSong());
+
+            gender.setSelectedItem("Nam");
+            ethnicity.setSelectedItem("Tày");
+            nationality.setSelectedItem("Khác");
+            editText(panel, "patient@example.test", "updated@example.test");
+            editText(panel, "01-002", "01-003");
+            RegisterPatientCommand edited = panel.toRegisterCommand(AUTHORIZATION, AUDIT);
+            assertEquals(GioiTinh.M, edited.patient().getGioiTinh());
+            assertEquals("Tày", edited.patient().getDanToc());
+            assertEquals("Khác", edited.patient().getQuocTich());
+            assertEquals("updated@example.test", edited.patient().getEmail());
+            assertEquals("01-003", edited.insurance().getMaNoiDangKyKCB());
+            assertEquals("K-legacy", edited.insurance().getMaNoiSong());
+            assertNull(edited.patient().getMaTinh());
+            assertNull(edited.patient().getMaHuyen());
+            assertNull(edited.patient().getNguoiLienHeTen());
+            assertNull(edited.patient().getNguoiLienHeDienThoai());
+            assertEquals("TINH-01", patient.getMaTinh());
+            assertEquals("HUYEN-01", patient.getMaHuyen());
+            assertEquals("Synthetic Contact", patient.getNguoiLienHeTen());
+            assertEquals("legacy extension 42", patient.getNguoiLienHeDienThoai());
+            assertEquals(LoaiBaoHiem.BAO_HIEM_TAI_NAN, insurance.getLoaiBaoHiem());
+            return null;
+        });
+    }
+
+    @Test
+    void switchingPatientsPreservesUnsetCombosAndClearsPreviouslyLoadedInsurance() throws Exception {
+        onEdt(() -> {
+            PatientRegistrationFormPanel panel = createPanelWithRoom();
+            BenhNhan first = syntheticPatient();
+            first.setGioiTinh(GioiTinh.O);
+            first.setDanToc("Legacy ethnicity");
+            first.setQuocTich("Legacy nationality");
+            panel.selectPatient(first, syntheticInsurance());
+
+            BenhNhan second = syntheticPatient();
+            second.setId(52);
+            second.setDanToc(null);
+            second.setQuocTich("");
+            panel.selectPatient(second, null);
+
+            RegisterPatientCommand command = panel.toRegisterCommand(AUTHORIZATION, AUDIT);
+            assertEquals(52, command.patient().getId());
+            assertEquals(GioiTinh.F, command.patient().getGioiTinh());
+            assertNull(command.patient().getDanToc());
+            assertEquals("", command.patient().getQuocTich());
+            assertNull(command.insurance());
+            assertEquals(5, comboStartingWith(panel, "Kinh").getItemCount());
+            assertEquals(3, comboStartingWith(panel, "Việt nam").getItemCount());
+
+            panel.clearForm();
+            RegisterPatientCommand cleared = panel.toRegisterCommand(AUTHORIZATION, AUDIT);
+            assertEquals("Kinh", cleared.patient().getDanToc());
+            assertEquals("Việt nam", cleared.patient().getQuocTich());
+            assertEquals(2, comboStartingWith(panel, "Việt nam").getItemCount());
+            return null;
+        });
     }
 
     @Test
@@ -140,7 +230,7 @@ class PatientRegistrationFormPanelTest {
         patient.setDienThoai("0912345678");
         patient.setEmail("patient@example.test");
         patient.setDanToc("Kinh");
-        patient.setQuocTich("Việt nam");
+        patient.setQuocTich("Việt Nam");
         patient.setSoCCCD("123456789012345");
         patient.setNgayCapCCCD(LocalDate.of(2020, 2, 3));
         patient.setNoiCapCCCD("Công an");
@@ -166,10 +256,25 @@ class PatientRegistrationFormPanelTest {
     }
 
     private static List<JTextField> findTextFields(Container container) {
-        List<JTextField> result = new ArrayList<>();
+        return findComponents(container, JTextField.class);
+    }
+
+    private static void editText(Container container, String before, String after) {
+        findTextFields(container).stream().filter(field -> before.equals(field.getText()))
+                .findFirst().orElseThrow().setText(after);
+    }
+
+    private static JComboBox<?> comboStartingWith(Container container, String firstItem) {
+        return findComponents(container, JComboBox.class).stream()
+                .filter(combo -> firstItem.equals(combo.getItemAt(0)))
+                .findFirst().orElseThrow();
+    }
+
+    private static <T> List<T> findComponents(Container container, Class<T> type) {
+        List<T> result = new ArrayList<>();
         for (Component component : container.getComponents()) {
-            if (component instanceof JTextField field) result.add(field);
-            if (component instanceof Container child) result.addAll(findTextFields(child));
+            if (type.isInstance(component)) result.add(type.cast(component));
+            if (component instanceof Container child) result.addAll(findComponents(child, type));
         }
         return result;
     }
