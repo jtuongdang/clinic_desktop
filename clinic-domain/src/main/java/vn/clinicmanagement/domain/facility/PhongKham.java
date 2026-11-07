@@ -2,6 +2,7 @@ package vn.clinicmanagement.domain.facility;
 import vn.clinicmanagement.domain.common.BaseEntity;
 
 public class PhongKham extends BaseEntity<Integer> {
+    private String maPhong;
     private int maKhoa;
     private String tenPhong = "";
     private String viTri;
@@ -9,6 +10,8 @@ public class PhongKham extends BaseEntity<Integer> {
     private Khoa khoa;
 
     public PhongKham() {}
+    public String getMaPhong() { return maPhong != null ? maPhong : tenPhong; }
+    public void setMaPhong(String maPhong) { this.maPhong = maPhong; }
     public int getMaKhoa() { return maKhoa; }
     public void setMaKhoa(int maKhoa) { this.maKhoa = maKhoa; }
     public String getTenPhong() { return tenPhong; }
