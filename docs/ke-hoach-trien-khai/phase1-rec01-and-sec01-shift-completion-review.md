@@ -1,7 +1,7 @@
 # REC-01 and SEC-01 Desktop Hardening Completion Review
 
 **Review date:** 2026-11-07  
-**Reviewed baseline:** `feature/patient-reception-workflow` at `8fa16a0`  
+**Reviewed baseline:** `feature/patient-reception-workflow` at `eb52b71`  
 **Review type:** Read-only source/commit verification and focused synthetic headless tests.
 
 This review verifies the requested REC-01 and SEC-01 hardening slices against the current source, cited commits, focused test classes, and the existing completion reviews. It does not claim Owner visual acceptance or close any gate.
@@ -39,15 +39,23 @@ This review verifies the requested REC-01 and SEC-01 hardening slices against th
 | **Wave 9 documentation sync** | Synced `03-model-task-board.md` and `phase1-rec01-and-sec01-shift-completion-review.md` for Wave 9 commits (`b69be2b`, `669cf3f`, `f150edc`). | `b7c550b` (task `e572f1c2` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md). |
 | **Waves 1–10 leadership summary and visual checklist sync** | Updated `LEADERSHIP_HANDOVER_LEADER_ANTI.md` and `desktop-owner-visual-smoke-checklist.md` with Waves 1–10 summary (36 commits integrated, 466 passing synthetic tests) ([`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md), [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)). | `8fa16a0` (task `3468a083` — `leaderANTI`): [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md), [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md). |
 
+## Wave 11 completion evidence (f04315d, 14f671c, eb52b71)
+
+| Item | Verified implementation and evidence | Commit and focused tests |
+|---|---|---|
+| **`SEC-AUTHZ-02C` & Doctor UI Preservation — ReceptionProtectedReadWiringTest & DoctorStationUiPreservationTest** | Restored `ReceptionProtectedReadWiringTest` verifying protected read wiring for reception queries under `SEC-AUTHZ-02C` ([`ReceptionProtectedReadWiringTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/reception/ReceptionProtectedReadWiringTest.java)). Added `DoctorStationUiPreservationTest` guarding `6aabb85` Doctor UI layout invariants: 8-column history table, 9 action buttons, `250px` split pane, and 5 tabs ([`DoctorStationUiPreservationTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/examination/DoctorStationUiPreservationTest.java)). | `f04315d` (task `34a27647` — `copilot-cli`): [`ReceptionProtectedReadWiringTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/reception/ReceptionProtectedReadWiringTest.java), **1/1 PASS**; [`DoctorStationUiPreservationTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/examination/DoctorStationUiPreservationTest.java), **3/3 PASS**. |
+| **Wave 10 documentation sync** | Synced task board and completion review with Wave 10 evidence (`797cc8c`, `b7c550b`, `8fa16a0`). | `14f671c` (task `a5f7c1e4` — `google-antigravity-cli-claude-sonnet-02507d`): [`03-model-task-board.md`](03-model-task-board.md), [`phase1-rec01-and-sec01-shift-completion-review.md`](phase1-rec01-and-sec01-shift-completion-review.md). |
+| **Non-UI Doctor composition wiring & tests** | Restored non-UI `DoctorCompositionRoot` and `DoctorCompositionRootTest` providing pure dependency injection wiring for doctor station use cases without modifying `DoctorStationPanel` or any Doctor UI component ([`DoctorCompositionRoot`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/DoctorCompositionRoot.java), [`DoctorCompositionRootTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/examination/DoctorCompositionRootTest.java)). | `eb52b71` (task `a990195c` — `leaderANTI`): [`DoctorCompositionRootTest`](../../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/examination/DoctorCompositionRootTest.java), **2/2 PASS**. |
+
 ## Verification run and gate preservation
 
-The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, and the newly restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**). Across the reactor, **466 tests PASS (100 domain + 131 application + 118 infrastructure + 117 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
+The focused Maven run also included `ReceptionCompositionRootTest` (**5/5**), the Application registration-handler tests above, the restored Wave 9 test suites (`MainLookAndFeelTest` **2/2**, `ExaminationShortcutMaskTest` **4/4**, `DocxManagerTest` **1/1**, `DocxDocumentTest` **2/2**), and the Wave 11 test suites (`ReceptionProtectedReadWiringTest` **1/1**, `DoctorStationUiPreservationTest` **3/3**, `DoctorCompositionRootTest` **2/2**). Across the reactor, **472 tests PASS (100 domain + 131 application + 118 infrastructure + 123 desktop; 0 failures, 0 errors, 4 opt-in SQL Server skips)**. Fixtures were synthetic/headless, including JDBC proxies; no live database was used.
 
 ```sh
 mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
   -pl clinic-desktop,clinic-infrastructure -am \
   -Djava.awt.headless=true -Dsurefire.failIfNoSpecifiedTests=false \
-  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest,MainLookAndFeelTest,ExaminationShortcutMaskTest,DocxManagerTest,DocxDocumentTest \
+  -Dtest=BaoHiemRepositoryImplTest,PatientRegistrationFormPanelTest,RegisterPatientHandlerTest,ReceptionCompositionRootTest,ReceptionPanelActiveRoomBindingTest,ReceptionPanelFormResetAndSummaryTest,ReceptionActionBindingsTest,ReceptionPanelWorkerAndSearchHardeningTest,ReceptionPanelMessagePolicyTest,LoginSessionFlowTest,DashboardNavigationPolicyTest,UserSessionContextTest,MainLookAndFeelTest,ExaminationShortcutMaskTest,DocxManagerTest,DocxDocumentTest,ReceptionProtectedReadWiringTest,DoctorStationUiPreservationTest,DoctorCompositionRootTest \
   test
 ```
 
@@ -56,7 +64,7 @@ mvn -o -B -ntp -Daether.syncContext.named.factory=rwlock-local \
 ## Related Artifacts
 
 - [`phase1-doctor-ui-preservation-and-wiring-plan.md`](phase1-doctor-ui-preservation-and-wiring-plan.md) — Doctor UI invariants and surgical wiring blueprint for PAT-02 (`797cc8c`)
-- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`8fa16a0`)
+- [`LEADERSHIP_HANDOVER_LEADER_ANTI.md`](LEADERSHIP_HANDOVER_LEADER_ANTI.md) — Authoritative leadership handover and operational shift log (`eb52b71`)
 - [`desktop-owner-visual-smoke-checklist.md`](desktop-owner-visual-smoke-checklist.md)
 - [`desktop-main-ui-preservation-review.md`](desktop-main-ui-preservation-review.md)
 - [`03-model-task-board.md`](03-model-task-board.md)
