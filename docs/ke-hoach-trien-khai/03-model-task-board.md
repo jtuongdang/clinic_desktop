@@ -498,6 +498,16 @@ At `feature/patient-reception-workflow` up to commits `1239784` and `644a904`, c
 
 **Reactor test count:** 604 tests run (112 domain + 235 application + 125 infrastructure + 132 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 và Phase 3 đã được củng cố tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
 
+## Wave 17 Hardening and Verification — 07/11/2026 [leaderANTI]
+
+| Commit · task | Phân hệ · Thay đổi cụ thể | Bằng chứng kiểm thử tự động | Trạng thái cổng |
+|---|---|---|---|
+| `764510c` · `bc4b80c3` (`copilot-cli`) | `clinic-domain`: Bổ sung kiểm thử `CoSoTest`, `KhoaTest`, và `PhongKhamTest`, mở rộng kiểm thử miền cho cơ sở, khoa và phòng khám. | `3/3` tests PASS trong `CoSoTest`, `3/3` tests PASS trong `KhoaTest`, `3/3` tests PASS trong `PhongKhamTest`. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `af52771` · `a86f61e8` (`google-antigravity-cli-claude-sonnet-02507d`) | Đồng bộ task board (`03-model-task-board.md`), biên bản nghiệm thu ca trực (`phase1-rec01-and-sec01-shift-completion-review.md`) và biên bản bàn giao (`LEADERSHIP_HANDOVER_LEADER_ANTI.md`) ghi nhận Wave 16. | Tài liệu đồng bộ hoàn tất; 604 tests run toàn reactor (6 opt-in skips). | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+| `0b68800` · `ee1dcb40` (`copilot-cli`) | `clinic-domain`: Bổ sung kiểm thử `ChanDoanTest`, `SinhHieuTest`, và `ICDTest`, mở rộng kiểm thử miền cho chẩn đoán, sinh hiệu và danh mục mã bệnh ICD. | `3/3` tests PASS trong `ChanDoanTest`, `3/3` tests PASS trong `SinhHieuTest`, `3/3` tests PASS trong `ICDTest`. | `SEC-01`, `PAT-02`, `REC-01` tiếp tục `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. |
+
+**Reactor test count:** 622 tests run (130 domain + 235 application + 125 infrastructure + 132 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips: 4 in infrastructure + 2 in desktop). Các cổng `SEC-01`, `PAT-02`, và `REC-01` tiếp tục giữ nguyên trạng thái `[~] In progress` (`OPEN` / `default-deny`) chờ Owner visual smoke. Toàn bộ danh mục kiểm tra cổng nghiệm thu của Owner cho Phase 1–2 và Phase 3 đã được củng cố tại [`phase3-readiness-and-owner-gate-summary.md`](phase3-readiness-and-owner-gate-summary.md).
+
 
 
 
