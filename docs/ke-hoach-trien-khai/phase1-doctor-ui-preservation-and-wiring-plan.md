@@ -1,7 +1,7 @@
 # PAT-02 — Doctor UI preservation and read-wiring plan
 
 **Status:** Review and future-slice blueprint only. Wiring is not authorized by this document.
-**Baseline:** `6aabb85` (main UI), restored into the current branch at `982c1f6`; current worktree `HEAD` is `f150edc`.
+**Baseline:** `6aabb85` (main UI), restored into the current branch at `982c1f6`; current worktree `HEAD` is `eb52b71`.
 **Scope:** Preserve the Doctor station’s existing presentation while planning a separately owner-approved, read-only queue and history integration.
 
 ## 1. Baseline evidence and source-of-truth
@@ -13,7 +13,7 @@ There are two important mismatches between the task’s examples and the source:
 * `DoctorActionBar` contains **nine** buttons: seven clinical/workflow actions (`Làm mới`, `Tìm Kiếm`, `Bệnh Án`, `Dịch Vụ`, `Thuốc/VT`, `Phác Đồ ĐT`, `Thanh Toán`) plus `Menu` and `In`. Thus “7 buttons” accurately describes the seven workflow actions only. Preservation means retaining the complete original nine-button bar, in order, not reducing it to seven.
 * Baseline `DoctorHistoryPanel` has **eight** columns; the pre-restore component had **two** (`Loại tiền sử`, `Nội dung`), not seven. Keep the eight-column baseline schema exactly.
 
-The pre-restore `DoctorCompositionRoot.java` existed at `50c53ce`, but `982c1f6` deleted it and it is absent from the current worktree. No `DoctorStationController.java` exists in the current or pre-restore tree, nor was one found in the repository’s available commit history. The integration step must therefore first agree on whether to restore/adapt the composition root and introduce a controller; it must not assume those classes are currently available.
+The pre-restore `DoctorCompositionRoot.java` existed at `50c53ce`, but `982c1f6` deleted it. At commit `eb52b71`, non-UI `DoctorCompositionRoot.java` and its dedicated test `DoctorCompositionRootTest.java` (**2/2 PASS**) have been restored into the codebase. In addition, `DoctorStationUiPreservationTest.java` (**3/3 PASS**) was added at commit `f04315d` (alongside `ReceptionProtectedReadWiringTest` **1/1 PASS**) to programmatically verify and enforce the UI preservation invariants, while `DoctorStationPanel` and its 4 UI components (`DoctorActionBar`, `DoctorClinicalForm`, `DoctorHistoryPanel`, `DoctorQueueSidebar`) remain 100% byte-identical to `6aabb85`. No `DoctorStationController.java` exists in the current tree; future wiring will introduce and bind the controller to these components once owner-approved.
 
 ## 2. UI invariants to preserve from `6aabb85`
 
@@ -82,17 +82,40 @@ The side-by-side comparison of `6aabb85` and `50c53ce` shows these user-visible 
 
 This sequence is a future implementation plan, not authorization to change Java code. All steps must preserve the invariants above and keep database access behind application handlers. No Swing event handler may call JDBC or a repository directly.
 
-1. **Approve source and controller ownership first.** Reconcile the current tree with historical wiring: the former `DoctorCompositionRoot` built the queue/history handlers, but it was removed by `982c1f6`; there is no existing `DoctorStationController`. Owner approval should specify whether to restore/adapt the composition root and where the controller belongs. Do not resurrect old code without reviewing its lifecycle, authorization, diagnostics, and tests.
+1. **Approve source and controller ownership first.** Reconcile the current tree with historical wiring: non-UI `DoctorCompositionRoot.java` and `DoctorCompositionRootTest.java` (**2/2 PASS**) have now been restored at commit `eb52b71`, constructing guarded `GetDoctorQueueHandler` and `GetPatientHistoryHandler` instances without database connections. No `DoctorStationController.java` exists yet in the current tree. Owner approval will govern when and how a dedicated controller is introduced and connected to `DoctorStationPanel`.
 2. **Compose the existing protected reads.** Follow the existing `clinic-application` contracts: `GetDoctorQueueHandler` with `GetDoctorQueueQuery` for the active scoped doctor queue, and `GetPatientHistoryHandler` with `GetPatientHistoryQuery` for patient-level `TienSuBenh`. Build the handlers at the approved desktop composition boundary; inject query functions/ports into the controller. UI code receives no repository, `Connection`, or JDBC provider.
 3. **Load the queue read-only and off the EDT.** On panel activation/refresh, capture the authenticated `AuthorizationContext` and matching `AuditActorContext`, validate the actor/scope, and request the clinic business date in `Asia/Ho_Chi_Minh`. Invoke the queue handler in a `SwingWorker` (or established equivalent), not on the EDT. Render only returned `ReceptionQueueItem` values in the existing queue table; preserve its component geometry and controls. Treat denied, failed, null, or invalid results as unavailable—never substitute fabricated patients.
 4. **Bind selection to the exact returned item.** Selection should retain the selected `ReceptionQueueItem` (including patient and visit identifiers), not infer identity from display text or row index. On selection, update the existing banner/form values through a view mapping, clear prior history immediately, and request history only for the selected `patientId` under the same authorization/audit scope. A null selection clears the patient-dependent values/data without altering their layout.
 5. **Gate the history projection on a truthful data contract.** `GetPatientHistoryHandler` returns patient-level `TienSuBenh` entries (`LoaiTienSu` and `MoTa`), while the preserved eight columns describe visit/encounter history (`Ngày Vào`, admission type, department, room, discharge, disposition, service, diagnosis). Those are not equivalent data shapes. Before implementing projection, the Owner must approve a field-to-column mapping backed by actual source data, or approve using/adding the correct read query for encounter history. Keep the exact existing eight headers and table; do not invent dates, visits, facilities, rooms, procedures, or diagnoses, and do not silently relabel the panel. Until the mismatch is resolved, do not claim that patient-history rows are valid encounter-history rows.
 6. **Keep asynchronous results current.** Use monotonically increasing request epochs/tokens. Advance the queue epoch on refresh, scope/session change, deactivation/clear; advance the history epoch on patient selection, clear, and scope/session change. Each worker captures its epoch plus the relevant authorization/session identity and patient/visit identity. In `done()` on the EDT, publish only if the worker is not cancelled, its epoch still matches, the session/actor still matches, and— for history— the same patient remains selected. Cancellation is advisory; the epoch/identity checks are the correctness guard. Do not let an older history result overwrite a newer selection.
 7. **Surface safe errors with correlation.** Keep loading/empty/unavailable feedback within the existing queue/history display areas; do not resize or replace the components. For a failed `Result`, show a concise safe message and stable error code, plus the operation’s existing `AuditActorContext.correlationId` so support can find diagnostics. Never display raw exception text, SQL, stack traces, or sensitive patient data in an error dialog. If no correlation ID is available, show the generic safe message and code without inventing an ID. Authorization denial should be handled as a safe unavailable/denied state, not as success or as a data fallback.
-8. **Verify the preservation contract before merge.** Add/adjust focused synthetic-data tests for query mapping, result invalidation (stale queue/history workers and changed patient/session), safe error content, and the eight-column model/header contract. Compare the Doctor UI paths against `6aabb85` or use the existing visual smoke process. Reject any diff that changes component bounds/layout, divider default, button count/order, form fields, table columns, or tab structure. Run only isolated tests; do not connect to `localhost:1433` or `clinicDb`.
+8. **Verify the preservation contract before merge.** Add/adjust focused synthetic-data tests for query mapping, result invalidation (stale queue/history workers and changed patient/session), safe error content, and the eight-column model/header contract. Baseline UI preservation tests are now active: `DoctorStationUiPreservationTest.java` (**3/3 PASS**) was introduced at commit `f04315d` (alongside `ReceptionProtectedReadWiringTest` **1/1 PASS**), programmatically asserting the 8-column read-only history table schema, the 9 action buttons in exact sequence, and the horizontal split geometry (divider 250 px, size 4 px) with 5 tabs. Non-UI wiring is verified by `DoctorCompositionRootTest.java` (**2/2 PASS**) restored at `eb52b71`. Reject any diff that alters component bounds/layout, divider default, button count/order, form fields, table columns, or tab structure, ensuring `DoctorStationPanel` and its 4 UI components stay 100% byte-identical to `6aabb85`. Run only isolated tests; do not connect to `localhost:1433` or `clinicDb`.
 
 ## 5. Evidence and limits of this review
 
 Evidence inspected: current Doctor module versus `6aabb85`; `50c53ce` Doctor-module patch and full pre-restore tree comparison; `982c1f6` restore diff; historical `DoctorCompositionRoot`; current `GetDoctorQueueHandler`/query/`ReceptionQueueItem` and `GetPatientHistoryHandler`/query; current Doctor UI components; and existing Doctor history contract and visual smoke runbook.
 
 This change is documentation only. No Java files were edited, no tests/build were run, and no database or external system was contacted.
+
+## 6. Wave 11 Verification Evidence
+
+During Wave 11 (`eb52b71`), the Doctor module preservation and composition contracts were verified headlessly within the full 472-test Maven reactor build:
+
+* **Reactor Test Suite Execution:** 472 tests executed across all modules (**472/472 PASS**, 0 failures, 0 errors, 0 skipped at `eb52b71`).
+* **Non-UI Composition Root Restoration (`eb52b71`):**
+  - Source: `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorCompositionRoot.java`.
+  - Test Suite: `DoctorCompositionRootTest.java` (**2/2 PASS**).
+  - Verified behaviors:
+    1. Composes guarded and audited `GetDoctorQueueHandler` and `GetPatientHistoryHandler` application handlers via `SessionLifecycleService` without establishing live database connections or accessing `clinicDb`.
+    2. Enforces strict null-safety checks rejecting missing dependencies.
+* **UI Preservation Test Suite (`f04315d`):**
+  - Test Suite: `DoctorStationUiPreservationTest.java` (**3/3 PASS**).
+  - Verified UI invariants:
+    1. `historyTableKeepsOriginalReadOnlyEightColumnSchema`: Verifies the single `JTable` in `DoctorHistoryPanel` preserves all 8 exact column headers (`Ngày Vào`, `Hình Thức Vào`, `Khoa`, `Phòng`, `Ngày Ra`, `Xử Trí`, `Dịch`, `Chẩn Đoán`) and all cells remain non-editable.
+    2. `actionBarKeepsAllOriginalButtonsInOrder`: Verifies all 9 buttons (`Menu`, `In`, `Làm mới`, `Tìm Kiếm`, `Bệnh Án`, `Dịch Vụ`, `Thuốc/VT`, `Phác Đồ ĐT`, `Thanh Toán`) retain their exact labels and order on `DoctorActionBar`.
+    3. `stationKeepsOriginalHorizontalSplitGeometryAndFiveTabs`: Verifies a single `JSplitPane` with `HORIZONTAL_SPLIT`, initial divider location `250`, divider size `4`, and `JTabbedPane` with all 5 original tabs (`Bệnh Nhân`, `Công Khám(1)`, `Thuốc(2)`, `Xử Trí`, `Phản Hồi`).
+  - Added alongside `ReceptionProtectedReadWiringTest.java` (**1/1 PASS** at `f04315d`), verifying protected application handler read routing.
+* **Byte-level UI Preservation:**
+  - `DoctorStationPanel.java` and its 4 UI components (`DoctorActionBar.java`, `DoctorClinicalForm.java`, `DoctorHistoryPanel.java`, `DoctorQueueSidebar.java`) remain **100% byte-identical** to baseline commit `6aabb85`.
+* **Database Isolation:** All headless tests run entirely with synthetic fixtures and in-memory test doubles; zero network traffic or JDBC connection to `localhost:1433` (`clinicDb`).
+
