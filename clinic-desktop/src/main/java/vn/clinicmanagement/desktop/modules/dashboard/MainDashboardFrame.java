@@ -181,10 +181,7 @@ public class MainDashboardFrame extends JFrame {
 
         RibbonButton btnUser = guardedButton("Người Dùng", "👥", "user", k -> {
             JOptionPane.showMessageDialog(this,
-                    "Bác sĩ đang khám: " + loginSession.fullName() + "\n" +
-                    "Cơ sở: " + loginSession.workScope().facilityName() + "\n" +
-                    "Khoa phòng: " + loginSession.workScope().departmentName() + "\n" +
-                    "Vai trò: " + loginSession.role().name(),
+                    formatDoctorUserInfo(loginSession),
                     "Thông Tin Bác Sĩ Điều Trị", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -336,10 +333,7 @@ public class MainDashboardFrame extends JFrame {
 
         RibbonButton btnUser = guardedButton("Người Dùng", "👤", "user", k -> {
             JOptionPane.showMessageDialog(this,
-                    "Thông tin người dùng: " + loginSession.fullName() + "\n" +
-                    "Cơ sở: " + loginSession.workScope().facilityName() + "\n" +
-                    "Khoa phòng: " + loginSession.workScope().departmentName() + "\n" +
-                    "Vai trò: " + loginSession.role().name(),
+                    formatStaffUserInfo(loginSession),
                     "Tài Khoản Đang Đăng Nhập", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -368,6 +362,30 @@ public class MainDashboardFrame extends JFrame {
                 && navigation.canOpen(key);
     }
 
+    static String formatDoctorUserInfo(CompletedLoginSession loginSession) {
+        return "Bác sĩ đang khám: " + loginSession.fullName() + "\n" +
+                "Cơ sở: " + loginSession.workScope().facilityName() + "\n" +
+                "Khoa phòng: " + loginSession.workScope().departmentName() + "\n" +
+                "Vai trò: " + loginSession.role().name();
+    }
+
+    static String formatStaffUserInfo(CompletedLoginSession loginSession) {
+        return "Thông tin người dùng: " + loginSession.fullName() + "\n" +
+                "Cơ sở: " + loginSession.workScope().facilityName() + "\n" +
+                "Khoa phòng: " + loginSession.workScope().departmentName() + "\n" +
+                "Vai trò: " + loginSession.role().name();
+    }
+
+    static void syncRibbonButtonsForSessionState(SessionLifecycleService sessionLifecycle,
+                                                 DashboardNavigationPolicy navigation,
+                                                 Map<String, RibbonButton> ribbonButtons) {
+        boolean active = sessionLifecycle.evaluate() == SessionLifecycleService.State.ACTIVE;
+        for (var entry : ribbonButtons.entrySet()) {
+            String key = entry.getKey();
+            entry.getValue().setEnabled("exit".equals(key) || active && navigation.canOpen(key));
+        }
+    }
+
     private RibbonButton guardedButton(String title, String icon, String key,
                                         java.util.function.Consumer<String> action) {
         RibbonButton button = new RibbonButton(title, icon, key, action == null ? null : selected -> {
@@ -394,6 +412,7 @@ public class MainDashboardFrame extends JFrame {
     private void updateSessionLock() {
         if (closing) return;
         SessionLifecycleService.State state = sessionLifecycle.evaluate();
+        syncRibbonButtonsForSessionState(sessionLifecycle, navigation, ribbonButtons);
         if (state == SessionLifecycleService.State.ACTIVE) {
             lockOverlay.setVisible(false);
             return;
@@ -405,9 +424,6 @@ public class MainDashboardFrame extends JFrame {
         boolean newlyLocked = !lockOverlay.isVisible();
         lockOverlay.setVisible(true);
         if (newlyLocked) lockOverlay.focusCredentials();
-        for (var entry : ribbonButtons.entrySet()) {
-            entry.getValue().setEnabled("exit".equals(entry.getKey()));
-        }
     }
 
     private void reauthenticate(SessionLockOverlay.Credentials credentials) {
@@ -426,12 +442,8 @@ public class MainDashboardFrame extends JFrame {
                 if (closing) return;
                 try {
                     if (!get()) lockOverlay.setMessage("Không thể tiếp tục: xác thực, phạm vi hoặc nhật ký phiên chưa hợp lệ.");
+                    syncRibbonButtonsForSessionState(sessionLifecycle, navigation, ribbonButtons);
                     updateSessionLock();
-                    if (sessionLifecycle.evaluate() == SessionLifecycleService.State.ACTIVE) {
-                        for (var entry : ribbonButtons.entrySet()) {
-                            entry.getValue().setEnabled("exit".equals(entry.getKey()) || canNavigate(entry.getKey()));
-                        }
-                    }
                 } catch (InterruptedException ex) {
                     DesktopWorkerDiagnostics.restoreInterruptStatus();
                 } catch (java.util.concurrent.ExecutionException | RuntimeException ex) {
