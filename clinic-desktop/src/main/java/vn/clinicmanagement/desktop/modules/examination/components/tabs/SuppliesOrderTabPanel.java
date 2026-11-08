@@ -1,6 +1,7 @@
 package vn.clinicmanagement.desktop.modules.examination.components.tabs;
 
 import vn.clinicmanagement.desktop.core.config.AppFonts;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationPanel.AdminPatientItem;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -11,6 +12,8 @@ import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Tab "Vật Tư(1)" trong phân hệ Khám Bệnh.
@@ -31,9 +34,31 @@ public class SuppliesOrderTabPanel extends JPanel {
     private JLabel lblMaPhieu;
     private JLabel lblTrangThai;
     private JLabel lblKhoa;
+    private JLabel lblLoaiPhieu;
+    private JLabel lblNguoiChiDinh;
+    private JLabel lblNoiChiDinh;
+    private JLabel lblChanDoan;
     private JPanel selectedTicketCard;
 
+    private JButton btnPrint;
+    private JButton btnCancel;
+    private AdminPatientItem patient;
+    private String patientCode = "22000308";
+    private String patientName = "NGUYỄN THỊ BÌNH AN";
+    private String currentTicketCode = "VT220819.1";
+    private boolean isCancelled = false;
+    private boolean suppressDialogs = false;
+
     public SuppliesOrderTabPanel() {
+        this(null);
+    }
+
+    public SuppliesOrderTabPanel(AdminPatientItem patient) {
+        this.patient = patient;
+        if (patient != null) {
+            this.patientName = patient.name;
+            this.patientCode = patient.code;
+        }
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -42,6 +67,137 @@ public class SuppliesOrderTabPanel extends JPanel {
 
         // 2. KHUNG TRUNG TÂM: CHI TIẾT PHIẾU VẬT TƯ (THÔNG TIN HÀNH CHÍNH + BẢNG VẬT TƯ + NÚT IN)
         add(buildTicketDetailPanel(), BorderLayout.CENTER);
+
+        if (patient != null) {
+            applyPatientData(patient);
+        }
+    }
+
+    public void setPatient(AdminPatientItem patient) {
+        this.patient = patient;
+        if (patient != null) {
+            this.patientName = patient.name != null ? patient.name : "";
+            this.patientCode = patient.code != null ? patient.code : "";
+            applyPatientData(patient);
+        }
+    }
+
+    private void applyPatientData(AdminPatientItem p) {
+        if (lblChanDoan != null && p.diagnosis != null) {
+            lblChanDoan.setText(p.diagnosis);
+        }
+        if (lblNoiChiDinh != null && p.department != null) {
+            lblNoiChiDinh.setText(p.department);
+        }
+        if (lblNguoiChiDinh != null && p.doctor != null) {
+            lblNguoiChiDinh.setText(p.doctor);
+        }
+    }
+
+    public void setSupplies(List<Object[]> suppliesList) {
+        if (tableModel == null) return;
+        tableModel.setRowCount(0);
+        if (suppliesList != null && !suppliesList.isEmpty()) {
+            int stt = 1;
+            for (Object[] item : suppliesList) {
+                // Mong đợi mảng 4 hoặc 5 phần tử: [STT, Mã, Tên, ĐVT, SL] hoặc [Mã, Tên, ĐVT, SL]
+                if (item.length >= 5) {
+                    tableModel.addRow(new Object[]{String.valueOf(stt++), item[1], item[2], item[3], item[4]});
+                } else if (item.length == 4) {
+                    tableModel.addRow(new Object[]{String.valueOf(stt++), item[0], item[1], item[2], item[3]});
+                } else if (item.length > 0) {
+                    tableModel.addRow(item);
+                }
+            }
+        } else {
+            tableModel.addRow(new Object[]{"1", "VT026", "Bơm cho ăn 5ml", "Cái", "50"});
+        }
+
+        int currentRows = tableModel.getRowCount();
+        for (int i = currentRows; i < 18; i++) {
+            tableModel.addRow(new Object[]{"", "", "", "", ""});
+        }
+        this.isCancelled = false;
+        if (lblTrangThai != null) {
+            lblTrangThai.setText("Đã xuất [Mã phiếu : " + currentTicketCode + "]");
+        }
+    }
+
+    public void setSuppressDialogs(boolean suppressDialogs) {
+        this.suppressDialogs = suppressDialogs;
+    }
+
+    public boolean isSuppressDialogs() {
+        return suppressDialogs;
+    }
+
+    private boolean isModalDialogAllowed() {
+        if (suppressDialogs || GraphicsEnvironment.isHeadless()) return false;
+        String surefire = System.getProperty("surefire.test.class.path");
+        return surefire == null || surefire.isBlank();
+    }
+
+    public void executePrint() {
+        StringBuilder itemsSummary = new StringBuilder();
+        int count = 0;
+        if (tableModel != null) {
+            for (int i = 0; i < tableModel.getRowCount(); i++) {
+                Object nameObj = tableModel.getValueAt(i, 2);
+                Object qtyObj = tableModel.getValueAt(i, 4);
+                if (nameObj != null && !nameObj.toString().trim().isEmpty()) {
+                    if (count > 0) itemsSummary.append(", ");
+                    itemsSummary.append(nameObj.toString().trim());
+                    if (qtyObj != null && !qtyObj.toString().trim().isEmpty()) {
+                        itemsSummary.append(" (SL: ").append(qtyObj.toString().trim()).append(")");
+                    }
+                    count++;
+                }
+            }
+        }
+        if (itemsSummary.length() == 0) {
+            itemsSummary.append("Bơm cho ăn 5ml (SL: 50)");
+        }
+
+        String msg = "Đang xuất lệnh in phiếu chỉ định vật tư:\n" +
+                "▶ Mã phiếu: " + currentTicketCode + "\n" +
+                "▶ Bệnh nhân: " + patientName + " | " + patientCode + "\n" +
+                "▶ Vật tư: " + itemsSummary;
+
+        if (isModalDialogAllowed()) {
+            JOptionPane.showMessageDialog(this, msg, "In Phiếu Chỉ Định Vật Tư", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
+    public void executeCancel() {
+        if (isModalDialogAllowed()) {
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Bạn có chắc chắn muốn hủy phiếu chỉ định vật tư " + currentTicketCode + "?",
+                    "Xác Nhận Hủy Gửi Phiếu", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (confirm != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+
+        this.isCancelled = true;
+        if (lblTrangThai != null) {
+            lblTrangThai.setText("ĐÃ HỦY PHIẾU [" + currentTicketCode + "]");
+        }
+
+        if (tableModel != null) {
+            for (int i = 0; i < tableModel.getRowCount(); i++) {
+                Object nameObj = tableModel.getValueAt(i, 2);
+                if (nameObj != null && !nameObj.toString().trim().isEmpty()) {
+                    String str = nameObj.toString().trim();
+                    if (!str.contains("[Đã hủy]")) {
+                        tableModel.setValueAt(str + " [Đã hủy]", i, 2);
+                    }
+                }
+            }
+        }
+
+        if (isModalDialogAllowed()) {
+            JOptionPane.showMessageDialog(this, "Đã hủy phiếu vật tư " + currentTicketCode + " thành công!", "Thông Báo", JOptionPane.INFORMATION_MESSAGE);
+        }
     }
 
     private JPanel buildTicketSelectorPanel() {
@@ -75,54 +231,40 @@ public class SuppliesOrderTabPanel extends JPanel {
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         listPanel.setBackground(Color.WHITE);
 
-        // Thẻ phiếu 1: VT7730BZL1 (đang chọn màu xanh dương đậm khớp ảnh chụp)
-        JPanel card1 = createTicketCard("VT7730BZL 1 - 10/09/2022", "(Khám bệnh) Lúc 15:25 19/08/2022", true);
-        selectedTicketCard = card1;
+        selectedTicketCard = createTicketCard("VT220819.1", "(Khám bệnh) Lúc 18:20 21/08/2022", true);
+        listPanel.add(selectedTicketCard);
 
-        // Thẻ phiếu 2: VT7730KAL 1
-        JPanel card2 = createTicketCard("VT7730KAL 1 - 20/08/2022", "(Khám bệnh) Lúc 15:25 19/08/2022", false);
-
-        // Thẻ phiếu 3: V/P7/C... - Lịch sử khám bệnh
-        JPanel card3 = createTicketCard("V/P7/C... - Lịch sử khám bệnh", "(Khám bệnh) Lúc 15:25 19/08/2022", false);
-
-        listPanel.add(card1);
-        listPanel.add(card2);
-        listPanel.add(card3);
         panel.add(listPanel, BorderLayout.CENTER);
-
         return panel;
     }
 
-    private JPanel createTicketCard(String title, String subtitle, boolean isSelected) {
-        JPanel card = new JPanel(new GridLayout(2, 1, 0, 2));
+    private JPanel createTicketCard(String ticketCode, String subtitle, boolean isSelected) {
+        JPanel card = new JPanel(new BorderLayout(4, 2));
+        card.setMaximumSize(new Dimension(205, 46));
+        card.setPreferredSize(new Dimension(205, 46));
         card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(225, 230, 238)),
-                new EmptyBorder(4, 8, 4, 6)
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(215, 222, 232)),
+                new EmptyBorder(4, 8, 4, 8)
         ));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
-        card.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        JLabel l1 = new JLabel(title);
-        l1.setFont(AppFonts.SMALL_BOLD);
-
-        JLabel l2 = new JLabel(subtitle);
-        l2.setFont(AppFonts.SMALL);
 
         if (isSelected) {
-            card.setBackground(new Color(0, 120, 215)); // Màu xanh dương hoàng gia EHC
-            l1.setForeground(Color.WHITE);
-            l2.setForeground(new Color(235, 245, 255));
+            card.setBackground(new Color(18, 55, 125));
         } else {
             card.setBackground(Color.WHITE);
-            l1.setForeground(new Color(30, 35, 45));
-            l2.setForeground(new Color(90, 95, 105));
         }
 
-        card.add(l1);
-        card.add(l2);
+        JLabel l1 = new JLabel(ticketCode);
+        l1.setFont(AppFonts.SMALL_BOLD);
+        l1.setForeground(isSelected ? Color.WHITE : new Color(30, 30, 30));
 
-        // Tạo Popup Menu khi bấm chuột phải: [ ✓ ] Chuyển Ngày Y Lệnh
-        JPopupMenu contextMenu = createOrderDateContextMenu(title, l2);
+        JLabel l2 = new JLabel(subtitle);
+        l2.setFont(AppFonts.TINY);
+        l2.setForeground(isSelected ? new Color(220, 235, 255) : new Color(110, 110, 110));
+
+        card.add(l1, BorderLayout.NORTH);
+        card.add(l2, BorderLayout.SOUTH);
+
+        JPopupMenu contextMenu = createOrderDateContextMenu(ticketCode, l2);
 
         MouseAdapter rightClickAdapter = new MouseAdapter() {
             @Override
@@ -162,7 +304,7 @@ public class SuppliesOrderTabPanel extends JPanel {
         miChangeDate.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                miChangeDate.setBackground(new Color(225, 238, 252)); // Nền xanh nhạt hover chuẩn EHC
+                miChangeDate.setBackground(new Color(225, 238, 252));
             }
             @Override
             public void mouseExited(MouseEvent e) {
@@ -173,7 +315,7 @@ public class SuppliesOrderTabPanel extends JPanel {
         miChangeDate.addActionListener(e -> {
             String current = lblNgayYLenh != null ? lblNgayYLenh.getText() : "18:20 21/08/2022";
             String newDate = null;
-            if (!GraphicsEnvironment.isHeadless()) {
+            if (isModalDialogAllowed()) {
                 newDate = JOptionPane.showInputDialog(this,
                         "Nhập ngày y lệnh mới cho phiếu " + ticketCode + ":",
                         current);
@@ -263,7 +405,7 @@ public class SuppliesOrderTabPanel extends JPanel {
         actionFooter.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(210, 218, 228)));
         actionFooter.setPreferredSize(new Dimension(800, 38));
 
-        JButton btnPrint = new JButton(" In Phiếu (F3)", new PrinterIcon());
+        btnPrint = new JButton(" In Phiếu (F3)", new PrinterIcon());
         btnPrint.setFont(AppFonts.BODY_BOLD);
         btnPrint.setForeground(new Color(25, 25, 25));
         btnPrint.setBackground(Color.WHITE);
@@ -273,16 +415,9 @@ public class SuppliesOrderTabPanel extends JPanel {
                 new LineBorder(new Color(185, 195, 208), 1),
                 new EmptyBorder(3, 10, 3, 10)
         ));
-        btnPrint.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this,
-                    "Đang xuất lệnh in phiếu chỉ định vật tư:\n" +
-                    "▶ Mã phiếu: VT220819.1\n" +
-                    "▶ Bệnh nhân: NGUYỄN THỊ BÌNH AN | 22000308\n" +
-                    "▶ Vật tư: Bơm cho ăn 5ml (SL: 1)",
-                    "In Phiếu Chỉ Định Vật Tư", JOptionPane.INFORMATION_MESSAGE);
-        });
+        btnPrint.addActionListener(e -> executePrint());
 
-        JButton btnCancel = new JButton(" Hủy Gửi Phiếu", new RedCrossIcon());
+        btnCancel = new JButton(" Hủy Gửi Phiếu", new RedCrossIcon());
         btnCancel.setFont(AppFonts.BODY_BOLD);
         btnCancel.setForeground(new Color(185, 20, 20));
         btnCancel.setBackground(Color.WHITE);
@@ -292,14 +427,7 @@ public class SuppliesOrderTabPanel extends JPanel {
                 new LineBorder(new Color(185, 195, 208), 1),
                 new EmptyBorder(3, 10, 3, 10)
         ));
-        btnCancel.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(this,
-                    "Bạn có chắc chắn muốn hủy phiếu chỉ định vật tư VT220819.1?",
-                    "Xác Nhận Hủy Gửi Phiếu", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-            if (confirm == JOptionPane.YES_OPTION) {
-                JOptionPane.showMessageDialog(this, "Đã hủy phiếu vật tư thành công!");
-            }
-        });
+        btnCancel.addActionListener(e -> executeCancel());
 
         actionFooter.add(btnPrint);
         actionFooter.add(btnCancel);
@@ -320,33 +448,33 @@ public class SuppliesOrderTabPanel extends JPanel {
         int r = 0;
 
         // Hàng 1: Loại phiếu | Ngày y lệnh | Ngày chỉ định
-        JLabel lblLoaiPhieu = createUnderlineValue("Phiếu chỉ định");
-        this.lblNgayYLenh = createUnderlineValue("18:20 21/08/2022");
-        this.lblNgayChiDinh = createUnderlineValue("19:21 19/08/2022");
+        lblLoaiPhieu = createUnderlineValue("Phiếu chỉ định");
+        lblNgayYLenh = createUnderlineValue("18:20 21/08/2022");
+        lblNgayChiDinh = createUnderlineValue("19:21 19/08/2022");
         addHeaderRow(form, c, r++,
                 "Loại phiếu:", lblLoaiPhieu, 1,
                 "Ngày y lệnh:", lblNgayYLenh, 1,
                 "Ngày chỉ định:", lblNgayChiDinh, 1);
 
         // Hàng 2: Mã phiếu | Nơi chỉ định
-        this.lblMaPhieu = createUnderlineValue("VT220621.1");
-        JLabel lblNoiChiDinh = createUnderlineValue("PK Nhi 1");
+        lblMaPhieu = createUnderlineValue("VT220621.1");
+        lblNoiChiDinh = createUnderlineValue("PK Nhi 1");
         addHeaderRow(form, c, r++,
                 "Mã phiếu:", lblMaPhieu, 1,
                 "Nơi chỉ định:", lblNoiChiDinh, 3,
                 null, null, 0);
 
         // Hàng 3: Người chỉ định | Trạng thái (Đã xuất...)
-        JLabel lblNguoiChiDinh = createUnderlineValue("Sennv");
-        this.lblTrangThai = createUnderlineValue("Đã xuất [Mã phiếu : 1608773]");
+        lblNguoiChiDinh = createUnderlineValue("Sennv");
+        lblTrangThai = createUnderlineValue("Đã xuất [Mã phiếu : 1608773]");
         addHeaderRow(form, c, r++,
                 "Người chỉ định :", lblNguoiChiDinh, 1,
                 "Trạng thái:", lblTrangThai, 3,
                 null, null, 0);
 
         // Hàng 4: Khoa | Chẩn đoán
-        this.lblKhoa = createUnderlineValue("TTVT Phòng Phẩm");
-        JLabel lblChanDoan = createUnderlineValue("A62.0 Viêm ruột do Salmonella");
+        lblKhoa = createUnderlineValue("TTVT Phòng Phẩm");
+        lblChanDoan = createUnderlineValue("A62.0 Viêm ruột do Salmonella");
         addHeaderRow(form, c, r,
                 "Khoa:", lblKhoa, 1,
                 "Chẩn đoán:", lblChanDoan, 3,
@@ -388,10 +516,22 @@ public class SuppliesOrderTabPanel extends JPanel {
     private JLabel createUnderlineValue(String text) {
         JLabel lbl = new JLabel(text);
         lbl.setFont(AppFonts.SMALL);
-        lbl.setForeground(new Color(18, 45, 130)); // Chữ màu xanh dương đậm
+        lbl.setForeground(new Color(18, 45, 130));
         lbl.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(185, 195, 210)));
         return lbl;
     }
+
+    // Getters
+    public JButton getBtnPrint() { return btnPrint; }
+    public JButton getBtnCancel() { return btnCancel; }
+    public JTable getSuppliesTable() { return suppliesTable; }
+    public DefaultTableModel getTableModel() { return tableModel; }
+    public JLabel getLblTrangThai() { return lblTrangThai; }
+    public JLabel getLblMaPhieu() { return lblMaPhieu; }
+    public JLabel getLblChanDoan() { return lblChanDoan; }
+    public AdminPatientItem getPatient() { return patient; }
+    public boolean isCancelled() { return isCancelled; }
+    public String getCurrentTicketCode() { return currentTicketCode; }
 
     // =========================================================================
     // VECTOR ICONS

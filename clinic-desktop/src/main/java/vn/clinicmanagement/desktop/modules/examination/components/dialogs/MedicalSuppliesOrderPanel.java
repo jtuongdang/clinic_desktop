@@ -1,6 +1,7 @@
 package vn.clinicmanagement.desktop.modules.examination.components.dialogs;
 
 import vn.clinicmanagement.desktop.core.config.AppFonts;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationPanel.AdminPatientItem;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -15,6 +16,9 @@ import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Giao diện màn hình: "ĐHC - Chỉ Định Vật Tư"
@@ -35,6 +39,21 @@ public class MedicalSuppliesOrderPanel extends JPanel {
     private JPanel orderStatusBar;
     private JLabel lblTotalCostVal;
     private JLabel lblBhytCostVal;
+
+    private AdminPatientItem patient;
+    private Consumer<List<Object[]>> onSuppliesSavedCallback;
+    private boolean suppressDialogs = false;
+
+    private JLabel lblPatientLine1;
+    private JLabel lblPatientLine2;
+    private JLabel lblPatientLine3;
+    private JLabel lblBhyt;
+    private JComboBox<String> cbOrderDate;
+    private JComboBox<String> cbIcd;
+    private JComboBox<String> cbDiagnosisDesc;
+    private JTextField txtQty;
+    private JButton btnSave;
+    private JButton btnSaveAndClose;
 
     public MedicalSuppliesOrderPanel() {
         this((Runnable) null);
@@ -100,23 +119,23 @@ public class MedicalSuppliesOrderPanel extends JPanel {
         JPanel textPanel = new JPanel(new GridLayout(3, 1, 0, 0));
         textPanel.setOpaque(false);
 
-        JLabel l1 = new JLabel("NGUYỄN THỊ BÌNH AN | 22000308 | 1995 (23 tuổi) | Nữ", SwingConstants.RIGHT);
-        l1.setFont(AppFonts.SMALL_BOLD);
-        l1.setForeground(new Color(125, 20, 20));
+        lblPatientLine1 = new JLabel("NGUYỄN THỊ BÌNH AN | 22000308 | 1995 (23 tuổi) | Nữ", SwingConstants.RIGHT);
+        lblPatientLine1.setFont(AppFonts.SMALL_BOLD);
+        lblPatientLine1.setForeground(new Color(125, 20, 20));
 
-        JLabel l2 = new JLabel("Mã VP : 214332 | DN-4-01-8337377888 | Còn 867 ngày", SwingConstants.RIGHT);
-        l2.setFont(AppFonts.SMALL);
-        l2.setForeground(new Color(125, 20, 20));
+        lblPatientLine2 = new JLabel("Mã VP : 214332 | DN-4-01-8337377888 | Còn 867 ngày", SwingConstants.RIGHT);
+        lblPatientLine2.setFont(AppFonts.SMALL);
+        lblPatientLine2.setForeground(new Color(125, 20, 20));
 
-        JLabel l3 = new JLabel("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh", SwingConstants.RIGHT);
-        l3.setFont(AppFonts.SMALL);
-        l3.setForeground(new Color(125, 20, 20));
+        lblPatientLine3 = new JLabel("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh", SwingConstants.RIGHT);
+        lblPatientLine3.setFont(AppFonts.SMALL);
+        lblPatientLine3.setForeground(new Color(125, 20, 20));
 
-        textPanel.add(l1);
-        textPanel.add(l2);
-        textPanel.add(l3);
+        textPanel.add(lblPatientLine1);
+        textPanel.add(lblPatientLine2);
+        textPanel.add(lblPatientLine3);
 
-        JLabel lblBhyt = new JLabel("<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>80%</b></font></center></html>", SwingConstants.CENTER);
+        lblBhyt = new JLabel("<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>80%</b></font></center></html>", SwingConstants.CENTER);
         lblBhyt.setFont(AppFonts.SMALL_BOLD);
         lblBhyt.setBorder(new EmptyBorder(0, 8, 0, 4));
 
@@ -134,7 +153,7 @@ public class MedicalSuppliesOrderPanel extends JPanel {
         JLabel lblOrderDate = new JLabel("Ngày y lệnh:");
         lblOrderDate.setFont(AppFonts.BODY);
 
-        JComboBox<String> cbOrderDate = new JComboBox<>(new String[]{"15:15 19/08/2022"});
+        cbOrderDate = new JComboBox<>(new String[]{"15:15 19/08/2022"});
         cbOrderDate.setFont(AppFonts.BODY);
         cbOrderDate.setPreferredSize(new Dimension(150, 24));
         cbOrderDate.setBackground(Color.WHITE);
@@ -142,14 +161,14 @@ public class MedicalSuppliesOrderPanel extends JPanel {
         JLabel lblDiagnosis = new JLabel("Chẩn đoán:");
         lblDiagnosis.setFont(AppFonts.BODY);
 
-        JComboBox<String> cbIcd = new JComboBox<>(new String[]{"A02.0"});
+        cbIcd = new JComboBox<>(new String[]{"A02.0"});
         cbIcd.setFont(AppFonts.BODY);
         cbIcd.setPreferredSize(new Dimension(85, 24));
         cbIcd.setBackground(Color.WHITE);
 
         JButton btnBrowseIcd = createMiniBrowseButton();
 
-        JComboBox<String> cbDiagnosisDesc = new JComboBox<>(new String[]{"Viêm ruột do Salmonella"});
+        cbDiagnosisDesc = new JComboBox<>(new String[]{"Viêm ruột do Salmonella"});
         cbDiagnosisDesc.setFont(AppFonts.BODY);
         cbDiagnosisDesc.setPreferredSize(new Dimension(420, 24));
         cbDiagnosisDesc.setBackground(Color.WHITE);
@@ -278,7 +297,7 @@ public class MedicalSuppliesOrderPanel extends JPanel {
         JLabel lblQty = new JLabel("Số lượng:");
         lblQty.setFont(AppFonts.BODY);
 
-        JTextField txtQty = new JTextField("1");
+        txtQty = new JTextField("1");
         txtQty.setFont(AppFonts.BODY_BOLD);
         txtQty.setPreferredSize(new Dimension(50, 24));
         txtQty.setHorizontalAlignment(SwingConstants.CENTER);
@@ -478,7 +497,7 @@ public class MedicalSuppliesOrderPanel extends JPanel {
         JPanel rightButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
         rightButtons.setOpaque(false);
 
-        JButton btnSave = new JButton(" Lưu (Ctrl + S)", new FloppyDiskIcon(new Color(125, 45, 135)));
+        btnSave = new JButton(" Lưu (Ctrl + S)", new FloppyDiskIcon(new Color(125, 45, 135)));
         btnSave.setFont(AppFonts.BODY_BOLD);
         btnSave.setBackground(Color.WHITE);
         btnSave.setFocusPainted(false);
@@ -488,16 +507,9 @@ public class MedicalSuppliesOrderPanel extends JPanel {
                 new LineBorder(new Color(185, 195, 208), 1),
                 new EmptyBorder(2, 6, 2, 6)
         ));
-        btnSave.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this,
-                    "Đã lưu thành công đơn chỉ định vật tư y tế!\n" +
-                    "▶ Bệnh nhân: NGUYỄN THỊ BÌNH AN | 22000308\n" +
-                    "▶ Vật tư đã kê: Bơm cho ăn 5ml (SL: 1) - Kho: 0\n" +
-                    "▶ Tổng chi phí: 1,023,160 đ",
-                    "Lưu Chỉ Định Vật Tư", JOptionPane.INFORMATION_MESSAGE);
-        });
+        btnSave.addActionListener(e -> executeSave());
 
-        JButton btnSaveAndClose = new JButton(" Lưu + Đóng", new FloppyDiskIcon(new Color(40, 145, 75)));
+        btnSaveAndClose = new JButton(" Lưu + Đóng", new FloppyDiskIcon(new Color(40, 145, 75)));
         btnSaveAndClose.setFont(AppFonts.BODY_BOLD);
         btnSaveAndClose.setBackground(Color.WHITE);
         btnSaveAndClose.setFocusPainted(false);
@@ -508,6 +520,7 @@ public class MedicalSuppliesOrderPanel extends JPanel {
                 new EmptyBorder(2, 6, 2, 6)
         ));
         btnSaveAndClose.addActionListener(e -> {
+            executeSave();
             if (onCloseCallback != null) {
                 onCloseCallback.run();
             } else if (ownerWindow != null) {
@@ -521,6 +534,107 @@ public class MedicalSuppliesOrderPanel extends JPanel {
         footer.add(rightButtons, BorderLayout.EAST);
         return footer;
     }
+
+    public void setPatient(AdminPatientItem patient) {
+        this.patient = patient;
+        if (patient == null) return;
+        if (lblPatientLine1 != null) {
+            lblPatientLine1.setText(patient.name + " | " + patient.code + " | " + patient.birthYear + " (" + patient.bannerAge + ") | " + patient.gender);
+        }
+        if (lblPatientLine2 != null) {
+            lblPatientLine2.setText("Mã VP : " + (patient.invoiceCode != null ? patient.invoiceCode : "") + " | " + (patient.requestType != null ? patient.requestType : ""));
+        }
+        if (lblPatientLine3 != null) {
+            lblPatientLine3.setText(patient.bannerAddress != null ? patient.bannerAddress : (patient.address != null ? patient.address : ""));
+        }
+        boolean isBhyt = patient.requestType != null && (patient.requestType.contains("BHYT") || patient.requestType.contains("hiểm"));
+        if (lblBhyt != null) {
+            lblBhyt.setText(isBhyt
+                    ? "<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>80%</b></font></center></html>"
+                    : "<html><center><font color='#800000'><b>Viện<br>phí</b></font></center></html>");
+        }
+        if (cbDiagnosisDesc != null && patient.diagnosis != null && !patient.diagnosis.isBlank()) {
+            cbDiagnosisDesc.removeAllItems();
+            cbDiagnosisDesc.addItem(patient.diagnosis);
+        }
+    }
+
+    public void setOnSuppliesSavedCallback(Consumer<List<Object[]>> callback) {
+        this.onSuppliesSavedCallback = callback;
+    }
+
+    public void setSuppressDialogs(boolean suppressDialogs) {
+        this.suppressDialogs = suppressDialogs;
+    }
+
+    public boolean isSuppressDialogs() {
+        return suppressDialogs;
+    }
+
+    private boolean isModalDialogAllowed() {
+        if (suppressDialogs || GraphicsEnvironment.isHeadless()) return false;
+        String surefire = System.getProperty("surefire.test.class.path");
+        return surefire == null || surefire.isBlank();
+    }
+
+    public void executeSave() {
+        String name = patient != null && patient.name != null ? patient.name : "NGUYỄN THỊ BÌNH AN";
+        String code = patient != null && patient.code != null ? patient.code : "22000308";
+
+        List<Object[]> savedItems = new ArrayList<>();
+        int selectedRow = suppliesTable != null ? suppliesTable.getSelectedRow() : -1;
+        String firstItemDesc = "Bơm cho ăn 5ml (SL: 1) - Kho: 0";
+
+        if (tableModel != null) {
+            int stt = 1;
+            for (int r = 0; r < tableModel.getRowCount(); r++) {
+                Object codeVal = tableModel.getValueAt(r, 0);
+                Object nameVal = tableModel.getValueAt(r, 1);
+                Object unitVal = tableModel.getValueAt(r, 2);
+                if (codeVal != null && !codeVal.toString().trim().isEmpty() &&
+                    nameVal != null && !nameVal.toString().trim().isEmpty()) {
+                    String qty = (r == selectedRow && txtQty != null && !txtQty.getText().isBlank()) ? txtQty.getText().trim() : "1";
+                    savedItems.add(new Object[]{String.valueOf(stt++), codeVal.toString().trim(), nameVal.toString().trim(), unitVal != null ? unitVal.toString().trim() : "Cái", qty});
+                }
+            }
+        }
+
+        if (selectedRow >= 0 && selectedRow < tableModel.getRowCount()) {
+            Object nameVal = tableModel.getValueAt(selectedRow, 1);
+            Object storeVal = tableModel.getValueAt(selectedRow, 3);
+            if (nameVal != null && !nameVal.toString().isBlank()) {
+                String shortName = nameVal.toString();
+                if (shortName.contains("(")) {
+                    shortName = shortName.substring(0, shortName.indexOf('(')).trim();
+                }
+                String qty = txtQty != null ? txtQty.getText().trim() : "1";
+                firstItemDesc = shortName + " (SL: " + qty + ") - Kho: " + (storeVal != null ? storeVal : "0");
+            }
+        }
+
+        String totalCost = (lblTotalCostVal != null && lblTotalCostVal.getText() != null) ? lblTotalCostVal.getText() : "1,023,160";
+
+        if (onSuppliesSavedCallback != null) {
+            onSuppliesSavedCallback.accept(savedItems);
+        }
+
+        if (isModalDialogAllowed()) {
+            JOptionPane.showMessageDialog(this,
+                    "Đã lưu thành công đơn chỉ định vật tư y tế!\n" +
+                    "▶ Bệnh nhân: " + name + " | " + code + "\n" +
+                    "▶ Vật tư đã kê: " + firstItemDesc + "\n" +
+                    "▶ Tổng chi phí: " + totalCost + " đ",
+                    "Lưu Chỉ Định Vật Tư", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
+    public JButton getBtnSave() { return btnSave; }
+    public JButton getBtnSaveAndClose() { return btnSaveAndClose; }
+    public JTable getSuppliesTable() { return suppliesTable; }
+    public DefaultTableModel getTableModel() { return tableModel; }
+    public AdminPatientItem getPatient() { return patient; }
+    public JLabel getLblTotalCostVal() { return lblTotalCostVal; }
+    public JTextField getTxtQty() { return txtQty; }
 
     private void applyOrderSelection() {
         if (suppliesTable != null && suppliesTable.getRowCount() > 1) {

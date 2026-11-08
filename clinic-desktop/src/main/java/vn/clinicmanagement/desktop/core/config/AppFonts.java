@@ -11,7 +11,7 @@ import java.util.Set;
 /**
  * Hệ thống chữ DUY NHẤT của toàn ứng dụng.
  *
- * Quy chuẩn rút ra từ ảnh phần mềm EHC mẫu:
+ * Quy chuẩn phần mềm:
  * - Nhãn (label), nội dung bảng, menu   : 13 thường
  * - Giá trị dữ liệu, tên bệnh nhân, tab : 13 ĐẬM
  * - Tiêu đề cột bảng, tiêu đề nhóm      : 13 ĐẬM
@@ -35,6 +35,7 @@ public final class AppFonts {
     public static final Font BODY_BOLD     = make(Font.BOLD, 13);
     public static final Font SMALL         = make(Font.PLAIN, 12);
     public static final Font SMALL_BOLD    = make(Font.BOLD, 12);
+    public static final Font TINY          = make(Font.PLAIN, 11);
     public static final Font SECTION       = make(Font.BOLD, 15);
     public static final Font HEADER        = make(Font.BOLD, 18);
     public static final Font ICON          = make(Font.PLAIN, 14);

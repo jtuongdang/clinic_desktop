@@ -11,6 +11,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
+import java.util.function.Consumer;
 
 /**
  * Thanh công cụ phụ (Sub-Toolbar) trên đầu màn hình Quản lý Kho / Tủ Trực Vật Tư.
@@ -18,9 +19,16 @@ import java.awt.geom.RoundRectangle2D;
  */
 public class PharmacySubToolbar extends JPanel {
 
+    private final JButton btnMenu;
+    private final JButton btnReport;
+    private final JButton btnList;
+    private final JButton btnCreate;
+    private final JButton btnSearch;
     private final JTextField txtTicketCode;
     private final JTextField txtFromDate;
     private final JTextField txtToDate;
+
+    private Consumer<String> searchListener;
 
     public PharmacySubToolbar() {
         setLayout(new BorderLayout());
@@ -32,10 +40,10 @@ public class PharmacySubToolbar extends JPanel {
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
         leftPanel.setOpaque(false);
 
-        JButton btnMenu = createToolbarButton("Menu", PharmacyIcons.createMenuIcon(), false);
-        JButton btnReport = createToolbarButton("Báo Cáo", PharmacyIcons.createReportIcon(), false);
-        JButton btnList = createToolbarButton("Danh Sách", PharmacyIcons.createListIcon(), true); // Đang chọn (highlight)
-        JButton btnCreate = createToolbarButton("Tạo Phiếu", PharmacyIcons.createPlusIcon(), false);
+        btnMenu = createToolbarButton("Menu", PharmacyIcons.createMenuIcon(), false);
+        btnReport = createToolbarButton("Báo Cáo", PharmacyIcons.createReportIcon(), false);
+        btnList = createToolbarButton("Danh Sách", PharmacyIcons.createListIcon(), true); // Đang chọn (highlight)
+        btnCreate = createToolbarButton("Tạo Phiếu", PharmacyIcons.createPlusIcon(), false);
 
         JLabel lblTicketCode = new JLabel("Mã phiếu:");
         lblTicketCode.setFont(AppFonts.BODY_BOLD);
@@ -49,6 +57,7 @@ public class PharmacySubToolbar extends JPanel {
                 new LineBorder(new Color(165, 180, 196), 1),
                 new EmptyBorder(1, 4, 1, 4)
         ));
+        txtTicketCode.addActionListener(e -> triggerSearch());
 
         leftPanel.add(btnMenu);
         leftPanel.add(btnReport);
@@ -73,7 +82,8 @@ public class PharmacySubToolbar extends JPanel {
 
         txtToDate = createDateTimeBox("23:59 14/09/2021");
 
-        JButton btnSearch = createSearchButton();
+        btnSearch = createSearchButton();
+        btnSearch.addActionListener(e -> triggerSearch());
 
         rightPanel.add(lblFrom);
         rightPanel.add(txtFromDate);
@@ -193,7 +203,49 @@ public class PharmacySubToolbar extends JPanel {
         return btn;
     }
 
+    public void setOnSearchListener(Consumer<String> listener) {
+        this.searchListener = listener;
+    }
+
+    private void triggerSearch() {
+        if (searchListener != null) {
+            searchListener.accept(getTicketCode());
+        }
+    }
+
     public String getTicketCode() {
         return txtTicketCode.getText();
+    }
+
+    public JButton getBtnMenu() {
+        return btnMenu;
+    }
+
+    public JButton getBtnReport() {
+        return btnReport;
+    }
+
+    public JButton getBtnList() {
+        return btnList;
+    }
+
+    public JButton getBtnCreate() {
+        return btnCreate;
+    }
+
+    public JButton getBtnSearch() {
+        return btnSearch;
+    }
+
+    public JTextField getTxtTicketCode() {
+        return txtTicketCode;
+    }
+
+    public JTextField getTxtFromDate() {
+        return txtFromDate;
+    }
+
+    public JTextField getTxtToDate() {
+        return txtToDate;
     }
 }

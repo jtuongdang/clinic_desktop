@@ -131,6 +131,44 @@ class DoctorStationWiringTest {
         assertEquals(0, panel.getInFlightWorkersCount());
     }
 
+    @Test
+    @DisplayName("DoctorActionBar buttons switch clinical tabs and trigger actions")
+    void actionBarSwitchesTabsCorrectly() throws Exception {
+        DoctorStationPanel panel = new DoctorStationPanel();
+        assertNotNull(panel);
+        vn.clinicmanagement.desktop.modules.doctor.components.DoctorActionBar bar = panel.getActionBar();
+        assertNotNull(bar);
+        JTabbedPane tabs = panel.getClinicalTabs();
+        assertNotNull(tabs);
+
+        // Click Bệnh Án -> index 0
+        runOnEdtAndWait(() -> bar.getBtnMedicalRecord().doClick());
+        assertEquals(0, tabs.getSelectedIndex());
+
+        // Click Dịch Vụ -> index 1
+        runOnEdtAndWait(() -> bar.getBtnService().doClick());
+        assertEquals(1, tabs.getSelectedIndex());
+
+        // Click Thuốc/VT -> index 2
+        runOnEdtAndWait(() -> bar.getBtnMedicine().doClick());
+        assertEquals(2, tabs.getSelectedIndex());
+
+        // Click Phác Đồ ĐT -> index 3
+        runOnEdtAndWait(() -> bar.getBtnRegimen().doClick());
+        assertEquals(3, tabs.getSelectedIndex());
+
+        // Click Thanh Toán -> index 4
+        runOnEdtAndWait(() -> bar.getBtnPayment().doClick());
+        assertEquals(4, tabs.getSelectedIndex());
+
+        // Click In, Làm mới, Menu (should not throw exceptions in headless mode)
+        runOnEdtAndWait(() -> {
+            bar.getBtnPrint().doClick();
+            bar.getBtnRefresh().doClick();
+            bar.getBtnMenu().doClick();
+        });
+    }
+
     private static void runOnEdtAndWait(Runnable action) throws InterruptedException, InvocationTargetException {
         if (SwingUtilities.isEventDispatchThread()) {
             action.run();

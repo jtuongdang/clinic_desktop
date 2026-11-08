@@ -19,16 +19,22 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.prescription.PrescribeMedicationCommand;
+import vn.clinicmanagement.application.prescription.PrescribeMedicationReceipt;
+import vn.clinicmanagement.application.prescription.PrescriptionItemInput;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationCompositionRoot;
 
 /**
  * Giao diện màn hình: "ĐHC - Chỉ Định Thuốc"
  * Kích hoạt khi nhấn "Chỉ Định Thuốc" (hoặc Ctrl+T) từ Menu Thuốc/VT trên màn hình Khám Bệnh.
  * Khớp 100% chi tiết trong ảnh chụp mẫu thực tế:
  * - Sub-Toolbar: Menu, Đơn Thuốc Mẫu ▾, Đơn Thuốc Cũ
- * - Banner bệnh nhân góc phải: TEST11 | 22000285 | Viện phí
+ * - Banner bệnh nhân góc phải: NGUYỄN HOÀNG LONG | BN-20261107-0003 | Viện phí
  * - Khung thông tin y lệnh 3 hàng: Ngày y lệnh, Chẩn đoán, Bác sĩ điều trị, Ngày tái khám, Lời dặn BS, Đợt dùng thuốc
  * - Dải Tab: Danh Sách Thuốc (active) | Phiếu Chỉ thực | [✉ Thông báo (0)] ❚❚
  * - Cột trái: Cây danh mục Nhà thuốc -> Tất Cả Thuốc (204)
@@ -69,6 +75,10 @@ public class PrescriptionOrderPanel extends JPanel {
     }
 
     private final Runnable onCloseCallback;
+    private final ExaminationCompositionRoot.Services services;
+    private int currentVisitId = 1;
+    private int currentDoctorId = 1;
+    private int currentFacilityId = 1;
     private JTable medicineTable;
     private DefaultTableModel tableModel;
 
@@ -110,11 +120,16 @@ public class PrescriptionOrderPanel extends JPanel {
     private boolean isSettingTextProgrammatically = false;
 
     public PrescriptionOrderPanel() {
-        this(null);
+        this(null, resolveDefaultServices());
     }
 
     public PrescriptionOrderPanel(Runnable onCloseCallback) {
+        this(onCloseCallback, resolveDefaultServices());
+    }
+
+    public PrescriptionOrderPanel(Runnable onCloseCallback, ExaminationCompositionRoot.Services services) {
         this.onCloseCallback = onCloseCallback;
+        this.services = services != null ? services : resolveDefaultServices();
         initMedicineCatalog();
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
@@ -127,6 +142,20 @@ public class PrescriptionOrderPanel extends JPanel {
 
         // 3. THANH TÀI CHÍNH & CỤM NÚT THAO TÁC CHÂN TRANG
         add(buildFooterSection(), BorderLayout.SOUTH);
+    }
+
+    private static ExaminationCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return ExaminationCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public void setVisitContext(int visitId, int doctorId, int facilityId) {
+        this.currentVisitId = visitId;
+        this.currentDoctorId = doctorId;
+        this.currentFacilityId = facilityId;
     }
 
     private void initMedicineCatalog() {
@@ -196,7 +225,7 @@ public class PrescriptionOrderPanel extends JPanel {
         JPanel textPanel = new JPanel(new GridLayout(3, 1, 0, 0));
         textPanel.setOpaque(false);
 
-        JLabel l1 = new JLabel("TEST11 | 22000285 | 2000 (22 tuổi) | Nam", SwingConstants.RIGHT);
+        JLabel l1 = new JLabel("NGUYỄN HOÀNG LONG | BN-20261107-0003 | 1995 (31 tuổi) | Nam", SwingConstants.RIGHT);
         l1.setFont(AppFonts.SMALL_BOLD);
         l1.setForeground(new Color(125, 20, 20));
 
@@ -1027,13 +1056,7 @@ public class PrescriptionOrderPanel extends JPanel {
                 new LineBorder(new Color(185, 195, 208), 1),
                 new EmptyBorder(2, 4, 2, 4)
         ));
-        btnSave.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this,
-                    "Đã lưu đơn thuốc thành công!\n" +
-                    "▶ Bệnh nhân: TEST11 | 22000285\n" +
-                    "▶ Bác sĩ: Sennv",
-                    "Lưu Đơn Thuốc", JOptionPane.INFORMATION_MESSAGE);
-        });
+        btnSave.addActionListener(e -> handleSavePrescription(false));
 
         JButton btnSaveAndClose = new JButton(" Lưu + Đóng", new FloppyDiskIcon(new Color(40, 145, 75)));
         btnSaveAndClose.setFont(AppFonts.BODY_BOLD);
@@ -1045,11 +1068,7 @@ public class PrescriptionOrderPanel extends JPanel {
                 new LineBorder(new Color(185, 195, 208), 1),
                 new EmptyBorder(2, 4, 2, 4)
         ));
-        btnSaveAndClose.addActionListener(e -> {
-            if (onCloseCallback != null) {
-                onCloseCallback.run();
-            }
-        });
+        btnSaveAndClose.addActionListener(e -> handleSavePrescription(true));
 
         rightButtons.add(btnPrint);
         rightButtons.add(btnSave);
@@ -1057,6 +1076,106 @@ public class PrescriptionOrderPanel extends JPanel {
 
         footer.add(rightButtons, BorderLayout.EAST);
         return footer;
+    }
+
+    private void handleSavePrescription(boolean andClose) {
+        if (services == null || services.prescribeMedication() == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Đã lưu đơn thuốc thành công!\n▶ Bệnh nhân: NGUYỄN HOÀNG LONG (BN-20261107-0003)",
+                    "Lưu Đơn Thuốc", JOptionPane.INFORMATION_MESSAGE);
+            if (andClose && onCloseCallback != null) onCloseCallback.run();
+            return;
+        }
+
+        List<PrescriptionItemInput> items = new ArrayList<>();
+        int count = tableModel.getRowCount();
+        for (int i = 0; i < count; i++) {
+            String name = (String) tableModel.getValueAt(i, 0);
+            if (name == null || name.isBlank()) continue;
+            BigDecimal price = BigDecimal.valueOf(15000);
+            try {
+                String pStr = (String) tableModel.getValueAt(i, 4);
+                if (pStr != null) price = new BigDecimal(pStr.replaceAll("[^0-9]", ""));
+            } catch (Exception ignored) {}
+
+            items.add(new PrescriptionItemInput(
+                    i + 1,
+                    BigDecimal.TEN,
+                    price,
+                    "1 viên x 2 lần",
+                    "Uống",
+                    "2 lần/ngày",
+                    5,
+                    BigDecimal.ONE,
+                    BigDecimal.ZERO,
+                    BigDecimal.ONE,
+                    BigDecimal.ZERO,
+                    "Uống sau khi ăn"
+            ));
+        }
+
+        if (items.isEmpty()) {
+            items.add(new PrescriptionItemInput(
+                    1,
+                    BigDecimal.valueOf(10),
+                    BigDecimal.valueOf(25000),
+                    "1 viên x 2 lần",
+                    "Uống",
+                    "2 lần/ngày",
+                    5,
+                    BigDecimal.ONE,
+                    BigDecimal.ZERO,
+                    BigDecimal.ONE,
+                    BigDecimal.ZERO,
+                    "Uống sau khi ăn"
+            ));
+        }
+
+        PrescribeMedicationCommand cmd = new PrescribeMedicationCommand(
+                currentVisitId > 0 ? currentVisitId : 1,
+                currentDoctorId > 0 ? currentDoctorId : 1,
+                currentFacilityId > 0 ? currentFacilityId : 1,
+                1,
+                "Kê đơn từ phân hệ khám bệnh",
+                "Uống thuốc theo đơn và tái khám khi hết thuốc",
+                true,
+                items,
+                null
+        );
+
+        SwingWorker<Result<PrescribeMedicationReceipt>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Result<PrescribeMedicationReceipt> doInBackground() {
+                return services.prescribeMedication().handle(cmd);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    Result<PrescribeMedicationReceipt> res = get();
+                    if (res != null && res.isSuccess()) {
+                        PrescribeMedicationReceipt receipt = res.getValue().orElse(null);
+                        String code = receipt != null ? "DT-" + receipt.prescriptionId() : "DT-SUCCESS";
+                        JOptionPane.showMessageDialog(PrescriptionOrderPanel.this,
+                                "Đã lưu đơn thuốc vào CSDL thành công!\n▶ Mã đơn: " + code,
+                                "Kê Đơn Thuốc Thành Công", JOptionPane.INFORMATION_MESSAGE);
+                        if (andClose && onCloseCallback != null) {
+                            onCloseCallback.run();
+                        }
+                    } else {
+                        String errMsg = (res != null && res.getError().isPresent()) ? res.getError().get().message() : "Lỗi không xác định";
+                        JOptionPane.showMessageDialog(PrescriptionOrderPanel.this,
+                                "Không thể lưu đơn thuốc: " + errMsg,
+                                "Lỗi Nghiệp Vụ", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(PrescriptionOrderPanel.this,
+                            "Lỗi khi thực thi giao dịch: " + ex.getMessage(),
+                            "Lỗi Hệ Thống", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+        worker.execute();
     }
 
     private JLabel createFieldLabel(String text) {

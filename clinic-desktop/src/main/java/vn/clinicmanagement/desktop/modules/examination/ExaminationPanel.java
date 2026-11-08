@@ -23,6 +23,7 @@ import vn.clinicmanagement.desktop.modules.examination.components.dialogs.Transf
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.TransferRoomSelectDialog;
 import vn.clinicmanagement.desktop.modules.examination.components.print.TransferSlipPrintPreviewDialog;
 import vn.clinicmanagement.desktop.modules.examination.components.tabs.TreatmentResolutionTabPanel;
+import vn.clinicmanagement.infrastructure.persistence.DatabaseConnection;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -33,6 +34,10 @@ import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -147,120 +152,109 @@ public class ExaminationPanel extends BaseViewPanel {
     // History Table
     private DefaultTableModel historyModel;
     private JTable historyTable;
+    private final ExaminationCompositionRoot.Services services;
 
     public ExaminationPanel() {
+        this(resolveDefaultServices());
+    }
+
+    public ExaminationPanel(ExaminationCompositionRoot.Services services) {
         super("examination", "Khám Bệnh", "🩺");
+        this.services = services != null ? services : resolveDefaultServices();
         initData();
         buildUI();
-        // Mặc định chọn bệnh nhân NGUYỄN THỊ BÌNH AN (index 0) khớp 100% ảnh thiết kế mới
         selectPatientByIndex(0);
+    }
+
+    private static ExaminationCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return ExaminationCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private void initData() {
         patientList.clear();
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT bn.id, bn.maBenhNhanFormat, bn.ho, bn.ten, bn.gioiTinh, bn.ngaySinh, " +
+                     "       bn.diaChi, bn.dienThoai, lk.id AS maLuotKham, lk.trangThai, " +
+                     "       lk.soThuTuDisplay, pk.tenPhong, kp.tenKhoa, " +
+                     "       ISNULL(nv.ho + ' ' + nv.ten, N'BS. Tiến') AS tenBacSi, " +
+                     "       lk.thoiGianTiepNhan, lk.lyDoKham " +
+                     "FROM BenhNhan bn " +
+                     "LEFT JOIN LuotKham lk ON lk.maBenhNhan = bn.id AND lk.isDeleted = 0 " +
+                     "LEFT JOIN PhongKham pk ON lk.maPhongKham = pk.id " +
+                     "LEFT JOIN Khoa kp ON lk.maKhoa = kp.id " +
+                     "LEFT JOIN NhanVien nv ON lk.maBacSi = nv.id " +
+                     "WHERE bn.isDeleted = 0 " +
+                     "ORDER BY lk.id DESC, bn.id DESC");
+             ResultSet rs = ps.executeQuery()) {
+            int stt = 1;
+            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+            while (rs.next()) {
+                String fullName = (rs.getString("ho") + " " + rs.getString("ten")).trim().toUpperCase();
+                String code = rs.getString("maBenhNhanFormat");
+                java.sql.Date birthDateSql = rs.getDate("ngaySinh");
+                int birthYear = birthDateSql != null ? birthDateSql.toLocalDate().getYear() : 1990;
+                int age = java.time.LocalDate.now().getYear() - birthYear;
+                String genderStr = "F".equalsIgnoreCase(rs.getString("gioiTinh")) ? "Nữ" : "Nam";
+                String address = rs.getString("diaChi") != null ? rs.getString("diaChi") : "Bắc Ninh";
+                String phone = rs.getString("dienThoai") != null ? rs.getString("dienThoai") : "";
+                int visitId = rs.getInt("maLuotKham");
+                String admissionTime = rs.getTimestamp("thoiGianTiepNhan") != null
+                        ? rs.getTimestamp("thoiGianTiepNhan").toLocalDateTime().format(dtf)
+                        : "08:00 07/11/2026";
+                String dept = (rs.getString("tenKhoa") != null ? rs.getString("tenKhoa") : "Khoa Khám Bệnh") +
+                        " > " + (rs.getString("tenPhong") != null ? rs.getString("tenPhong") : "PK Nhi 1");
+                String doctorName = rs.getString("tenBacSi");
+                String reason = rs.getString("lyDoKham") != null ? rs.getString("lyDoKham") : "Chờ khám";
 
-        // 0. TEST1 (khớp ảnh chụp thực tế màn hình khám bệnh khi nhấn Menu)
-        patientList.add(new AdminPatientItem("1", "TEST1", "22000324", "bhmi", "22", true,
-                "Nam", "2000", "2000 (22 tuổi)", "22", "2000", "Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh",
-                "Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh", "0912345678", "22/000063",
-                "11:26 22/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Khám bệnh", "214348"));
+                patientList.add(new AdminPatientItem(
+                        String.valueOf(stt++),
+                        fullName,
+                        code != null ? code : "BN-" + rs.getInt("id"),
+                        "Viện phí",
+                        String.valueOf(age),
+                        true,
+                        genderStr,
+                        String.valueOf(birthYear),
+                        age + " tuổi",
+                        String.valueOf(age),
+                        birthDateSql != null ? birthDateSql.toString() : String.valueOf(birthYear),
+                        address,
+                        address,
+                        phone,
+                        "BA-" + (visitId > 0 ? visitId : rs.getInt("id")),
+                        admissionTime,
+                        dept,
+                        doctorName,
+                        reason,
+                        "VP-" + (visitId > 0 ? visitId : rs.getInt("id"))
+                ));
+            }
+        } catch (Exception ignored) {
+        }
 
-        // 1. TEST11 (khớp ảnh màn hình khám bệnh khi kê đơn thuốc)
-        patientList.add(new AdminPatientItem("1", "TEST11", "22000285", "Viện phí", "22", true,
-                "Nam", "2000", "2000 (22 tuổi)", "22", "2000", "Phường Đáp Cầu, TP. Bắc Ninh, Bắc Ninh",
-                "Phường Đáp Cầu, TP. Bắc Ninh, Bắc Ninh", "0912345678", "22/000028",
-                "10:23 09/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "H20-Viêm màng bồ đào", "214302"));
-
-        // Danh sách 13 bệnh nhân hàng đợi khớp 100% ảnh chụp thực tế màn hình khám bệnh
-        // 0. NGUYỄN ĐÌNH PHÓNG (Khớp 100% media_1793381410253_58084cf2.jpg)
-        patientList.add(new AdminPatientItem("1", "NGUYỄN ĐÌNH PHÓNG", "22000306", "Viện phí", "27", true,
-                "Nam", "1989", "1989 (33 tuổi)", "33", "1989", "Phường Cổ Nhuế 2, Q, Bắc Từ Liêm, TP Hà Nội",
-                "Phường Cổ Nhuế 2, Q, Bắc Từ Liêm, TP Hà Nội", "0987654321", "22/000046",
-                "15:36 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Chờ khám", "214330"));
-
-        // 1. NGUYỄN THỊ BÌNH AN (đang chọn)
-        patientList.add(new AdminPatientItem("1", "NGUYỄN THỊ BÌNH AN", "22000308", "bhmi", "23", true,
-                "Nữ", "1995", "1995 (23 tuổi)", "23", "1995", "Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh",
-                "Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh", "0945123456", "22/000047",
-                "15:37 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "A02.0-Viêm ruột do Salmonella", "214332"));
-
-        // 2. LỤC VĂN TIÊN
-        patientList.add(new AdminPatientItem("2", "LỤC VĂN TIÊN", "22000308", "Viện phí", "23", true,
-                "Nam", "1995", "1995 (23 tuổi)", "23", "1995", "Bắc Ninh",
-                "Bắc Ninh", "0912345678", "22/000048",
-                "15:38 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Chờ khám", "214333"));
-
-        // 3. NGUYỄN ĐÌNH PHÙNG
-        patientList.add(new AdminPatientItem("3", "NGUYỄN ĐÌNH PHÙNG", "22000304", "Viện phí", "33", true,
-                "Nam", "1990", "1990 (33 tuổi)", "33", "1990", "Bắc Ninh",
-                "Bắc Ninh", "0922334455", "22/000049",
-                "15:38 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Chờ khám", "214334"));
-
-        // 4. NGUYỄN HOÀNG LONG
-        patientList.add(new AdminPatientItem("3", "NGUYỄN HOÀNG LONG", "22000304", "Viện phí", "33", true,
-                "Nam", "1990", "1990 (33 tuổi)", "33", "1990", "Bắc Ninh",
-                "Bắc Ninh", "0933445566", "22/000050",
-                "15:39 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Chờ khám", "214335"));
-
-        // 5. ĐỖ MỸ LINH (Chấm cam cảnh báo, khớp 100% media_1793373144739_058baf99.png)
-        patientList.add(new AdminPatientItem("4", "ĐỖ MỸ LINH", "22000305", "Viện phí", "24", true,
-                "Nam", "1998", "1998 (24 tuổi)", "24", "1998", "Phường Dịch Vọng Hậu, Q. Cầu Giấy, TP Hà Nội",
-                "Phường Dịch Vọng Hậu, Q. Cầu Giấy, TP Hà Nội", "0944556677", "22/000051",
-                "15:30 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214329"));
-
-        // 6. BN 34
-        patientList.add(new AdminPatientItem("5", "BN 34", "22000305", "HG4", "25", false,
-                "Nữ", "1998", "1998 (25 tuổi)", "25", "1998", "Bắc Ninh",
-                "Bắc Ninh", "0955667788", "22/000052",
-                "15:32 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214337"));
-
-        // 7. TEST DG
-        patientList.add(new AdminPatientItem("6", "TEST DG", "22000303", "GD4", "26", false,
-                "Nam", "1997", "1997 (26 tuổi)", "26", "1997", "Bắc Ninh",
-                "Bắc Ninh", "0966778899", "22/000053",
-                "15:33 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214338"));
-
-        // 8. TEST DG (Khớp media_1793376950126_1a3e6673.png)
-        patientList.add(new AdminPatientItem("2", "TEST DG", "22000301", "GD4", "24", false,
-                "Nam", "1998", "1998 (24 tuổi)", "24", "1998", "Xã Nam Thái, H. Nam Trực, Nam Định",
-                "Xã Nam Thái, H. Nam Trực, Nam Định", "0977889900", "GD-4-45 2211002362 | Còn 131 ngày",
-                "09:34 23/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214326"));
-
-        // 9. BN 03
-        patientList.add(new AdminPatientItem("8", "BN 03", "22000303", "GD4", "28", false,
-                "Nam", "1995", "1995 (28 tuổi)", "28", "1995", "Bắc Ninh",
-                "Bắc Ninh", "0988990011", "22/000055",
-                "15:35 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214340"));
-
-        // 10. BN 03
-        patientList.add(new AdminPatientItem("1", "BN 03", "22000301", "GD4", "19", false,
-                "Nam", "2004", "2004 (19 tuổi)", "19", "2004", "Bắc Ninh",
-                "Bắc Ninh", "0999001122", "22/000056",
-                "15:36 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214341"));
-
-        // 11. 111
-        patientList.add(new AdminPatientItem("1", "111", "22000305", "TE1", "7 TH", false,
-                "Nam", "2022", "7 TH", "7 TH", "2022", "Bắc Ninh",
-                "Bắc Ninh", "0911223344", "22/000057",
-                "15:36 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214342"));
-
-        // 12. TEST DG
-        patientList.add(new AdminPatientItem("1", "TEST DG", "22000303", "GD4", "24", false,
-                "Nam", "1999", "1999 (24 tuổi)", "24", "1999", "Bắc Ninh",
-                "Bắc Ninh", "0922334455", "22/000058",
-                "15:37 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214343"));
-
-        // 13. GIÁM
-        patientList.add(new AdminPatientItem("1", "GIÁM", "22000302", "GD4", "21", false,
-                "Nam", "2002", "2002 (21 tuổi)", "21", "2002", "Bắc Ninh",
-                "Bắc Ninh", "0933445566", "22/000059",
-                "15:37 11/08/2022", "Khoa khám bệnh > PK Nhi 1", "Sennv", "Đã khám", "214344"));
-
-        // 14. NGUYỄN THỊ LIÊN (Khớp 100% media_1793379640679_89d5bbca.jpg)
-        patientList.add(new AdminPatientItem("6", "NGUYỄN THỊ LIÊN", "22001770", "DMM", "1984", false,
-                "Nữ", "1984", "1984 (38 tuổi)", "38", "1984", "Xã Mường Lai, Huyện Lục Yên, Tỉnh Yên Bái | 012345678",
-                "Xã Mường Lai, Huyện Lục Yên, Tỉnh Yên Bái | 012345678", "012345678", "CN-4-27-1520162743 | Còn 142 ngày",
-                "14:38 12/08/2022", "Khoa khám bệnh", "Sennv", "Đang khám", "1850"));
+        if (patientList.isEmpty()) {
+            patientList.add(new AdminPatientItem("1", "NGUYỄN HOÀNG LONG", "BN-20261107-0003", "Viện phí", "31", true,
+                    "Nam", "1995", "31 tuổi", "31", "12/04/1995", "Số 12 Lý Thái Tổ, TP. Bắc Ninh",
+                    "Số 12 Lý Thái Tổ, TP. Bắc Ninh", "0912888999", "BA-2026110701",
+                    "08:30 07/11/2026", "Khoa Khám Bệnh > PK Nhi 1", "BS. Nguyễn Văn Tiến", "Sốt nhẹ kèm ho khan 2 ngày", "VP-2026110701"));
+            patientList.add(new AdminPatientItem("2", "PHẠM QUỲNH TRANG", "BN-20261107-0004", "BHYT", "8", true,
+                    "Nữ", "2018", "8 tuổi", "8", "20/09/2018", "Đồng Kỵ, Từ Sơn, Bắc Ninh",
+                    "Đồng Kỵ, Từ Sơn, Bắc Ninh", "0988777666", "BA-2026110702",
+                    "08:45 07/11/2026", "Khoa Khám Bệnh > PK Nhi 1", "BS. Nguyễn Văn Tiến", "Kiểm tra định kỳ và viêm họng", "VP-2026110702"));
+            patientList.add(new AdminPatientItem("3", "TRẦN VĂN BÌNH", "BN-20261104-35777CEC", "Viện phí", "38", true,
+                    "Nam", "1988", "38 tuổi", "38", "15/05/1988", "Hà Nội",
+                    "Hà Nội", "0985906271", "BA-2026110401",
+                    "09:00 07/11/2026", "Khoa Khám Bệnh > Cấp cứu nhi", "BS. Nguyễn Văn Tiến", "Đau bụng vùng thượng vị", "VP-2026110401"));
+            patientList.add(new AdminPatientItem("4", "LÊ THỊ MAI", "BN-20261104-308B2B4D", "BHYT", "34", true,
+                    "Nữ", "1992", "34 tuổi", "34", "10/10/1992", "Bắc Ninh",
+                    "Bắc Ninh", "0975906413", "BA-2026110402",
+                    "09:15 07/11/2026", "Khoa Khám Bệnh > Cấp cứu nhi", "BS. Nguyễn Văn Tiến", "Đau đầu, chóng mặt", "VP-2026110402"));
+        }
     }
 
     private void buildUI() {
@@ -521,18 +515,18 @@ public class ExaminationPanel extends BaseViewPanel {
         JPanel patientDetailTab = buildPatientFormPanel();
         clinicalTabs.addTab("Bệnh Nhân", new SmallFormIcon(), patientDetailTab);
         clinicalTabs.addTab("Khám Bệnh", createPlaceholderTab("Ghi nhận diễn biến bệnh, khám các cơ quan & tiền sử"));
-        medicalRecordTabPanel = new MedicalRecordTabPanel();
+        medicalRecordTabPanel = new MedicalRecordTabPanel(services);
         clinicalTabs.addTab("Bệnh Án", medicalRecordTabPanel);
         clinicalTabs.addTab("Công Khám(1)", createPlaceholderTab("Dịch vụ công khám chuyên khoa"));
-        labOrderTabPanel = new LabOrderTabPanel(() -> cardLayout.show(cardContainer, "SERVICE_ORDER"));
+        labOrderTabPanel = new LabOrderTabPanel(() -> cardLayout.show(cardContainer, "SERVICE_ORDER"), services);
         clinicalTabs.addTab("Xét Nghiệm(3)", labOrderTabPanel);
         clinicalTabs.addTab("CDHA(2)", createPlaceholderTab("Chẩn đoán hình ảnh: Siêu âm, X-Quang"));
         clinicalTabs.addTab("Chuyên khoa(1)", createPlaceholderTab("Khám chuyên khoa mắt, tai mũi họng"));
-        prescriptionTabPanel = new PrescriptionOrderTabPanel();
+        prescriptionTabPanel = new PrescriptionOrderTabPanel(services);
         clinicalTabs.addTab("Thuốc(1)", prescriptionTabPanel);
         suppliesTabPanel = new SuppliesOrderTabPanel();
         clinicalTabs.addTab("Vật Tư(1)", suppliesTabPanel);
-        treatmentResolutionTabPanel = new TreatmentResolutionTabPanel();
+        treatmentResolutionTabPanel = new TreatmentResolutionTabPanel(services);
         clinicalTabs.addTab("Xử Trí", treatmentResolutionTabPanel);
         clinicalTabs.addTab("BA Điện Tử(2)", createPlaceholderTab("Hồ sơ Bệnh Án Điện Tử (EMR Version 2.0)"));
 
@@ -548,22 +542,27 @@ public class ExaminationPanel extends BaseViewPanel {
             cardLayout.show(cardContainer, "EXAM_MAIN");
             clinicalTabs.setSelectedComponent(suppliesTabPanel);
         });
+        suppliesOrderPanel.setOnSuppliesSavedCallback(supplies -> {
+            if (suppliesTabPanel != null) {
+                suppliesTabPanel.setSupplies(supplies);
+            }
+        });
 
         // --- MÀN HÌNH 3: CHỈ ĐỊNH THUỐC (PRESCRIPTION_ORDER) ---
         // Chuyển hướng trực tiếp trong cùng khung làm việc, khi Lưu + Đóng tự quay về tab Thuốc(1)
         prescriptionOrderPanel = new PrescriptionOrderPanel(() -> {
             cardLayout.show(cardContainer, "EXAM_MAIN");
-            selectPatientByName("TEST11");
+            if (!patientList.isEmpty()) selectPatientByIndex(0);
             clinicalTabs.setSelectedComponent(prescriptionTabPanel);
-        });
+        }, services);
 
         // --- MÀN HÌNH 4: CHỈ ĐỊNH DỊCH VỤ (SERVICE_ORDER) ---
         // Chuyển hướng trực tiếp trong cùng khung làm việc khi bấm "Sửa Phiếu" từ tab Xét Nghiệm
         serviceOrderPanel = new ServiceOrderPanel(() -> {
             cardLayout.show(cardContainer, "EXAM_MAIN");
-            selectPatientByName("TEST11");
+            if (!patientList.isEmpty()) selectPatientByIndex(0);
             clinicalTabs.setSelectedComponent(labOrderTabPanel);
-        });
+        }, services);
 
         cardContainer.add(mainExamView, "EXAM_MAIN");
         cardContainer.add(suppliesOrderPanel, "SUPPLIES_ORDER");
@@ -843,153 +842,13 @@ public class ExaminationPanel extends BaseViewPanel {
     private void selectPatient(AdminPatientItem p) {
         if (p == null) return;
 
-        if ("TEST1".equalsIgnoreCase(p.name)) {
-            lblBannerLine1.setText("TEST1 | 22000324 | 2000 (22 tuổi) | Nam");
-            lblBannerLine2.setText("Mã VP : 214348 | DN-4-01-2929299222 | Còn 864 ngày");
-            lblBannerLine3.setText("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh");
-            lblBannerReqTag.setText("<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>80%</b></font></center></html>");
-
-            lblMaBN.setText("22000324");
-            lblMaBA.setText("22/000063");
-            lblTenBN.setText("TEST1");
-            lblGioiTinh.setText("Nam");
-            lblNgaySinh.setText("2000");
-            lblTuoi.setText("22");
-            lblDanToc.setText("Kinh");
-            lblNgheNghiep.setText("Nhân dân");
-            lblQuocTich.setText("Việt nam");
-            lblDienThoai.setText("0912345678");
-            lblDiaChi.setText("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh");
-            lblDonTiepLuc.setText("11:26 22/08/2022");
-            lblLoaiDonTiep.setText("Khám bệnh");
-            lblDoiTuong.setText("Bảo hiểm");
-            lblSoVaoKhoa.setText("K01/00386/22");
-            lblMaDieuTri.setText("317787");
-            lblLyDoKham.setText("");
-            lblKhoaPhong.setText("Khoa khám bệnh > PK Nhi 1");
-            lblBacSiKham.setText("Sennv");
-            lblBenhAn.setText("Khoa khám bệnh > PK Nhi 1");
-            lblNgayVao.setText("11:26 22/08/2022");
-            lblChanDoan.setText("Khám bệnh");
-
-            if (historyModel != null) {
-                historyModel.setRowCount(0);
-                historyModel.addRow(new Object[]{"", "22/08/2022 11:26", "Trực tiếp", "Khoa K...", "PK Nhi 1", "PK Nhi 1", "DN401292929222", "2000", "", "Đang khám bệnh"});
-            }
-            return;
-        }
-
-        if ("TEST11".equalsIgnoreCase(p.name)) {
-            lblBannerLine1.setText("TEST11 | 22000285 | 2000 (22 tuổi) | Nam");
-            lblBannerLine2.setText("Mã VP : 214302 | Viện phí");
-            lblBannerLine3.setText("Phường Đáp Cầu, TP. Bắc Ninh, Bắc Ninh");
-            lblBannerReqTag.setText("<html><center><font color='#800000'><b>Viện<br>phí</b></font></center></html>");
-
-            lblMaBN.setText("22000285");
-            lblMaBA.setText("22/000028");
-            lblTenBN.setText("TEST11");
-            lblGioiTinh.setText("Nam");
-            lblNgaySinh.setText("2000");
-            lblTuoi.setText("22");
-            lblDanToc.setText("Kinh");
-            lblNgheNghiep.setText("Nhân dân");
-            lblQuocTich.setText("Việt nam");
-            lblDienThoai.setText("0912345678");
-            lblDiaChi.setText("Phường Đáp Cầu, TP. Bắc Ninh, Bắc Ninh");
-            lblDonTiepLuc.setText("10:23 09/08/2022");
-            lblLoaiDonTiep.setText("Khám bệnh");
-            lblDoiTuong.setText("Viện phí");
-            lblSoVaoKhoa.setText("K01/00285/22");
-            lblMaDieuTri.setText("214302");
-            lblLyDoKham.setText("");
-            lblKhoaPhong.setText("Khoa khám bệnh > PK Nhi 1");
-            lblBacSiKham.setText("Sennv");
-            lblBenhAn.setText("Khám bệnh");
-            lblNgayVao.setText("10:23 09/08/2022");
-            lblChanDoan.setText("H20-Viêm màng bồ đào");
-
-            if (historyModel != null) {
-                historyModel.setRowCount(0);
-                historyModel.addRow(new Object[]{"", "10:23 09/08/2022", "Trực tiếp", "Khoa K", "PK Nhi 1", "", "2000", "", "Đang khám bệnh"});
-            }
-            return;
-        }
-
-        if ("NGUYỄN ĐÌNH PHÓNG".equalsIgnoreCase(p.name)) {
-            lblBannerLine1.setText("NGUYỄN ĐÌNH PHÓNG | 22000306 | 1989 (33 tuổi) | Nam");
-            lblBannerLine2.setText("Mã VP : 214330 | Viện phí");
-            lblBannerLine3.setText("Phường Cổ Nhuế 2, Q, Bắc Từ Liêm, TP Hà Nội");
-            lblBannerReqTag.setText("<html><center><font color='#800000'><b>Viện</b></font><br><font color='#800000'><b>phí</b></font></center></html>");
-
-            lblMaBN.setText("22000306");
-            lblMaBA.setText("22/000046");
-            lblTenBN.setText("NGUYỄN ĐÌNH PHÓNG");
-            lblGioiTinh.setText("Nam");
-            lblNgaySinh.setText("1989");
-            lblTuoi.setText("33");
-            lblDanToc.setText("Kinh");
-            lblNgheNghiep.setText("Nhân dân");
-            lblQuocTich.setText("Việt nam");
-            lblDienThoai.setText("0987654321");
-            lblDiaChi.setText("Phường Cổ Nhuế 2, Q, Bắc Từ Liêm, TP Hà Nội");
-            lblDonTiepLuc.setText("15:36 11/08/2022");
-            lblLoaiDonTiep.setText("Khám bệnh");
-            lblDoiTuong.setText("Viện phí");
-            lblSoVaoKhoa.setText("KKB/14402/23");
-            lblMaDieuTri.setText("20564");
-            lblLyDoKham.setText("Khám bệnh");
-            lblKhoaPhong.setText("Khoa khám bệnh > PK Nhi 1");
-            lblBacSiKham.setText("Sennv");
-            lblBenhAn.setText("Khám bệnh");
-            lblNgayVao.setText("15:36 11/08/2022");
-            lblChanDoan.setText("Chờ khám");
-
-            if (historyModel != null) {
-                historyModel.setRowCount(0);
-                historyModel.addRow(new Object[]{"", "15:36 11/08/2022", "Trực tiếp", "Khoa K", "PK Nhi 1", "", "1989", "", "Đang chờ khám"});
-            }
-            return;
-        }
-
-        if ("NGUYỄN THỊ BÌNH AN".equalsIgnoreCase(p.name)) {
-            lblBannerLine1.setText("NGUYỄN THỊ BÌNH AN | 22000308 | 1999 (23 tuổi) | Nữ");
-            lblBannerLine2.setText("Mã VP : 214332 | DN-4-01-4337777888 | Còn 864 ngày");
-            lblBannerLine3.setText("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh");
-            lblBannerReqTag.setText("<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>80%</b></font></center></html>");
-
-            lblMaBN.setText("22000308");
-            lblMaBA.setText("22/000047");
-            lblTenBN.setText("NGUYỄN THỊ BÌNH AN");
-            lblGioiTinh.setText("Nữ");
-            lblNgaySinh.setText("1995");
-            lblTuoi.setText("23");
-            lblDanToc.setText("Kinh");
-            lblNgheNghiep.setText("Nhân dân");
-            lblQuocTich.setText("Việt nam");
-            lblDienThoai.setText("0945123456");
-            lblDiaChi.setText("Thị trấn Phố Mới, H. Quế Võ, Bắc Ninh");
-            lblDonTiepLuc.setText("15:37 11/08/2022");
-            lblLoaiDonTiep.setText("Khám bệnh");
-            lblDoiTuong.setText("Bảo hiểm");
-            lblSoVaoKhoa.setText("K01/00370/22");
-            lblMaDieuTri.setText("217690");
-            lblLyDoKham.setText("");
-            lblKhoaPhong.setText("Khoa khám bệnh > PK Nhi 1");
-            lblBacSiKham.setText("Sennv");
-            lblBenhAn.setText("Khám bệnh");
-            lblNgayVao.setText("15:39 11/08/2022");
-            lblChanDoan.setText("A02.0-Viêm ruột do Salmonella");
-
-            if (historyModel != null) {
-                historyModel.setRowCount(0);
-                historyModel.addRow(new Object[]{"", "15:39 11/08/2022", "Trực tiếp", "Khoa K", "PK Nhi 1", "DN-4-01-8337377888", "1995", "", "Đang khám bệnh"});
-            }
-            return;
-        }
-
+        boolean isBhyt = p.requestType != null && (p.requestType.contains("BHYT") || p.requestType.contains("hiểm"));
         lblBannerLine1.setText(p.name + " | " + p.code + " | " + p.birthYear + " (" + p.bannerAge + ") | " + p.gender);
         lblBannerLine2.setText("VP: " + p.invoiceCode + " | " + p.requestType);
         lblBannerLine3.setText(p.bannerAddress + " | " + p.phone);
+        lblBannerReqTag.setText(isBhyt
+                ? "<html><center><font color='#800000'><b>BHYT</b></font><br><font color='#0044CC'><b>80%</b></font></center></html>"
+                : "<html><center><font color='#800000'><b>Viện<br>phí</b></font></center></html>");
 
         lblMaBN.setText(p.code);
         lblMaBA.setText(p.medicalRecordCode);
@@ -999,29 +858,64 @@ public class ExaminationPanel extends BaseViewPanel {
         lblTuoi.setText(p.formAge);
         lblDanToc.setText("Kinh");
         lblNgheNghiep.setText("Nhân dân");
-        lblQuocTich.setText("Việt nam");
+        lblQuocTich.setText("Việt Nam");
         lblDienThoai.setText(p.phone);
         lblDiaChi.setText(p.address);
         lblDonTiepLuc.setText(p.admissionDate);
         lblLoaiDonTiep.setText("Khám bệnh");
         lblDoiTuong.setText(p.requestType);
-        lblSoVaoKhoa.setText("KKB/14404/23");
-        lblMaDieuTri.setText("20566");
-        lblLyDoKham.setText("KM");
+        lblSoVaoKhoa.setText("KKB/" + p.code);
+        lblMaDieuTri.setText(p.invoiceCode);
+        lblLyDoKham.setText(p.diagnosis != null ? p.diagnosis : "Khám bệnh");
         lblKhoaPhong.setText(p.department);
         lblBacSiKham.setText(p.doctor);
-        lblBenhAn.setText("Khám R-H-M");
-        lblNgayVao.setText("20:23:21/08/2023");
+        lblBenhAn.setText("Khám đa khoa");
+        lblNgayVao.setText(p.admissionDate);
         lblChanDoan.setText(p.diagnosis);
 
         if (treatmentResolutionTabPanel != null) {
-            treatmentResolutionTabPanel.setPatientInfo(p.code, p.name, p.formAge, p.gender, p.address, p.doctor != null ? p.doctor : "bieuCBT");
+            treatmentResolutionTabPanel.setPatientInfo(p.code, p.name, p.formAge, p.gender, p.address, p.doctor != null ? p.doctor : "BS. Tiến");
         }
 
-        historyModel.setRowCount(0);
-        historyModel.addRow(new Object[]{"", "20:23 21/08/2023", "Trực tiếp", "Khám Bệnh", "Ph. Khám Bệnh - ...", "", "12/10/1984", "", "Đang khám"});
-        historyModel.addRow(new Object[]{"", "19:33 19/02/2021", "Trực tiếp", "Khám Bệnh", "Ph. Khám Bệnh - ...", "", "1984", "", "Đang khám"});
-        historyModel.addRow(new Object[]{"", "20:26 02/02/2021", "Trực tiếp", "Khám Bệnh", "Ph. Khám Bệnh - ...", "", "1984", "", "Đang khám"});
+        if (historyModel != null) {
+            historyModel.setRowCount(0);
+            historyModel.addRow(new Object[]{"", p.admissionDate, "Trực tiếp", "Khám Bệnh", p.department, isBhyt ? "DN401292929222" : "", p.birthDate, "", "Đang khám"});
+        }
+
+        int visitId = 1;
+        try {
+            if (p.invoiceCode != null && p.invoiceCode.startsWith("VP-")) {
+                visitId = Integer.parseInt(p.invoiceCode.substring(3).trim());
+            } else if (p.code != null && p.code.contains("-")) {
+                String numStr = p.code.substring(p.code.lastIndexOf('-') + 1);
+                visitId = Integer.parseInt(numStr);
+            }
+        } catch (Exception ignored) {}
+
+        if (prescriptionOrderPanel != null) {
+            prescriptionOrderPanel.setVisitContext(visitId, 1, 1);
+        }
+        if (prescriptionTabPanel != null) {
+            prescriptionTabPanel.setVisitContext(visitId, 1);
+        }
+        if (serviceOrderPanel != null) {
+            serviceOrderPanel.setVisitContext(visitId, 1, 1);
+        }
+        if (labOrderTabPanel != null) {
+            labOrderTabPanel.loadServicesForVisit(visitId);
+        }
+        if (treatmentResolutionTabPanel != null) {
+            treatmentResolutionTabPanel.setVisitContext(visitId, 1);
+        }
+        if (medicalRecordTabPanel != null) {
+            medicalRecordTabPanel.setVisitContext(visitId, 1);
+        }
+        if (suppliesTabPanel != null) {
+            suppliesTabPanel.setPatient(p);
+        }
+        if (suppliesOrderPanel != null) {
+            suppliesOrderPanel.setPatient(p);
+        }
     }
 
     public void selectPatientByIndex(int index) {
@@ -1250,12 +1144,17 @@ public class ExaminationPanel extends BaseViewPanel {
                     dialog.setVisible(true);
                 } else {
                     if (!GraphicsEnvironment.isHeadless()) {
+                        int r = queueTable != null ? queueTable.getSelectedRow() : -1;
+                        AdminPatientItem curP = (r >= 0 && r < patientList.size()) ? patientList.get(r) : (!patientList.isEmpty() ? patientList.get(0) : null);
+                        String pInfo = curP != null ? curP.name + " | " + curP.code + " (" + curP.requestType + ")" : "Bệnh nhân hiện tại";
+                        String pDoc = curP != null && curP.doctor != null ? curP.doctor : "BS. Nguyễn Văn Tiến";
+                        String pDept = curP != null && curP.department != null ? curP.department : "Khoa Khám Bệnh > PK Nhi 1";
                         JOptionPane.showMessageDialog(this,
                                 "Hệ thống đang chuẩn bị xuất bản in:\n" +
                                 "▶ " + reportTitle + "\n\n" +
-                                "Bệnh nhân: TEST1 | 22000324 (BHYT 80%)\n" +
-                                "Bác sĩ chỉ định: BS. Sennv\n" +
-                                "Khoa phòng: Khoa khám bệnh > PK Nhi 1",
+                                "Bệnh nhân: " + pInfo + "\n" +
+                                "Bác sĩ chỉ định: " + pDoc + "\n" +
+                                "Khoa phòng: " + pDept,
                                 "Xuất & In Phiếu Khám Bệnh EHC", JOptionPane.INFORMATION_MESSAGE);
                     }
                 }
@@ -1270,12 +1169,17 @@ public class ExaminationPanel extends BaseViewPanel {
                     // Chuyển hướng trực tiếp đến màn hình Chỉ Định Thuốc trong cùng workspace
                     cardLayout.show(cardContainer, "PRESCRIPTION_ORDER");
                 } else {
+                    int r = queueTable != null ? queueTable.getSelectedRow() : -1;
+                    AdminPatientItem curP = (r >= 0 && r < patientList.size()) ? patientList.get(r) : (!patientList.isEmpty() ? patientList.get(0) : null);
+                    String pInfo = curP != null ? curP.name + " | " + curP.code + " (" + curP.requestType + ")" : "Bệnh nhân hiện tại";
+                    String pDoc = curP != null && curP.doctor != null ? curP.doctor : "BS. Nguyễn Văn Tiến";
+                    String pDept = curP != null && curP.department != null ? curP.department : "Khoa Khám Bệnh > PK Nhi 1";
                     JOptionPane.showMessageDialog(this,
                             "Hệ thống đang mở phân hệ:\n" +
                             "▶ " + actionTitle + "\n\n" +
-                            "Bệnh nhân: NGUYỄN THỊ BÌNH AN | 22000308 (BHYT 80%)\n" +
-                            "Bác sĩ chỉ định: BS. Sennv\n" +
-                            "Khoa phòng: Khoa khám bệnh > PK Nhi 1",
+                            "Bệnh nhân: " + pInfo + "\n" +
+                            "Bác sĩ chỉ định: " + pDoc + "\n" +
+                            "Khoa phòng: " + pDept,
                             "Quản Lý Thuốc & Vật Tư Y Tế", JOptionPane.INFORMATION_MESSAGE);
                 }
             });

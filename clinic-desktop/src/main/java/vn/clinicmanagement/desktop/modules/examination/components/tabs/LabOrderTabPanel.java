@@ -3,6 +3,14 @@ package vn.clinicmanagement.desktop.modules.examination.components.tabs;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.ServiceOrderDialog;
 import vn.clinicmanagement.desktop.modules.examination.components.print.ClinicalOrderPrintPreviewDialog;
 
+import java.util.List;
+import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.cls.CancelServiceOrderCommand;
+import vn.clinicmanagement.application.cls.CancelServiceOrderReceipt;
+import vn.clinicmanagement.application.cls.GetServicesByVisitQuery;
+import vn.clinicmanagement.application.cls.ServiceOrderDto;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationCompositionRoot;
+
 import vn.clinicmanagement.desktop.core.config.AppFonts;
 
 import javax.swing.*;
@@ -46,12 +54,21 @@ public class LabOrderTabPanel extends JPanel {
     private boolean isCanceled = false;
     private Runnable onEditOrderCallback;
 
+    private final ExaminationCompositionRoot.Services services;
+    private int currentVisitId = 1;
+    private int currentOrderId = 1;
+
     public LabOrderTabPanel() {
-        this(null);
+        this(null, resolveDefaultServices());
     }
 
     public LabOrderTabPanel(Runnable onEditOrderCallback) {
+        this(onEditOrderCallback, resolveDefaultServices());
+    }
+
+    public LabOrderTabPanel(Runnable onEditOrderCallback, ExaminationCompositionRoot.Services services) {
         this.onEditOrderCallback = onEditOrderCallback;
+        this.services = services != null ? services : resolveDefaultServices();
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -60,6 +77,54 @@ public class LabOrderTabPanel extends JPanel {
 
         // 2. KHUNG TRUNG TÂM: CHI TIẾT PHIẾU XÉT NGHIỆM + BẢNG KẾT QUẢ + CHÂN TRANG
         add(buildTicketDetailPanel(), BorderLayout.CENTER);
+    }
+
+    private static ExaminationCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return ExaminationCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public void loadServicesForVisit(int visitId) {
+        this.currentVisitId = visitId;
+        if (services == null || services.getServicesByVisit() == null || visitId <= 0) return;
+
+        SwingWorker<Result<List<ServiceOrderDto>>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Result<List<ServiceOrderDto>> doInBackground() {
+                return services.getServicesByVisit().handle(new GetServicesByVisitQuery(visitId, null, null));
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    Result<List<ServiceOrderDto>> res = get();
+                    if (res != null && res.isSuccess()) {
+                        List<ServiceOrderDto> list = res.getValue().orElse(List.of());
+                        if (!list.isEmpty()) {
+                            ServiceOrderDto first = list.get(0);
+                            currentOrderId = first.orderId();
+                            if (lblMaPhieu != null) lblMaPhieu.setText("XN-" + first.orderId());
+                            tableModel.setRowCount(0);
+                            int stt = 1;
+                            for (ServiceOrderDto s : list) {
+                                tableModel.addRow(new Object[]{
+                                        String.valueOf(stt++),
+                                        s.serviceName(),
+                                        "1",
+                                        s.status() != null ? s.status() : "Chờ thực hiện",
+                                        "",
+                                        ""
+                                });
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        };
+        worker.execute();
     }
 
     public void setOnEditOrderCallback(Runnable onEditOrderCallback) {
@@ -523,10 +588,35 @@ public class LabOrderTabPanel extends JPanel {
             styleButton(btnCancelSend);
             btnCancelSend.addActionListener(e -> {
                 int ret = JOptionPane.showConfirmDialog(this,
-                        "Bạn có chắc chắn muốn hủy phiếu xét nghiệm XN220809.5 không?",
+                        "Bạn có chắc chắn muốn hủy phiếu xét nghiệm không?",
                         "Xác Nhận Hủy Gửi Phiếu Xét Nghiệm", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
                 if (ret == JOptionPane.YES_OPTION) {
-                    setOrderCanceled(true);
+                    if (services != null && services.cancelServiceOrder() != null) {
+                        CancelServiceOrderCommand cmd = new CancelServiceOrderCommand(
+                                currentOrderId > 0 ? currentOrderId : 1,
+                                "Hủy theo yêu cầu của bác sĩ",
+                                null,
+                                null
+                        );
+                        SwingWorker<Result<CancelServiceOrderReceipt>, Void> cancelWorker = new SwingWorker<>() {
+                            @Override
+                            protected Result<CancelServiceOrderReceipt> doInBackground() {
+                                return services.cancelServiceOrder().handle(cmd);
+                            }
+
+                            @Override
+                            protected void done() {
+                                setOrderCanceled(true);
+                                tableModel.setRowCount(0);
+                                JOptionPane.showMessageDialog(LabOrderTabPanel.this,
+                                        "Đã hủy phiếu chỉ định dịch vụ thành công trên CSDL!",
+                                        "Hủy Chỉ Định Thành Công", JOptionPane.INFORMATION_MESSAGE);
+                            }
+                        };
+                        cancelWorker.execute();
+                    } else {
+                        setOrderCanceled(true);
+                    }
                 }
             });
             rightActionBox.add(btnCancelSend);

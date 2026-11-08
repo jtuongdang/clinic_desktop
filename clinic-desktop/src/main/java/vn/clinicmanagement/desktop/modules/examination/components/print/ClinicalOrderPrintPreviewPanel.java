@@ -24,7 +24,7 @@ import java.awt.image.BufferedImage;
  *   + Dòng chữ đỏ chân trang: "Chưa ký 1"
  * - Thanh công cụ đỉnh:
  *   + Cụm trái: [🖨 In Tài Liệu], Loại chữ ký : ---, Hiệu lực : ---, [✔ Kiểm Tra]
- *   + Cụm phải: Banner thông tin bệnh nhân TEST1 | 22000324 | 2000 (22 tuổi) | Nam | BHYT 80%
+ *   + Cụm phải: Banner thông tin bệnh nhân NGUYỄN HOÀNG LONG | BN-20261107-0003 | 1995 (31 tuổi) | Nam | BHYT 80%
  * - Vùng trung tâm: Trang giấy A4 mô phỏng chuẩn xác mẫu PHIẾU CHỈ ĐỊNH CẬN LÂM SÀNG
  *   + Logo Bệnh Viện Sản Nhi màu vàng đỏ
  *   + Barcode PID: 22001324 / Số BA: 22000063

@@ -47,6 +47,8 @@ public class DoctorStationPanel extends BaseViewPanel {
     private DoctorQueueSidebar queueSidebar;
     private DoctorClinicalForm clinicalForm;
     private DoctorHistoryPanel historyPanel;
+    private JTabbedPane clinicalTabs;
+    private PatientExamDto currentPatient;
 
     public DoctorStationPanel() {
         this(resolveDefaultServices(), null);
@@ -77,6 +79,7 @@ public class DoctorStationPanel extends BaseViewPanel {
 
         // 1. Top Action Bar + Banner tóm tắt bệnh nhân
         actionBar = new DoctorActionBar();
+        actionBar.setOnActionClickListener(this::handleDoctorAction);
         add(actionBar, BorderLayout.NORTH);
 
         // 2. Main Split: Cột trái (Hàng đợi) + Cột phải (Hồ sơ khám)
@@ -94,7 +97,7 @@ public class DoctorStationPanel extends BaseViewPanel {
         JPanel rightWorkPanel = new JPanel(new BorderLayout());
         rightWorkPanel.setBackground(Color.WHITE);
 
-        JTabbedPane clinicalTabs = new JTabbedPane();
+        clinicalTabs = new JTabbedPane();
         clinicalTabs.setFont(AppFonts.BODY_BOLD);
 
         // Tab "Bệnh Nhân"
@@ -121,9 +124,76 @@ public class DoctorStationPanel extends BaseViewPanel {
     }
 
     private void onPatientChanged(PatientExamDto p) {
+        this.currentPatient = p;
         actionBar.updatePatient(p);
         clinicalForm.updatePatient(p);
         historyPanel.updateHistory(p);
+    }
+
+    private void handleDoctorAction(String action) {
+        if (action == null) return;
+        switch (action) {
+            case "Làm mới" -> refreshData();
+            case "Bệnh Án" -> {
+                if (clinicalTabs != null && clinicalTabs.getTabCount() > 0) {
+                    clinicalTabs.setSelectedIndex(0);
+                }
+            }
+            case "Dịch Vụ" -> {
+                if (clinicalTabs != null && clinicalTabs.getTabCount() > 1) {
+                    clinicalTabs.setSelectedIndex(1);
+                }
+            }
+            case "Thuốc/VT" -> {
+                if (clinicalTabs != null && clinicalTabs.getTabCount() > 2) {
+                    clinicalTabs.setSelectedIndex(2);
+                }
+            }
+            case "Phác Đồ ĐT" -> {
+                if (clinicalTabs != null && clinicalTabs.getTabCount() > 3) {
+                    clinicalTabs.setSelectedIndex(3);
+                }
+            }
+            case "Thanh Toán" -> {
+                if (clinicalTabs != null && clinicalTabs.getTabCount() > 4) {
+                    clinicalTabs.setSelectedIndex(4);
+                }
+            }
+            case "Tìm Kiếm" -> {
+                if (queueSidebar != null) {
+                    queueSidebar.requestFocusInWindow();
+                }
+            }
+            case "In" -> printPatientSummary();
+            case "Menu" -> {
+                if (isShowing() && !java.awt.GraphicsEnvironment.isHeadless()) {
+                    JOptionPane.showMessageDialog(this,
+                            "Menu tác vụ mở rộng của Bác sĩ đang hoạt động.",
+                            "Tác Vụ Bác Sĩ",
+                            JOptionPane.INFORMATION_MESSAGE);
+                }
+            }
+            default -> {}
+        }
+    }
+
+    public void printPatientSummary() {
+        if (currentPatient == null) {
+            if (isShowing() && !java.awt.GraphicsEnvironment.isHeadless()) {
+                JOptionPane.showMessageDialog(this,
+                        "Vui lòng chọn một bệnh nhân trong hàng đợi để in hồ sơ.",
+                        "Thông Báo",
+                        JOptionPane.WARNING_MESSAGE);
+            }
+            return;
+        }
+        if (isShowing() && !java.awt.GraphicsEnvironment.isHeadless()) {
+            JOptionPane.showMessageDialog(this,
+                    "Đang gửi lệnh in hồ sơ tóm tắt cho bệnh nhân:\n"
+                            + currentPatient.getName() + " (" + currentPatient.getCode() + ")",
+                    "In Hồ Sơ Tóm Tắt",
+                    JOptionPane.INFORMATION_MESSAGE);
+        }
     }
 
     private JPanel createPlaceholderTab(String desc) {
@@ -251,6 +321,10 @@ public class DoctorStationPanel extends BaseViewPanel {
 
     public DoctorHistoryPanel getHistoryPanel() {
         return historyPanel;
+    }
+
+    public JTabbedPane getClinicalTabs() {
+        return clinicalTabs;
     }
 
     private AuthorizationContext currentAuthorizationContext() {

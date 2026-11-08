@@ -105,9 +105,11 @@ public class ClinicReportPanel extends BaseViewPanel {
         filterPanel.add(btnView);
 
         btnExport = new JButton("📥 Xuất Excel");
+        btnExport.addActionListener(e -> exportReport());
         filterPanel.add(btnExport);
 
         btnPrint = new JButton("🖨️ In Báo Cáo");
+        btnPrint.addActionListener(e -> printReport());
         filterPanel.add(btnPrint);
 
         add(filterPanel, BorderLayout.NORTH);
@@ -220,6 +222,76 @@ public class ClinicReportPanel extends BaseViewPanel {
 
         inFlightWorkers.add(worker);
         worker.execute();
+    }
+
+    public void exportReport() {
+        if (!isShowing() || GraphicsEnvironment.isHeadless()) {
+            return;
+        }
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Xuất Báo Cáo Ra Excel/CSV");
+        chooser.setSelectedFile(new java.io.File("BaoCao_" + LocalDate.now() + ".csv"));
+        int result = chooser.showSaveDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            java.io.File file = chooser.getSelectedFile();
+            try {
+                exportReportToCsv(file);
+                JOptionPane.showMessageDialog(this, "Xuất báo cáo thành công: " + file.getAbsolutePath(), "Thông Báo", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Lỗi khi xuất file: " + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    public void exportReportToCsv(java.io.File destination) throws java.io.IOException {
+        if (destination == null) {
+            throw new IllegalArgumentException("Destination file cannot be null");
+        }
+        try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
+                new java.io.OutputStreamWriter(new java.io.FileOutputStream(destination), java.nio.charset.StandardCharsets.UTF_8))) {
+            // Write UTF-8 BOM for Microsoft Excel compatibility
+            writer.write('\ufeff');
+
+            // Header columns
+            for (int i = 0; i < tableModel.getColumnCount(); i++) {
+                if (i > 0) writer.write(",");
+                writer.write(escapeCsv(tableModel.getColumnName(i)));
+            }
+            writer.newLine();
+
+            // Table rows
+            for (int row = 0; row < tableModel.getRowCount(); row++) {
+                for (int col = 0; col < tableModel.getColumnCount(); col++) {
+                    if (col > 0) writer.write(",");
+                    Object val = tableModel.getValueAt(row, col);
+                    writer.write(escapeCsv(val != null ? val.toString() : ""));
+                }
+                writer.newLine();
+            }
+        }
+    }
+
+    private String escapeCsv(String val) {
+        if (val == null) return "";
+        if (val.contains(",") || val.contains("\"") || val.contains("\n") || val.contains("\r")) {
+            return "\"" + val.replace("\"", "\"\"") + "\"";
+        }
+        return val;
+    }
+
+    public void printReport() {
+        if (!isShowing() || GraphicsEnvironment.isHeadless()) {
+            return;
+        }
+        try {
+            String title = cboReportType != null && cboReportType.getSelectedItem() != null
+                    ? cboReportType.getSelectedItem().toString() : "Báo Cáo Thống Kê";
+            java.text.MessageFormat header = new java.text.MessageFormat(title);
+            java.text.MessageFormat footer = new java.text.MessageFormat("Trang {0,number,integer}");
+            reportTable.print(JTable.PrintMode.FIT_WIDTH, header, footer);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Lỗi khi in báo cáo: " + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void cancelInFlightWorkers() {

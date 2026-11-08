@@ -19,6 +19,17 @@ public class DoctorActionBar extends JPanel {
     private final JLabel lblBannerLine3;
     private final JLabel lblBannerBhytRate;
 
+    private final JButton btnMenu;
+    private final JButton btnPrint;
+    private final JButton btnRefresh;
+    private final JButton btnSearch;
+    private final JButton btnMedicalRecord;
+    private final JButton btnService;
+    private final JButton btnMedicine;
+    private final JButton btnRegimen;
+    private final JButton btnPayment;
+    private java.util.function.Consumer<String> onActionClickListener;
+
     public DoctorActionBar() {
         setLayout(new BorderLayout());
         setBackground(new Color(245, 247, 250));
@@ -28,15 +39,35 @@ public class DoctorActionBar extends JPanel {
         JPanel doctorActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
         doctorActions.setOpaque(false);
 
-        doctorActions.add(createActionButton("Menu", "☰", false, null));
-        doctorActions.add(createActionButton("In", "🖨️", true, new Color(254, 237, 208))); // Nút "In" viền vàng đặc trưng
-        doctorActions.add(createActionButton("Làm mới", "🔄", false, null));
-        doctorActions.add(createActionButton("Tìm Kiếm", "🔍", false, null));
-        doctorActions.add(createActionButton("Bệnh Án", "📋", false, null));
-        doctorActions.add(createActionButton("Dịch Vụ", "🧪", false, null));
-        doctorActions.add(createActionButton("Thuốc/VT", "💊", false, null));
-        doctorActions.add(createActionButton("Phác Đồ ĐT", "📝", false, null));
-        doctorActions.add(createActionButton("Thanh Toán", "💳", false, null));
+        btnMenu = createActionButton("Menu", "☰", false, null);
+        btnPrint = createActionButton("In", "🖨️", true, new Color(254, 237, 208)); // Nút "In" viền vàng đặc trưng
+        btnRefresh = createActionButton("Làm mới", "🔄", false, null);
+        btnSearch = createActionButton("Tìm Kiếm", "🔍", false, null);
+        btnMedicalRecord = createActionButton("Bệnh Án", "📋", false, null);
+        btnService = createActionButton("Dịch Vụ", "🧪", false, null);
+        btnMedicine = createActionButton("Thuốc/VT", "💊", false, null);
+        btnRegimen = createActionButton("Phác Đồ ĐT", "📝", false, null);
+        btnPayment = createActionButton("Thanh Toán", "💳", false, null);
+
+        btnMenu.addActionListener(e -> triggerAction("Menu"));
+        btnPrint.addActionListener(e -> triggerAction("In"));
+        btnRefresh.addActionListener(e -> triggerAction("Làm mới"));
+        btnSearch.addActionListener(e -> triggerAction("Tìm Kiếm"));
+        btnMedicalRecord.addActionListener(e -> triggerAction("Bệnh Án"));
+        btnService.addActionListener(e -> triggerAction("Dịch Vụ"));
+        btnMedicine.addActionListener(e -> triggerAction("Thuốc/VT"));
+        btnRegimen.addActionListener(e -> triggerAction("Phác Đồ ĐT"));
+        btnPayment.addActionListener(e -> triggerAction("Thanh Toán"));
+
+        doctorActions.add(btnMenu);
+        doctorActions.add(btnPrint);
+        doctorActions.add(btnRefresh);
+        doctorActions.add(btnSearch);
+        doctorActions.add(btnMedicalRecord);
+        doctorActions.add(btnService);
+        doctorActions.add(btnMedicine);
+        doctorActions.add(btnRegimen);
+        doctorActions.add(btnPayment);
 
         add(doctorActions, BorderLayout.WEST);
 
@@ -141,4 +172,24 @@ public class DoctorActionBar extends JPanel {
 
         return btn;
     }
+
+    private void triggerAction(String action) {
+        if (onActionClickListener != null) {
+            onActionClickListener.accept(action);
+        }
+    }
+
+    public void setOnActionClickListener(java.util.function.Consumer<String> listener) {
+        this.onActionClickListener = listener;
+    }
+
+    public JButton getBtnMenu() { return btnMenu; }
+    public JButton getBtnPrint() { return btnPrint; }
+    public JButton getBtnRefresh() { return btnRefresh; }
+    public JButton getBtnSearch() { return btnSearch; }
+    public JButton getBtnMedicalRecord() { return btnMedicalRecord; }
+    public JButton getBtnService() { return btnService; }
+    public JButton getBtnMedicine() { return btnMedicine; }
+    public JButton getBtnRegimen() { return btnRegimen; }
+    public JButton getBtnPayment() { return btnPayment; }
 }

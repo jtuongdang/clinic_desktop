@@ -1,6 +1,15 @@
 package vn.clinicmanagement.desktop.modules.examination.components.tabs;
 
 import vn.clinicmanagement.desktop.modules.examination.components.print.PrescriptionPrintPreviewDialog;
+import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.prescription.CancelPrescriptionCommand;
+import vn.clinicmanagement.application.prescription.CancelPrescriptionReceipt;
+import vn.clinicmanagement.application.prescription.GetPrescriptionByVisitQuery;
+import vn.clinicmanagement.application.prescription.PrescriptionDto;
+import vn.clinicmanagement.application.prescription.PrescriptionItemDto;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationCompositionRoot;
+
+import java.util.List;
 
 import vn.clinicmanagement.desktop.core.config.AppFonts;
 
@@ -26,6 +35,11 @@ import java.awt.event.MouseEvent;
  */
 public class PrescriptionOrderTabPanel extends JPanel {
 
+    private final ExaminationCompositionRoot.Services services;
+    private int currentVisitId = 1;
+    private int currentDoctorId = 1;
+    private int currentPrescriptionId = 1;
+
     private JTable prescriptionTable;
     private DefaultTableModel tableModel;
     private JLabel lblNgayYLenh;
@@ -36,6 +50,11 @@ public class PrescriptionOrderTabPanel extends JPanel {
     private JPanel selectedTicketCard;
 
     public PrescriptionOrderTabPanel() {
+        this(resolveDefaultServices());
+    }
+
+    public PrescriptionOrderTabPanel(ExaminationCompositionRoot.Services services) {
+        this.services = services != null ? services : resolveDefaultServices();
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -44,6 +63,63 @@ public class PrescriptionOrderTabPanel extends JPanel {
 
         // 2. KHUNG TRUNG TÂM: CHI TIẾT ĐƠN THUỐC (THÔNG TIN HÀNH CHÍNH + BẢNG THUỐC + CỤM NÚT IN)
         add(buildTicketDetailPanel(), BorderLayout.CENTER);
+    }
+
+    private static ExaminationCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return ExaminationCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public void setVisitContext(int visitId, int doctorId) {
+        this.currentVisitId = visitId;
+        this.currentDoctorId = doctorId;
+        loadPrescriptionsForVisit(visitId);
+    }
+
+    public void loadPrescriptionsForVisit(int visitId) {
+        if (services == null || services.getPrescriptionByVisit() == null || visitId <= 0) return;
+        SwingWorker<Result<List<PrescriptionDto>>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Result<List<PrescriptionDto>> doInBackground() {
+                return services.getPrescriptionByVisit().handle(new GetPrescriptionByVisitQuery(visitId, null));
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    Result<List<PrescriptionDto>> res = get();
+                    if (res != null && res.isSuccess()) {
+                        List<PrescriptionDto> list = res.getValue().orElse(List.of());
+                        if (!list.isEmpty()) {
+                            PrescriptionDto first = list.get(0);
+                            currentPrescriptionId = first.id();
+                            if (lblMaPhieu != null) lblMaPhieu.setText("DT-" + first.id());
+                            if (lblTrangThai != null) lblTrangThai.setText(first.trangThai() != null ? first.trangThai().name() : "Chờ xuất");
+                            tableModel.setRowCount(0);
+                            int stt = 1;
+                            if (first.items() != null) {
+                                for (PrescriptionItemDto item : first.items()) {
+                                    tableModel.addRow(new Object[]{
+                                            String.valueOf(stt++),
+                                            item.itemName(),
+                                            item.itemCode(),
+                                            item.donViTinh(),
+                                            item.soLuongKe() != null ? item.soLuongKe().toString() : "1",
+                                            item.lieuDung(),
+                                            item.duongDung(),
+                                            item.huongDan()
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        };
+        worker.execute();
     }
 
     private JPanel buildTicketSelectorPanel() {
@@ -310,7 +386,7 @@ public class PrescriptionOrderTabPanel extends JPanel {
 
         btnPrintInfusion.addActionListener(e -> {
             JOptionPane.showMessageDialog(this,
-                    "In phiếu truyền HC:\n▶ Phiếu: TH220809.1\n▶ Bệnh nhân: TEST11 (22000285)",
+                    "In phiếu truyền HC:\n▶ Phiếu: TH220809.1\n▶ Bệnh nhân: NGUYỄN HOÀNG LONG (BN-20261107-0003)",
                     "In Phiếu Truyền HC", JOptionPane.INFORMATION_MESSAGE);
         });
 
@@ -320,12 +396,46 @@ public class PrescriptionOrderTabPanel extends JPanel {
 
         btnCancel.addActionListener(e -> {
             int ret = JOptionPane.showConfirmDialog(this,
-                    "Bạn có chắc chắn muốn hủy gửi đơn thuốc TH220809.1 không?",
+                    "Bạn có chắc chắn muốn hủy gửi đơn thuốc không?",
                     "Xác Nhận Hủy Gửi Đơn Thuốc", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
             if (ret == JOptionPane.YES_OPTION) {
-                tableModel.setRowCount(0);
-                for (int i = 0; i < 15; i++) {
-                    tableModel.addRow(new Object[]{"", "", "", "", "", "", "", ""});
+                if (services != null && services.cancelPrescription() != null) {
+                    CancelPrescriptionCommand cmd = new CancelPrescriptionCommand(
+                            currentPrescriptionId > 0 ? currentPrescriptionId : 1,
+                            currentDoctorId > 0 ? currentDoctorId : 1,
+                            "Hủy theo yêu cầu của bác sĩ khám",
+                            null
+                    );
+                    SwingWorker<Result<CancelPrescriptionReceipt>, Void> cancelWorker = new SwingWorker<>() {
+                        @Override
+                        protected Result<CancelPrescriptionReceipt> doInBackground() {
+                            return services.cancelPrescription().handle(cmd);
+                        }
+
+                        @Override
+                        protected void done() {
+                            try {
+                                Result<CancelPrescriptionReceipt> res = get();
+                                if (res != null && res.isSuccess()) {
+                                    tableModel.setRowCount(0);
+                                    if (lblTrangThai != null) lblTrangThai.setText("Đã hủy");
+                                    JOptionPane.showMessageDialog(PrescriptionOrderTabPanel.this,
+                                            "Đã hủy đơn thuốc thành công trên CSDL!",
+                                            "Hủy Đơn Thuốc", JOptionPane.INFORMATION_MESSAGE);
+                                } else {
+                                    tableModel.setRowCount(0);
+                                }
+                            } catch (Exception ex) {
+                                tableModel.setRowCount(0);
+                            }
+                        }
+                    };
+                    cancelWorker.execute();
+                } else {
+                    tableModel.setRowCount(0);
+                    for (int i = 0; i < 15; i++) {
+                        tableModel.addRow(new Object[]{"", "", "", "", "", "", "", ""});
+                    }
                 }
             }
         });

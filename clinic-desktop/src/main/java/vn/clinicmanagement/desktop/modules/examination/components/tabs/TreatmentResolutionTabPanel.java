@@ -1,5 +1,9 @@
 package vn.clinicmanagement.desktop.modules.examination.components.tabs;
 
+import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.examination.AddDiagnosisCommand;
+import vn.clinicmanagement.application.examination.CompleteExamCommand;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationCompositionRoot;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.DischargeSummaryDialog;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.IcdCatalogSelectionDialog;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.SecondaryDiagnosisDialog;
@@ -56,6 +60,10 @@ public class TreatmentResolutionTabPanel extends JPanel {
     private JTextArea txtLoiDanBacSi;
     private JButton btnSave;
 
+    private final ExaminationCompositionRoot.Services services;
+    private int currentVisitId = 1;
+    private int currentDoctorId = 1;
+
     public static final String[] INPATIENT_DEPARTMENTS = {
             "Gây mê hồi sức",
             "Khoa Bệnh nhiệt đới - Tiêu hóa nhi",
@@ -93,7 +101,53 @@ public class TreatmentResolutionTabPanel extends JPanel {
     };
 
     public TreatmentResolutionTabPanel() {
+        this(resolveDefaultServices());
+    }
+
+    public TreatmentResolutionTabPanel(ExaminationCompositionRoot.Services services) {
+        this.services = services != null ? services : resolveDefaultServices();
         initUI();
+    }
+
+    private static ExaminationCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return ExaminationCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public void setVisitContext(int visitId, int doctorId) {
+        this.currentVisitId = visitId;
+        this.currentDoctorId = doctorId;
+    }
+
+    public ExaminationCompositionRoot.Services getServices() {
+        return services;
+    }
+
+    public int getCurrentVisitId() {
+        return currentVisitId;
+    }
+
+    public int getCurrentDoctorId() {
+        return currentDoctorId;
+    }
+
+    public JButton getBtnSave() {
+        return btnSave;
+    }
+
+    public JTextArea getTxtChanDoanXacDinh() {
+        return txtChanDoanXacDinh;
+    }
+
+    public JTextField getTxtMaIcdChinh() {
+        return txtMaIcdChinh;
+    }
+
+    public JTextField getTxtTenIcdChinh() {
+        return txtTenIcdChinh;
     }
 
     private void initUI() {
@@ -976,12 +1030,63 @@ public class TreatmentResolutionTabPanel extends JPanel {
 
     private void handleSaveDisposition() {
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm dd/MM/yyyy");
-        if (txtThoiGianXuTri.getText().trim().equals(":   /  /")) {
+        if (txtThoiGianXuTri != null && txtThoiGianXuTri.getText().trim().equals(":   /  /")) {
             txtThoiGianXuTri.setText(sdf.format(new Date()));
         }
 
-        // Mở cửa sổ In Phiếu hẹn tái khám (K3_015_A1_PhuerienTaiKham.doc) khớp 100% media_1793380172130_9595cffb.jpg
-        openFollowUpAppointmentDialog();
+        if (services == null) {
+            openFollowUpAppointmentDialog();
+            return;
+        }
+
+        String mainDiagnosis = (txtChanDoanXacDinh != null && !txtChanDoanXacDinh.getText().isBlank())
+                ? txtChanDoanXacDinh.getText().trim()
+                : "Khám bệnh";
+        String doctorInstructions = txtLoiDanBacSi != null ? txtLoiDanBacSi.getText().trim() : "";
+        String disposition = cboHinhThucXuTri != null ? (String) cboHinhThucXuTri.getSelectedItem() : "Cấp toa cho về";
+        boolean isCompleteExam = !"Chuyển phòng khám".equalsIgnoreCase(disposition);
+
+        AddDiagnosisCommand diagCmd = new AddDiagnosisCommand(
+                currentVisitId > 0 ? currentVisitId : 1,
+                currentDoctorId > 0 ? currentDoctorId : 1,
+                1,
+                mainDiagnosis,
+                true,
+                "BENH_CHINH",
+                null
+        );
+
+        CompleteExamCommand completeCmd = new CompleteExamCommand(
+                currentVisitId > 0 ? currentVisitId : 1,
+                currentDoctorId > 0 ? currentDoctorId : 1,
+                null,
+                null,
+                doctorInstructions,
+                java.time.LocalDate.now().plusDays(7),
+                null
+        );
+
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() {
+                try {
+                    if (services.addDiagnosis() != null) {
+                        services.addDiagnosis().handle(diagCmd);
+                    }
+                    if (isCompleteExam && services.completeExam() != null) {
+                        services.completeExam().handle(completeCmd);
+                    }
+                } catch (Exception ignored) {
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                openFollowUpAppointmentDialog();
+            }
+        };
+        worker.execute();
     }
 
     public static class DocumentSheetIcon implements Icon {

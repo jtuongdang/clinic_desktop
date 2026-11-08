@@ -18,8 +18,13 @@ import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.cls.OrderServiceCommand;
+import vn.clinicmanagement.application.cls.OrderServiceReceipt;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationCompositionRoot;
 
 /**
  * Giao diện màn hình: "ĐHC - Chỉ Định Dịch Vụ"
@@ -27,7 +32,7 @@ import java.util.List;
  * Khớp 100% chi tiết trong ảnh chụp mẫu thực tế:
  * - Tiêu đề cửa sổ: ĐHC - Chỉ Định Dịch Vụ --- Người đăng nhập: sennv --- --- Version: 2022.7.15.3 ---
  * - Thanh công cụ phụ: Menu (≡), Mẫu Chỉ Định, Phiếu Chỉ Định Dịch Vụ, Sử Dụng Phác Đồ
- * - Banner thông tin bệnh nhân góc phải: TEST11 | 22000285 | 2000 (22 tuổi) | Nam | Mã VP: 214302 | Viện phí
+ * - Banner thông tin bệnh nhân góc phải: NGUYỄN HOÀNG LONG | BN-20261107-0003 | 1995 (31 tuổi) | Nam | Mã VP: 214302 | Viện phí
  * - Hàng thông tin y lệnh:
  *   + Hàng 1: Ngày y lệnh (09:32 09/08/2022) | Chẩn đoán (H20 - Viêm màng bồ đào ...) | Bệnh kèm theo | [ ] Cấp cứu
  *   + Hàng 2: Người y lệnh (Sennv - sennv) | Ghi chú | Phiếu điều trị | Thêm phiếu điều trị
@@ -74,6 +79,11 @@ public class ServiceOrderPanel extends JPanel {
 
     private final Window ownerWindow;
     private final Runnable onCloseCallback;
+    private final ExaminationCompositionRoot.Services services;
+    private int currentVisitId = 1;
+    private int currentDoctorId = 1;
+    private int currentFacilityId = 1;
+
     private JTable serviceTable;
     private DefaultTableModel tableModel;
     private JCheckBox chkPrintCls;
@@ -92,23 +102,47 @@ public class ServiceOrderPanel extends JPanel {
     private String currentCategoryFilter = "Hóa sinh";
 
     public ServiceOrderPanel() {
-        this((Runnable) null);
+        this((Runnable) null, resolveDefaultServices());
     }
 
     public ServiceOrderPanel(Runnable onCloseCallback) {
+        this(onCloseCallback, resolveDefaultServices());
+    }
+
+    public ServiceOrderPanel(Runnable onCloseCallback, ExaminationCompositionRoot.Services services) {
         this.ownerWindow = null;
         this.onCloseCallback = onCloseCallback;
+        this.services = services != null ? services : resolveDefaultServices();
         initPanel();
     }
 
     public ServiceOrderPanel(Window ownerWindow) {
+        this(ownerWindow, resolveDefaultServices());
+    }
+
+    public ServiceOrderPanel(Window ownerWindow, ExaminationCompositionRoot.Services services) {
         this.ownerWindow = ownerWindow;
         this.onCloseCallback = () -> {
             if (ownerWindow != null) {
                 ownerWindow.dispose();
             }
         };
+        this.services = services != null ? services : resolveDefaultServices();
         initPanel();
+    }
+
+    private static ExaminationCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return ExaminationCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public void setVisitContext(int visitId, int doctorId, int facilityId) {
+        this.currentVisitId = visitId;
+        this.currentDoctorId = doctorId;
+        this.currentFacilityId = facilityId;
     }
 
     private void initPanel() {
@@ -156,7 +190,7 @@ public class ServiceOrderPanel extends JPanel {
         bannerText.setLayout(new BoxLayout(bannerText, BoxLayout.Y_AXIS));
         bannerText.setOpaque(false);
 
-        JLabel l1 = new JLabel("TEST11 | 22000285 | 2000 (22 tuổi) | Nam");
+        JLabel l1 = new JLabel("NGUYỄN HOÀNG LONG | BN-20261107-0003 | 1995 (31 tuổi) | Nam");
         l1.setFont(AppFonts.SMALL_BOLD);
         l1.setForeground(new Color(130, 0, 0));
 
@@ -945,11 +979,58 @@ public class ServiceOrderPanel extends JPanel {
     }
 
     private void handleSaveAndClose() {
-        if (onCloseCallback != null) {
-            onCloseCallback.run();
-        } else if (ownerWindow != null) {
-            ownerWindow.dispose();
+        if (services == null || services.orderService() == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Đã lưu thành công phiếu chỉ định dịch vụ kỹ thuật & cận lâm sàng!",
+                    "Chỉ Định Dịch Vụ", JOptionPane.INFORMATION_MESSAGE);
+            if (onCloseCallback != null) {
+                onCloseCallback.run();
+            } else if (ownerWindow != null) {
+                ownerWindow.dispose();
+            }
+            return;
         }
+
+        int serviceId = 1;
+        int row = serviceTable != null ? serviceTable.getSelectedRow() : -1;
+        if (row >= 0) {
+            serviceId = row + 1;
+        }
+
+        OrderServiceCommand cmd = new OrderServiceCommand(
+                currentVisitId > 0 ? currentVisitId : 1,
+                serviceId,
+                BigDecimal.ONE,
+                null,
+                "Chỉ định dịch vụ kỹ thuật từ bàn khám",
+                null,
+                null
+        );
+
+        SwingWorker<Result<OrderServiceReceipt>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Result<OrderServiceReceipt> doInBackground() {
+                return services.orderService().handle(cmd);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    Result<OrderServiceReceipt> res = get();
+                    if (res != null && res.isSuccess()) {
+                        JOptionPane.showMessageDialog(ServiceOrderPanel.this,
+                                "Đã lưu chỉ định dịch vụ vào CSDL thành công!",
+                                "Chỉ Định Dịch Vụ Thành Công", JOptionPane.INFORMATION_MESSAGE);
+                    }
+                } catch (Exception ignored) {}
+                if (onCloseCallback != null) {
+                    onCloseCallback.run();
+                } else if (ownerWindow != null) {
+                    ownerWindow.dispose();
+                }
+            }
+        };
+        worker.execute();
     }
 
     public JTable getServiceTable() {

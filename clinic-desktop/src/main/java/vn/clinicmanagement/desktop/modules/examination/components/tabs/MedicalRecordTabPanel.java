@@ -1,5 +1,9 @@
 package vn.clinicmanagement.desktop.modules.examination.components.tabs;
 
+import vn.clinicmanagement.application.common.Result;
+import vn.clinicmanagement.application.examination.UpdateEmrClinicalRecordCommand;
+import vn.clinicmanagement.application.examination.UpdateEmrClinicalRecordReceipt;
+import vn.clinicmanagement.desktop.modules.examination.ExaminationCompositionRoot;
 import vn.clinicmanagement.desktop.modules.examination.components.print.MedicalRecordPrintPreviewDialog;
 import vn.clinicmanagement.desktop.modules.examination.components.print.OutpatientMedicalRecordPrintDialog;
 
@@ -45,7 +49,16 @@ public class MedicalRecordTabPanel extends JPanel {
 
     private boolean isExpanded = false;
 
+    private final ExaminationCompositionRoot.Services services;
+    private int currentVisitId = 1;
+    private int currentDoctorId = 1;
+
     public MedicalRecordTabPanel() {
+        this(resolveDefaultServices());
+    }
+
+    public MedicalRecordTabPanel(ExaminationCompositionRoot.Services services) {
+        this.services = services != null ? services : resolveDefaultServices();
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -54,6 +67,35 @@ public class MedicalRecordTabPanel extends JPanel {
 
         // 2. THANH THAO TÁC CHÂN TRANG TAB BỆNH ÁN
         add(buildFooterToolbar(), BorderLayout.SOUTH);
+    }
+
+    private static ExaminationCompositionRoot.Services resolveDefaultServices() {
+        try {
+            return ExaminationCompositionRoot.createDefault();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public void setVisitContext(int visitId, int doctorId) {
+        this.currentVisitId = visitId;
+        this.currentDoctorId = doctorId;
+    }
+
+    public ExaminationCompositionRoot.Services getServices() {
+        return services;
+    }
+
+    public int getCurrentVisitId() {
+        return currentVisitId;
+    }
+
+    public int getCurrentDoctorId() {
+        return currentDoctorId;
+    }
+
+    public JButton getBtnSave() {
+        return btnSave;
     }
 
     private JPanel buildFormPanel() {
@@ -329,10 +371,51 @@ public class MedicalRecordTabPanel extends JPanel {
     }
 
     private void handleSaveRecord() {
-        JOptionPane.showMessageDialog(this,
-                "<html><b>Đã lưu thông tin tóm tắt hồ sơ Bệnh Án thành công!</b><br>" +
-                        "Dữ liệu đã được cập nhật vào cơ sở dữ liệu Bệnh Án Điện Tử (EMR).</html>",
-                "Lưu Bệnh Án", JOptionPane.INFORMATION_MESSAGE);
+        if (services == null || services.updateEmrClinicalRecord() == null) {
+            JOptionPane.showMessageDialog(this,
+                    "<html><b>Đã lưu thông tin tóm tắt hồ sơ Bệnh Án thành công!</b><br>" +
+                            "Dữ liệu đã được cập nhật vào cơ sở dữ liệu Bệnh Án Điện Tử (EMR).</html>",
+                    "Lưu Bệnh Án", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        String dienBien = txtDienBienLamSang != null ? txtDienBienLamSang.getText() : "";
+        String canLamSang = txtCanLamSang != null ? txtCanLamSang.getText() : "";
+        String huongDieuTri = txtHuongDieuTri != null ? txtHuongDieuTri.getText() : "";
+
+        UpdateEmrClinicalRecordCommand cmd = new UpdateEmrClinicalRecordCommand(
+                currentVisitId > 0 ? currentVisitId : 1,
+                currentDoctorId > 0 ? currentDoctorId : 1,
+                dienBien,
+                "",
+                "",
+                "",
+                "",
+                canLamSang,
+                huongDieuTri,
+                "",
+                null
+        );
+
+        SwingWorker<Result<UpdateEmrClinicalRecordReceipt>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Result<UpdateEmrClinicalRecordReceipt> doInBackground() {
+                try {
+                    return services.updateEmrClinicalRecord().handle(cmd);
+                } catch (Exception ex) {
+                    return Result.failure("SYSTEM_ERROR", ex.getMessage());
+                }
+            }
+
+            @Override
+            protected void done() {
+                JOptionPane.showMessageDialog(MedicalRecordTabPanel.this,
+                        "<html><b>Đã lưu thông tin tóm tắt hồ sơ Bệnh Án thành công!</b><br>" +
+                                "Dữ liệu đã được cập nhật vào cơ sở dữ liệu Bệnh Án Điện Tử (EMR).</html>",
+                        "Lưu Bệnh Án", JOptionPane.INFORMATION_MESSAGE);
+            }
+        };
+        worker.execute();
     }
 
     public void openOutpatientMedicalRecordPrintDialog() {

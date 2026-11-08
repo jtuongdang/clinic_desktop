@@ -138,4 +138,37 @@ class ClinicReportPanelWiringTest {
         assertEquals("1", panelHolder[0].getTableModel().getValueAt(0, 0));
         assertEquals("VNĐ", panelHolder[0].getTableModel().getValueAt(0, 2));
     }
+
+    @Test
+    @DisplayName("Export report to CSV writes correct headers and table rows")
+    void exportReportToCsvWritesCorrectData() throws Exception {
+        ClinicReportPanel panel = new ClinicReportPanel();
+        panel.getTableModel().setRowCount(0);
+        panel.getTableModel().addRow(new Object[]{"1", "Tổng số ca khám", "Lượt", "10", "15", "+50.0%", "Bình thường"});
+
+        java.io.File tempFile = java.io.File.createTempFile("clinic_report_test_", ".csv");
+        tempFile.deleteOnExit();
+
+        panel.exportReportToCsv(tempFile);
+
+        assertTrue(tempFile.exists());
+        assertTrue(tempFile.length() > 0);
+
+        String content = java.nio.file.Files.readString(tempFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(content.contains("STT,Chỉ Tiêu / Hạng Mục,Đơn Vị Tính"));
+        assertTrue(content.contains("1,Tổng số ca khám,Lượt,10,15,+50.0%,Bình thường"));
+    }
+
+    @Test
+    @DisplayName("Export and Print buttons invoke safely in headless mode")
+    void exportAndPrintButtonsInvokeSafely() {
+        ClinicReportPanel panel = new ClinicReportPanel();
+        assertNotNull(panel.getBtnExport());
+        assertNotNull(panel.getBtnPrint());
+
+        assertDoesNotThrow(() -> panel.getBtnExport().doClick());
+        assertDoesNotThrow(() -> panel.getBtnPrint().doClick());
+        assertDoesNotThrow(panel::exportReport);
+        assertDoesNotThrow(panel::printReport);
+    }
 }

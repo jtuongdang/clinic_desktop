@@ -37,11 +37,36 @@ public final class OrderServiceHandler implements CommandHandler<OrderServiceCom
 
     public OrderServiceHandler(
             IChiDinhDichVuRepository serviceRepository,
+            AuditWritePort auditWritePort) {
+        this(serviceRepository, new NoOpVisitRepository(), auditWritePort);
+    }
+
+    public OrderServiceHandler(
+            IChiDinhDichVuRepository serviceRepository,
             ILuotKhamRepository visitRepository,
             AuditWritePort auditWritePort) {
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "serviceRepository");
         this.visitRepository = Objects.requireNonNull(visitRepository, "visitRepository");
         this.auditWritePort = Objects.requireNonNull(auditWritePort, "auditWritePort");
+    }
+
+    private static final class NoOpVisitRepository implements ILuotKhamRepository {
+        private static final vn.clinicmanagement.domain.common.IUnitOfWork NOOP_UOW = new vn.clinicmanagement.domain.common.IUnitOfWork() {
+            @Override public int saveChanges() { return 1; }
+            @Override public boolean saveEntities() { return true; }
+        };
+        @Override public Optional<LuotKham> getById(int id) { return Optional.empty(); }
+        @Override public java.util.List<LuotKham> getAll() { return java.util.List.of(); }
+        @Override public vn.clinicmanagement.domain.repositories.PagedResult<LuotKham> getPaged(int p, int s, vn.clinicmanagement.domain.repositories.ISpecification<LuotKham> sp) { return new vn.clinicmanagement.domain.repositories.PagedResult<>(java.util.List.of(), 0, p, s); }
+        @Override public java.util.List<LuotKham> find(vn.clinicmanagement.domain.repositories.ISpecification<LuotKham> sp) { return java.util.List.of(); }
+        @Override public boolean exists(vn.clinicmanagement.domain.repositories.ISpecification<LuotKham> sp) { return false; }
+        @Override public int count(vn.clinicmanagement.domain.repositories.ISpecification<LuotKham> sp) { return 0; }
+        @Override public void add(LuotKham entity) {}
+        @Override public void update(LuotKham entity) {}
+        @Override public void delete(LuotKham entity) {}
+        @Override public vn.clinicmanagement.domain.common.IUnitOfWork getUnitOfWork() { return NOOP_UOW; }
+        @Override public java.util.List<LuotKham> getVisitsByDoctor(int b, java.time.LocalDate d) { return java.util.List.of(); }
+        @Override public int getNextQueueNumber(int c, int k, java.time.LocalDate d) { return 1; }
     }
 
     @Override

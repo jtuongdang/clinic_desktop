@@ -7,19 +7,50 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.function.Consumer;
 
 /**
- * Cây danh mục kho / loại phiếu bên trái (Hóa chất khoa sinh hóa).
- * Khớp 100% figmar thiết kế:
- * - Dòng banner vàng cam chữ đỏ sẫm "Hóa chất khoa sinh hóa"
- * - Hàng đang chọn màu xanh dương chữ trắng "Tất Cả Phiếu (1)"
- * - Nút nhánh cây "[-] Loại Phiếu" và "Nhập bù (1)"
+ * Cây danh mục kho / loại phiếu bên trái (Hóa chất khoa sinh hóa / Kho Dược).
+ * Khớp 100% thiết kế giao diện chuẩn EHC HIS:
+ * - Banner vàng nhạt header "Hóa chất khoa sinh hóa" / kho dược đang chọn.
+ * - Các dòng danh mục: Tất Cả Phiếu, Phiếu Nhập Kho, Phiếu Xuất Kho, Đơn Thuốc Chờ Phát.
+ * - Màu sắc EHC chuẩn: Nền chọn xanh dương #1068BC chữ trắng, vạch viền #C3CDD8, icon minus box.
  */
 public class PharmacyCategoryTreePanel extends JPanel {
 
-    private int selectedIndex = 0; // 0 = Tất Cả Phiếu (1), 1 = Nhập bù (1)
+    public static final String DEFAULT_WAREHOUSE_TITLE = "Hóa chất khoa sinh hóa";
+
+    /**
+     * Model / record filter định tuyến danh mục kho và loại phiếu.
+     */
+    public record CategoryFilter(Integer warehouseId, String ticketType) {
+        public static final String ALL = "ALL";
+        public static final String NHAP_KHO = "NHAP_KHO";
+        public static final String XUAT_KHO = "XUAT_KHO";
+        public static final String DON_THUOC = "DON_THUOC";
+    }
+
+    private Integer warehouseId;
+    private String warehouseTitle = DEFAULT_WAREHOUSE_TITLE;
+
+    private int selectedIndex = 0; // 0 = Tất Cả, 1 = Nhập Kho, 2 = Xuất Kho, 3 = Đơn Thuốc
+    private Consumer<CategoryFilter> onCategorySelected;
+
+    private int allCount;
+    private int importCount;
+    private int exportCount;
+    private int prescriptionCount;
+
+    private final JLabel lblTitle;
     private final JPanel rowAllTickets;
-    private final JPanel rowImportReplenish;
+    private final JPanel rowImport;
+    private final JPanel rowExport;
+    private final JPanel rowPrescription;
+
+    private final JLabel lblAll;
+    private final JLabel lblImport;
+    private final JLabel lblExport;
+    private final JLabel lblPrescription;
 
     public PharmacyCategoryTreePanel() {
         setLayout(new BorderLayout());
@@ -33,7 +64,7 @@ public class PharmacyCategoryTreePanel extends JPanel {
         headerPanel.setBackground(new Color(255, 242, 178)); // Nền vàng nhạt chuẩn EHC
         headerPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(223, 207, 139)));
 
-        JLabel lblTitle = new JLabel("Hóa chất khoa sinh hóa");
+        lblTitle = new JLabel(warehouseTitle);
         lblTitle.setFont(AppFonts.BODY_BOLD);
         lblTitle.setForeground(new Color(138, 30, 0)); // Chữ đỏ cam sẫm chuẩn EHC
         lblTitle.setBorder(new EmptyBorder(0, 8, 0, 0));
@@ -54,31 +85,37 @@ public class PharmacyCategoryTreePanel extends JPanel {
         treeContent.setLayout(new BoxLayout(treeContent, BoxLayout.Y_AXIS));
         treeContent.setBackground(Color.WHITE);
 
-        // Row 1: Tất Cả Phiếu (1) - ĐANG CHỌN (Solid Blue, White Text)
+        // Row 0: Tất Cả Phiếu - Mặc định ĐANG CHỌN (Solid Blue, White Text)
+        lblAll = new JLabel("Tất Cả Phiếu (1)");
+        lblAll.setFont(AppFonts.BODY_BOLD);
+        lblAll.setForeground(Color.WHITE);
+        lblAll.setBorder(new EmptyBorder(0, 12, 0, 0));
+
         rowAllTickets = new JPanel(new BorderLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
                 if (selectedIndex == 0) {
-                    g.setColor(new Color(16, 104, 188)); // Xanh dương đậm chọn hàng
+                    g.setColor(new Color(16, 104, 188)); // Xanh dương đậm chọn hàng #1068BC
                     g.fillRect(0, 0, getWidth(), getHeight());
                 } else {
                     super.paintComponent(g);
                 }
             }
         };
-        rowAllTickets.setOpaque(selectedIndex != 0);
+        rowAllTickets.setOpaque(false);
         rowAllTickets.setBackground(Color.WHITE);
         rowAllTickets.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
         rowAllTickets.setPreferredSize(new Dimension(215, 24));
         rowAllTickets.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        JLabel lblAll = new JLabel("Tất Cả Phiếu (1)");
-        lblAll.setFont(AppFonts.BODY_BOLD);
-        lblAll.setForeground(selectedIndex == 0 ? Color.WHITE : Color.BLACK);
-        lblAll.setBorder(new EmptyBorder(0, 12, 0, 0));
         rowAllTickets.add(lblAll, BorderLayout.WEST);
+        rowAllTickets.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                selectRow(0);
+            }
+        });
 
-        // Row 2: Nút nhánh cha "[-] Loại Phiếu"
+        // Nút nhánh cha "[-] Loại Phiếu"
         JPanel rowCategoryNode = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 3));
         rowCategoryNode.setBackground(Color.WHITE);
         rowCategoryNode.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
@@ -93,64 +130,21 @@ public class PharmacyCategoryTreePanel extends JPanel {
         rowCategoryNode.add(lblMinus);
         rowCategoryNode.add(lblCategory);
 
-        // Row 3: Nhánh con "Nhập bù (1)" với đường nét nối cây
-        rowImportReplenish = new JPanel(new BorderLayout()) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                if (selectedIndex == 1) {
-                    g.setColor(new Color(16, 104, 188));
-                    g.fillRect(0, 0, getWidth(), getHeight());
-                } else {
-                    super.paintComponent(g);
-                    // Vẽ đường nối cây thư mục
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setColor(new Color(180, 185, 195));
-                    g2.drawLine(14, 0, 14, 12);
-                    g2.drawLine(14, 12, 28, 12);
-                    g2.dispose();
-                }
-            }
-        };
-        rowImportReplenish.setOpaque(selectedIndex != 1);
-        rowImportReplenish.setBackground(Color.WHITE);
-        rowImportReplenish.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
-        rowImportReplenish.setPreferredSize(new Dimension(215, 24));
-        rowImportReplenish.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        // Các nhánh con
+        lblImport = new JLabel("Phiếu Nhập Kho (1)");
+        rowImport = createTreeChildRow(1, lblImport, false);
 
-        JLabel lblReplenish = new JLabel("Nhập bù (1)");
-        lblReplenish.setFont(AppFonts.BODY);
-        lblReplenish.setForeground(selectedIndex == 1 ? Color.WHITE : Color.BLACK);
-        lblReplenish.setBorder(new EmptyBorder(0, 32, 0, 0));
-        rowImportReplenish.add(lblReplenish, BorderLayout.WEST);
+        lblExport = new JLabel("Phiếu Xuất Kho (0)");
+        rowExport = createTreeChildRow(2, lblExport, false);
 
-        // Sự kiện click chuyển chọn
-        rowAllTickets.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                selectedIndex = 0;
-                lblAll.setForeground(Color.WHITE);
-                lblReplenish.setForeground(Color.BLACK);
-                rowAllTickets.setOpaque(false);
-                rowImportReplenish.setOpaque(true);
-                repaint();
-            }
-        });
-
-        rowImportReplenish.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                selectedIndex = 1;
-                lblAll.setForeground(Color.BLACK);
-                lblReplenish.setForeground(Color.WHITE);
-                rowAllTickets.setOpaque(true);
-                rowImportReplenish.setOpaque(false);
-                repaint();
-            }
-        });
+        lblPrescription = new JLabel("Đơn Thuốc Chờ Phát (0)");
+        rowPrescription = createTreeChildRow(3, lblPrescription, true);
 
         treeContent.add(rowAllTickets);
         treeContent.add(rowCategoryNode);
-        treeContent.add(rowImportReplenish);
+        treeContent.add(rowImport);
+        treeContent.add(rowExport);
+        treeContent.add(rowPrescription);
 
         // Filler trống phía dưới
         JPanel filler = new JPanel();
@@ -158,5 +152,176 @@ public class PharmacyCategoryTreePanel extends JPanel {
         treeContent.add(filler);
 
         add(treeContent, BorderLayout.CENTER);
+
+        // Khởi tạo số lượng đếm ban đầu
+        updateTicketCounts(1, 1, 0, 0);
     }
+
+    private JPanel createTreeChildRow(int index, JLabel label, boolean isLast) {
+        JPanel row = new JPanel(new BorderLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                if (selectedIndex == index) {
+                    g.setColor(new Color(16, 104, 188));
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                } else {
+                    super.paintComponent(g);
+                    // Vẽ đường nối cây thư mục
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setColor(new Color(180, 185, 195));
+                    int yEnd = isLast ? 12 : getHeight();
+                    g2.drawLine(14, 0, 14, yEnd);
+                    g2.drawLine(14, 12, 28, 12);
+                    g2.dispose();
+                }
+            }
+        };
+        row.setOpaque(selectedIndex != index);
+        row.setBackground(Color.WHITE);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+        row.setPreferredSize(new Dimension(215, 24));
+        row.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        label.setFont(AppFonts.BODY);
+        label.setForeground(selectedIndex == index ? Color.WHITE : Color.BLACK);
+        label.setBorder(new EmptyBorder(0, 32, 0, 0));
+        row.add(label, BorderLayout.WEST);
+
+        row.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                selectRow(index);
+            }
+        });
+
+        return row;
+    }
+
+    /**
+     * Cập nhật số lượng badge của từng danh mục.
+     */
+    public void updateTicketCounts(int allCount, int importCount, int exportCount, int prescriptionCount) {
+        this.allCount = allCount;
+        this.importCount = importCount;
+        this.exportCount = exportCount;
+        this.prescriptionCount = prescriptionCount;
+
+        lblAll.setText(String.format("Tất Cả Phiếu (%d)", allCount));
+        lblImport.setText(String.format("Phiếu Nhập Kho (%d)", importCount));
+        lblExport.setText(String.format("Phiếu Xuất Kho (%d)", exportCount));
+        lblPrescription.setText(String.format("Đơn Thuốc Chờ Phát (%d)", prescriptionCount));
+    }
+
+    /**
+     * Thiết lập tiêu đề kho đang chọn hiển thị trên banner vàng.
+     */
+    public void setWarehouseTitle(String title) {
+        this.warehouseTitle = (title != null && !title.isBlank()) ? title : DEFAULT_WAREHOUSE_TITLE;
+        lblTitle.setText(this.warehouseTitle);
+    }
+
+    public String getWarehouseTitle() {
+        return lblTitle.getText();
+    }
+
+    public void setWarehouseId(Integer warehouseId) {
+        this.warehouseId = warehouseId;
+    }
+
+    public Integer getWarehouseId() {
+        return warehouseId;
+    }
+
+    public void setWarehouse(Integer warehouseId, String title) {
+        this.warehouseId = warehouseId;
+        setWarehouseTitle(title);
+    }
+
+    /**
+     * Đăng ký listener nhận sự kiện khi chọn danh mục phiếu.
+     */
+    public void setOnCategorySelected(Consumer<CategoryFilter> listener) {
+        this.onCategorySelected = listener;
+    }
+
+    public Consumer<CategoryFilter> getOnCategorySelected() {
+        return onCategorySelected;
+    }
+
+    /**
+     * Chọn dòng theo chỉ số: 0 = ALL, 1 = NHAP_KHO, 2 = XUAT_KHO, 3 = DON_THUOC.
+     */
+    public void selectRow(int index) {
+        if (index < 0 || index > 3) {
+            return;
+        }
+        this.selectedIndex = index;
+
+        rowAllTickets.setOpaque(selectedIndex != 0);
+        lblAll.setForeground(selectedIndex == 0 ? Color.WHITE : Color.BLACK);
+
+        rowImport.setOpaque(selectedIndex != 1);
+        lblImport.setForeground(selectedIndex == 1 ? Color.WHITE : Color.BLACK);
+
+        rowExport.setOpaque(selectedIndex != 2);
+        lblExport.setForeground(selectedIndex == 2 ? Color.WHITE : Color.BLACK);
+
+        rowPrescription.setOpaque(selectedIndex != 3);
+        lblPrescription.setForeground(selectedIndex == 3 ? Color.WHITE : Color.BLACK);
+
+        repaint();
+
+        if (onCategorySelected != null) {
+            onCategorySelected.accept(getSelectedFilter());
+        }
+    }
+
+    /**
+     * Chọn dòng theo mã loại phiếu ("ALL", "NHAP_KHO", "XUAT_KHO", "DON_THUOC").
+     */
+    public void selectCategory(String ticketType) {
+        if (ticketType == null) return;
+        switch (ticketType.trim().toUpperCase()) {
+            case CategoryFilter.ALL, "TAT_CA" -> selectRow(0);
+            case CategoryFilter.NHAP_KHO -> selectRow(1);
+            case CategoryFilter.XUAT_KHO -> selectRow(2);
+            case CategoryFilter.DON_THUOC -> selectRow(3);
+            default -> {}
+        }
+    }
+
+    public String getTicketTypeByIndex(int index) {
+        return switch (index) {
+            case 1 -> CategoryFilter.NHAP_KHO;
+            case 2 -> CategoryFilter.XUAT_KHO;
+            case 3 -> CategoryFilter.DON_THUOC;
+            default -> CategoryFilter.ALL;
+        };
+    }
+
+    public CategoryFilter getSelectedFilter() {
+        return new CategoryFilter(warehouseId, getTicketTypeByIndex(selectedIndex));
+    }
+
+    public int getSelectedIndex() {
+        return selectedIndex;
+    }
+
+    // Getters phục vụ kiểm thử và liên kết
+    public JLabel getLblTitle() { return lblTitle; }
+    public JLabel getLblAll() { return lblAll; }
+    public JLabel getLblImport() { return lblImport; }
+    public JLabel getLblExport() { return lblExport; }
+    public JLabel getLblPrescription() { return lblPrescription; }
+
+    public JPanel getRowAllTickets() { return rowAllTickets; }
+    public JPanel getRowImport() { return rowImport; }
+    public JPanel getRowImportReplenish() { return rowImport; } // Alias tương thích
+    public JPanel getRowExport() { return rowExport; }
+    public JPanel getRowPrescription() { return rowPrescription; }
+
+    public int getAllCount() { return allCount; }
+    public int getImportCount() { return importCount; }
+    public int getExportCount() { return exportCount; }
+    public int getPrescriptionCount() { return prescriptionCount; }
 }
