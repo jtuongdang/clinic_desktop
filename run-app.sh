@@ -5,8 +5,16 @@ if [ ! -f "$JAVA_BIN" ]; then
     JAVA_BIN="java"
 fi
 
-# Thiết lập kết nối mặc định tới clinicDb (SQL Server localhost) nếu chưa có biến môi trường
-export DB_URL="${DB_URL:-jdbc:sqlserver://localhost:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=true}"
+# Đọc cấu hình từ db.properties nếu có
+if [ -z "$DB_URL" ] && [ -f "$DIR/db.properties" ]; then
+    DB_PROP_URL=$(grep "^db.url=" "$DIR/db.properties" | cut -d'=' -f2-)
+    if [ -n "$DB_PROP_URL" ]; then
+        DB_URL="$DB_PROP_URL"
+    fi
+fi
+
+# Thiết lập kết nối mặc định tới clinicDb_test nếu chưa có
+export DB_URL="${DB_URL:-jdbc:sqlserver://localhost:1433;databaseName=clinicDb_test;encrypt=true;trustServerCertificate=true}"
 export DB_USERNAME="${DB_USERNAME:-sa}"
 export DB_PASSWORD="${DB_PASSWORD:-Password123!}"
 
