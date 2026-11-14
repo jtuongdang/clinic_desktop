@@ -9,12 +9,12 @@
 ## 1. Danh mục nền tảng (Catalogs)
 
 ### Hiện có
-- **Models:** `ICD`, `DanhMucDichVu`, `Item`, `DonViTinhQuyDoi`, `NhaCungCap`, `DinhMucVatTuDichVu`.
+- **Models:** `ICD`, `DanhMucDichVu`, `MatHang`, `DonViTinhQuyDoi`, `NhaCungCap`, `DinhMucVatTuDichVu`.
 - **Migration:** Có script seed dữ liệu ban đầu cho một số danh mục như `ICD`, dịch vụ, item, phòng khám và khoa. Cần xác minh dữ liệu/phiên bản trên DB thử nghiệm; không xem seed là danh mục nghiệp vụ đã được duyệt.
-- **UI:** `CatalogPanel` và `SystemConfigPanel`.
+- **UI:** `DanhMucManHinh` và `HeThongCauHinhManHinh`.
 
 ### Backlog kỹ thuật
-- [ ] Xây dựng `ICDRepositoryImpl`, `DanhMucDichVuRepositoryImpl`, `ItemRepositoryImpl` trong `clinic-infrastructure`.
+- [ ] Xây dựng `ICDRepository`, `DanhMucDichVuRepository`, `ItemRepository` trong `clinic-infrastructure`.
 - [ ] Tạo cơ chế Cache bộ nhớ trong ứng dụng cho danh mục ICD-10 và Bảng giá dịch vụ để tăng tốc độ phản hồi bàn khám và tiếp đón.
 - [ ] Chức năng tìm kiếm nhanh mã bệnh ICD-10 với auto-complete theo mã và tên bệnh tiếng Việt.
 
@@ -24,15 +24,15 @@
 
 ### Hiện có trong source
 Package **`vn.clinicmanagement.desktop.core.docx`** có các lớp tạo/xuất tài liệu OpenXML. Cần kiểm thử file đầu ra, xác nhận nội dung mẫu với nghiệp vụ và nối vào luồng UI trước khi nghiệm thu:
-- **`DocxDocument.java`**: Trình tạo cấu trúc tài liệu WordprocessingML, đoạn văn, định dạng in đậm, in nghiêng, cỡ chữ, căn lề.
-- **`DocxTable.java`**: Trình tạo bảng biểu y tế có header xám, border, căn lề theo cột (chuẩn bảng kê đơn thuốc và chi phí).
-- **`DocxMedicalDocumentType.java`**: Enum khai báo nhiều loại tài liệu. Tên/description trong enum chưa phải bằng chứng mẫu đã được dựng hoặc tuân thủ biểu mẫu hiện hành.
-- **`DocxExportService.java`**: Có các hàm dựng tài liệu từ dữ liệu Domain; cần kiểm tra trường nào được đưa vào và xử lý dữ liệu thiếu.
-- **`DocxManager.java`**: Hiện có `promptAndExportPrescription` và `promptAndExportMedicalRecord`, dùng `JFileChooser` rồi lưu file. Chưa thấy API xuất giấy hẹn trong manager.
+- **`DOCXTaiLieu.java`**: Trình tạo cấu trúc tài liệu WordprocessingML, đoạn văn, định dạng in đậm, in nghiêng, cỡ chữ, căn lề.
+- **`DOCXBang.java`**: Trình tạo bảng biểu y tế có header xám, border, căn lề theo cột (chuẩn bảng kê đơn thuốc và chi phí).
+- **`DOCXYTeTaiLieuLoai.java`**: Enum khai báo nhiều loại tài liệu. Tên/description trong enum chưa phải bằng chứng mẫu đã được dựng hoặc tuân thủ biểu mẫu hiện hành.
+- **`DOCXExportDichVu.java`**: Có các hàm dựng tài liệu từ dữ liệu Domain; cần kiểm tra trường nào được đưa vào và xử lý dữ liệu thiếu.
+- **`DOCXQuanLy.java`**: Hiện có `promptAndExportPrescription` và `promptAndExportMedicalRecord`, dùng `JFileChooser` rồi lưu file. Chưa thấy API xuất giấy hẹn trong manager.
 
 ### Backlog cần nối vào UI
-- [ ] Xác định nút/luồng phù hợp rồi nối đơn thuốc với `DocxManager.promptAndExportPrescription(...)`.
-- [ ] Nối xuất bệnh án với `DocxManager.promptAndExportMedicalRecord(...)` sau khi có dữ liệu khám đã lưu.
+- [ ] Xác định nút/luồng phù hợp rồi nối đơn thuốc với `DOCXQuanLy.promptAndExportPrescription(...)`.
+- [ ] Nối xuất bệnh án với `DOCXQuanLy.promptAndExportMedicalRecord(...)` sau khi có dữ liệu khám đã lưu.
 - [ ] Chỉ bổ sung xuất giấy hẹn khi nghiệp vụ lịch hẹn và API tạo tài liệu đã được triển khai.
 - [ ] Kiểm thử mở file DOCX bằng parser/Word-compatible reader và review mẫu với nghiệp vụ; không tuyên bố tuân thủ chỉ dựa trên enum mô tả.
 
@@ -41,7 +41,7 @@ Package **`vn.clinicmanagement.desktop.core.docx`** có các lớp tạo/xuất 
 ## 3. Báo cáo & Thống kê
 
 ### Hiện có
-- **UI:** `ClinicReportPanel` có filter ngày/loại và bảng ví dụ; hiện đang dùng dữ liệu tĩnh.
+- **UI:** `PhongKhamBaoCaoManHinh` có filter ngày/loại và bảng ví dụ; hiện đang dùng dữ liệu tĩnh.
 - **Định hướng:** dùng query/Read Model trong Application với truy vấn phù hợp ở infrastructure; hiện chưa thấy persistence báo cáo được nghiệm thu.
 
 ### Backlog cần bổ sung

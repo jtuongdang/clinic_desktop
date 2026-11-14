@@ -13,7 +13,7 @@
 ## Ngoài phạm vi
 
 - Không seed ma trận ALLOW; không tạo user/role mới.
-- Không triển khai `AuthorizationService`, guard, audit reader, permission UI hoặc tự cấp `AUDIT_READ`.
+- Không triển khai `PhanQuyenDichVu`, guard, audit reader, permission UI hoặc tự cấp `AUDIT_READ`.
 - Không chạy SQL Server opt-in trong agent execution; root chỉ chạy trên database `clinic_test_*` riêng.
 - Không kết nối `clinicDb`, không sửa migration lịch sử, không cập nhật hoặc xóa permission rows.
 

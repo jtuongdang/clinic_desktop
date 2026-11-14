@@ -49,13 +49,13 @@ Tất cả các tài khoản dưới đây đã được cấu hình và đồng
 | Tài khoản (Username) | Mật khẩu (Password) | Vai trò (Role) | Họ và Tên | Phân hệ truy cập & Chức năng |
 |---|---|---|---|---|
 | **`admin`** | `Password123!` | `ADMIN` | Nguyễn Quản Trị | Toàn quyền quản trị hệ thống, danh mục, phân quyền. |
-| **`tiennv`** | `Password123!` | `DOCTOR` | BS. Nguyễn Văn Tiến | Bàn khám Bác sĩ (`DoctorStationPanel`), kê đơn, chỉ định CLS. |
-| **`doctor`** | `Password123!` | `DOCTOR` | BS. Lê Thị Bác Sĩ | Bàn khám Bác sĩ (`DoctorStationPanel`), kê đơn, chỉ định CLS. |
+| **`tiennv`** | `Password123!` | `DOCTOR` | BS. Nguyễn Văn Tiến | Bàn khám Bác sĩ (`BacSiTramManHinh`), kê đơn, chỉ định CLS. |
+| **`doctor`** | `Password123!` | `DOCTOR` | BS. Lê Thị Bác Sĩ | Bàn khám Bác sĩ (`BacSiTramManHinh`), kê đơn, chỉ định CLS. |
 | **`director`** | `Password123!` | `ADMIN` | BS.CKII Trần Văn Giám Đốc | Toàn quyền kiểm tra, xem dashboard chỉ số lãnh đạo. |
-| **`receptionist`** | `Password123!` | `RECEPTIONIST` | Hoàng Thị Lễ Tân | Tiếp đón & Đăng ký khám (`ReceptionPanel`), phân buồng khám. |
+| **`receptionist`** | `Password123!` | `RECEPTIONIST` | Hoàng Thị Lễ Tân | Tiếp đón & Đăng ký khám (`TiepDonManHinh`), phân buồng khám. |
 | **`pharmacist`** | `Password123!` | `PHARMACIST` | DS. Phạm Văn Dược Sĩ | Kho dược (`PharmacyInventoryPanel`), xuất nhập thuốc, thẻ kho. |
-| **`accountant`** | `Password123!` | `CASHIER` | Vũ Thị Thu Ngân | Thu ngân & Viện phí (`BillingInvoicePanel`), in bảng kê viện phí. |
-| **`cashier`** | `Password123!` | `CASHIER` | Đặng Văn Thu Ngân | Thu ngân & Viện phí (`BillingInvoicePanel`), thu tiền tạm ứng/thanh toán. |
+| **`accountant`** | `Password123!` | `CASHIER` | Vũ Thị Thu Ngân | Thu ngân & Viện phí (`VienPhiHoaDonManHinh`), in bảng kê viện phí. |
+| **`cashier`** | `Password123!` | `CASHIER` | Đặng Văn Thu Ngân | Thu ngân & Viện phí (`VienPhiHoaDonManHinh`), thu tiền tạm ứng/thanh toán. |
 
 *(Lưu ý: Hệ thống được trang bị cơ chế chống dò mật khẩu `V11__Add_Account_Login_Throttle`. Nếu đăng nhập sai quá số lần quy định, tài khoản sẽ tự động bị khóa tạm thời theo chính sách bảo mật).*
 
@@ -109,7 +109,7 @@ Trong quá trình triển khai kiểm thử tự động, 11 CSDL tạm (`clinic
 
 Khi màn hình chính hiển thị, Owner có thể tiến hành kiểm thử các luồng nghiệp vụ thực tế theo từng phân hệ:
 
-### Phân hệ 1: Tiếp Đón & Đăng Ký Khám Ngoại Trú (`ReceptionPanel`)
+### Phân hệ 1: Tiếp Đón & Đăng Ký Khám Ngoại Trú (`TiepDonManHinh`)
 1. **Tìm kiếm bệnh nhân:** Nhập số CCCD hoặc Số điện thoại vào ô tìm kiếm -> Nhấn phím `Enter` hoặc click nút **Tìm kiếm**.
 2. **Tiếp nhận bệnh nhân mới:**
    - Điền thông tin Họ tên, Ngày sinh/Tuổi, Giới tính, Địa chỉ, Số BHYT.
@@ -117,7 +117,7 @@ Khi màn hình chính hiển thị, Owner có thể tiến hành kiểm thử c�
    - Nhấn **F1** (hoặc nút **Lưu / Tiếp nhận**) -> Hệ thống tự động tạo hồ sơ bệnh nhân, cấp mã lượt khám và đẩy bệnh nhân vào hàng đợi khám của buồng tương ứng.
 3. **Phím tắt nhanh:** Nhấn **F2** để làm mới form (`Reset`).
 
-### Phân hệ 2: Bàn Khám Bác Sĩ & Điều Trị Lâm Sàng (`DoctorStationPanel`)
+### Phân hệ 2: Bàn Khám Bác Sĩ & Điều Trị Lâm Sàng (`BacSiTramManHinh`)
 1. **Danh sách hàng đợi khám:** Kiểm tra danh sách bệnh nhân chờ khám hiển thị từ CSDL thực tế (đã triệt tiêu vĩnh viễn dữ liệu tĩnh `TEST BN 060`/`033`).
 2. **Chọn bệnh nhân khám:** Click đúp vào bệnh nhân trong danh sách để nạp thông tin lượt khám vào các tab lâm sàng:
    - **Tab Sinh hiệu & Thể trạng:** Xem/nhập Mạch, Nhiệt độ, Huyết áp, SpO2, Cân nặng, Chiều cao.
@@ -128,26 +128,26 @@ Khi màn hình chính hiển thị, Owner có thể tiến hành kiểm thử c�
 
 ### Phân hệ 3: Biểu Mẫu & Xem Trước Bản In (Print Preview & Export)
 Owner kiểm tra các hộp thoại in ấn biểu mẫu y tế tại menu in của Bàn khám hoặc phím chức năng:
-1. **Đơn thuốc (`PrescriptionPrintPreviewDialog`):**
+1. **Đơn thuốc (`DonThuocPrintPreviewHopThoai`):**
    - Đã được đấu nối dữ liệu động thực tế theo lượt khám.
    - Không còn xuất hiện chuỗi giả lập tĩnh (`"TEST1"`, `"22000324"`, `"tiennv"`).
    - Nếu chưa có đơn thuốc, giao diện hiển thị thông báo rỗng an toàn *"Chưa có dữ liệu đơn thuốc."*
-2. **Bệnh án Ngoại trú (`MedicalRecordPrintPreviewDialog`):**
+2. **Bệnh án Ngoại trú (`YTeRecordPrintPreviewHopThoai`):**
    - Nạp thông tin bệnh nhân, quá trình bệnh lý, kết luận chẩn đoán thực tế.
-3. **Phiếu chỉ định Cận lâm sàng (`ClinicalOrderPrintPreviewDialog`):**
+3. **Phiếu chỉ định Cận lâm sàng (`LamSangYeuCauPrintPreviewHopThoai`):**
    - Hiển thị danh sách dịch vụ kỹ thuật bác sĩ đã chỉ định, bác sĩ chỉ định và phòng thực hiện.
-4. **Bảng kê Chi phí / Viện phí (`MedicalBillingSlipDialog`):**
+4. **Bảng kê Chi phí / Viện phí (`YTeVienPhiPhieuHopThoai`):**
    - Hiển thị bảng chi tiết các khoản chi phí khám, xét nghiệm, thuốc, tiền BHYT chi trả và người bệnh cùng chi trả.
-5. **Xuất file tài liệu Word (`DocxExportService`):**
+5. **Xuất file tài liệu Word (`DOCXExportDichVu`):**
    - Click nút **Xuất Word / Docx** -> Tài liệu được tạo sạch sẽ dưới định dạng `.docx` chuẩn OpenXML.
 
-### Phân hệ 4: Thu Ngân & Viện Phí (`BillingInvoicePanel`)
+### Phân hệ 4: Thu Ngân & Viện Phí (`VienPhiHoaDonManHinh`)
 1. Chọn lượt khám cần thanh toán.
 2. Kiểm tra tổng chi phí điều trị phát sinh từ khám bệnh, thuốc và cận lâm sàng.
 3. Áp dụng khấu trừ BHYT và tạm ứng (nếu có).
 4. Nhấn **Thu tiền / Phát hành hóa đơn** -> Ghi nhận thanh toán và cập nhật công nợ bệnh nhân.
 
-### Phân hệ 5: Báo Cáo & Thống Kê Quản Trị (`ClinicReportPanel`)
+### Phân hệ 5: Báo Cáo & Thống Kê Quản Trị (`PhongKhamBaoCaoManHinh`)
 1. Chọn khoảng thời gian từ ngày đến ngày.
 2. Chọn loại báo cáo trong ComboBox:
    - Báo cáo Doanh thu Viện phí

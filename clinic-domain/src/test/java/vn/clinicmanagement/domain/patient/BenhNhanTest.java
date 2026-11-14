@@ -2,7 +2,7 @@ package vn.clinicmanagement.domain.patient;
 
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.domain.billing.HoaDon;
-import vn.clinicmanagement.domain.common.events.BenhNhanRegisteredEvent;
+import vn.clinicmanagement.domain.common.events.BenhNhanDaDangKySuKien;
 import vn.clinicmanagement.domain.common.enums.GioiTinh;
 import vn.clinicmanagement.domain.examination.LuotKham;
 
@@ -68,8 +68,8 @@ class BenhNhanTest {
         assertEquals(17, patient.getCreatedBy());
         assertEquals(1, patient.getDomainEvents().size());
 
-        BenhNhanRegisteredEvent event = assertInstanceOf(
-                BenhNhanRegisteredEvent.class, patient.getDomainEvents().get(0));
+        BenhNhanDaDangKySuKien event = assertInstanceOf(
+                BenhNhanDaDangKySuKien.class, patient.getDomainEvents().get(0));
         assertEquals(0, event.getPatientId());
         assertEquals("000000000001", event.getCccd());
         assertEquals("Nguyen An", event.getFullName());

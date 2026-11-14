@@ -10,10 +10,10 @@ Task này chỉ tạo evaluator/contract và unit tests; chưa gắn vào recept
 
 ## Contract kỹ thuật
 
-- `AuthorizationContext` bất biến: employee ID, role ID/code, đúng một facility ID + department ID, session UUID. Không chứa username, password/hash, bệnh nhân/CCCD/BHYT, free text hay dữ liệu UI.
-- `AuthorizationRequest`: context, module code, `HanhDongQuyen`, và target facility/department IDs của tài nguyên.
-- `AuthorizationDecision`: allow/deny cùng mã lý do ổn định, không đưa dữ liệu định danh vào thông báo.
-- `AuthorizationService` phải kiểm tra mỗi lần gọi:
+- `PhanQuyenNguCanh` bất biến: employee ID, role ID/code, đúng một facility ID + department ID, session UUID. Không chứa username, password/hash, bệnh nhân/CCCD/BHYT, free text hay dữ liệu UI.
+- `PhanQuyenYeuCau`: context, module code, `HanhDongQuyen`, và target facility/department IDs của tài nguyên.
+- `PhanQuyenQuyetDinh`: allow/deny cùng mã lý do ổn định, không đưa dữ liệu định danh vào thông báo.
+- `PhanQuyenDichVu` phải kiểm tra mỗi lần gọi:
   1. context/request hợp lệ;
   2. session adapter xác nhận cùng session ID, employee, role và pair vẫn active/unlocked/chưa timeout;
   3. employee còn active/non-deleted;
@@ -27,7 +27,7 @@ Task này chỉ tạo evaluator/contract và unit tests; chưa gắn vào recept
 
 ## Ngoài phạm vi
 
-- Không nối evaluator vào use cases, không sửa `UserSession`, LoginForm, reception UI, repository SQL hoặc schema.
+- Không nối evaluator vào use cases, không sửa `NguoiDungPhien`, LoginForm, reception UI, repository SQL hoặc schema.
 - Không seed ALLOW/DENY rows, không tạo màn hình quản trị quyền, không cho phép sửa permission matrix.
 - Không triển khai audit reader, retention/purge, login lockout hoặc unresolved DEC actions.
 - Không SQL Server connection trong agent task; chỉ synthetic unit tests.

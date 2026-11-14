@@ -6,6 +6,7 @@ public enum PhamViDuLieu {
     KHOA_PHONG(3, "Khoa phòng"),
     CHI_NHANH(4, "Chi nhánh");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -14,9 +15,12 @@ public enum PhamViDuLieu {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static PhamViDuLieu fromValue(int value) {
         for (PhamViDuLieu item : values()) {
             if (item.value == value) return item;

@@ -11,7 +11,7 @@ Baseline này xác nhận identity/session, default-deny, grant đã duyệt, c�
 ## Bằng chứng trên nhánh sau khôi phục
 
 - `982c1f6` khôi phục `clinic-desktop` từ `main` (`6aabb85`). Domain, Application và Infrastructure giữ nguyên tại lần khôi phục. Các lớp và test Desktop đã bỏ được đối chiếu trong [báo cáo bảo toàn thiết kế](desktop-main-ui-preservation-review.md).
-- `mvn -Djava.awt.headless=true clean test` dừng tại Desktop do lời gọi constructor `AuthenticateUserHandler` cũ và hai lời gọi `AuthenticatedUser.roleName()`. Cần khôi phục luồng hoàn tất đăng nhập với một vai trò và đúng cặp cơ sở/khoa trước khi mở dashboard. [Báo cáo tương thích xác thực Desktop](desktop-main-auth-compatibility-review.md)
+- `mvn -Djava.awt.headless=true clean test` dừng tại Desktop do lời gọi constructor `AuthenticateNguoiDungHandler` cũ và hai lời gọi `DaXacThucNguoiDung.roleName()`. Cần khôi phục luồng hoàn tất đăng nhập với một vai trò và đúng cặp cơ sở/khoa trước khi mở dashboard. [Báo cáo tương thích xác thực Desktop](desktop-main-auth-compatibility-review.md)
 - Bản `main` chạy riêng để Owner kiểm tra thiết kế. Visual smoke nghiệm thu bảo mật phải dùng bản ứng viên có luồng xác thực và phân quyền đã nối, với dữ liệu synthetic theo quy trình chạy UI thủ công. [Hướng dẫn chạy UI](phase1-doctor-ui-visual-smoke-runbook.md)
 
 ## Checklist và bằng chứng trước khôi phục
@@ -21,7 +21,7 @@ Các dòng PASS bên dưới là snapshot trước `982c1f6`. Đối chiếu l�
 | Hạng mục | Trạng thái | Bằng chứng / giới hạn |
 |---|---|---|
 | Danh tính, chọn một role và một scope cơ sở+khoa, session idle 15 phút / tối đa 12 giờ | PASS | Implementation và test được theo dõi ở `SEC-DATA-01`, `SEC-LOGIN-01`, `SEC-SESSION-01`; task board ghi bằng chứng theo từng task. |
-| Default-deny, allowlist sáu role và grant `KHOA_PHONG` đã duyệt | PASS | `ApprovedRoleCodes` dùng chung evaluator/navigation; unit tests cho sáu role hợp lệ và role không hỗ trợ; `AUDIT_READ` luôn deny. Không cấp grant cho workflow tương lai. |
+| Default-deny, allowlist sáu role và grant `KHOA_PHONG` đã duyệt | PASS | `DaDuyetVaiTroMa` dùng chung evaluator/navigation; unit tests cho sáu role hợp lệ và role không hỗ trợ; `AUDIT_READ` luôn deny. Không cấp grant cho workflow tương lai. |
 | Đường ghi tiếp đón có authorization đúng scope và audit mutation cùng transaction | PASS | SQL Server opt-in synthetic acceptance ghi ở `SEC-AUTHZ-02B`/`SEC-AUDIT-01D`; audit failure rollback dữ liệu liên quan. |
 | Patient search, queue và room read scope đúng cặp; successful-read audit trước khi trả dữ liệu | PASS | SQL Server synthetic acceptance ghi ở `SEC-AUTHZ-02C`/`SEC-AUDIT-01D`; lỗi audit fail-closed. Queue kiểm tra ngày nghiệp vụ hiện tại, scope cơ sở+khoa, `CHO_KHAM`/`DANG_KHAM`/`CHO_CLS`, loại cancelled/completed và soft-deleted rows. |
 | Login throttle theo policy B được duyệt | PASS (local) | Đã được Owner phê duyệt và triển khai (`SEC-LOCKOUT-IMPLEMENT-01`). Sau 5 sai trong fixed window 15 phút, lần kế tiếp phải chờ trước password verification; mức đầu 30 giây, tăng gấp đôi tới 15 phút. Trong khi delay còn hiệu lực chỉ audit, không tăng delay. Mật khẩu đúng của tài khoản hoạt động reset ngay sau xác minh; account inactive/deleted không reset. SQL Server UTC là nguồn thời gian chuẩn. Snapshot kiểm thử tại thời điểm triển khai: JDK 17 `mvn -Djava.awt.headless=true clean verify` 321 tests, 0 failures/errors, 6 opt-in skips; SQL Server synthetic V1–V11 migration 1/1 và throttle concurrency/audit rollback 1/1. Chi tiết tại `phase2-login-lockout-policy-proposal.md`. |

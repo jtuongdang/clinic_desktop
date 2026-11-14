@@ -6,6 +6,7 @@ public enum TrangThaiXuatNoiBo {
     DA_NHAN_HANG(2, "Đã nhận hàng"),
     TU_CHOI(3, "Từ chối");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -14,9 +15,12 @@ public enum TrangThaiXuatNoiBo {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static TrangThaiXuatNoiBo fromValue(int value) {
         for (TrangThaiXuatNoiBo item : values()) {
             if (item.value == value) return item;

@@ -6,6 +6,7 @@ public enum PhuongThucThanhToan {
     THE(3, "Thẻ ngân hàng"),
     BAO_HIEM(4, "Bảo hiểm chi trả");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -14,9 +15,12 @@ public enum PhuongThucThanhToan {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static PhuongThucThanhToan fromValue(int value) {
         for (PhuongThucThanhToan item : values()) {
             if (item.value == value) return item;

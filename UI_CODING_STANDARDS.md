@@ -8,8 +8,8 @@
 1. [Tổng Quan Hệ Thống & Triết Lý Thiết Kế Medical UI/UX](#1-tổng-quan-hệ-thống--triết-lý-thiết-kế-medical-uiux)
 2. [Nguyên Tắc Vàng Trong Lập Trình Giao Diện Desktop (Golden Rules)](#2-nguyên-tắc-vàng-trong-lập-trình-giao-diện-desktop-golden-rules)
 3. [Hệ Thống Thiết Kế Nền Tảng (Foundational Design System)](#3-hệ-thống-thiết-kế-nền-tảng-foundational-design-system)
-   - 3.1. [Typography & Font Chữ Chuẩn (`AppFonts.java`)](#31-typography--font-chữ-chuẩn-appfontsjava)
-   - 3.2. [Bảng Màu Y Tế Chuẩn (`UIConstants.java`)](#32-bảng-màu-y-tế-chuẩn-uiconstantsjava)
+   - 3.1. [Typography & Font Chữ Chuẩn (`UngDungPhongChu.java`)](#31-typography--font-chữ-chuẩn-appfontsjava)
+   - 3.2. [Bảng Màu Y Tế Chuẩn (`GiaoDienHangSo.java`)](#32-bảng-màu-y-tế-chuẩn-uiconstantsjava)
    - 3.3. [Quy Chuẩn Không Gian, Lưới & Kích Thước (Grid & Layout Standards)](#33-quy-chuẩn-không-gian-lưới--kích-thước-grid--layout-standards)
    - 3.4. [Thư Viện Thành Phần Cốt Lõi Tái Sử Dụng (Core UI Components)](#34-thư-viện-thành-phần-cốt-lõi-tái-sử-dụng-core-ui-components)
 4. [Phân Tích Chi Tiết Toàn Bộ Form & Giao Diện Hệ Thống (Form-by-Form Analysis)](#4-phân-tích-chi-tiết-toàn-bộ-form--giao-diện-hệ-thống-form-by-form-analysis)
@@ -47,37 +47,37 @@ Hệ thống **Clinic Management Desktop (EHC HIS)** là nền tảng quản tr�
 1. **High Information Density (Mật độ thông tin cao):** Khác với ứng dụng web tiêu dùng (Consumer Web) có nhiều khoảng trắng lớn, phần mềm y tế desktop ưu tiên tối đa diện tích hiển thị để Bác sĩ có thể quan sát đồng thời: Bệnh sử, Thông tin BHYT, Sinh hiệu, Kết quả CLS và Đơn thuốc mà không phải cuộn trang quá nhiều lần.
 2. **Keyboard-First Architecture (Ưu tiên bàn phím số 1):** Bác sĩ và nhân sự tiếp đón khám hàng trăm lượt mỗi ngày. Mọi thao tác cốt lõi (Ghi nhận bệnh nhân, Thêm dịch vụ, Kê đơn, Lưu, In ấn, Chuyển tab) đều có phím tắt (F1–F12, Enter chuyển ô, Esc đóng popup, Ctrl+F tra cứu) để thao tác mà không cần rời tay khỏi bàn phím.
 3. **Zero-Error Affordance (Ngăn ngừa tuyệt đối sai sót y tế):** Các trường hợp rủi ro cao (Dị ứng thuốc, Trùng thuốc, Hạn thẻ BHYT hết hạn, Thuốc sắp hết hạn trong kho) phải có cảnh báo thị giác trực quan (Màu đỏ `#8B0000`, Hộp thoại xác nhận, Badge trạng thái nổi bật).
-4. **Single-Window MDI Desktop Experience:** Người dùng chỉ làm việc trong một cửa sổ ứng dụng duy nhất (`MainDashboardFrame`). Các chức năng phân hệ được mở theo cơ chế Tab dưới chân màn hình (Bottom Tabs), giữ trạng thái làm việc (Stateful), không mở tràn lan cửa sổ rời gây mất dấu công việc.
+4. **Single-Window MDI Desktop Experience:** Người dùng chỉ làm việc trong một cửa sổ ứng dụng duy nhất (`KhoiDongBangDieuKhienCuaSo`). Các chức năng phân hệ được mở theo cơ chế Tab dưới chân màn hình (Bottom Tabs), giữ trạng thái làm việc (Stateful), không mở tràn lan cửa sổ rời gây mất dấu công việc.
 
 ---
 
 ## 2. NGUYÊN TẮC VÀNG TRONG LẬP TRÌNH GIAO DIỆN DESKTOP (GOLDEN RULES)
 
-1. **TUYỆT ĐỐI KHÔNG TỰ Ý TẠO FONT:** Cấm sử dụng `new Font("...", ...)` rải rác hoặc hardcode chuỗi font size trong HTML `<span style='font-size:...'>`. Toàn bộ font chữ của giao diện phải tham chiếu tập trung qua lớp hằng số [`AppFonts`](file:///Users/jtuong/Documents/desktop_clinic/desktop/clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/config/AppFonts.java).
+1. **TUYỆT ĐỐI KHÔNG TỰ Ý TẠO FONT:** Cấm sử dụng `new Font("...", ...)` rải rác hoặc hardcode chuỗi font size trong HTML `<span style='font-size:...'>`. Toàn bộ font chữ của giao diện phải tham chiếu tập trung qua lớp hằng số [`UngDungPhongChu`](file:///Users/jtuong/Documents/desktop_clinic/desktop/clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/config/AppFonts.java).
 2. **CẤM DÙNG EMOJI HỆ THỐNG LÀM ICON CHÍNH:** Tuyệt đối không dùng ký tự emoji UTF-8 (🩺, 💊, 🏠, 📋...) cho các icon nút bấm quan trọng trong ứng dụng production vì macOS, Windows 10/11 và Linux sẽ render hình dạng, màu sắc khác nhau, dễ gây vỡ khung hoặc lỗi ô vuông font `[]`. Mọi icon giao diện phải vẽ bằng **Vector Graphics (`Graphics2D`)** hoặc đối tượng `Icon` chuẩn hóa.
-3. **MỌI MÀN HÌNH CHÍNH PHẢI KẾ THỪA `BaseViewPanel`:** Không tạo `JFrame` riêng lẻ cho các màn hình nghiệp vụ. Toàn bộ view phải kế thừa [`BaseViewPanel`](file:///Users/jtuong/Documents/desktop_clinic/desktop/clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/base/BaseViewPanel.java) để [`WorkspaceManager`](file:///Users/jtuong/Documents/desktop_clinic/desktop/clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/WorkspaceManager.java) quản lý vòng đời MDI Tab (ngăn chặn mở trùng lặp, giải phóng bộ nhớ khi đóng tab).
+3. **MỌI MÀN HÌNH CHÍNH PHẢI KẾ THỪA `CoSoManHinhManHinh`:** Không tạo `JFrame` riêng lẻ cho các màn hình nghiệp vụ. Toàn bộ view phải kế thừa [`CoSoManHinhManHinh`](file:///Users/jtuong/Documents/desktop_clinic/desktop/clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/base/BaseViewPanel.java) để [`KhongGianLamViecQuanLy`](file:///Users/jtuong/Documents/desktop_clinic/desktop/clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/WorkspaceManager.java) quản lý vòng đời MDI Tab (ngăn chặn mở trùng lặp, giải phóng bộ nhớ khi đóng tab).
 4. **CẤM VIẾT FILE MONOLITHIC QUÁ DÀI:** Mỗi phân hệ nghiệp vụ bắt buộc phải chia nhỏ thành các thư mục con: `components/`, `dialogs/`, `menus/`, `tabs/`, `print/` và `model/`. Không gom toàn bộ hàng ngàn dòng code vào một file class duy nhất.
 5. **CHUẨN TỶ LỆ 1:1 TỐI ƯU MÀN HÌNH 13-INCH:** Toàn bộ layout phải được thiết kế và kiểm thử chuẩn trên độ phân giải phổ thông của thiết bị di động y tế: Màn hình 13-inch (MacBook M1 / laptop phổ thông 1366×768 / 1440×900). Không để tràn thanh cuộn ngang ngoài ý muốn, không rớt dòng menu ribbon.
 6. **TUÂN THỦ SWING EVENT DISPATCH THREAD (EDT):** Mọi tác vụ cập nhật giao diện phải chạy trên EDT. Các tác vụ tốn thời gian (truy vấn CSDL, kết nối cổng BHYT, in ấn) phải đóng gói trong `SwingWorker` để không làm đơ (freeze) giao diện bác sĩ.
-7. **ĐẢM BẢO QUẢN LÝ TÀI NGUYÊN BỘ NHỚ:** Khi đóng Tab trong `WorkspaceManager`, phương thức `destroy()` của `BaseViewPanel` phải được gọi để gỡ bỏ Listeners, dọn dẹp Timer, đóng kết nối camera/máy quét mã vạch nếu có.
+7. **ĐẢM BẢO QUẢN LÝ TÀI NGUYÊN BỘ NHỚ:** Khi đóng Tab trong `KhongGianLamViecQuanLy`, phương thức `destroy()` của `CoSoManHinhManHinh` phải được gọi để gỡ bỏ Listeners, dọn dẹp Timer, đóng kết nối camera/máy quét mã vạch nếu có.
 
 ---
 
 ## 3. HỆ THỐNG THIẾT KẾ NỀN TẢNG (FOUNDATIONAL DESIGN SYSTEM)
 
-### 3.1. Typography & Font Chữ Chuẩn (`AppFonts.java`)
-Lớp quản trị tập trung: `vn.clinicmanagement.desktop.core.config.AppFonts`
+### 3.1. Typography & Font Chữ Chuẩn (`UngDungPhongChu.java`)
+Lớp quản trị tập trung: `vn.clinicmanagement.desktop.core.config.UngDungPhongChu`
 
 #### A. Bảng Hằng Số Phân Cấp Typography
 
 | Tên Hằng Số | Cỡ Chữ | Kiểu Dáng (Style) | Trường Hợp Ứng Dụng |
 | :--- | :---: | :---: | :--- |
-| `AppFonts.HEADER` | **18pt** | **Bold** | Tiêu đề lớn màn hình đăng nhập, logo banner hệ thống |
-| `AppFonts.SECTION` | **15pt** | **Bold** | Dòng 1 banner tóm tắt thông tin bệnh nhân, tiêu đề phân hệ lớn |
-| `AppFonts.BODY_BOLD` | **13pt** | **Bold** | Tiêu đề cột `JTableHeader`, tên bệnh nhân, tab active, giá trị nổi bật |
-| `AppFonts.BODY` | **13pt** | Regular | Nội dung các ô bảng dữ liệu, nhãn form nhập liệu, textfield, menu |
-| `AppFonts.SMALL_BOLD` | **12pt** | **Bold** | Số thứ tự hàng đợi (STT), nhãn badge trạng thái, số lượng |
-| `AppFonts.SMALL` | **12pt** | Regular | Thanh trạng thái chân trang (Footer), dòng mã BN phụ, chú thích nhỏ |
+| `UngDungPhongChu.HEADER` | **18pt** | **Bold** | Tiêu đề lớn màn hình đăng nhập, logo banner hệ thống |
+| `UngDungPhongChu.SECTION` | **15pt** | **Bold** | Dòng 1 banner tóm tắt thông tin bệnh nhân, tiêu đề phân hệ lớn |
+| `UngDungPhongChu.BODY_BOLD` | **13pt** | **Bold** | Tiêu đề cột `JTableHeader`, tên bệnh nhân, tab active, giá trị nổi bật |
+| `UngDungPhongChu.BODY` | **13pt** | Regular | Nội dung các ô bảng dữ liệu, nhãn form nhập liệu, textfield, menu |
+| `UngDungPhongChu.SMALL_BOLD` | **12pt** | **Bold** | Số thứ tự hàng đợi (STT), nhãn badge trạng thái, số lượng |
+| `UngDungPhongChu.SMALL` | **12pt** | Regular | Thanh trạng thái chân trang (Footer), dòng mã BN phụ, chú thích nhỏ |
 
 #### B. Cơ Chế Fallback & Tự Động Co Giãn (Global Scaling)
 * **Smart Fallback:** Hệ thống tự động phát hiện hệ điều hành để áp dụng bộ font tối ưu:
@@ -86,12 +86,12 @@ Lớp quản trị tập trung: `vn.clinicmanagement.desktop.core.config.AppFont
   ```java
   private static final float FONT_SCALE = 1.0f; // 1.15f tăng 15% kích thước font toàn hệ thống
   ```
-* **Kích hoạt tự động:** Gọi `AppFonts.installGlobally()` trước khi khởi tạo bất kỳ giao diện nào trong `Main.java` để nạp cài đặt vào `UIManager`.
+* **Kích hoạt tự động:** Gọi `UngDungPhongChu.installGlobally()` trước khi khởi tạo bất kỳ giao diện nào trong `KhoiDong.java` để nạp cài đặt vào `UIManager`.
 
 ---
 
-### 3.2. Bảng Màu Y Tế Chuẩn (`UIConstants.java`)
-Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
+### 3.2. Bảng Màu Y Tế Chuẩn (`GiaoDienHangSo.java`)
+Lớp quản trị: `vn.clinicmanagement.desktop.core.config.GiaoDienHangSo`
 
 | Nhóm Màu | Tên Hằng Số | Mã Hex / RGB | Ý Nghĩa Nghiệp Vụ & Sử Dụng |
 | :--- | :--- | :--- | :--- |
@@ -107,7 +107,7 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 | **Panel Work BG** | `BG_PANEL` | `#F8F9FB` (`248, 249, 251`) | Màu nền vùng làm việc nội dung form |
 | **Tab Strip BG** | `COLOR_TAB_BAR_BG` | `#D8E4F2` (`216, 228, 242`) | Nền thanh chứa các tab MDI chân trang chuẩn EHC |
 | **Status Bar BG** | `BG_STATUS` | `#F1F3F6` (`241, 243, 246`) | Nền thanh trạng thái 9 ô chân màn hình |
-| **Border Grid** | `BORDER_GRID` | `#E1E6EB` (`225, 230, 235`) | Viền kẻ lưới các bảng dữ liệu `StyledTable` |
+| **Border Grid** | `BORDER_GRID` | `#E1E6EB` (`225, 230, 235`) | Viền kẻ lưới các bảng dữ liệu `CoKieuBang` |
 | **Border Separator**| `BORDER_SEPARATOR` | `#C3CAD3` (`195, 202, 211`) | Viền phân chia giữa các khối panel |
 
 ---
@@ -127,18 +127,18 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 
 ### 3.4. Thư Viện Thành Phần Cốt Lõi Tái Sử Dụng (Core UI Components)
 
-1. **`StyledTable.java` (`core.components`):**
-   - Kế thừa `JTable`, cài đặt sẵn font `AppFonts.BODY`, header dùng `AppFonts.BODY_BOLD`.
+1. **`CoKieuBang.java` (`core.components`):**
+   - Kế thừa `JTable`, cài đặt sẵn font `UngDungPhongChu.BODY`, header dùng `UngDungPhongChu.BODY_BOLD`.
    - Màu viền lưới nhạt `BORDER_GRID`, tự động căn lề theo kiểu dữ liệu (Số căn phải, Mã/STT căn giữa, Tên văn bản căn trái).
    - Hiệu ứng chọn dòng đồng bộ màu `#0072C6` với chữ trắng tương phản rõ nét.
-2. **`RibbonButton.java` (`core.components`):**
+2. **`ThanhBangNut.java` (`core.components`):**
    - Nút bấm thanh công cụ đỉnh hiển thị icon vector và nhãn trên cùng 1 dòng.
    - Hỗ trợ trạng thái hover (viền sáng), trạng thái active (nền gradient cam vàng nhạt `#FEE8B8` ➔ `#F9D18B` khi tab tương ứng đang mở).
    - Tích hợp sẵn `JPopupMenu` cho các nút có mũi tên mở rộng (`▾`).
-3. **`BottomTab.java` (`core.components`):**
+3. **`DuoiThe.java` (`core.components`):**
    - Tab MDI chân màn hình, có nút đóng nhanh `×`.
    - Khi tab active: Nền xanh dương đậm `#1C66B4`, chữ trắng, có mũi tên trắng tam giác chỉ lên phía đỉnh tab liên kết trực tiếp với vùng làm việc.
-4. **`StatusBarPanel.java` (`core.components`):**
+4. **`TrangThaiThanhManHinh.java` (`core.components`):**
    - Thanh trạng thái cố định chân trang chia làm 9 ô độc lập:
      1. Bác sĩ / Người dùng đăng nhập
      2. Cơ sở KCB
@@ -149,7 +149,7 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
      7. Phiên bản phần mềm & Ngày build
      8. Đồng hồ hệ thống thời gian thực
      9. Trạng thái phím khóa bàn phím (CAPS / NUM)
-5. **`MedicalPopupChooser.java` (`modules.reception.components`):**
+5. **`YTeBatLenBoChon.java` (`modules.reception.components`):**
    - Hộp thoại chọn nhanh kiểu pop-up gắn liền với ô nhập liệu (autocomplete / dropdown search), hỗ trợ lọc danh sách dịch vụ kỹ thuật, danh mục ICD-10 và phòng khám.
 
 ---
@@ -158,7 +158,7 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 
 ### 4.1. Khung Vỏ Trung Tâm & Quản Lý Tab MDI (Shell & Workspace Manager)
 
-#### A. Màn hình Khung Vỏ Chính (`MainDashboardFrame.java`)
+#### A. Màn hình Khung Vỏ Chính (`KhoiDongBangDieuKhienCuaSo.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.dashboard`
 * **Loại màn hình:** Cửa sổ chính duy nhất của hệ thống (`JFrame`), toàn màn hình (Maximized).
 * **Đối tượng sử dụng:** Mọi vai trò trong hệ thống (Tự động thích ứng giao diện theo Role).
@@ -166,16 +166,16 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
   - **North (Đỉnh):** Thanh Ribbon Menu thích ứng:
     + *Chế độ Bác sĩ (Doctor Mode):* Menu chuyên sâu lâm sàng (Menu ▾, In ▾, Làm mới, Tìm kiếm bệnh nhân, Dịch vụ kỹ thuật ▾, Thuốc & Vật tư ▾, Hoàn tất khám, Tạm hoãn, Kiosk tiếp đón).
     + *Chế độ Quản trị (Admin Mode):* Toàn bộ 12 phân hệ tổng thể (Trang Chủ, Quản Lý, Đón Tiếp, Khám Bệnh, Viện Phí, CĐHA & Thăm Dò, Nhà Thuốc, Báo Cáo, Hệ Thống, Danh Mục, Người Dùng, Kết Thúc).
-  - **Center (Trung tâm):** Vùng chứa `CardLayout` quản lý bởi `WorkspaceManager`.
-  - **South (Chân trang):** Dải Tab MDI (`BottomTab`) và Thanh trạng thái 9 ô (`StatusBarPanel`).
+  - **Center (Trung tâm):** Vùng chứa `CardLayout` quản lý bởi `KhongGianLamViecQuanLy`.
+  - **South (Chân trang):** Dải Tab MDI (`DuoiThe`) và Thanh trạng thái 9 ô (`TrangThaiThanhManHinh`).
 * **UX Tương Tác:**
   - Chuyển đổi tab tức thì không giật lag.
   - Tự động đồng bộ trạng thái nút Ribbon khi người dùng nhấp chọn tab dưới đáy hoặc đóng tab.
 
-#### B. Bộ Điều Phối Vòng Đời Tab (`WorkspaceManager.java`)
-* **Cơ chế Singleton View:** Mỗi `BaseViewPanel` có một định danh duy nhất (`viewKey`). Nếu người dùng bấm mở một phân hệ đã mở trước đó, hệ thống sẽ tự động kích hoạt tab đó mà không tạo thêm instance mới, giúp tiết kiệm bộ nhớ RAM.
+#### B. Bộ Điều Phối Vòng Đời Tab (`KhongGianLamViecQuanLy.java`)
+* **Cơ chế Singleton View:** Mỗi `CoSoManHinhManHinh` có một định danh duy nhất (`viewKey`). Nếu người dùng bấm mở một phân hệ đã mở trước đó, hệ thống sẽ tự động kích hoạt tab đó mà không tạo thêm instance mới, giúp tiết kiệm bộ nhớ RAM.
 * **Vòng đời Tab:**
-  - `openView(BaseViewPanel view)`: Kiểm tra tồn tại, tạo tab mới hoặc chuyển card view.
+  - `openView(CoSoManHinhManHinh view)`: Kiểm tra tồn tại, tạo tab mới hoặc chuyển card view.
   - `activateTab(String viewKey)`: Đánh dấu active, kích hoạt sự kiện `view.onShow()`.
   - `closeTab(String viewKey)`: Gỡ bỏ khỏi CardLayout, xóa tab button, gọi `view.destroy()` để thu hồi bộ nhớ.
 
@@ -183,11 +183,11 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 
 ### 4.2. Phân Hệ Đăng Nhập & Điều Phối Phiên (Authentication & Session)
 
-#### Form Đăng Nhập (`LoginForm.java`)
+#### Form Đăng Nhập (`DangNhapBieuMau.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.auth`
 * **Loại giao diện:** Cửa sổ Modal độc lập (`JFrame`, không thể resize, kích thước cố định `440x390px`, căn giữa màn hình).
 * **Bố cục:**
-  - **Header:** Logo y tế EHC, Tiêu đề phần mềm (Font `AppFonts.HEADER` 18pt Bold), Phụ đề phiên bản.
+  - **Header:** Logo y tế EHC, Tiêu đề phần mềm (Font `UngDungPhongChu.HEADER` 18pt Bold), Phụ đề phiên bản.
   - **Center:** Form nhập liệu:
     + Ô Tên đăng nhập (`txtUsername`)
     + Ô Mật khẩu (`txtPassword`)
@@ -197,7 +197,7 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 * **Xử lý An toàn & UX:**
   - Tự động ghi nhớ tài khoản gần nhất.
   - Chặn brute-force đăng nhập sai quá 5 lần.
-  - Phân luồng đăng nhập tự động: Nếu chọn vai trò Bác sĩ ➔ Tự động mở thẳng `DoctorStationPanel` làm việc ngay lập tức.
+  - Phân luồng đăng nhập tự động: Nếu chọn vai trò Bác sĩ ➔ Tự động mở thẳng `BacSiTramManHinh` làm việc ngay lập tức.
 
 ---
 
@@ -207,7 +207,7 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 
 ```
 +----------------------------------------------------------------------------------------------------+
-| [MENU ▾] [IN ▾] [LÀM MỚI] [GỌI SỐ (F12)] [BỎ QUA] [CHỈ ĐỊNH (F3)] [KÊ ĐƠN (F4)] [HOÀN TẤT (F2)]     | (DoctorActionBar)
+| [MENU ▾] [IN ▾] [LÀM MỚI] [GỌI SỐ (F12)] [BỎ QUA] [CHỈ ĐỊNH (F3)] [KÊ ĐƠN (F4)] [HOÀN TẤT (F2)]     | (BacSiHanhDongThanh)
 +-----------------------+----------------------------------------------------+-----------------------+
 | HÀNG ĐỢI BỆNH NHÂN     | KHUNG THÔNG TIN HÀNH CHÍNH & LÂM SÀNG               | LỊCH SỬ KHÁM BỆNH     |
 | [Tất cả] [Chờ] [Đã khám]| Mã BN: 18039327 | Tên: TEST BN 033 | Nam | 23T      | Các đợt KCB trước     |
@@ -220,15 +220,15 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 +-----------------------+----------------------------------------------------+-----------------------+
 ```
 
-#### A. Bàn Khám Bác Sĩ Chính (`DoctorStationPanel.java`)
-* **Kế thừa:** `BaseViewPanel` (`treatmentKey = "treatment"`, Tên Tab: "Điều Trị").
+#### A. Bàn Khám Bác Sĩ Chính (`BacSiTramManHinh.java`)
+* **Kế thừa:** `CoSoManHinhManHinh` (`treatmentKey = "treatment"`, Tên Tab: "Điều Trị").
 * **Bố cục tổng thể:** Chia 3 cột:
-  - Cột 1 (Trái - `DoctorQueueSidebar`): Độ rộng cố định `280px`.
-  - Cột 2 (Giữa - `DoctorClinicalForm`): Độ rộng tự co giãn chiếm ưu tiên lớn nhất.
-  - Cột 3 (Phải - `DoctorHistoryPanel`): Độ rộng `280px` hiển thị lịch sử và kết quả CLS.
-  - Đỉnh: Thanh hành động lâm sàng `DoctorActionBar`.
+  - Cột 1 (Trái - `BacSiHangDoiThanhBen`): Độ rộng cố định `280px`.
+  - Cột 2 (Giữa - `BacSiLamSangBieuMau`): Độ rộng tự co giãn chiếm ưu tiên lớn nhất.
+  - Cột 3 (Phải - `BacSiTienSuManHinh`): Độ rộng `280px` hiển thị lịch sử và kết quả CLS.
+  - Đỉnh: Thanh hành động lâm sàng `BacSiHanhDongThanh`.
 
-#### B. Thanh Hành Động Bác Sĩ (`DoctorActionBar.java`)
+#### B. Thanh Hành Động Bác Sĩ (`BacSiHanhDongThanh.java`)
 * **Chiều cao:** `32px`, nền xám nhạt `BG_TOOLBAR`.
 * **Hệ thống nút bấm vector:**
   - Nút **"Gọi Số Tiếp Theo" (F12):** Tự động phát âm thanh loa thông báo phòng khám và chuyển trạng thái bệnh nhân kế tiếp sang "Đang khám".
@@ -238,14 +238,14 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
   - Nút **"Hoàn Tất Khám" (F2):** Khóa hồ sơ lượt khám hiện tại, chuyển sang trạng thái đã hoàn tất.
   - Nút **"In Hồ Sơ" (Ctrl+P):** Mở menu chọn in: Đơn thuốc, Phiếu hẹn, Giấy chuyển viện.
 
-#### C. Cột Danh Sách Chờ Khám (`DoctorQueueSidebar.java`)
+#### C. Cột Danh Sách Chờ Khám (`BacSiHangDoiThanhBen.java`)
 * **Thành phần:**
   - Bộ lọc trạng thái: Nút chọn nhanh (Tất cả, Đang chờ khám, Chờ kết quả CLS, Đã khám xong).
   - Lưới hiển thị bệnh nhân: Hiển thị STT, Họ và tên (In đậm), Năm sinh/Tuổi, Giới tính, Loại khám (BHYT / Viện phí).
   - Tự động làm mới danh sách (Polling qua Worker mỗi 15-30 giây hoặc qua Event Bus).
   - Nhấp chuột chọn bệnh nhân ➔ Cập nhật toàn bộ dữ liệu ở Cột giữa và Cột phải.
 
-#### D. Form Lâm Sàng Trung Tâm (`DoctorClinicalForm.java`)
+#### D. Form Lâm Sàng Trung Tâm (`BacSiLamSangBieuMau.java`)
 * **Layout:** `GridBagLayout` nén chặt, không gian giữa các thành phần `2px - 4px`.
 * **Phân vùng chi tiết:**
   1. *Khung Hành Chính & Thẻ BHYT:*
@@ -263,7 +263,7 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
      - Hướng điều trị: Ngoại trú / Nhập viện / Chuyển viện / Cho về.
      - Lời dặn của bác sĩ và số ngày hẹn tái khám.
 
-#### E. Khung Lịch Sử & Cận Lâm Sàng (`DoctorHistoryPanel.java`)
+#### E. Khung Lịch Sử & Cận Lâm Sàng (`BacSiTienSuManHinh.java`)
 * **Bố cục 2 phần dạng dọc:**
   - Nửa trên: Cây hoặc danh sách các đợt KCB trong quá khứ của bệnh nhân (kèm ngày khám và chẩn đoán).
   - Nửa dưới: Bảng kết quả cận lâm sàng của ngày hôm nay (Xét nghiệm máu, Nước tiểu, X-quang, Siêu âm) với các giá trị bất thường được tô màu cam/đỏ.
@@ -272,7 +272,7 @@ Lớp quản trị: `vn.clinicmanagement.desktop.core.config.UIConstants`
 
 ### 4.4. Phân Hệ Khám Bệnh - Quản Trị & Điều Phối Hàng Đợi (`modules/examination/`)
 
-#### Màn hình Khám Bệnh Quản Trị (`ExaminationPanel.java`)
+#### Màn hình Khám Bệnh Quản Trị (`KhamBenhManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.examination`
 * **Mục đích:** Màn hình điều phối tổng thể phân hệ khám bệnh dành cho Admin hoặc Bác sĩ trưởng khoa.
 * **Tối ưu chuẩn 13-inch:**
@@ -289,11 +289,11 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 | Tên Lớp Tab Component | Chức Năng Nghiệp Vụ Y Tế Chi Tiết | Các Trường Dữ Liệu & Thao Tác Chính |
 | :--- | :--- | :--- |
-| **`MedicalRecordTabPanel`** | Bệnh án ngoại trú & Diễn tiến điều trị | Lý do vào viện, Quá trình bệnh lý, Tiền sử bản thân/gia đình, Khám toàn thân, Khám bộ phận, Hướng điều trị. |
-| **`PrescriptionOrderTabPanel`** / **`PrescriptionOrderPanel`** | Kê đơn thuốc ngoại trú cho bệnh nhân | Lưới đơn thuốc: Tên thuốc, Hoạt chất, Đơn vị tính, Số lượng, Cách dùng (Sáng-Trưa-Chiều-Tối), Số ngày, Tồn kho thực tế. |
-| **`LabOrderTabPanel`** | Chỉ định Xét nghiệm & Thăm dò chức năng | Cây danh mục xét nghiệm (Huyết học, Sinh hóa, Vi sinh), Trạng thái lấy mẫu, Thời gian trả kết quả, Nơi thực hiện. |
-| **`SuppliesOrderTabPanel`** | Kê vật tư y tế tiêu hao phòng khám | Bơm kim tiêm, Băng gạc, Dây truyền dịch, Găng tay y tế, Nẹp định hình. |
-| **`TreatmentResolutionTabPanel`** | Xử trí kết thúc đợt khám & Ra viện | Kết luận đợt điều trị (Khỏi, Giảm, Không thay đổi, Nặng hơn, Tử vong), Hẹn tái khám, Cấp giấy nghỉ ốm hưởng BHXH. |
+| **`YTeHoSoTheManHinh`** | Bệnh án ngoại trú & Diễn tiến điều trị | Lý do vào viện, Quá trình bệnh lý, Tiền sử bản thân/gia đình, Khám toàn thân, Khám bộ phận, Hướng điều trị. |
+| **`DonThuocYeuCauTheManHinh`** / **`DonThuocYeuCauManHinh`** | Kê đơn thuốc ngoại trú cho bệnh nhân | Lưới đơn thuốc: Tên thuốc, Hoạt chất, Đơn vị tính, Số lượng, Cách dùng (Sáng-Trưa-Chiều-Tối), Số ngày, Tồn kho thực tế. |
+| **`XetNghiemYeuCauTheManHinh`** | Chỉ định Xét nghiệm & Thăm dò chức năng | Cây danh mục xét nghiệm (Huyết học, Sinh hóa, Vi sinh), Trạng thái lấy mẫu, Thời gian trả kết quả, Nơi thực hiện. |
+| **`VatTuYeuCauTheManHinh`** | Kê vật tư y tế tiêu hao phòng khám | Bơm kim tiêm, Băng gạc, Dây truyền dịch, Găng tay y tế, Nẹp định hình. |
+| **`DieuTriXuTriTheManHinh`** | Xử trí kết thúc đợt khám & Ra viện | Kết luận đợt điều trị (Khỏi, Giảm, Không thay đổi, Nặng hơn, Tử vong), Hẹn tái khám, Cấp giấy nghỉ ốm hưởng BHXH. |
 
 ---
 
@@ -301,26 +301,26 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.dialogs`:
 
-1. **`IcdCatalogSelectionDialog` & `IcdCatalogPanel`:**
+1. **`ICDDanhMucLuaChonHopThoai` & `ICDDanhMucManHinh`:**
    - Hộp thoại tra cứu danh mục bệnh tật quốc tế ICD-10.
    - Tìm kiếm nhanh đa năng: Tìm theo Mã ICD (ví dụ `J00`, `E11`) hoặc Tìm theo Tên bệnh tiếng Việt không dấu/có dấu.
    - Hiển thị cây phân cấp: Chương bệnh ➔ Nhóm bệnh ➔ Tên bệnh chi tiết.
-2. **`ServiceOrderDialog` & `ServiceOrderPanel`:**
+2. **`DichVuYeuCauHopThoai` & `DichVuYeuCauManHinh`:**
    - Hộp thoại chọn và chỉ định dịch vụ kỹ thuật cận lâm sàng.
    - Tích hợp kiểm tra giới hạn chỉ định của BHYT theo thông tư BYT, tự động tính tổng tiền dịch vụ theo giá viện phí hoặc giá bảo hiểm.
-3. **`MedicalSuppliesOrderDialog` & `MedicalSuppliesOrderPanel`:**
+3. **`YTeVatTuYeuCauHopThoai` & `YTeVatTuYeuCauManHinh`:**
    - Hộp thoại kê vật tư tiêu hao gắn liền với dịch vụ thủ thuật.
-4. **`TransferRoomSelectDialog` & `TransferRoomConfirmDialog`:**
+4. **`ChuyenPhongChonHopThoai` & `ChuyenPhongXacNhanHopThoai`:**
    - Điều chuyển bệnh nhân sang phòng khám chuyên khoa khác (ví dụ: Từ phòng Khám Nội sang phòng Khám Răng Hàm Mặt).
    - Cơ chế xác nhận bảo lưu thông tin đã khám ban đầu.
-5. **`SecondaryDiagnosisDialog` & `SecondaryDiagnosisPanel`:**
+5. **`ThuPhuChanDoanHopThoai` & `ThuPhuChanDoanManHinh`:**
    - Quản lý danh sách các chẩn đoán phụ đi kèm của bệnh nhân nhiều bệnh lý nền.
-6. **`ReopenMedicalRecordDialog` & `ReopenMedicalRecordPanel`:**
+6. **`MoLaiYTeHoSoHopThoai` & `MoLaiYTeHoSoManHinh`:**
    - Quy trình kiểm soát mở lại hồ sơ bệnh án đã kết thúc và đã khóa.
    - Bắt buộc ghi nhận lý do mở lại và lưu vết kiểm toán (Audit Trail) phục vụ giám định BHYT.
-7. **`DischargeSummaryDialog` & `DischargeSummaryPanel`:**
+7. **`RaVienTongHopHopThoai` & `RaVienTongHopManHinh`:**
    - Lập tóm tắt hồ sơ bệnh án ra viện cho bệnh nhân kết thúc đợt điều trị ngoại trú dài ngày.
-8. **`MedicalRecordTypeDialog` & `MedicalRecordTypePanel`:**
+8. **`YTeHoSoLoaiHopThoai` & `YTeHoSoLoaiManHinh`:**
    - Lựa chọn loại mẫu bệnh án chuyên khoa phù hợp (Bệnh án Ngoại trú chung, Mắt, Răng Hàm Mặt, Tai Mũi Họng, Nhi khoa).
 
 ---
@@ -329,18 +329,18 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.print`:
 
-* **`PrescriptionPrintPreviewDialog` & `PrescriptionPrintPreviewPanel`:**
+* **`DonThuocInXemTruocHopThoai` & `DonThuocInXemTruocManHinh`:**
   - Xem trước và in Đơn thuốc ngoại trú chuẩn theo Thông tư 52/2017/TT-BYT và Thông tư 18/2018/TT-BYT.
   - Hỗ trợ khổ giấy A4 (in 2 đơn/tờ) hoặc A5 (in 1 đơn/tờ). Hiển thị mã vạch đơn thuốc (Barcode 128).
-* **`ClinicalOrderPrintPreviewDialog` & `ClinicalOrderPrintPreviewPanel`:**
+* **`LamSangYeuCauInXemTruocHopThoai` & `LamSangYeuCauInXemTruocManHinh`:**
   - Phiếu chỉ định cận lâm sàng phục vụ bệnh nhân cầm đi các phòng chức năng làm xét nghiệm/siêu âm.
-* **`MedicalBillingSlipDialog` & `MedicalBillingSlipPanel`:**
+* **`YTeVienPhiPhieuHopThoai` & `YTeVienPhiPhieuManHinh`:**
   - Bảng kê chi phí khám bệnh chữa bệnh ngoại trú (Mẫu số 01/BV chuẩn Bộ Y Tế và Bảo hiểm Xã hội).
-* **`FollowUpAppointmentPrintDialog` & `FollowUpAppointmentPrintPanel`:**
+* **`TheoTiepLichHenInHopThoai` & `TheoTiepLichHenInManHinh`:**
   - Giấy hẹn khám lại với ngày hẹn cụ thể, bác sĩ hẹn và lời dặn dò.
-* **`OutpatientMedicalRecordPrintDialog` & `OutpatientMedicalRecordPrintPanel`:**
+* **`NgoaiTruYTeHoSoInHopThoai` & `NgoaiTruYTeHoSoInManHinh`:**
   - Trích sao hồ sơ bệnh án ngoại trú phục vụ chuyển tuyến hoặc lưu trữ hành chính.
-* **`TransferSlipPrintPreviewDialog`:**
+* **`ChuyenPhieuInXemTruocHopThoai`:**
   - Giấy chuyển tuyến khám bệnh, chữa bệnh BHYT (Mẫu số 06/BHYT).
 
 ---
@@ -349,40 +349,40 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.menus`:
 
-1. **`PatientQueueContextMenu`:**
+1. **`BenhNhanHangDoiNguCanhMenu`:**
    - Kích hoạt khi nhấp chuột phải vào một hàng trong danh sách chờ:
      + *Gọi bệnh nhân vào phòng khám*
      + *Đánh dấu diện ưu tiên (Trẻ em dưới 6 tuổi, Người già > 75 tuổi, Cấp cứu)*
      + *Chuyển phòng khám khác*
      + *Hủy lượt khám (kèm xác nhận)*
-2. **`ServiceContextMenu`:**
+2. **`DichVuNguCanhMenu`:**
    - Chuột phải trên danh sách dịch vụ chỉ định: Xóa dịch vụ, Thay đổi số lượng, Xem kết quả nhanh, Đổi bác sĩ chỉ định.
-3. **`MedicineSuppliesPopupMenu`:**
+3. **`ThuocVatTuBatLenMenu`:**
    - Chuột phải trên dòng thuốc: Tra cứu tồn kho chi tiết các quầy thuốc, Tra cứu tương tác thuốc, Đổi thuốc biệt dược tương đương hoạt chất.
-4. **`PrintReportPopupMenu`:**
+4. **`InBaoCaoBatLenMenu`:**
    - Menu xổ xuống từ nút "In ▾": Danh sách các biểu mẫu in ấn nhanh cho bác sĩ.
-5. **`ExaminationMenuPopupMenu`:**
+5. **`KhamBenhMenuBatLenMenu`:**
    - Menu tiện ích mở rộng: Tra cứu lịch sử thẻ BHYT trên cổng giám định, Thiết lập thông số mặc định của phòng khám.
 
 ---
 
 ### 4.9. Phân Hệ Đón Tiếp & Đăng Ký Khám Bệnh (`modules/reception/`)
 
-#### A. Màn hình Tiếp Đón Trung Tâm (`ReceptionPanel.java`)
+#### A. Màn hình Tiếp Đón Trung Tâm (`TiepDonManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.reception`
-* **Kế thừa:** `BaseViewPanel` (`viewKey = "reception"`, Tab: "Đăng Ký Khám Bệnh").
+* **Kế thừa:** `CoSoManHinhManHinh` (`viewKey = "reception"`, Tab: "Đăng Ký Khám Bệnh").
 * **Bố cục chính:**
-  - **North:** `ReceptionTopToolbar`:
+  - **North:** `TiepDonTrenThanhCongCu`:
     + Nút menu hệ thống, In phiếu STT, Làm mới dữ liệu.
     + Nút "Bệnh Nhân Mới" (F1): Reset sạch form để nhập thông tin ca mới.
     + Nút "Quét CCCD gắn chip / Thẻ BHYT" (F4): Tự động điền thông tin hành chính qua đầu đọc QR/mã vạch.
     + Nút "Gọi Số Tiếp Theo" (F12) liên kết loa màn hình hiển thị tại cửa đón tiếp.
   - **Center (`JSplitPane` Dọc, vị trí chia `218px`):**
-    + *Nửa trên (`PatientRegistrationFormPanel`):* Form hành chính, liên lạc, thông tin thẻ BHYT 15 ký tự, chọn phòng khám, lý do khám.
-    + *Nửa dưới (`ClinicRoomStatusPanel`):* Bảng 3 cột theo dõi trạng thái tải thực tế của từng phòng khám (Phòng khám, Bác sĩ trực, Số lượng đang chờ, Đã khám).
-  - **South (`ReceptionFooterBar`):** Dải phím tắt chân trang: `F1-Mới | F2-Lưu | F3-In Phiếu | F4-Thẻ KCB | F12-Gọi Số`.
+    + *Nửa trên (`BenhNhanDangKyBieuMauManHinh`):* Form hành chính, liên lạc, thông tin thẻ BHYT 15 ký tự, chọn phòng khám, lý do khám.
+    + *Nửa dưới (`PhongKhamPhongTrangThaiManHinh`):* Bảng 3 cột theo dõi trạng thái tải thực tế của từng phòng khám (Phòng khám, Bác sĩ trực, Số lượng đang chờ, Đã khám).
+  - **South (`TiepDonChanTrangThanh`):** Dải phím tắt chân trang: `F1-Mới | F2-Lưu | F3-In Phiếu | F4-Thẻ KCB | F12-Gọi Số`.
 
-#### B. Trạng Thái Phòng Khám & Cảnh Báo Tải (`ClinicRoomStatusPanel.java`)
+#### B. Trạng Thái Phòng Khám & Cảnh Báo Tải (`PhongKhamPhongTrangThaiManHinh.java`)
 * Hiển thị danh sách 17 phòng khám chuyên khoa (PK Nhi, Cấp cứu, Khám Nội, Tai Mũi Họng, v.v.).
 * Khi nhân viên tiếp đón chọn phòng khám ở form trên ➔ Dòng phòng khám đó ở bảng dưới tự động highlight màu đỏ cam để kiểm tra số lượng chờ, tránh dồn bệnh nhân vào phòng đang quá tải.
 
@@ -390,9 +390,9 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 ### 4.10. Phân Hệ Quản Lý Viện Phí & Hóa Đơn (`modules/billing/`)
 
-#### Màn hình Thu Ngân & Viện Phí (`BillingInvoicePanel.java`)
+#### Màn hình Thu Ngân & Viện Phí (`VienPhiHoaDonManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.billing`
-* **Kế thừa:** `BaseViewPanel` (`viewKey = "billing"`, Tab: "Quản Lý Viện Phí").
+* **Kế thừa:** `CoSoManHinhManHinh` (`viewKey = "billing"`, Tab: "Quản Lý Viện Phí").
 * **Bố cục:**
   - **Khung tìm kiếm & Bộ lọc:** Tìm theo Mã bệnh nhân, Họ tên, Số hóa đơn, Trạng thái (Chờ thanh toán, Đã thanh toán, Tạm ứng, Hoàn ứng).
   - **Bảng danh sách phiếu thu (Master Table):** Hiển thị danh sách hóa đơn theo ngày.
@@ -409,37 +409,37 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 ### 4.11. Phân Hệ Kho Dược & Cấp Phát Thuốc (`modules/pharmacy/`)
 
-#### Màn hình Tủ Trực Vật Tư & Cấp Phát Thuốc (`PharmacyDispensePanel.java`)
+#### Màn hình Tủ Trực Vật Tư & Cấp Phát Thuốc (`NhaThuocCapPhatManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.pharmacy`
-* **Kế thừa:** `BaseViewPanel` (`viewKey = "pharmacy"`, Tab: "Tủ Trực Vật Tư").
+* **Kế thừa:** `CoSoManHinhManHinh` (`viewKey = "pharmacy"`, Tab: "Tủ Trực Vật Tư").
 * **Bố cục Master-Detail (`JSplitPane` Ngang, vị trí chia `215px`):**
-  - **Cột Trái (`PharmacyCategoryTreePanel`):** Cây danh mục kho dược:
+  - **Cột Trái (`NhaThuocDanhMucCayManHinh`):** Cây danh mục kho dược:
     + Kho tổng chẵn
     + Kho thuốc ngoại trú
     + Kho thuốc nội trú
     + Tủ trực cấp cứu các khoa
-  - **Cột Phải (`PharmacyTicketTablePanel`):** Bảng danh sách phiếu xuất/nhập/cấp phát thuốc:
+  - **Cột Phải (`NhaThuocPhieuBangManHinh`):** Bảng danh sách phiếu xuất/nhập/cấp phát thuốc:
     + Quản lý theo nguyên tắc **FEFO (First Expired, First Out - Hạn gần xuất trước)**.
     + Cảnh báo màu vàng cho thuốc cận hạn dùng (dưới 6 tháng), màu đỏ cho thuốc hết hạn hoặc hết tồn kho an toàn.
-  - **Thanh công cụ phụ (`PharmacySubToolbar`):** Xuất kho theo đơn, Trả lại kho, Kiểm kê tồn, In thẻ kho.
+  - **Thanh công cụ phụ (`NhaThuocPhuThanhCongCu`):** Xuất kho theo đơn, Trả lại kho, Kiểm kê tồn, In thẻ kho.
 
 ---
 
 ### 4.12. Phân Hệ Cận Lâm Sàng & Chẩn Đoán Hình Ảnh (`modules/paraclinical/`)
 
-#### Màn hình CĐHA & Thăm Dò Chức Năng (`ParaclinicalOrderPanel.java`)
+#### Màn hình CĐHA & Thăm Dò Chức Năng (`CanLamSangYeuCauManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.paraclinical`
 * **Mục đích:** Tiếp nhận chỉ định từ các phòng khám, thực hiện kỹ thuật và nhập kết quả chuyên môn.
 * **Quy trình:**
   1. Tiếp nhận bệnh nhân theo danh sách chờ cận lâm sàng (X-quang, Siêu âm, Điện tim, Nội soi).
   2. Bác sĩ chuyên khoa chẩn đoán hình ảnh nhập kết luận mô tả và hình ảnh mẫu.
-  3. Duyệt kết quả (Ký số) ➔ Tự động đồng bộ kết quả về màn hình của Bác sĩ điều trị (`DoctorStationPanel`).
+  3. Duyệt kết quả (Ký số) ➔ Tự động đồng bộ kết quả về màn hình của Bác sĩ điều trị (`BacSiTramManHinh`).
 
 ---
 
 ### 4.13. Phân Hệ Quản Lý Danh Mục Dùng Chung (`modules/catalog/`)
 
-#### Màn hình Quản Lý Danh Mục (`CatalogPanel.java`)
+#### Màn hình Quản Lý Danh Mục (`DanhMucManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.catalog`
 * **Mục đích:** Quản lý toàn bộ danh mục tham chiếu cốt lõi của hệ thống y tế:
   - Danh mục ICD-10 Bộ Y Tế ban hành.
@@ -452,7 +452,7 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 ### 4.14. Phân Hệ Báo Cáo Thống Kê (`modules/reports/`)
 
-#### Màn hình Báo Cáo Thống Kê (`ClinicReportPanel.java`)
+#### Màn hình Báo Cáo Thống Kê (`PhongKhamBaoCaoManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.reports`
 * **Mục đích:** Cung cấp số liệu phân tích hoạt động khám chữa bệnh và kết xuất dữ liệu báo cáo:
   - Báo cáo tổng hợp lượt khám bệnh theo ngày / theo bác sĩ / theo chuyên khoa.
@@ -465,7 +465,7 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 ### 4.15. Phân Hệ Quản Trị Hệ Thống & Phân Quyền (`modules/system/`)
 
-#### Màn hình Quản Trị Hệ Thống (`SystemConfigPanel.java`)
+#### Màn hình Quản Trị Hệ Thống (`HeThongCauHinhManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.system`
 * **Bố cục:**
   - Thanh tìm kiếm thời gian thực nhanh với nền màu vàng `#FFFFD0` (kích hoạt bằng phím `Ctrl+F`).
@@ -476,7 +476,7 @@ Nằm trong package `vn.clinicmanagement.desktop.modules.examination.components.
 
 ### 4.16. Trang Chủ & Bảng Tin Trung Tâm (`modules/home/`)
 
-#### Màn hình Chào & Tổng Quan (`HomeWelcomePanel.java`)
+#### Màn hình Chào & Tổng Quan (`TrangChuChaoMungManHinh.java`)
 * **Package:** `vn.clinicmanagement.desktop.modules.home`
 * **Mục đích:** Tab mặc định hiển thị khi khởi động ứng dụng:
   - Biểu đồ tóm tắt số lượt tiếp đón, số lượt đang khám, số ca đã hoàn tất trong ngày.
@@ -521,7 +521,7 @@ Mọi màn hình trong hệ thống bắt buộc phải hỗ trợ hệ thống 
 
 * **Thời gian phản hồi tương tác (Click Response):** Phải dưới `50ms`. Người dùng nhấp chuột hoặc bấm phím tắt phải thấy ngay hiệu ứng thay đổi trạng thái nút hoặc con trỏ chuột `WaitCursor`.
 * **Tác vụ nền bất đồng bộ (Background Tasks):** Không bao giờ khóa giao diện người dùng (EDT). Dùng thanh tiến trình `JProgressBar` hoặc biểu tượng xoay indeterminate cho các tác vụ tải dữ liệu lớn, cho phép người dùng bấm hủy nếu muốn.
-* **Thông báo Toast & Alert:** Không lạm dụng `JOptionPane` chặn màn hình cho các thông tin không quan trọng; ưu tiên hiển thị thông báo trạng thái tại góc dưới bên phải hoặc trên thanh `StatusBarPanel`.
+* **Thông báo Toast & Alert:** Không lạm dụng `JOptionPane` chặn màn hình cho các thông tin không quan trọng; ưu tiên hiển thị thông báo trạng thái tại góc dưới bên phải hoặc trên thanh `TrangThaiThanhManHinh`.
 
 ---
 
@@ -534,47 +534,47 @@ clinic-desktop/src/main/java/vn/clinicmanagement/desktop/
 │
 ├── core/                              # NỀN TẢNG CỐT LÕI (CORE FOUNDATION)
 │   ├── base/
-│   │   └── BaseViewPanel.java         # Lớp cơ sở cho MỌI màn hình phân hệ
+│   │   └── CoSoManHinhManHinh.java         # Lớp cơ sở cho MỌI màn hình phân hệ
 │   ├── config/
-│   │   ├── AppFonts.java              # Nguồn font chữ DUY NHẤT toàn hệ thống
-│   │   └── UIConstants.java           # Bảng màu, border, kích thước chuẩn
+│   │   ├── UngDungPhongChu.java              # Nguồn font chữ DUY NHẤT toàn hệ thống
+│   │   └── GiaoDienHangSo.java           # Bảng màu, border, kích thước chuẩn
 │   ├── components/                    # Các Component giao diện tái sử dụng
-│   │   ├── BottomTab.java             # Tab MDI chân trang có nút đóng '×' và mũi tên active
-│   │   ├── RibbonButton.java          # Nút menu Ribbon 1 dòng chuẩn vector icon
-│   │   ├── StatusBarPanel.java        # Thanh trạng thái chân màn hình 9 ô chuẩn
-│   │   └── StyledTable.java           # JTable chuẩn viền lưới và màu chọn y tế
+│   │   ├── DuoiThe.java             # Tab MDI chân trang có nút đóng '×' và mũi tên active
+│   │   ├── ThanhBangNut.java          # Nút menu Ribbon 1 dòng chuẩn vector icon
+│   │   ├── TrangThaiThanhManHinh.java        # Thanh trạng thái chân màn hình 9 ô chuẩn
+│   │   └── CoKieuBang.java           # JTable chuẩn viền lưới và màu chọn y tế
 │   └── session/
-│       └── UserSession.java           # Quản lý phiên làm việc, Bác sĩ, Cơ sở, Mã trạm
+│       └── NguoiDungPhien.java           # Quản lý phiên làm việc, Bác sĩ, Cơ sở, Mã trạm
 │
 └── modules/                           # CÁC PHÂN HỆ NGHIỆP VỤ ĐỘC LẬP
-    ├── auth/                          # Đăng nhập & lựa chọn khoa phòng (LoginForm)
-    ├── dashboard/                     # Vỏ khung chính (MainDashboardFrame & WorkspaceManager)
-    ├── home/                          # Bảng điều khiển trang chủ (HomeWelcomePanel)
+    ├── auth/                          # Đăng nhập & lựa chọn khoa phòng (DangNhapBieuMau)
+    ├── dashboard/                     # Vỏ khung chính (KhoiDongBangDieuKhienCuaSo & KhongGianLamViecQuanLy)
+    ├── home/                          # Bảng điều khiển trang chủ (TrangChuChaoMungManHinh)
     ├── doctor/                        # PHÂN HỆ BÁC SĨ ĐIỀU TRỊ (Doctor Station)
-    │   ├── DoctorStationPanel.java    # Bàn khám chính
+    │   ├── BacSiTramManHinh.java    # Bàn khám chính
     │   ├── components/                # ActionBar, QueueSidebar, ClinicalForm, HistoryPanel
-    │   └── model/                     # DTO dữ liệu lâm sàng (PatientExamDto)
+    │   └── model/                     # DTO dữ liệu lâm sàng (BenhNhanKhamDuLieu)
     ├── examination/                   # PHÂN HỆ KHÁM BỆNH QUẢN TRỊ (Examination Station)
-    │   ├── ExaminationPanel.java      # Giao diện khám bệnh tổng thể
+    │   ├── KhamBenhManHinh.java      # Giao diện khám bệnh tổng thể
     │   ├── components/
     │   │   ├── banner/                # PatientSummaryBannerPanel
     │   │   ├── queue/                 # PatientQueueTablePanel, Pagination
     │   │   ├── tabs/                  # 8 Tab: MedicalRecord, Prescription, LabOrder, Supplies...
     │   │   ├── dialogs/               # IcdCatalog, ServiceOrder, TransferRoom, DischargeSummary...
     │   │   ├── print/                 # PrescriptionPrint, BillingSlip, ClinicalOrder...
-    │   │   └── menus/                 # PatientQueueContextMenu, ServiceContextMenu...
+    │   │   └── menus/                 # BenhNhanHangDoiNguCanhMenu, DichVuNguCanhMenu...
     ├── reception/                     # PHÂN HỆ TIẾP ĐÓN & ĐĂNG KÝ KHÁM
-    │   ├── ReceptionPanel.java        # Màn hình tiếp đón trung tâm
+    │   ├── TiepDonManHinh.java        # Màn hình tiếp đón trung tâm
     │   └── components/                # RegistrationForm, ClinicRoomStatus, Chooser, FooterBar
     ├── billing/                       # PHÂN HỆ VIỆN PHÍ & THU NGÂN
-    │   └── BillingInvoicePanel.java   # Quản lý hóa đơn viện phí
+    │   └── VienPhiHoaDonManHinh.java   # Quản lý hóa đơn viện phí
     ├── pharmacy/                      # PHÂN HỆ KHO DƯỢC & CẤP PHÁT THUỐC
-    │   ├── PharmacyDispensePanel.java # Cấp phát thuốc & Tủ trực
+    │   ├── NhaThuocCapPhatManHinh.java # Cấp phát thuốc & Tủ trực
     │   └── components/                # CategoryTree, TicketTable, SubToolbar
-    ├── paraclinical/                  # PHÂN HỆ CẬN LÂM SÀNG & CĐHA (ParaclinicalOrderPanel)
-    ├── catalog/                       # PHÂN HỆ DANH MỤC DÙNG CHUNG (CatalogPanel)
-    ├── reports/                       # PHÂN HỆ BÁO CÁO THỐNG KÊ (ClinicReportPanel)
-    └── system/                        # PHÂN HỆ QUẢN TRỊ HỆ THỐNG (SystemConfigPanel)
+    ├── paraclinical/                  # PHÂN HỆ CẬN LÂM SÀNG & CĐHA (CanLamSangYeuCauManHinh)
+    ├── catalog/                       # PHÂN HỆ DANH MỤC DÙNG CHUNG (DanhMucManHinh)
+    ├── reports/                       # PHÂN HỆ BÁO CÁO THỐNG KÊ (PhongKhamBaoCaoManHinh)
+    └── system/                        # PHÂN HỆ QUẢN TRỊ HỆ THỐNG (HeThongCauHinhManHinh)
 ```
 
 ---
@@ -587,20 +587,20 @@ Khi nhận yêu cầu xây dựng một màn hình/phân hệ mới, lập trìn
 * Không đặt file vào thư mục gốc hoặc sai package nghiệp vụ.
 * Tạo cấu trúc package con nếu màn hình có nhiều hơn 3 thành phần con (`components/`, `dialogs/`, `model/`).
 
-### Bước 2: Kế Thừa Chuẩn `BaseViewPanel`
-Mọi form nghiệp vụ phải kế thừa `BaseViewPanel` theo mẫu boilerplate sau:
+### Bước 2: Kế Thừa Chuẩn `CoSoManHinhManHinh`
+Mọi form nghiệp vụ phải kế thừa `CoSoManHinhManHinh` theo mẫu boilerplate sau:
 
 ```java
 package vn.clinicmanagement.desktop.modules.myfeature;
 
-import vn.clinicmanagement.desktop.core.base.BaseViewPanel;
-import vn.clinicmanagement.desktop.core.config.AppFonts;
-import vn.clinicmanagement.desktop.core.config.UIConstants;
+import vn.clinicmanagement.desktop.core.base.CoSoManHinhManHinh;
+import vn.clinicmanagement.desktop.core.config.UngDungPhongChu;
+import vn.clinicmanagement.desktop.core.config.GiaoDienHangSo;
 
 import javax.swing.*;
 import java.awt.*;
 
-public class MyFeaturePanel extends BaseViewPanel {
+public class MyFeaturePanel extends CoSoManHinhManHinh {
 
     public MyFeaturePanel() {
         super("my-feature-key", "Tên Phân Hệ Mới", "icon_key");
@@ -612,7 +612,7 @@ public class MyFeaturePanel extends BaseViewPanel {
         setBackground(Color.WHITE);
 
         // 1. Áp dụng bảng màu và font chuẩn
-        // Tuyệt đối dùng AppFonts.BODY, AppFonts.BODY_BOLD, UIConstants.COLOR_PRIMARY...
+        // Tuyệt đối dùng UngDungPhongChu.BODY, UngDungPhongChu.BODY_BOLD, GiaoDienHangSo.COLOR_PRIMARY...
     }
 
     @Override
@@ -634,10 +634,10 @@ public class MyFeaturePanel extends BaseViewPanel {
 ```
 
 ### Bước 3: Đăng Ký Nút Mở Tab Trên Ribbon Menu
-Trong `MainDashboardFrame.java`, liên kết nút bấm với `WorkspaceManager`:
+Trong `KhoiDongBangDieuKhienCuaSo.java`, liên kết nút bấm với `KhongGianLamViecQuanLy`:
 
 ```java
-RibbonButton btnFeature = new RibbonButton("Tên Phân Hệ", "vector_icon", "my-feature-key",
+ThanhBangNut btnFeature = new ThanhBangNut("Tên Phân Hệ", "vector_icon", "my-feature-key",
         k -> workspaceManager.openView(new MyFeaturePanel()));
 ribbonButtons.put("my-feature-key", btnFeature);
 ribbon.add(btnFeature);
@@ -646,7 +646,7 @@ ribbon.add(btnFeature);
 ### Bước 4: Kiểm Tra Biên Dịch & Nghiệm Thu UI/UX (Verification Checklist)
 
 Trước khi commit mã nguồn, bắt buộc kiểm tra các tiêu chí:
-- [ ] Không có bất kỳ dòng nào dùng `new Font(...)` tự do; toàn bộ dùng `AppFonts`.
+- [ ] Không có bất kỳ dòng nào dùng `new Font(...)` tự do; toàn bộ dùng `UngDungPhongChu`.
 - [ ] Không dùng emoji hệ thống làm icon chính trên giao diện.
 - [ ] Form hiển thị cân đối, không rớt dòng trên màn hình MacBook 13-inch (1280x800 hoặc 1440x900).
 - [ ] Phím `Tab` và `Enter` di chuyển tuần tự đúng thứ tự tự nhiên giữa các ô nhập liệu.
@@ -659,5 +659,5 @@ Trước khi commit mã nguồn, bắt buộc kiểm tra các tiêu chí:
 ---
 
 ## 8. LỊCH SỬ PHIÊN BẢN
-* **Phiên bản 1.0 (2026-10-30):** Chuẩn hóa toàn bộ hệ thống chữ sang `AppFonts`, chuẩn hóa tỷ lệ hiển thị 1:1 cho MacBook 13-inch M1, tách độc lập phân hệ `modules/doctor` và `modules/examination`.
+* **Phiên bản 1.0 (2026-10-30):** Chuẩn hóa toàn bộ hệ thống chữ sang `UngDungPhongChu`, chuẩn hóa tỷ lệ hiển thị 1:1 cho MacBook 13-inch M1, tách độc lập phân hệ `modules/doctor` và `modules/examination`.
 * **Phiên bản 2.0 (2026-11-01):** Đại tu toàn diện tài liệu thiết kế: Bổ sung phân tích chi tiết toàn bộ các Form, Dialog, Print Preview, Context Menu và Tab chuyên môn của 10 phân hệ y tế; thiết lập bản đồ phím tắt y tế toàn diện (F1-F12), chuẩn hóa kiến trúc MDI Tab Shell và cơ chế phòng ngừa sai sót y khoa.

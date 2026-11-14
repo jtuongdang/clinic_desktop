@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import vn.clinicmanagement.domain.common.enums.TrangThaiChiDinhDichVu;
-import vn.clinicmanagement.domain.common.events.AbstractDomainEvent;
-import vn.clinicmanagement.domain.common.events.IDomainEvent;
+import vn.clinicmanagement.domain.common.events.TruuTuongMienNghiepVuSuKien;
+import vn.clinicmanagement.domain.common.events.IMienNghiepVuSuKien;
 import vn.clinicmanagement.domain.examination.LuotKham;
 
 import java.math.BigDecimal;
@@ -205,19 +205,19 @@ class ChiDinhDichVuTest {
     @DisplayName("Should manage domain events lifecycle correctly")
     void managesDomainEventsHub() {
         ChiDinhDichVu order = new ChiDinhDichVu();
-        IDomainEvent event1 = new TestDomainEvent();
-        IDomainEvent event2 = new TestDomainEvent();
+        IMienNghiepVuSuKien event1 = new TestDomainEvent();
+        IMienNghiepVuSuKien event2 = new TestDomainEvent();
 
         assertThrows(NullPointerException.class, () -> order.registerDomainEvent(null));
 
         order.registerDomainEvent(event1);
         order.registerDomainEvent(event2);
 
-        List<IDomainEvent> events = order.getDomainEvents();
+        List<IMienNghiepVuSuKien> events = order.getDomainEvents();
         assertEquals(2, events.size());
         assertThrows(UnsupportedOperationException.class, () -> events.add(new TestDomainEvent()));
 
-        List<IDomainEvent> pulled = order.pullDomainEvents();
+        List<IMienNghiepVuSuKien> pulled = order.pullDomainEvents();
         assertEquals(2, pulled.size());
         assertTrue(order.getDomainEvents().isEmpty());
 
@@ -226,7 +226,7 @@ class ChiDinhDichVuTest {
         assertTrue(order.getDomainEvents().isEmpty());
     }
 
-    private static class TestDomainEvent extends AbstractDomainEvent {}
+    private static class TestDomainEvent extends TruuTuongMienNghiepVuSuKien {}
 
     @Test
     @DisplayName("Should satisfy identity-based equality and hash code semantics")

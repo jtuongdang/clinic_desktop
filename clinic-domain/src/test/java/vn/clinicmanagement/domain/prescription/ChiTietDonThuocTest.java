@@ -1,7 +1,7 @@
 package vn.clinicmanagement.domain.prescription;
 
 import org.junit.jupiter.api.Test;
-import vn.clinicmanagement.domain.inventory.Item;
+import vn.clinicmanagement.domain.inventory.MatHang;
 
 import java.math.BigDecimal;
 
@@ -34,7 +34,7 @@ class ChiTietDonThuocTest {
     void storesPrescriptionItemQuantitiesAndCompleteDosageInstructions() {
         ChiTietDonThuoc lineItem = new ChiTietDonThuoc();
         DonThuoc prescription = new DonThuoc();
-        Item item = new Item();
+        MatHang item = new MatHang();
         BigDecimal prescribed = new BigDecimal("12.50");
         BigDecimal dispensed = new BigDecimal("4.25");
         BigDecimal price = new BigDecimal("1500.00");

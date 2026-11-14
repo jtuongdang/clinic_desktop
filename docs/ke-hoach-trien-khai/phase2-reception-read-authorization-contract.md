@@ -6,7 +6,7 @@
 
 ## Mục tiêu
 
-Enforce authorization và cặp scope cơ sở+khoa ở Application cho ba protected read đang được `ReceptionPanel` gọi: tìm bệnh nhân, tải hàng đợi/lượt khám và tải danh sách/tóm tắt phòng khám. Dữ liệu chỉ được trả cho caller sau khi successful-read audit được ghi và commit trên connection độc lập.
+Enforce authorization và cặp scope cơ sở+khoa ở Application cho ba protected read đang được `TiepDonManHinh` gọi: tìm bệnh nhân, tải hàng đợi/lượt khám và tải danh sách/tóm tắt phòng khám. Dữ liệu chỉ được trả cho caller sau khi successful-read audit được ghi và commit trên connection độc lập.
 
 ## Hợp đồng từng use case
 
@@ -20,20 +20,20 @@ Mọi quyền còn dùng đúng evaluator default-deny, role đã chọn và sco
 
 ## Thứ tự query/audit/response
 
-1. Validate input và immutable `AuthorizationContext`/`AuditActorContext`.
+1. Validate input và immutable `PhanQuyenNguCanh`/`KiemToanTacNhanNguCanh`.
 2. Evaluate active session, employee, role, assignment, permission và exact scope. Khi deny: không chạy protected query; ghi `AUTH_ACCESS_DENIED` độc lập, chỉ actor/scope/reason, không resource ID hay search term.
 3. Chạy scoped query và dựng response hoàn chỉnh trong Application.
-4. Ghi successful-read event bằng `AuditWritePort.appendIndependently`; dùng per-operation workstation/correlation UUID, không ghi search term, CCCD/BHYT, patient name hay narrative. Queue/search audit không gắn ID từng bệnh nhân.
-5. Chỉ trả `Result.success(data)` sau khi append/commit audit thành công. Nếu truy vấn hoặc audit thất bại, trả failure chung và không đưa dữ liệu protected ra ngoài.
+4. Ghi successful-read event bằng `KiemToanWriteCongKetNoi.appendIndependently`; dùng per-operation workstation/correlation UUID, không ghi search term, CCCD/BHYT, patient name hay narrative. Queue/search audit không gắn ID từng bệnh nhân.
+5. Chỉ trả `KetQua.success(data)` sau khi append/commit audit thành công. Nếu truy vấn hoặc audit thất bại, trả failure chung và không đưa dữ liệu protected ra ngoài.
 
 Truy vấn thành công nhưng không có kết quả vẫn là một lần search/queue/catalog read được audit. Lỗi validate trước query không phát sinh successful-read event. Query và audit không cần atomic với nhau; audit độc lập commit là điều kiện phát dữ liệu.
 
 ## Thiết kế implementation
 
-- `SearchPatientsQuery` và `GetReceptionQueueQuery` mang cả authorization context và per-operation audit actor; không cung cấp constructor bỏ qua context.
+- `SearchBenhNhanQuery` và `GetTiepDonHangDoiQuery` mang cả authorization context và per-operation audit actor; không cung cấp constructor bỏ qua context.
 - Tạo query/handler cho room catalog, không gọi `IPhongKhamRepository.getActiveRooms()` trực tiếp từ Swing.
 - Thêm repository/port scoped methods; SQL bắt buộc lọc cả facility và department, không lọc theo mỗi cơ sở, room hay ngày.
-- `ReceptionPanel` lấy context còn hiệu lực từ `SessionLifecycleService` cho mỗi thao tác; trên lỗi chỉ hiện thông báo cố định và giữ draft tìm/đăng ký.
+- `TiepDonManHinh` lấy context còn hiệu lực từ `PhienVongDoiDichVu` cho mỗi thao tác; trên lỗi chỉ hiện thông báo cố định và giữ draft tìm/đăng ký.
 - Không thay đổi flow đăng ký/writes từ SEC-AUTHZ-02B, không thêm SQL migration hoặc seed.
 
 ## Acceptance

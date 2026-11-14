@@ -2,18 +2,18 @@
 
 - **Task:** `PLAT-VO-POLICY-01`
 - **Trạng thái:** Owner xác nhận cả ba quyết định ngày 06/11/2026. Các acceptance hẹp được ghi theo task liên quan; `PLAT-VO-01` vẫn `[~]`. Điều này không đánh dấu Phase 0/1 hay visual acceptance hoàn tất.
-- **Phạm vi:** `DateRange`, `PhoneNumber`, `Money` và các điểm tiêu thụ thật trong project.
+- **Phạm vi:** `NgayKhoang`, `DienThoaiSo`, `Tien` và các điểm tiêu thụ thật trong project.
 - **Gate:** Không thêm consumer vào workflow nhạy cảm trước `SEC-01`; mọi acceptance persistence dùng fixture tổng hợp.
 
 ## Tóm tắt
 
-Source audit ban đầu ghi nhận ba Value Object chưa có consumer production. Hiện `DateRange` được dùng để kiểm tra interval BHYT ở handler tiếp đón; `PhoneNumber` validate và lưu giá trị đã làm sạch, với read-back SQL synthetic được theo dõi riêng; `Money` chưa có consumer invoice/billing. Các acceptance hẹp không hoàn tất `PLAT-VO-01` hay visual acceptance. Chi tiết source snapshot và validation evidence được tách tại [`phase0-value-object-domain-review.md`](phase0-value-object-domain-review.md).
+Source audit ban đầu ghi nhận ba Value Object chưa có consumer production. Hiện `NgayKhoang` được dùng để kiểm tra interval BHYT ở handler tiếp đón; `DienThoaiSo` validate và lưu giá trị đã làm sạch, với read-back SQL synthetic được theo dõi riêng; `Tien` chưa có consumer invoice/billing. Các acceptance hẹp không hoàn tất `PLAT-VO-01` hay visual acceptance. Chi tiết source snapshot và validation evidence được tách tại [`phase0-value-object-domain-review.md`](phase0-value-object-domain-review.md).
 
 **Nguyên tắc triển khai:** quyết định và kiểm thử theo từng loại dữ liệu; không chuyển đổi hàng loạt model trong một task. Owner đã chốt các quy tắc bên dưới. Không thêm consumer ngoài các acceptance hẹp đã ghi, thay schema hoặc mở workflow tài chính; mọi phần mở rộng cần task và acceptance riêng.
 
-## 1. `DateRange` — ngày hiệu lực bảo hiểm
+## 1. `NgayKhoang` — ngày hiệu lực bảo hiểm
 
-**Hiện trạng:** `DateRange` chấp nhận ngày bắt đầu chưa biết; `contains` không xác nhận ngày thuộc khoảng khi start chưa biết, hai đầu mút đã biết là bao gồm, và `overlaps` xử lý thận trọng khi endpoint chưa biết ([`DateRange.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/DateRange.java#L7-L35)). `BaoHiem` lưu ngày bắt đầu nullable, ngày hết hạn bắt buộc; handler dùng `DateRange` để từ chối khoảng đã biết bị đảo, không so sánh ngày thẻ với ngày hiện tại ([`BaoHiem.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/patient/BaoHiem.java#L11-L12), [`RegisterPatientHandler.java`](../../clinic-application/src/main/java/vn/clinicmanagement/application/reception/RegisterPatientHandler.java#L197-L210)). Form và JDBC truyền `LocalDate` trực tiếp.
+**Hiện trạng:** `NgayKhoang` chấp nhận ngày bắt đầu chưa biết; `contains` không xác nhận ngày thuộc khoảng khi start chưa biết, hai đầu mút đã biết là bao gồm, và `overlaps` xử lý thận trọng khi endpoint chưa biết ([`NgayKhoang.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/DateRange.java#L7-L35)). `BaoHiem` lưu ngày bắt đầu nullable, ngày hết hạn bắt buộc; handler dùng `NgayKhoang` để từ chối khoảng đã biết bị đảo, không so sánh ngày thẻ với ngày hiện tại ([`BaoHiem.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/patient/BaoHiem.java#L11-L12), [`RegisterBenhNhanHandler.java`](../../clinic-application/src/main/java/vn/clinicmanagement/application/reception/RegisterPatientHandler.java#L197-L210)). Form và JDBC truyền `LocalDate` trực tiếp.
 
 | Lựa chọn đã thảo luận trước quyết định Owner | Phương án | Ghi chú khi thảo luận |
 |---|---|---|
@@ -23,11 +23,11 @@ Source audit ban đầu ghi nhận ba Value Object chưa có consumer production
 
 **Quyết định Owner — 06/11/2026:** ngày bắt đầu có thể trống và có nghĩa là chưa biết, không được suy thành bắt đầu từ vô hạn quá khứ hay giả định đủ điều kiện; ngày hết hạn có hiệu lực hết toàn bộ ngày lịch địa phương ghi trên thẻ (inclusive). Tiếp đón không bị chặn bởi thẻ hết hạn, chưa đến ngày bắt đầu hoặc chưa biết ngày bắt đầu. Ghi nhận/kiểm tra tính hợp lệ của khoảng ngày không phải là xác minh hay adjudication quyền lợi thanh toán.
 
-**Ranh giới và bằng chứng hiện tại:** Handler BHYT đã dùng `DateRange` để xác thực khoảng; test handler bao phủ start chưa biết, ngày hết hạn, ngày tương lai, cùng ngày và khoảng đảo. `PLAT-VO-BHYT-SQL-READBACK-01` xác nhận qua form intake, persistence và scoped CCCD read-back trên SQL Server tổng hợp rằng start null vẫn null và ngày hết hạn quá khứ được đọc lại đúng `LocalDate`: opt-in `mvn -pl clinic-desktop -am -Djava.awt.headless=true -Dclinic.test.sqlserver=true -Dclinic.test.sqlserver.databaseName=clinic_test_patient_history_20261106 -Dtest=ReceptionSqlServerPersistenceTest -Dsurefire.failIfNoSpecifiedTests=false test` đạt **BUILD SUCCESS, 1/1, 0 failures, 0 errors, 0 skips** trên database hiện hữu `clinic_test_patient_history_20261106`. Root `mvn -Djava.awt.headless=true clean verify` đạt **BUILD SUCCESS, 337 tests, 0 failures, 0 errors, 6 opt-in skips, 70 Surefire reports**. Bài test chứng minh lưu/đọc lại giá trị, không chứng minh eligibility, coverage adjudication hay việc workflow coverage tương lai thực thi expiry-inclusive. Không dùng `contains` hoặc trạng thái ngày để adjudicate hay chặn tiếp đón. Visual smoke, phone-equivalent search và các gate rộng hơn vẫn mở; xem [`phase0-value-object-domain-review.md`](phase0-value-object-domain-review.md) và task board.
+**Ranh giới và bằng chứng hiện tại:** Handler BHYT đã dùng `NgayKhoang` để xác thực khoảng; test handler bao phủ start chưa biết, ngày hết hạn, ngày tương lai, cùng ngày và khoảng đảo. `PLAT-VO-BHYT-SQL-READBACK-01` xác nhận qua form intake, persistence và scoped CCCD read-back trên SQL Server tổng hợp rằng start null vẫn null và ngày hết hạn quá khứ được đọc lại đúng `LocalDate`: opt-in `mvn -pl clinic-desktop -am -Djava.awt.headless=true -Dclinic.test.sqlserver=true -Dclinic.test.sqlserver.databaseName=clinic_test_patient_history_20261106 -Dtest=TiepDonSQLMayChuLuuTruTest -Dsurefire.failIfNoSpecifiedTests=false test` đạt **BUILD SUCCESS, 1/1, 0 failures, 0 errors, 0 skips** trên database hiện hữu `clinic_test_patient_history_20261106`. Root `mvn -Djava.awt.headless=true clean verify` đạt **BUILD SUCCESS, 337 tests, 0 failures, 0 errors, 6 opt-in skips, 70 Surefire reports**. Bài test chứng minh lưu/đọc lại giá trị, không chứng minh eligibility, coverage adjudication hay việc workflow coverage tương lai thực thi expiry-inclusive. Không dùng `contains` hoặc trạng thái ngày để adjudicate hay chặn tiếp đón. Visual smoke, phone-equivalent search và các gate rộng hơn vẫn mở; xem [`phase0-value-object-domain-review.md`](phase0-value-object-domain-review.md) và task board.
 
-## 2. `PhoneNumber` — số liên hệ bệnh nhân
+## 2. `DienThoaiSo` — số liên hệ bệnh nhân
 
-**Hiện trạng:** `PhoneNumber` chỉ nhận số di động Việt Nam theo prefix hiện có; bỏ khoảng trắng, dấu chấm và gạch nối nhưng không chuyển đổi `0...` sang `+84...` ([`PhoneNumber.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/PhoneNumber.java#L7-L15)). Tiếp đón cho phép số chính và số liên hệ khẩn cấp vắng mặt; số đã nhập được chuẩn hóa trước khi lưu.
+**Hiện trạng:** `DienThoaiSo` chỉ nhận số di động Việt Nam theo prefix hiện có; bỏ khoảng trắng, dấu chấm và gạch nối nhưng không chuyển đổi `0...` sang `+84...` ([`DienThoaiSo.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/PhoneNumber.java#L7-L15)). Tiếp đón cho phép số chính và số liên hệ khẩn cấp vắng mặt; số đã nhập được chuẩn hóa trước khi lưu.
 
 | Lựa chọn đã thảo luận trước quyết định Owner | Phương án | Ghi chú khi thảo luận |
 |---|---|---|
@@ -38,11 +38,11 @@ Source audit ban đầu ghi nhận ba Value Object chưa có consumer production
 
 **Quyết định Owner — 06/11/2026:** số chính và số khẩn cấp đều tùy chọn; chỉ validate khi có nhập theo bộ quy tắc mobile Việt Nam hiện có; bỏ các dấu phân cách được hỗ trợ (khoảng trắng, dấu chấm, gạch nối) khi lưu; giữ nguyên prefix `0...` hoặc `+84...` như đã nhập, không chuyển đổi giữa hai dạng. Không backfill dữ liệu cũ.
 
-**Ranh giới và bằng chứng hiện tại:** test ứng dụng bao phủ số tùy chọn, validation và giá trị canonical; SQL Server opt-in đã xác nhận form-originated insert/update và đọc lại giá trị canonical qua tìm bệnh nhân theo CCCD. Tìm kiếm bằng số với cách nhập tương đương và visual/interaction acceptance toàn `ReceptionPanel` chưa được nghiệm thu. Không tự động sửa số legacy không hợp lệ.
+**Ranh giới và bằng chứng hiện tại:** test ứng dụng bao phủ số tùy chọn, validation và giá trị canonical; SQL Server opt-in đã xác nhận form-originated insert/update và đọc lại giá trị canonical qua tìm bệnh nhân theo CCCD. Tìm kiếm bằng số với cách nhập tương đương và visual/interaction acceptance toàn `TiepDonManHinh` chưa được nghiệm thu. Không tự động sửa số legacy không hợp lệ.
 
-## 3. `Money` — các trường tiền
+## 3. `Tien` — các trường tiền
 
-**Hiện trạng:** `Money` hiện chỉ chấp nhận VND và vẫn làm tròn về hai chữ số bằng `HALF_UP` khi tạo đối tượng ([`Money.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/Money.java#L8-L25)). Đây là hành vi code hiện tại, không phải phê duyệt áp dụng cách làm tròn này tại bất kỳ ranh giới hóa đơn nào. Các model/schema có trường tiền `BigDecimal`/`DECIMAL(18,2)`, nhưng không lưu currency code; chưa có consumer production cho hóa đơn.
+**Hiện trạng:** `Tien` hiện chỉ chấp nhận VND và vẫn làm tròn về hai chữ số bằng `HALF_UP` khi tạo đối tượng ([`Tien.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/Money.java#L8-L25)). Đây là hành vi code hiện tại, không phải phê duyệt áp dụng cách làm tròn này tại bất kỳ ranh giới hóa đơn nào. Các model/schema có trường tiền `BigDecimal`/`DECIMAL(18,2)`, nhưng không lưu currency code; chưa có consumer production cho hóa đơn.
 
 | Lựa chọn đã thảo luận trước quyết định Owner | Phương án | Ghi chú khi thảo luận |
 |---|---|---|
@@ -51,15 +51,15 @@ Source audit ban đầu ghi nhận ba Value Object chưa có consumer production
 | Áp dụng cho nhóm nào? | A. Chỉ dịch vụ/viện phí. B. Bao gồm thuốc, kho, công nợ, đặt cọc và lương. | A cho phép tách hợp đồng hóa đơn; các nhóm khác cần quy tắc riêng. Khoản đặt cọc lịch hẹn hiện vẫn `DENY`. |
 | Constructor có tự làm tròn không? | A. Có, scale cố định 2. B. Không; làm tròn tại boundary đã được nghiệp vụ chỉ định. | B tránh làm tròn lặp ngoài ý muốn, nhưng yêu cầu quy tắc scale/rounding được chốt trước khi có consumer. |
 
-**Quyết định Owner — 06/11/2026:** chỉ dùng VND. Chưa phê duyệt consumer hóa đơn/viện phí hoặc cách làm tròn tại bất kỳ ranh giới hóa đơn nào. Trước khi mở consumer như vậy, Owner phải có một quyết định riêng chốt cả điểm làm tròn và phạm vi field áp dụng. Hành vi hiện tại của `Money` (hai chữ số, `HALF_UP`) không phải phê duyệt làm tròn hóa đơn. Quyết định này cũng không cho phép mở thanh toán, đặt cọc, giảm trừ hay hoàn tiền.
+**Quyết định Owner — 06/11/2026:** chỉ dùng VND. Chưa phê duyệt consumer hóa đơn/viện phí hoặc cách làm tròn tại bất kỳ ranh giới hóa đơn nào. Trước khi mở consumer như vậy, Owner phải có một quyết định riêng chốt cả điểm làm tròn và phạm vi field áp dụng. Hành vi hiện tại của `Tien` (hai chữ số, `HALF_UP`) không phải phê duyệt làm tròn hóa đơn. Quyết định này cũng không cho phép mở thanh toán, đặt cọc, giảm trừ hay hoàn tiền.
 
 **Gate consumer:** không thêm consumer invoice/billing cho tới khi Owner quyết định riêng điểm làm tròn và field scope. Khi được quyết định, acceptance tương ứng phải chứng minh đúng các field và boundary được phê duyệt với dữ liệu tổng hợp; quyết định này không mở rộng sang nghiệp vụ tiền khác. Không ghi đơn giá hoặc dữ liệu thật vào log.
 
 ## Trạng thái triển khai hẹp
 
-1. `PhoneNumber`: acceptance canonical persistence/read-back hẹp đã có; visual/interaction acceptance và tìm kiếm bằng định dạng số tương đương vẫn mở.
-2. `DateRange`: đã hỗ trợ start chưa biết và được nối vào validation khoảng BHYT; không biến null thành giả định quyền lợi hay quyết định tiếp đón.
-3. `Money`: chỉ VND; không tích hợp consumer hóa đơn trước quyết định riêng về rounding point và field scope.
+1. `DienThoaiSo`: acceptance canonical persistence/read-back hẹp đã có; visual/interaction acceptance và tìm kiếm bằng định dạng số tương đương vẫn mở.
+2. `NgayKhoang`: đã hỗ trợ start chưa biết và được nối vào validation khoảng BHYT; không biến null thành giả định quyền lợi hay quyết định tiếp đón.
+3. `Tien`: chỉ VND; không tích hợp consumer hóa đơn trước quyết định riêng về rounding point và field scope.
 
 ## Không thuộc quyết định của tài liệu này
 
@@ -72,7 +72,7 @@ Source audit ban đầu ghi nhận ba Value Object chưa có consumer production
 
 - [`phase0-value-object-consumer-audit.md`](phase0-value-object-consumer-audit.md)
 - [`03-model-task-board.md`](03-model-task-board.md), task `PLAT-VO-01`
-- `clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/{DateRange,Money,PhoneNumber}.java`
+- `clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/{NgayKhoang,Tien,DienThoaiSo}.java`
 - `clinic-domain/src/main/java/vn/clinicmanagement/domain/patient/BaoHiem.java`
-- `clinic-application/src/main/java/vn/clinicmanagement/application/reception/RegisterPatientHandler.java`
+- `clinic-application/src/main/java/vn/clinicmanagement/application/reception/RegisterBenhNhanHandler.java`
 - `clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql`

@@ -22,7 +22,7 @@ Theo hợp đồng đã được phê duyệt `18847587-233a-4f02-99cd-13e1eaf07
    - **Manual Launch & Visual Inspection (Khởi chạy và quan sát trực tiếp):** Bắt buộc phải do Owner trực tiếp khởi chạy trong môi trường đồ họa desktop thật để quan sát cách hiển thị pixel, phông chữ, bảng màu, hành vi cửa sổ và tương tác chuột/bàn phím.
    - **Không tự nhận nghiệm thu trực quan:** Agent thực hiện đối soát mã nguồn và biên soạn tài liệu; **tuyệt đối không tự nhận (claim) nghiệm thu trực quan** hoặc suy diễn kết quả quan sát của Owner.
 4. **Bảo toàn thiết kế gốc:** Không tự ý đề xuất hoặc áp dụng việc thiết kế lại bố cục (redesign layout), bảng màu hoặc thành phần giao diện. Giữ nguyên tỷ lệ tối ưu cho màn hình 13-inch (1280×800 và 1440×900).
-5. **Lỗi biên dịch tại baseline lịch sử `e953bc5`:** Thời điểm checklist được soạn, Desktop còn ba lỗi xác thực tại `AuthenticationCompositionRoot.java:19` và `LoginForm.java:136,140`. Các lỗi đó đã được xử lý trong ứng viên hiện tại; kết quả build mới được ghi ở mục 8. Không dùng bản dựng baseline `e953bc5` để nghiệm thu đăng nhập.
+5. **Lỗi biên dịch tại baseline lịch sử `e953bc5`:** Thời điểm checklist được soạn, Desktop còn ba lỗi xác thực tại `XacThucGhepNoiGoc.java:19` và `DangNhapBieuMau.java:136,140`. Các lỗi đó đã được xử lý trong ứng viên hiện tại; kết quả build mới được ghi ở mục 8. Không dùng bản dựng baseline `e953bc5` để nghiệm thu đăng nhập.
 
 ---
 
@@ -32,23 +32,23 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 
 | Phân hệ / Màn hình | Tệp mã nguồn (Repository-relative path) | Dòng mã nguồn (Line numbers) | Hiện trạng đối chiếu mã nguồn tĩnh |
 |---|---|---|---|
-| **Cửa sổ đăng nhập** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java) | [L31–L98](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L31-L98) | Trùng khớp 100% với `6aabb85`. Kích thước cố định 440×390, không co giãn, nền trắng, 2 ô nhập liệu tên đăng nhập/mật khẩu, 1 nút đăng nhập lớn. Không có dropdown chọn vai trò/cơ sở trên UI. |
-| **Khung Dashboard** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java) | [L42–L98](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L42-L98), [L103–L311](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L103-L311) | Trùng khớp 100% với `6aabb85`. Khung phóng to toàn màn hình, Ribbon đỉnh, vùng làm việc CardLayout ở giữa, dải MDI Tab cao 26px và thanh StatusBar ở đáy. |
-| **Thanh trạng thái** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/StatusBarPanel.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/StatusBarPanel.java) | [L34–L85](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/StatusBarPanel.java#L34-L85) | Trùng khớp 100% với `6aabb85`. Chiều cao 25px, gồm chính xác 9 ô thông tin từ trái qua phải (Đã đăng ký, EHC mini, Tên cơ sở linh hoạt, Số thu, DB, VN, Đồng hồ thực tế, Thông báo nền vàng, Trợ giúp). |
-| **Quản lý MDI Tab** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/WorkspaceManager.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/WorkspaceManager.java) | [L43–L100](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/WorkspaceManager.java#L43-L100) | Trùng khớp 100% với `6aabb85`. Điều phối chuyển đổi CardLayout, đồng bộ trạng thái chọn nút Ribbon, gọi vòng đời `onShow()` / `onHide()`. |
-| **Màn hình Tiếp đón** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java) | [L28–L64](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L28-L64) | Trùng khớp 100% với `6aabb85`. Bố cục `BorderLayout`: Thanh công cụ đỉnh, JSplitPane dọc chia tại 218px (Form nhập liệu ở trên, Trạng thái phòng ở dưới), thanh phím tắt footer ở đáy. |
-| **Form nhập Tiếp đón** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java) | [L64–L138](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L64-L138), [L141–L301](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L141-L301), [L316–L423](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L316-L423) | Trùng khớp 100% với `6aabb85`. Gồm thanh tìm kiếm nhanh đỉnh, chia 2 cột dọc (Cột trái: 8 dòng hành chính bệnh nhân; Cột phải: 8 dòng thông tin thẻ BHYT). |
-| **Bảng phòng Tiếp đón** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java) | [L37–L70](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L37-L70), [L75–L117](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L75-L117), [L122–L200](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L122-L200) | Trùng khớp 100% với `6aabb85`. Dải 9 tab ngang (mặc định tab 2 "Trạng Thái Phòng Khám"), hiển thị lưới 3 cột song song (cột giữa bôi màu ĐỎ phòng được chọn "Phòng Tiêm Chủng"). |
-| **Bàn khám Bác sĩ** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java) | [L31–L130](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L31-L130) | Trùng khớp 100% với `6aabb85`. Bố cục **2 vùng chính (two-pane layout)** chia ngang tại 250px: Bên trái là cột hàng đợi bệnh nhân; bên phải là 5 tab lâm sàng (Tab 1 "Bệnh Nhân" chứa form lâm sàng và bảng lịch sử; 4 tab còn lại hiển thị placeholder thông báo sẵn sàng kết nối). |
-| **Thanh công cụ Bác sĩ** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorActionBar.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorActionBar.java) | [L28–L85](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorActionBar.java#L28-L85) | Trùng khớp 100% với `6aabb85`. Nút chức năng bác sĩ bên trái (nút "In" viền nền vàng nhạt); banner tóm tắt thông tin bệnh nhân chữ đỏ bên phải kèm ô tỷ lệ BHYT 80% to màu xanh navy. |
-| **Hàng đợi Bác sĩ** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java) | [L31–L142](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java#L31-L142) | Trùng khớp 100% với `6aabb85`. Thanh lọc vàng nhạt phía trên, bảng hàng đợi renderer 2 dòng cho bệnh nhân, footer 2 hộp chọn "(Tất cả bệnh nhân)" và "(Tất cả khoa)". |
-| **Lâm sàng & Tiền sử** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java) & [`DoctorHistoryPanel.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java) | [`DoctorClinicalForm.java:48–112`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java#L48-L112); [`DoctorHistoryPanel.java:25–45`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L25-L45) | Trùng khớp 100% với `6aabb85`. Lưới GridBagLayout 11 hàng hiển thị thông tin hành chính/lâm sàng với nhãn liên kết màu xanh navy; bảng lịch sử 8 cột bên dưới. |
+| **Cửa sổ đăng nhập** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/DangNhapBieuMau.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java) | [L31–L98](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L31-L98) | Trùng khớp 100% với `6aabb85`. Kích thước cố định 440×390, không co giãn, nền trắng, 2 ô nhập liệu tên đăng nhập/mật khẩu, 1 nút đăng nhập lớn. Không có dropdown chọn vai trò/cơ sở trên UI. |
+| **Khung Dashboard** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainBangDieuKhienCuaSo.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java) | [L42–L98](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L42-L98), [L103–L311](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L103-L311) | Trùng khớp 100% với `6aabb85`. Khung phóng to toàn màn hình, Ribbon đỉnh, vùng làm việc CardLayout ở giữa, dải MDI Tab cao 26px và thanh StatusBar ở đáy. |
+| **Thanh trạng thái** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/TrangThaiThanhManHinh.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/StatusBarPanel.java) | [L34–L85](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/StatusBarPanel.java#L34-L85) | Trùng khớp 100% với `6aabb85`. Chiều cao 25px, gồm chính xác 9 ô thông tin từ trái qua phải (Đã đăng ký, EHC mini, Tên cơ sở linh hoạt, Số thu, DB, VN, Đồng hồ thực tế, Thông báo nền vàng, Trợ giúp). |
+| **Quản lý MDI Tab** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/KhongGianLamViecQuanLy.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/WorkspaceManager.java) | [L43–L100](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/WorkspaceManager.java#L43-L100) | Trùng khớp 100% với `6aabb85`. Điều phối chuyển đổi CardLayout, đồng bộ trạng thái chọn nút Ribbon, gọi vòng đời `onShow()` / `onHide()`. |
+| **Màn hình Tiếp đón** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/TiepDonManHinh.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java) | [L28–L64](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L28-L64) | Trùng khớp 100% với `6aabb85`. Bố cục `BorderLayout`: Thanh công cụ đỉnh, JSplitPane dọc chia tại 218px (Form nhập liệu ở trên, Trạng thái phòng ở dưới), thanh phím tắt footer ở đáy. |
+| **Form nhập Tiếp đón** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/BenhNhanDangKyBieuMauManHinh.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java) | [L64–L138](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L64-L138), [L141–L301](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L141-L301), [L316–L423](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L316-L423) | Trùng khớp 100% với `6aabb85`. Gồm thanh tìm kiếm nhanh đỉnh, chia 2 cột dọc (Cột trái: 8 dòng hành chính bệnh nhân; Cột phải: 8 dòng thông tin thẻ BHYT). |
+| **Bảng phòng Tiếp đón** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PhongKhamPhongTrangThaiManHinh.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java) | [L37–L70](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L37-L70), [L75–L117](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L75-L117), [L122–L200](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L122-L200) | Trùng khớp 100% với `6aabb85`. Dải 9 tab ngang (mặc định tab 2 "Trạng Thái Phòng Khám"), hiển thị lưới 3 cột song song (cột giữa bôi màu ĐỎ phòng được chọn "Phòng Tiêm Chủng"). |
+| **Bàn khám Bác sĩ** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/BacSiTramManHinh.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java) | [L31–L130](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L31-L130) | Trùng khớp 100% với `6aabb85`. Bố cục **2 vùng chính (two-pane layout)** chia ngang tại 250px: Bên trái là cột hàng đợi bệnh nhân; bên phải là 5 tab lâm sàng (Tab 1 "Bệnh Nhân" chứa form lâm sàng và bảng lịch sử; 4 tab còn lại hiển thị placeholder thông báo sẵn sàng kết nối). |
+| **Thanh công cụ Bác sĩ** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/BacSiHanhDongThanh.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorActionBar.java) | [L28–L85](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorActionBar.java#L28-L85) | Trùng khớp 100% với `6aabb85`. Nút chức năng bác sĩ bên trái (nút "In" viền nền vàng nhạt); banner tóm tắt thông tin bệnh nhân chữ đỏ bên phải kèm ô tỷ lệ BHYT 80% to màu xanh navy. |
+| **Hàng đợi Bác sĩ** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/BacSiHangDoiThanhBen.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java) | [L31–L142](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java#L31-L142) | Trùng khớp 100% với `6aabb85`. Thanh lọc vàng nhạt phía trên, bảng hàng đợi renderer 2 dòng cho bệnh nhân, footer 2 hộp chọn "(Tất cả bệnh nhân)" và "(Tất cả khoa)". |
+| **Lâm sàng & Tiền sử** | [`clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/BacSiLamSangBieuMau.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java) & [`BacSiTienSuManHinh.java`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java) | [`BacSiLamSangBieuMau.java:48–112`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java#L48-L112); [`BacSiTienSuManHinh.java:25–45`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L25-L45) | Trùng khớp 100% với `6aabb85`. Lưới GridBagLayout 11 hàng hiển thị thông tin hành chính/lâm sàng với nhãn liên kết màu xanh navy; bảng lịch sử 8 cột bên dưới. |
 
 > [!IMPORTANT]
 > **Đối chiếu thực tế so với tài liệu tiêu chuẩn `UI_CODING_STANDARDS.md`:**
 > 1. **Bàn khám Bác sĩ:** Mã nguồn thực tế tại `6aabb85` và bản khôi phục là **bố cục 2 vùng (two-pane)**: cột hàng đợi bên trái (250px) và vùng làm việc đa tab bên phải. Tài liệu `UI_CODING_STANDARDS.md` (mục 2.3 dòng 223–229) mô tả thiết kế kỳ vọng 3 cột (hàng đợi trái, hồ sơ giữa, chỉ định phải). **Bắt buộc giữ nguyên bố cục 2 vùng của mã nguồn gốc; tuyệt đối không tự ý tái cấu trúc sang 3 cột khi chưa có yêu cầu từ Owner.**
 > 2. **Màn hình Đăng nhập:** Mã nguồn gốc là form gọn 440×390 với 2 trường Username/Password. Tài liệu chuẩn mô tả các dropdown chọn vai trò/cơ sở; mã nguồn gốc không chứa các dropdown này.
-> 3. **Biểu tượng Ribbon:** Mã nguồn gốc sử dụng các ký tự UTF-8/emoji làm icon trên `RibbonButton` (🏠, 📋, 👨‍⚕️, ⚙️, ❌). Đây là hiện trạng gốc cần giữ ổn định, không tự ý thay đổi icon khi nghiệm thu.
+> 3. **Biểu tượng Ribbon:** Mã nguồn gốc sử dụng các ký tự UTF-8/emoji làm icon trên `ThanhBangNut` (🏠, 📋, 👨‍⚕️, ⚙️, ❌). Đây là hiện trạng gốc cần giữ ổn định, không tự ý thay đổi icon khi nghiệm thu.
 
 ---
 
@@ -56,13 +56,13 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 
 ### 3.1. Yêu cầu môi trường thử nghiệm trực quan
 - **Màn hình hiển thị:** Độ phân giải chuẩn 13-inch: **1280×800** hoặc **1440×900**, Display Scaling chuẩn 100% (hoặc Retina 2x trên macOS).
-- **Phông chữ hệ thống:** Lớp [`AppFonts`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/config/AppFonts.java) cài đặt Segoe UI / Tahoma / Helvetica / Arial.
+- **Phông chữ hệ thống:** Lớp [`UngDungPhongChu`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/config/AppFonts.java) cài đặt Segoe UI / Tahoma / Helvetica / Arial.
 - **Tài khoản kiểm tra (Synthetic account):** Sử dụng tài khoản mẫu tổng hợp (ví dụ: `admin` hoặc `tiennv` với mật khẩu demo theo quy ước), tuyệt đối không dùng thông tin cá nhân thật.
 
 ---
 
-### 3.2. Bước 1: Kiểm tra màn hình Đăng Nhập (`LoginForm`)
-**Căn cứ mã nguồn:** [`LoginForm.java:31–98`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L31-L98)
+### 3.2. Bước 1: Kiểm tra màn hình Đăng Nhập (`DangNhapBieuMau`)
+**Căn cứ mã nguồn:** [`DangNhapBieuMau.java:31–98`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L31-L98)
 
 1. **Thao tác khởi chạy:** Khởi chạy cửa sổ đăng nhập ứng dụng.
 2. **Quan sát kích thước & vị trí:**
@@ -72,14 +72,14 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 3. **Quan sát nội dung & bố cục hiển thị:**
    - **Nền:** Màu trắng (`Color.WHITE`), lề trong `EmptyBorder(25, 30, 25, 30)`.
    - **Phần đầu (Header):**
-     - Dòng 1: `HỆ THỐNG Y TẾ THÔNG MINH EHC` (căn giữa, phông đậm `AppFonts.SECTION`, màu xanh thương hiệu `UIConstants.COLOR_PRIMARY`).
-     - Dòng 2: `Đăng nhập tài khoản & chọn phân hệ làm việc` (căn giữa, chữ nhỏ `UIConstants.FONT_SMALL`, màu xám `Color.GRAY`).
+     - Dòng 1: `HỆ THỐNG Y TẾ THÔNG MINH EHC` (căn giữa, phông đậm `UngDungPhongChu.SECTION`, màu xanh thương hiệu `GiaoDienHangSo.COLOR_PRIMARY`).
+     - Dòng 2: `Đăng nhập tài khoản & chọn phân hệ làm việc` (căn giữa, chữ nhỏ `GiaoDienHangSo.FONT_SMALL`, màu xám `Color.GRAY`).
    - **Phần thân (Form nhập):**
      - Nhãn `Tên đăng nhập:` (in đậm), bên dưới là ô nhập văn bản `txtUsername`.
      - Nhãn `Mật khẩu:` (in đậm), bên dưới là ô nhập mật khẩu che ký tự `txtPassword`.
      - Khoảng cách giữa các hàng đều đặn 6px (`GridLayout(4, 1, 6, 6)`).
    - **Phần chân (Footer):**
-     - Nút bấm lớn màu xanh: `ĐĂNG NHẬP HỆ THỐNG` (chiều cao 42px, nền `UIConstants.COLOR_PRIMARY`, chữ trắng in đậm).
+     - Nút bấm lớn màu xanh: `ĐĂNG NHẬP HỆ THỐNG` (chiều cao 42px, nền `GiaoDienHangSo.COLOR_PRIMARY`, chữ trắng in đậm).
 4. **Kiểm tra hành vi nhập liệu & phản hồi:**
    - Nhấn phím `Tab`: Con trỏ di chuyển tự nhiên từ ô `Tên đăng nhập` sang `Mật khẩu` rồi đến nút `ĐĂNG NHẬP HỆ THỐNG`.
    - Để trống và nhấn Đăng nhập: Xuất hiện hộp thoại cảnh báo `Vui lòng nhập tên đăng nhập và mật khẩu.` (tiêu đề `Cảnh báo`, icon cảnh báo).
@@ -87,8 +87,8 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 
 ---
 
-### 3.3. Bước 2: Kiểm tra khung Dashboard chính (`MainDashboardFrame`)
-**Căn cứ mã nguồn:** [`MainDashboardFrame.java:42–98, 103–311`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L42-L98)
+### 3.3. Bước 2: Kiểm tra khung Dashboard chính (`MainBangDieuKhienCuaSo`)
+**Căn cứ mã nguồn:** [`MainBangDieuKhienCuaSo.java:42–98, 103–311`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L42-L98)
 
 1. **Khởi chạy vào Dashboard:** Đăng nhập với quyền Bác sĩ (`role = "Bác sĩ điều trị"`) hoặc quyền Quản trị (`role = "admin"`).
 2. **Quan sát hình học khung cửa sổ (Geometry):**
@@ -116,9 +116,9 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 4. **Quan sát vùng làm việc MDI và dải Tab chân màn hình (Bottom MDI Tab Strip):**
    - Dải tab cao 26px nằm ngay phía trên thanh trạng thái, nền xanh xám nhạt `RGB(216, 228, 242)`.
    - Khi đăng nhập quyền Bác sĩ: Tab `Trang Chủ` và tab `Điều Trị` được tự động mở.
-   - Nhấp vào tab `Trang Chủ`: Màn hình giữa chuyển sang `HomeWelcomePanel`, nút `Trang Chủ` trên Ribbon tự động chuyển trạng thái được chọn (đồng bộ hai chiều giữa Tab và Ribbon).
+   - Nhấp vào tab `Trang Chủ`: Màn hình giữa chuyển sang `TrangChuChaoMungManHinh`, nút `Trang Chủ` trên Ribbon tự động chuyển trạng thái được chọn (đồng bộ hai chiều giữa Tab và Ribbon).
    - Nhấp vào nút đóng `×` trên tab: Tab đóng lại và giải phóng màn hình tương ứng.
-5. **Quan sát thanh trạng thái chân màn hình (`StatusBarPanel`):**
+5. **Quan sát thanh trạng thái chân màn hình (`TrangThaiThanhManHinh`):**
    - Chiều cao chính xác **25px**, nền xám nhạt `RGB(240, 242, 246)`, viền trên 1px.
    - Kiểm tra hiển thị đủ **9 ô thông tin**:
      1. Ô 1 (96px): Chữ xanh đậm `Đã đăng ký` căn giữa.
@@ -133,22 +133,22 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 
 ---
 
-### 3.4. Bước 3: Kiểm tra phân hệ Tiếp Đón & Đăng Ký Khám (`ReceptionPanel`)
-**Căn cứ mã nguồn:** [`ReceptionPanel.java:28–54`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L28-L54)
+### 3.4. Bước 3: Kiểm tra phân hệ Tiếp Đón & Đăng Ký Khám (`TiepDonManHinh`)
+**Căn cứ mã nguồn:** [`TiepDonManHinh.java:28–54`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L28-L54)
 
 1. **Kích hoạt màn hình:** Nhấp vào nút `Đón Tiếp` -> chọn `Đăng Ký Khám Bệnh`.
 2. **Quan sát bố cục phân chia (Split Pane):**
    - Vùng trung tâm được chia dọc bằng `JSplitPane`:
-     - Nửa trên: Khung nhập liệu thông tin bệnh nhân & BHYT (`PatientRegistrationFormPanel`).
+     - Nửa trên: Khung nhập liệu thông tin bệnh nhân & BHYT (`BenhNhanDangKyBieuMauManHinh`).
      - Vị trí thanh chia (Divider location): Chính xác tại **218px**, độ dày 4px.
-     - Nửa dưới: Bảng dải tab và trạng thái phòng khám (`ClinicRoomStatusPanel`).
-3. **Thanh công cụ đỉnh Tiếp đón (`ReceptionTopToolbar`):**
+     - Nửa dưới: Bảng dải tab và trạng thái phòng khám (`PhongKhamPhongTrangThaiManHinh`).
+3. **Thanh công cụ đỉnh Tiếp đón (`TiepDonTrenThanhCongCu`):**
    - Chiều cao 50px, nền xanh nhạt `RGB(238, 243, 248)`.
    - Bên trái gồm 6 nút hành động dọc (icon phía trên, chữ phía dưới): `Menu`, `In`, `Làm Mới`, `Bệnh Nhân Mới`, `Nhập Thẻ BH`, `Kiểm Tra Thẻ BH`.
    - Bên phải gồm cụm:
      - Hộp `Cửa đón tiếp` có ô số `2` nổi bật **nền vàng rực `RGB(255, 255, 60)`**, viền đen.
      - Hộp có biểu tượng loa phát thanh và chữ `Gọi Số Tiếp Theo`.
-4. **Khung nhập liệu (`PatientRegistrationFormPanel`):**
+4. **Khung nhập liệu (`BenhNhanDangKyBieuMauManHinh`):**
    - **Thanh tìm kiếm nhanh (trên cùng form):** Dropdown `Đối tượng:` (Viện phí, BHYT, Dịch vụ), checkbox đỏ `ĐN vn tiền`, nhãn tím `Tìm kiếm :`, ô `Số điện thoại:`, ô `Số CCCD:`.
    - **Chia 2 cột chính (JSplitPane ngang, tỷ lệ 0.58):**
      - **Cột trái (Hành chính bệnh nhân - 8 dòng):**
@@ -170,14 +170,14 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
        - Dòng 6: Checkbox chữ xanh lam: `Giấy chứng nhận không cùng chi trả trong năm`.
        - Dòng 7: `Ngày miễn cùng chi trả:` (3 ô ngày/tháng/năm).
        - Dòng 8: `Ngày đóng đủ 5 năm liên tục:` (3 ô ngày/tháng/năm).
-5. **Dải 9 Tab và Bảng trạng thái phòng khám (`ClinicRoomStatusPanel`):**
+5. **Dải 9 Tab và Bảng trạng thái phòng khám (`PhongKhamPhongTrangThaiManHinh`):**
    - Kiểm tra đủ dải **9 tab ngang**: `DS Đăng Ký Khám`, `Lịch Sử Khám Và Điều Trị`, `Trạng Thái Phòng Khám` (mặc định chọn, có gờ xanh dương đậm trên đỉnh), `Sinh Hiệu`, `Zalo`, `Thông Tin Xác Thực`, `Gia Đình`, `Quân Nhân`, `Ghi Chú`.
    - **Giao diện Tab 2 ("Trạng Thái Phòng Khám"):** Hiển thị lưới **3 cột song song**:
      - Cột 1 (trái): Bảng các phòng khám với các cột `Tên Phòng Khám`, `ĐK`, `Chờ`, `Khám`.
      - Cột 2 (giữa): Bảng phòng khám trong đó dòng `Phòng Tiêm Chủng` có chữ và số được hiển thị **màu ĐỎ in đậm** (`Color(210, 35, 35)`).
      - Cột 3 (phải): Lưới ô kẻ trống sẵn sàng nạp STT.
    - **Chuyển sang Tab 0 ("DS Đăng Ký Khám"):** Bảng hiển thị 7 cột: `Ngày Đăng Ký | Số thứ tự`, `STT Khám`, `Trạng Thái`, `Ngày Hẹn`, `Ngày Khám`, `Bác Sĩ Khám`, `Ngày Ra` (kèm dòng dữ liệu mẫu STT 2).
-6. **Thanh phím tắt chân trang Tiếp đón (`ReceptionFooterBar`):**
+6. **Thanh phím tắt chân trang Tiếp đón (`TiepDonChanTrangThanh`):**
    - Chiều cao 40px, căn lề phải gồm 4 nút gradient bo góc có biểu tượng và 2 dòng chữ:
      1. `Bệnh Nhân Mới (F1)`
      2. `Lưu Lại (F2)`
@@ -186,24 +186,24 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 
 ---
 
-### 3.5. Bước 4: Kiểm tra Bàn Khám Bác Sĩ & Quản Lý Điều Trị (`DoctorStationPanel`)
-**Căn cứ mã nguồn:** [`DoctorStationPanel.java:31–130`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L31-L130)
+### 3.5. Bước 4: Kiểm tra Bàn Khám Bác Sĩ & Quản Lý Điều Trị (`BacSiTramManHinh`)
+**Căn cứ mã nguồn:** [`BacSiTramManHinh.java:31–130`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L31-L130)
 
 1. **Kích hoạt màn hình:** Nhấp vào nút `Điều Trị` trên Ribbon.
 2. **Quan sát bố cục tổng thể (Two-Pane Layout):**
-   - Phía trên là thanh công cụ bác sĩ và banner tóm tắt bệnh nhân (`DoctorActionBar`).
+   - Phía trên là thanh công cụ bác sĩ và banner tóm tắt bệnh nhân (`BacSiHanhDongThanh`).
    - Phía dưới là `JSplitPane` ngang chia tại **250px**:
-     - Cột trái: Hàng đợi bệnh nhân chờ khám (`DoctorQueueSidebar`).
+     - Cột trái: Hàng đợi bệnh nhân chờ khám (`BacSiHangDoiThanhBen`).
      - Cột phải: Vùng làm việc đa tab lâm sàng (`clinicalTabs`).
-3. **Thanh công cụ Bác sĩ & Banner tóm tắt bệnh nhân (`DoctorActionBar`):**
+3. **Thanh công cụ Bác sĩ & Banner tóm tắt bệnh nhân (`BacSiHanhDongThanh`):**
    - **Bên trái:** 9 nút hành động: `Menu`, `In` (nút **nền vàng nhạt `RGB(254, 237, 208)`** đặc trưng), `Làm mới`, `Tìm Kiếm`, `Bệnh Án`, `Dịch Vụ`, `Thuốc/VT`, `Phác Đồ ĐT`, `Thanh Toán`.
    - **Bên phải:** Banner thông tin tóm tắt bệnh nhân:
      - 3 dòng chữ màu đỏ đậm (`RGB(139, 20, 20)`):
-       - Dòng 1: `TEST BN 033 | 18039327 | 1995 (23 tuổi) | Nam` (phông to `AppFonts.SECTION`).
+       - Dòng 1: `TEST BN 033 | 18039327 | 1995 (23 tuổi) | Nam` (phông to `UngDungPhongChu.SECTION`).
        - Dòng 2: `GD-4-21-21-212-12125 | Còn 49 ngày`.
        - Dòng 3: `Xã Việt Hồng, H. Thanh Hà, Hải Dương`.
      - Khối BHYT ngoài cùng bên phải: Nhãn đỏ `BHYT` và số tỷ lệ to màu xanh navy đậm `80%`.
-4. **Cột hàng đợi bệnh nhân bên trái (`DoctorQueueSidebar`):**
+4. **Cột hàng đợi bệnh nhân bên trái (`BacSiHangDoiThanhBen`):**
    - Độ rộng 250px.
    - Trên cùng là thanh lọc ngày vàng nhạt `RGB(255, 255, 215)` với nhãn `13/11/18 >> 13/11/18 - BH(115...` và biểu tượng kính lúp 🔍.
    - Danh sách bệnh nhân (bảng không kẻ ô, chiều cao dòng 38px): Mỗi bệnh nhân hiển thị 2 dòng (Dòng 1: Tên in đậm; Dòng 2: Mã bên dưới; Cột STT bên phải hiển thị số badge).
@@ -212,7 +212,7 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 5. **Vùng làm việc 5 Tab lâm sàng bên phải:**
    - Gồm 5 tab: `Bệnh Nhân`, `Công Khám(1)`, `Thuốc(2)`, `Xử Trí`, `Phản Hồi`.
    - **Tab 1 ("Bệnh Nhân"):**
-     - **Phần trên (`DoctorClinicalForm`):** Lưới thông tin lâm sàng 11 hàng bố trí cân đối bằng `GridBagLayout`:
+     - **Phần trên (`BacSiLamSangBieuMau`):** Lưới thông tin lâm sàng 11 hàng bố trí cân đối bằng `GridBagLayout`:
        - Hàng 1: Mã BN (`18039327`), Tên bệnh nhân (`TEST BN 033`), Giới tính (`Nam`).
        - Hàng 2: Ngày sinh (`01/02/1995`), NS (`1995`), Nghề nghiệp (`Nhân dân`).
        - Hàng 3: Dân tộc (`Kinh`), Quốc tịch (`Việt Nam`), Điện thoại.
@@ -225,7 +225,7 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
        - Hàng 10: Ngày vào (`09:40 11/11/2018`), Ngày ra, Chẩn đoán (`D21-Bướu lành khác của mô liên kết và mô mềm khác`).
        - Hàng 11: Bệnh kèm theo, Xử trí.
        - Các trường dạng liên kết (Link) hiển thị màu xanh navy đậm `RGB(15, 65, 145)`, có gạch chân viền mờ dưới và đổi con trỏ chuột dạng bàn tay (`HAND_CURSOR`).
-     - **Phần dưới (`DoctorHistoryPanel`):** Tiêu đề xanh `Lịch Sử Khám và Điều Trị`, bảng 8 cột: `Ngày Vào`, `Hình Thức Vào`, `Khoa`, `Phòng`, `Ngày Ra`, `Xử Trí`, `Dịch`, `Chẩn Đoán`.
+     - **Phần dưới (`BacSiTienSuManHinh`):** Tiêu đề xanh `Lịch Sử Khám và Điều Trị`, bảng 8 cột: `Ngày Vào`, `Hình Thức Vào`, `Khoa`, `Phòng`, `Ngày Ra`, `Xử Trí`, `Dịch`, `Chẩn Đoán`.
    - **Tab 2 đến Tab 5:** Hiển thị panel placeholder thông báo an toàn (ví dụ: `Nội dung chỉ định dịch vụ công khám & thủ thuật - Sẵn sàng kết nối dữ liệu khám bệnh EMR & chỉ định thuốc`).
 6. **Thử nghiệm tương tác chuyển đổi bệnh nhân:**
    - Nhấp chọn bệnh nhân khác trong hàng đợi (ví dụ: `TEST BN 060` hoặc `PHẠM QUANG XX`).
@@ -242,11 +242,11 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 2. **Các nút hành động trên thanh công cụ Bác sĩ:**
    - Các nút `Thuốc/VT`, `Phác Đồ ĐT`, `Thanh Toán`, `Dịch Vụ` không được thực hiện bất kỳ thao tác ghi (mutation) nào vào cơ sở dữ liệu khi chưa có ngữ cảnh phiên làm việc xác thực.
 3. **Thao tác Gọi số và Lưu trên Tiếp đón:**
-   - Nút `Gọi Số Tiếp Theo` trên `ReceptionTopToolbar` và nút `Lưu Lại (F2)` trên `ReceptionFooterBar` trong bản khôi phục chỉ hiển thị hộp thoại thông báo mô phỏng (`JOptionPane.showMessageDialog`). Chúng không được thực thi lệnh SQL trực tiếp hay thay đổi hàng đợi thực tế khi chưa nối qua Application Service và Transaction Manager.
+   - Nút `Gọi Số Tiếp Theo` trên `TiepDonTrenThanhCongCu` và nút `Lưu Lại (F2)` trên `TiepDonChanTrangThanh` trong bản khôi phục chỉ hiển thị hộp thoại thông báo mô phỏng (`JOptionPane.showMessageDialog`). Chúng không được thực thi lệnh SQL trực tiếp hay thay đổi hàng đợi thực tế khi chưa nối qua Application Service và Transaction Manager.
 4. **Menu Kiosk:**
    - Các mục `Kiosk Đăng Ký Khám` và `Kiosk Đánh Giá Chất Lượng` trên menu xổ xuống của nút "Đón Tiếp" chỉ bật hộp thoại thông tin giới thiệu mô hình, không kích hoạt luồng Kiosk phần cứng.
 5. **Phương thức tải dữ liệu (`refreshData`):**
-   - `ReceptionPanel.refreshData()` và `DoctorStationPanel.refreshData()` là các stub rỗng, không được thực hiện các truy vấn JDBC blocking trực tiếp trên luồng giao diện Swing EDT.
+   - `TiepDonManHinh.refreshData()` và `BacSiTramManHinh.refreshData()` là các stub rỗng, không được thực hiện các truy vấn JDBC blocking trực tiếp trên luồng giao diện Swing EDT.
 6. **Chính sách thoát ứng dụng:**
    - Các nút `Kết Thúc` hiện gọi `System.exit(0)` sau hộp thoại xác nhận. Khi khôi phục phiên đầy đủ, cần kích hoạt dọn dẹp phiên và ghi audit logout trước khi đóng tiến trình.
 
@@ -258,27 +258,27 @@ Qua kiểm tra đối chiếu mã nguồn, toàn bộ các file thành phần gi
 
 | Mã Kiểm Tra | Thành Phần / Khu Vực | Căn Cứ Mã Nguồn Tĩnh (`file:lines`) | Bước Kiểm Tra Trực Quan Thực Tế | Kết Quả Kỳ Vọng Hiển Thị | Phân Loại | Kết Quả (PASS / FAIL / DIFF) | Ghi Chú Của Owner |
 |---|---|---|---|---|---|---|---|
-| **CHK-LOGIN-01** | `LoginForm` Kích thước & Cửa sổ | [`LoginForm.java:31–37`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L31-L37) | Mở cửa sổ đăng nhập trên màn hình | Cửa sổ 440×390 pixel, căn giữa, không phóng to, không co giãn viền | Launch / Visual | `[ ]` | |
-| **CHK-LOGIN-02** | `LoginForm` Header & Bố cục | [`LoginForm.java:42–56`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L42-L56) | Quan sát tiêu đề và phụ đề | Nền trắng, tiêu đề xanh thương hiệu in đậm, phụ đề xám căn giữa | Launch / Visual | `[ ]` | |
-| **CHK-LOGIN-03** | `LoginForm` Trường nhập liệu | [`LoginForm.java:59–78`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L59-L78) | Nhập username/password, phím Tab | Tab chuyển tuần tự Username -> Password -> Nút Đăng nhập | Launch / Interaction | `[ ]` | |
-| **CHK-LOGIN-04** | `LoginForm` Nút bấm & Phản hồi | [`LoginForm.java:81–95, 104–108`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L81-L95) | Nhấn đăng nhập khi ô nhập rỗng | Nút xanh chữ trắng; hiện hộp thoại cảnh báo `Vui lòng nhập...` | Launch / Interaction | `[ ]` | |
-| **CHK-DASH-01** | `MainDashboardFrame` Tiêu đề & Cỡ khung | [`MainDashboardFrame.java:42–52`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L42-L52) | Quan sát khung Dashboard khi mở | Cửa sổ toàn màn hình, tiêu đề chứa số hiệu build và phiên bản tương ứng | Launch / Visual | `[ ]` | |
-| **CHK-DASH-02** | `MainDashboardFrame` Doctor Ribbon | [`MainDashboardFrame.java:103–165`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L103-L165) | Kiểm tra Ribbon quyền Bác sĩ | Đủ 8 nút; nút "Điều Trị" được bôi cam mặc định; icon emoji gốc | Launch / Visual | `[ ]` | |
-| **CHK-DASH-03** | `MainDashboardFrame` Reception Popup | [`MainDashboardFrame.java:176–232`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L176-L232) | Nhấp nút "Đón Tiếp" trên Ribbon | Menu xổ xuống nền trắng hiển thị đúng 6 mục chức năng | Launch / Interaction | `[ ]` | |
-| **CHK-DASH-04** | `MainDashboardFrame` MDI Tab & Đồng bộ | [`MainDashboardFrame.java:85–98`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L85-L98) | Chuyển đổi qua lại giữa các tab ở đáy | Màn hình CardLayout chuyển đổi mượt mà; nút Ribbon tương ứng tự đổi trạng thái | Launch / Interaction | `[ ]` | |
-| **CHK-STATUS-01** | `StatusBarPanel` 9 ô thông tin | [`StatusBarPanel.java:49–83`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/StatusBarPanel.java#L49-L83) | Kiểm tra thanh trạng thái chân màn hình | Cao 25px; hiển thị đủ 9 ô; đồng hồ nhảy từng giây; ô Thông báo nền vàng | Launch / Visual | `[ ]` | |
-| **CHK-REC-01** | `ReceptionPanel` Bố cục phân chia | [`ReceptionPanel.java:43–49`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L43-L49) | Mở màn hình Đăng Ký Khám Bệnh | Split dọc chia tại 218px: Form phía trên, bảng phòng phía dưới | Launch / Visual | `[ ]` | |
-| **CHK-REC-02** | `ReceptionTopToolbar` Nút & Gọi số | [`ReceptionTopToolbar.java:28–97`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ReceptionTopToolbar.java#L28-L97) | Quan sát thanh công cụ đỉnh | 6 nút trái; ô Cửa đón tiếp số 2 nền vàng rực; nút loa phát thanh | Launch / Visual | `[ ]` | |
-| **CHK-REC-03** | `PatientRegistrationFormPanel` Cột trái | [`PatientRegistrationFormPanel.java:141–301`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L141-L301) | Quan sát cột hành chính bệnh nhân | Đủ 8 dòng; ngày sinh 3 ô; tuổi xanh lam; phòng khám bôi vàng nổi bật | Launch / Visual | `[ ]` | |
-| **CHK-REC-04** | `PatientRegistrationFormPanel` Cột BHYT | [`PatientRegistrationFormPanel.java:316–423`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L316-L423) | Quan sát cột thông tin thẻ BHYT | Đủ 8 dòng; 2 checkbox đỏ; số BHYT 4 ô phân đoạn; checkbox miễn cùng chi trả | Launch / Visual | `[ ]` | |
-| **CHK-REC-05** | `ClinicRoomStatusPanel` 9 Tab & Bảng phòng | [`ClinicRoomStatusPanel.java:37–70, 122–192`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L37-L70) | Kiểm tra bảng trạng thái phòng khám | 9 tab; tab 2 mặc định mở; 3 cột song song; "Phòng Tiêm Chủng" bôi ĐỎ nổi bật | Launch / Visual | `[ ]` | |
-| **CHK-REC-06** | `ReceptionFooterBar` Phím tắt footer | [`ReceptionFooterBar.java:23–50`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ReceptionFooterBar.java#L23-L50) | Quan sát thanh phím tắt chân trang | 4 nút gradient bo góc (F1, F2, F3, F4) căn lề phải | Launch / Visual | `[ ]` | |
-| **CHK-DOC-01** | `DoctorStationPanel` Bố cục 2 vùng | [`DoctorStationPanel.java:91–130`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L91-L130) | Mở màn hình Bàn Khám Bác Sĩ (Điều Trị) | Bố cục 2 vùng (hàng đợi trái 250px, vùng làm việc phải); không phải 3 cột | Launch / Visual | `[ ]` | |
-| **CHK-DOC-02** | `DoctorActionBar` Nút & Banner BN | [`DoctorActionBar.java:28–85`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorActionBar.java#L28-L85) | Quan sát thanh công cụ và banner đỉnh | 9 nút (nút "In" nền vàng nhạt); 3 dòng banner chữ đỏ; khối BHYT 80% xanh navy | Launch / Visual | `[ ]` | |
-| **CHK-DOC-03** | `DoctorQueueSidebar` Hàng đợi BN | [`DoctorQueueSidebar.java:31–142`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java#L31-L142) | Quan sát hàng đợi bệnh nhân cột trái | Thanh lọc vàng nhạt đỉnh; mỗi dòng 2 hàng thông tin; dòng chọn nền xanh | Launch / Visual | `[ ]` | |
-| **CHK-DOC-04** | `DoctorClinicalForm` Lưới thông tin | [`DoctorClinicalForm.java:48–112`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java#L48-L112) | Quan sát form lâm sàng tại tab Bệnh Nhân | 11 hàng bố trí cân đối; các trường liên kết dạng link màu xanh navy | Launch / Visual | `[ ]` | |
-| **CHK-DOC-05** | `DoctorHistoryPanel` Bảng lịch sử | [`DoctorHistoryPanel.java:25–45`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L25-L45) | Quan sát bảng lịch sử khám | Bảng kẻ ô 8 cột; tiêu đề xanh `Lịch Sử Khám và Điều Trị` | Launch / Visual | `[ ]` | |
-| **CHK-DOC-06** | `DoctorStationPanel` Placeholder tabs | [`DoctorStationPanel.java:121–125, 139–145`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L121-L125) | Nhấp lần lượt 4 tab: Công Khám, Thuốc, Xử Trí, Phản Hồi | Cả 4 tab hiển thị thông báo placeholder an toàn; không gây lỗi giao diện | Launch / Interaction | `[ ]` | |
+| **CHK-LOGIN-01** | `DangNhapBieuMau` Kích thước & Cửa sổ | [`DangNhapBieuMau.java:31–37`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L31-L37) | Mở cửa sổ đăng nhập trên màn hình | Cửa sổ 440×390 pixel, căn giữa, không phóng to, không co giãn viền | Launch / Visual | `[ ]` | |
+| **CHK-LOGIN-02** | `DangNhapBieuMau` Header & Bố cục | [`DangNhapBieuMau.java:42–56`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L42-L56) | Quan sát tiêu đề và phụ đề | Nền trắng, tiêu đề xanh thương hiệu in đậm, phụ đề xám căn giữa | Launch / Visual | `[ ]` | |
+| **CHK-LOGIN-03** | `DangNhapBieuMau` Trường nhập liệu | [`DangNhapBieuMau.java:59–78`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L59-L78) | Nhập username/password, phím Tab | Tab chuyển tuần tự Username -> Password -> Nút Đăng nhập | Launch / Interaction | `[ ]` | |
+| **CHK-LOGIN-04** | `DangNhapBieuMau` Nút bấm & Phản hồi | [`DangNhapBieuMau.java:81–95, 104–108`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/LoginForm.java#L81-L95) | Nhấn đăng nhập khi ô nhập rỗng | Nút xanh chữ trắng; hiện hộp thoại cảnh báo `Vui lòng nhập...` | Launch / Interaction | `[ ]` | |
+| **CHK-DASH-01** | `MainBangDieuKhienCuaSo` Tiêu đề & Cỡ khung | [`MainBangDieuKhienCuaSo.java:42–52`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L42-L52) | Quan sát khung Dashboard khi mở | Cửa sổ toàn màn hình, tiêu đề chứa số hiệu build và phiên bản tương ứng | Launch / Visual | `[ ]` | |
+| **CHK-DASH-02** | `MainBangDieuKhienCuaSo` Doctor Ribbon | [`MainBangDieuKhienCuaSo.java:103–165`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L103-L165) | Kiểm tra Ribbon quyền Bác sĩ | Đủ 8 nút; nút "Điều Trị" được bôi cam mặc định; icon emoji gốc | Launch / Visual | `[ ]` | |
+| **CHK-DASH-03** | `MainBangDieuKhienCuaSo` Reception Popup | [`MainBangDieuKhienCuaSo.java:176–232`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L176-L232) | Nhấp nút "Đón Tiếp" trên Ribbon | Menu xổ xuống nền trắng hiển thị đúng 6 mục chức năng | Launch / Interaction | `[ ]` | |
+| **CHK-DASH-04** | `MainBangDieuKhienCuaSo` MDI Tab & Đồng bộ | [`MainBangDieuKhienCuaSo.java:85–98`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/dashboard/MainDashboardFrame.java#L85-L98) | Chuyển đổi qua lại giữa các tab ở đáy | Màn hình CardLayout chuyển đổi mượt mà; nút Ribbon tương ứng tự đổi trạng thái | Launch / Interaction | `[ ]` | |
+| **CHK-STATUS-01** | `TrangThaiThanhManHinh` 9 ô thông tin | [`TrangThaiThanhManHinh.java:49–83`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/core/components/StatusBarPanel.java#L49-L83) | Kiểm tra thanh trạng thái chân màn hình | Cao 25px; hiển thị đủ 9 ô; đồng hồ nhảy từng giây; ô Thông báo nền vàng | Launch / Visual | `[ ]` | |
+| **CHK-REC-01** | `TiepDonManHinh` Bố cục phân chia | [`TiepDonManHinh.java:43–49`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L43-L49) | Mở màn hình Đăng Ký Khám Bệnh | Split dọc chia tại 218px: Form phía trên, bảng phòng phía dưới | Launch / Visual | `[ ]` | |
+| **CHK-REC-02** | `TiepDonTrenThanhCongCu` Nút & Gọi số | [`TiepDonTrenThanhCongCu.java:28–97`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ReceptionTopToolbar.java#L28-L97) | Quan sát thanh công cụ đỉnh | 6 nút trái; ô Cửa đón tiếp số 2 nền vàng rực; nút loa phát thanh | Launch / Visual | `[ ]` | |
+| **CHK-REC-03** | `BenhNhanDangKyBieuMauManHinh` Cột trái | [`BenhNhanDangKyBieuMauManHinh.java:141–301`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L141-L301) | Quan sát cột hành chính bệnh nhân | Đủ 8 dòng; ngày sinh 3 ô; tuổi xanh lam; phòng khám bôi vàng nổi bật | Launch / Visual | `[ ]` | |
+| **CHK-REC-04** | `BenhNhanDangKyBieuMauManHinh` Cột BHYT | [`BenhNhanDangKyBieuMauManHinh.java:316–423`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java#L316-L423) | Quan sát cột thông tin thẻ BHYT | Đủ 8 dòng; 2 checkbox đỏ; số BHYT 4 ô phân đoạn; checkbox miễn cùng chi trả | Launch / Visual | `[ ]` | |
+| **CHK-REC-05** | `PhongKhamPhongTrangThaiManHinh` 9 Tab & Bảng phòng | [`PhongKhamPhongTrangThaiManHinh.java:37–70, 122–192`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ClinicRoomStatusPanel.java#L37-L70) | Kiểm tra bảng trạng thái phòng khám | 9 tab; tab 2 mặc định mở; 3 cột song song; "Phòng Tiêm Chủng" bôi ĐỎ nổi bật | Launch / Visual | `[ ]` | |
+| **CHK-REC-06** | `TiepDonChanTrangThanh` Phím tắt footer | [`TiepDonChanTrangThanh.java:23–50`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/ReceptionFooterBar.java#L23-L50) | Quan sát thanh phím tắt chân trang | 4 nút gradient bo góc (F1, F2, F3, F4) căn lề phải | Launch / Visual | `[ ]` | |
+| **CHK-DOC-01** | `BacSiTramManHinh` Bố cục 2 vùng | [`BacSiTramManHinh.java:91–130`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L91-L130) | Mở màn hình Bàn Khám Bác Sĩ (Điều Trị) | Bố cục 2 vùng (hàng đợi trái 250px, vùng làm việc phải); không phải 3 cột | Launch / Visual | `[ ]` | |
+| **CHK-DOC-02** | `BacSiHanhDongThanh` Nút & Banner BN | [`BacSiHanhDongThanh.java:28–85`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorActionBar.java#L28-L85) | Quan sát thanh công cụ và banner đỉnh | 9 nút (nút "In" nền vàng nhạt); 3 dòng banner chữ đỏ; khối BHYT 80% xanh navy | Launch / Visual | `[ ]` | |
+| **CHK-DOC-03** | `BacSiHangDoiThanhBen` Hàng đợi BN | [`BacSiHangDoiThanhBen.java:31–142`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorQueueSidebar.java#L31-L142) | Quan sát hàng đợi bệnh nhân cột trái | Thanh lọc vàng nhạt đỉnh; mỗi dòng 2 hàng thông tin; dòng chọn nền xanh | Launch / Visual | `[ ]` | |
+| **CHK-DOC-04** | `BacSiLamSangBieuMau` Lưới thông tin | [`BacSiLamSangBieuMau.java:48–112`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorClinicalForm.java#L48-L112) | Quan sát form lâm sàng tại tab Bệnh Nhân | 11 hàng bố trí cân đối; các trường liên kết dạng link màu xanh navy | Launch / Visual | `[ ]` | |
+| **CHK-DOC-05** | `BacSiTienSuManHinh` Bảng lịch sử | [`BacSiTienSuManHinh.java:25–45`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/components/DoctorHistoryPanel.java#L25-L45) | Quan sát bảng lịch sử khám | Bảng kẻ ô 8 cột; tiêu đề xanh `Lịch Sử Khám và Điều Trị` | Launch / Visual | `[ ]` | |
+| **CHK-DOC-06** | `BacSiTramManHinh` Placeholder tabs | [`BacSiTramManHinh.java:121–125, 139–145`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java#L121-L125) | Nhấp lần lượt 4 tab: Công Khám, Thuốc, Xử Trí, Phản Hồi | Cả 4 tab hiển thị thông báo placeholder an toàn; không gây lỗi giao diện | Launch / Interaction | `[ ]` | |
 | **CHK-SCALE-01** | Hiển thị màn hình 13-inch (1280×800) | [`UI_CODING_STANDARDS.md:646–657`](../../UI_CODING_STANDARDS.md#L646-L657) | Chạy thử nghiệm ở độ phân giải 1280×800 | Toàn bộ các form, thanh Ribbon, StatusBar hiển thị trọn vẹn, không vỡ layout | Launch / Scaling | `[ ]` | |
 | **CHK-SCALE-02** | Hiển thị màn hình 13-inch (1440×900) | [`UI_CODING_STANDARDS.md:646–657`](../../UI_CODING_STANDARDS.md#L646-L657) | Chạy thử nghiệm ở độ phân giải 1440×900 | Bố cục co giãn hài hòa; ô Tên phòng khám trên StatusBar mở rộng vừa vặn | Launch / Scaling | `[ ]` | |
 
@@ -321,7 +321,7 @@ Kiểm tra lại trên `feature/patient-reception-workflow` tại `674f485` ngà
 
 - `mvn -Djava.awt.headless=true clean verify`: **BUILD SUCCESS**; 69 Surefire report files, 402 tests, 0 failures, 0 errors, 4 skipped. Các bài SQL opt-in vẫn không chạy trong bộ test mặc định. Không kết nối `clinicDb`.
 - Kiểm tra JAR `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar`: không có entry `db.properties`.
-- Phương thức `LoginForm.initUI()` trên ứng viên hiện tại giống byte-for-byte với `main` tại source baseline. Các thay đổi ở LoginForm và Dashboard nằm ở luồng xác thực, phiên, khóa màn hình và điều hướng; chưa có xác nhận pixel hoặc thao tác trực quan từ Owner.
+- Phương thức `DangNhapBieuMau.initUI()` trên ứng viên hiện tại giống byte-for-byte với `main` tại source baseline. Các thay đổi ở LoginForm và Dashboard nằm ở luồng xác thực, phiên, khóa màn hình và điều hướng; chưa có xác nhận pixel hoặc thao tác trực quan từ Owner.
 - Luồng Tiếp đón đã được nối lại vào handler ở Application. So sánh trực quan form, ribbon, bảng queue/phòng, hành vi nút và các màn hình gated vẫn cần Owner kiểm tra bằng giao diện chạy thật.
 - Kết quả build và so sánh source không thay thế visual sign-off. Các ô checklist tương tác/hiển thị tiếp tục để trống cho Owner ghi nhận.
 
@@ -331,11 +331,11 @@ Kiểm tra lại trên `feature/patient-reception-workflow` tại `674f485` ngà
 
 - **Candidate branch & commit:** `feature/patient-reception-workflow` at `29d99cc` (incorporating Waves 1–12; **474 tests run (100 domain + 131 application + 118 infrastructure + 125 desktop; 0 failures, 0 errors, 6 expected opt-in SQL Server skips (4 in infrastructure + 2 in desktop))**; freshly packaged shaded jar `clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar`).
 - **Newly hardened desktop behaviors ready for Owner visual smoke:**
-  1. `MainDashboardFrame` 'Người Dùng' dialog reads verified `CompletedLoginSession`, with headless lock/ribbon state sync helpers, `SessionLockOverlay` verification, and full `SEC-01` hardening (`FINDING-SEC-01-01/02/03`) (`b4e29f6`, `074aa71`, `030e043`, `527ba96`).
-  2. `ReceptionPanel` full `REC-01` hardening (P0.2, P1.3, P1.4, P1.5, P1.6, P1.7, P2.8): F1/F2 shortcuts, active room identity binding with duplicate room disambiguation (`TenPhong (#id)`), `clearForm()` delegation, room summary tables with clearing on failure, 50-result search cap, worker session-generation & epoch guards, duplicate-CCCD alignment with draft preservation and prompt to look up, safe message sanitizer with correlation IDs, clinic date consistency in `Asia/Ho_Chi_Minh`, and in-flight save form lock (`035e815`, `2efc3a6`, `096e8c0`, `947853d`, `1235e91`, `4e4035d`, `1239784`, `13178f9`, `81bf3a4`).
-  3. Narrow platform error handling restored in `Main.java` (`PLAT-ERROR-03` `installLookAndFeel` fallback + `MainLookAndFeelTest`), `ExaminationPanel.java` (`getMenuShortcutKeyMaskEx(Toolkit)` + `ExaminationShortcutMaskTest`), and `DocxManager.java` (`PLAT-ERROR-DOCX-01` safe non-leaking save error message + `DocxManagerTest` / `DocxDocumentTest`) (`b69be2b`, `669cf3f`).
-  4. `PAT-02` non-UI `DoctorCompositionRoot` + `DoctorStationUiPreservationTest` + `docs/ke-hoach-trien-khai/phase1-doctor-ui-preservation-and-wiring-plan.md`.
-  5. Restoration of key integration and persistence test suites: `ReceptionProtectedReadWiringTest`, `ReceptionSqlServerPersistenceTest`, and `ReceptionSqlServerProcessRestartTest`.
+  1. `MainBangDieuKhienCuaSo` 'Người Dùng' dialog reads verified `DaHoanTatDangNhapPhien`, with headless lock/ribbon state sync helpers, `PhienKhoaLopPhu` verification, and full `SEC-01` hardening (`FINDING-SEC-01-01/02/03`) (`b4e29f6`, `074aa71`, `030e043`, `527ba96`).
+  2. `TiepDonManHinh` full `REC-01` hardening (P0.2, P1.3, P1.4, P1.5, P1.6, P1.7, P2.8): F1/F2 shortcuts, active room identity binding with duplicate room disambiguation (`TenPhong (#id)`), `clearForm()` delegation, room summary tables with clearing on failure, 50-result search cap, worker session-generation & epoch guards, duplicate-CCCD alignment with draft preservation and prompt to look up, safe message sanitizer with correlation IDs, clinic date consistency in `Asia/Ho_Chi_Minh`, and in-flight save form lock (`035e815`, `2efc3a6`, `096e8c0`, `947853d`, `1235e91`, `4e4035d`, `1239784`, `13178f9`, `81bf3a4`).
+  3. Narrow platform error handling restored in `Main.java` (`PLAT-ERROR-03` `installLookAndFeel` fallback + `ChinhGiaoDienVaCamNhanTest`), `KhamBenhManHinh.java` (`getMenuShortcutKeyMaskEx(Toolkit)` + `KhamBenhPhimTatCheTest`), and `DOCXQuanLy.java` (`PLAT-ERROR-DOCX-01` safe non-leaking save error message + `DOCXQuanLyTest` / `DOCXTaiLieuTest`) (`b69be2b`, `669cf3f`).
+  4. `PAT-02` non-UI `BacSiGhepNoiGoc` + `BacSiTramGiaoDienBaoToanTest` + `docs/ke-hoach-trien-khai/phase1-doctor-ui-preservation-and-wiring-plan.md`.
+  5. Restoration of key integration and persistence test suites: `TiepDonDuocBaoVeReadKetNoiTest`, `TiepDonSQLMayChuLuuTruTest`, and `TiepDonSQLMayChuProcessKhoiDongLaiTest`.
   6. `SEC-01`, `PAT-02`, and `REC-01` remain default-deny (`[~] In progress`) pending Owner visual smoke sign-off.
 
 

@@ -4,6 +4,7 @@ public enum TrangThaiNhaCungCap {
     HOAT_DONG(1, "Đang hợp tác"),
     NGUNG_HOP_TAC(2, "Ngừng hợp tác");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -12,9 +13,12 @@ public enum TrangThaiNhaCungCap {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static TrangThaiNhaCungCap fromValue(int value) {
         for (TrangThaiNhaCungCap item : values()) {
             if (item.value == value) return item;

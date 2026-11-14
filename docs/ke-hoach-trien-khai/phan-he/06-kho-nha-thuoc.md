@@ -6,21 +6,21 @@
 
 ## Hiện có
 
-- Models: `Item`, `Kho`, `TonKho`, `NhaCungCap`, `DonDatHang`, `ChiTietDonDatHang`, `PhieuNhapKho`, `ChiTietNhapKho`, `PhieuXuatKho`, `ChiTietXuatKho`, `InventoryTransaction`, `Stocktake`, `StocktakeCount`, `DonViTinhQuyDoi`, `IdempotencyRecord`, `FefoAllocationService`.
-- UI: `PharmacyDispensePanel`, `PharmacyTicketTablePanel`, `PharmacyCategoryTreePanel`, `PharmacySubToolbar`.
+- Models: `MatHang`, `Kho`, `TonKho`, `NhaCungCap`, `DonDatHang`, `ChiTietDonDatHang`, `PhieuNhapKho`, `ChiTietNhapKho`, `PhieuXuatKho`, `ChiTietXuatKho`, `KhoGiaoDich`, `KiemKe`, `KiemKeDem`, `DonViTinhQuyDoi`, `TinhIdempotentRecord`, `FEFOPhanBoDichVu`.
+- UI: `NhaThuocDispenseManHinh`, `NhaThuocPhieuBangManHinh`, `NhaThuocDanhMucCayManHinh`, `NhaThuocPhuThanhCongCu`.
 - Chưa thấy màn hình riêng cho mua/nhận hàng, kiểm kê, điều chuyển, quản lý nhà cung cấp hoặc tra lịch sử tồn theo lô.
 
 ## Backlog theo model
 
-- [ ] **`Item` + `DonViTinhQuyDoi`:** danh mục thuốc/vật tư, hoạt chất/hàm lượng/đơn vị, ngừng sử dụng, quy đổi đơn vị có kiểm tra vòng lặp/tỷ lệ.
+- [ ] **`MatHang` + `DonViTinhQuyDoi`:** danh mục thuốc/vật tư, hoạt chất/hàm lượng/đơn vị, ngừng sử dụng, quy đổi đơn vị có kiểm tra vòng lặp/tỷ lệ.
 - [ ] **`NhaCungCap`:** hồ sơ, thông tin liên hệ, trạng thái, điều khoản và lịch sử giao dịch.
 - [ ] **`DonDatHang` + chi tiết:** lập, gửi, nhận một phần/đủ, hủy; số lượng đặt/nhận và giá.
 - [ ] **`PhieuNhapKho` + chi tiết:** nhận lô, hạn dùng, số đăng ký, giá nhập, NCC; kiểm tra hàng quá hạn và trùng lô.
 - [ ] **`TonKho`:** tra tồn theo kho/item/lô/hạn; cảnh báo dưới định mức và cận hạn.
 - [ ] **`DonThuoc` + `PhieuXuatKho`:** cấp phát sau duyệt, allocation FEFO, xác nhận dược sĩ và transaction atomic.
 - [ ] **`PhieuXuatKho`:** điều chuyển, xuất hủy và hoàn trả; cần phân biệt loại xuất và người nhận.
-- [ ] **`Stocktake` + `StocktakeCount`:** tạo phiên kiểm kê, khóa snapshot, nhập số đếm, giải trình chênh lệch, duyệt điều chỉnh.
-- [ ] **`InventoryTransaction` + `IdempotencyRecord`:** chỉ hiển thị read-only; truy vết mã lệnh và ngăn ghi trùng.
+- [ ] **`KiemKe` + `KiemKeDem`:** tạo phiên kiểm kê, khóa snapshot, nhập số đếm, giải trình chênh lệch, duyệt điều chỉnh.
+- [ ] **`KhoGiaoDich` + `TinhIdempotentRecord`:** chỉ hiển thị read-only; truy vết mã lệnh và ngăn ghi trùng.
 
 ## Màn hình cần bổ sung
 

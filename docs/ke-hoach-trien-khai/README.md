@@ -30,7 +30,7 @@ Chỉ đánh dấu hoàn tất khi có luồng sử dụng được từ màn h�
 | [Operations and release runbook](../OPERATIONS_RUNBOOK.md) | Hướng dẫn build/test, cấu hình, migration, launch và backup/restore rehearsal cho local hoặc controlled test deployment; ghi rõ gate chưa đạt. |
 | [Phase 0 — Review domain events](phase0-domain-events-review.md) | Vòng đời sự kiện miền, transaction timing, persistence, UI và test gaps. |
 | [Phase 0 — Review repository contracts](phase0-repository-contract-review.md) | Map model repository từ domain port tới adapter, use case, transaction và test. |
-| [Phase 0 — Value Object owner decisions](phase0-value-object-owner-decisions.md) | Các lựa chọn cần Owner chốt trước khi nối `DateRange`, `PhoneNumber` và `Money` vào form/handler/persistence. |
+| [Phase 0 — Value Object owner decisions](phase0-value-object-owner-decisions.md) | Các lựa chọn cần Owner chốt trước khi nối `NgayKhoang`, `DienThoaiSo` và `Tien` vào form/handler/persistence. |
 | [Phase 0 — Independent value object review](phase0-value-object-domain-review.md) | Source-cited review các VO, BHYT reception, phone privacy, giới hạn của test-source và các follow-up. Báo cáo có reconciliation mới hơn source snapshot ban đầu. |
 | [Phase 3 — Appointment owner decisions](phase3-appointment-owner-decisions.md) | Các quyết định booking, capacity, status/check-in, notification và deposit trước APPT-01; deposit tiếp tục DENY. |
 | [Phase 3 — Visit lifecycle owner decisions](phase3-visit-lifecycle-owner-decisions.md) | Làm rõ operational contract cho hủy, điều chuyển và sinh hiệu; giữ nguyên role policies đã duyệt. |

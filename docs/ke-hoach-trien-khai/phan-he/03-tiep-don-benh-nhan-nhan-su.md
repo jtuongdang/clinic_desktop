@@ -4,25 +4,25 @@
 **Phase:** 1; quản trị nhân sự mở rộng ở Phase 8.
 **Domain:** `patient`, `identity`, `facility`, `appointment`.
 
-> Current evidence (06/11/2026): root JDK 17 `mvn -Djava.awt.headless=true clean verify` passes 209 tests, 0 failures/errors, 4 SQL Server opt-in skips. PAT-FIELDS-01 proves all 15 reception-form fields map through the command and patient SELECT/INSERT/UPDATE paths. `FreshDatabaseMigrationSqlServerTest` passes 1/1 on dedicated synthetic DB `clinic_test_v9_20261106`, applies V1–V9 and exercises duplicate-active-link rejection/soft-delete replacement. `ReceptionSqlServerPersistenceTest` also passes 1/1 on that DB, covering the authorized synthetic actor, registration, facility-link actor metadata, idempotent update, search and queue reload. This uncovered and fixed a SQL Server assigned-scope query defect (`SELECT DISTINCT` sorted by non-selected columns). Phase 1 remains open: full Swing UI-to-DB desktop interaction, clinical-history authorization/workflow, and broader business acceptance are incomplete. Earlier JDK 17 smoke started the Swing AWT event loop, but the window itself was not observed.
+> Current evidence (06/11/2026): root JDK 17 `mvn -Djava.awt.headless=true clean verify` passes 209 tests, 0 failures/errors, 4 SQL Server opt-in skips. PAT-FIELDS-01 proves all 15 reception-form fields map through the command and patient SELECT/INSERT/UPDATE paths. `MoiCoSoDuLieuDiCuSQLMayChuTest` passes 1/1 on dedicated synthetic DB `clinic_test_v9_20261106`, applies V1–V9 and exercises duplicate-active-link rejection/soft-delete replacement. `TiepDonSQLMayChuLuuTruTest` also passes 1/1 on that DB, covering the authorized synthetic actor, registration, facility-link actor metadata, idempotent update, search and queue reload. This uncovered and fixed a SQL Server assigned-scope query defect (`SELECT DISTINCT` sorted by non-selected columns). Phase 1 remains open: full Swing UI-to-DB desktop interaction, clinical-history authorization/workflow, and broader business acceptance are incomplete. Earlier JDK 17 smoke started the Swing AWT event loop, but the window itself was not observed.
 
 ## Hiện có trong source
 
-- **Application:** `RegisterPatientHandler`, `SearchPatientsHandler`, `GetReceptionQueueHandler` cùng command/query tương ứng.
-- **Infrastructure:** `BenhNhanRepositoryImpl`, `BenhNhanCoSoRepositoryImpl`, `BaoHiemRepositoryImpl`, `PhongKhamRepositoryImpl`, `ReceptionQueueRepositoryImpl`; `DatabaseMigrationRunner` đăng ký V1–V9. Assigned role/scope lookup is exercised against SQL Server with active synthetic assignments.
-- **Desktop:** `ReceptionCompositionRoot`, `ReceptionPanel`, `PatientRegistrationFormPanel`, `ClinicRoomStatusPanel`; các thao tác tải, tìm kiếm và lưu reception dùng `SwingWorker`.
-- **Luồng lưu:** handler validate dữ liệu bắt buộc/phòng/BHYT và dùng `TransactionBoundary`; ghi bệnh nhân, thẻ BHYT nếu có, lượt khám/queue, rồi ensure idempotent `BenhNhanCoSo` trong cùng transaction theo facility/actor của authenticated context. SQL Server E2E synthetic xác nhận facility link và actor metadata sau register, sau đó re-register bệnh nhân cũ không nhân đôi liên kết. Manual failure injection xác nhận rollback không còn active patient/BHYT/visit rows.
+- **Application:** `RegisterBenhNhanHandler`, `SearchBenhNhanHandler`, `GetTiepDonHangDoiHandler` cùng command/query tương ứng.
+- **Infrastructure:** `BenhNhanRepository`, `BenhNhanCoSoRepository`, `BaoHiemRepository`, `PhongKhamRepository`, `TiepDonHangDoiRepository`; `CoSoDuLieuDiCuChay` đăng ký V1–V9. Assigned role/scope lookup is exercised against SQL Server with active synthetic assignments.
+- **Desktop:** `TiepDonGhepNoiGoc`, `TiepDonManHinh`, `BenhNhanDangKyBieuMauManHinh`, `PhongKhamPhongTrangThaiManHinh`; các thao tác tải, tìm kiếm và lưu reception dùng `SwingWorker`.
+- **Luồng lưu:** handler validate dữ liệu bắt buộc/phòng/BHYT và dùng `GiaoDichRanhGioi`; ghi bệnh nhân, thẻ BHYT nếu có, lượt khám/queue, rồi ensure idempotent `BenhNhanCoSo` trong cùng transaction theo facility/actor của authenticated context. SQL Server E2E synthetic xác nhận facility link và actor metadata sau register, sau đó re-register bệnh nhân cũ không nhân đôi liên kết. Manual failure injection xác nhận rollback không còn active patient/BHYT/visit rows.
 - **Tìm kiếm:** query repository theo keyword (mã bệnh nhân, CCCD, số điện thoại, họ tên theo logic repository), giới hạn 50 kết quả và ghép BHYT gần nhất. Save/search/reload qua composition mới và JVM process con độc lập đã pass; chưa phải restart toàn bộ ứng dụng Swing.
 
 ## Bằng chứng đã có
 
-- Tại `0d91903` có **18 test sources và 78 test cases được phát hiện**: domain 4/21, application 5/26, infrastructure 5/21, desktop 4/10; ba SQL Server opt-in tests bị skip trong default verify (hai test reception, một fresh-migration thuộc Phase 0). Root `mvn clean verify` pass trên JDK 17 với 0 failures/errors. `ReceptionSqlServerPersistenceTest` pass riêng 1/1 trên DB synthetic, xác nhận đăng ký+search+queue+reload và update patient+BHYT; process-restart probe pass riêng 1/1. Test suite không chứng minh Phase 2 access/audit.
-- `PhoneNumberTest` kiểm tra định dạng số di động Việt Nam, prefix `0`/`+84`, dấu phân cách và đầu vào sai; đây chỉ là validation domain.
+- Tại `0d91903` có **18 test sources và 78 test cases được phát hiện**: domain 4/21, application 5/26, infrastructure 5/21, desktop 4/10; ba SQL Server opt-in tests bị skip trong default verify (hai test reception, một fresh-migration thuộc Phase 0). Root `mvn clean verify` pass trên JDK 17 với 0 failures/errors. `TiepDonSQLMayChuLuuTruTest` pass riêng 1/1 trên DB synthetic, xác nhận đăng ký+search+queue+reload và update patient+BHYT; process-restart probe pass riêng 1/1. Test suite không chứng minh Phase 2 access/audit.
+- `DienThoaiSoTest` kiểm tra định dạng số di động Việt Nam, prefix `0`/`+84`, dấu phân cách và đầu vào sai; đây chỉ là validation domain.
 - `V4__Enforce_Active_Patient_CCCD_Uniqueness.sql` dừng nếu tồn tại CCCD trùng trên hồ sơ active trước khi tạo unique index. Test application kiểm tra nhánh duplicate không ghi BHYT/lượt khám; test infrastructure dùng lỗi tổng hợp xác nhận chỉ ánh xạ đúng index CCCD và không lộ giá trị trùng.
 - `V9__Enforce_Active_Patient_Facility_Uniqueness.sql` dừng an toàn nếu cặp bệnh nhân–cơ sở đang hoạt động bị trùng; unique filtered index bảo vệ ghi đồng thời. Static review `phase1-pat02-v9-review.md` không tìm thấy lỗi migration. Dedicated SQL Server fresh migration test đã chạy V1–V9 và xác nhận index chặn duplicate active pair, cho phép tạo liên kết mới sau soft delete.
-- SQL Server reception E2E ban đầu phát hiện `NhanVienRepositoryImpl.getAssignedWorkScopes` dùng `SELECT DISTINCT` nhưng `ORDER BY` theo cột không xuất hiện trong SELECT, khiến SQL Server từ chối authorization dependency. Đã đổi sắp xếp sang alias được chọn; E2E hiện pass. Đây là production defect được tìm ra bởi fixture actor có assignment thật, không phải lý do nới grant.
+- SQL Server reception E2E ban đầu phát hiện `NhanVienRepository.getAssignedWorkScopes` dùng `SELECT DISTINCT` nhưng `ORDER BY` theo cột không xuất hiện trong SELECT, khiến SQL Server từ chối authorization dependency. Đã đổi sắp xếp sang alias được chọn; E2E hiện pass. Đây là production defect được tìm ra bởi fixture actor có assignment thật, không phải lý do nới grant.
 - `PAT-FIELDS-01` (`b92efd0`) covers all 15 fields currently exposed by the reception form across form-to-command conversion and repository SELECT/INSERT/UPDATE mapping. It does not cover fields that are not present on that form, credentials, or `TienSuBenh`.
-- UI source nhận lỗi duplicate CCCD, hướng dẫn tìm hồ sơ hiện hữu, chạy tìm kiếm với CCCD và giữ form để tiếp tục. `PatientRegistrationFormPanelTest` bổ sung headless component coverage; commit `ea397f9` sửa giả định chọn phòng để kết quả test deterministic. Đây không phải end-to-end UI/JDBC test.
+- UI source nhận lỗi duplicate CCCD, hướng dẫn tìm hồ sơ hiện hữu, chạy tìm kiếm với CCCD và giữ form để tiếp tục. `BenhNhanDangKyBieuMauManHinhTest` bổ sung headless component coverage; commit `ea397f9` sửa giả định chọn phòng để kết quả test deterministic. Đây không phải end-to-end UI/JDBC test.
 - Evidence commits trong local history: `ef602a9` (fresh-database migration test), `3e3fe6f` (distinct JVM persistence probe), `99d709b`, `75a218d`, `fcfc62b`, `9ff7ddd`, `3f6ba31`, `ea397f9`, `264bbae`, `ff2045a`, `5d68840` (migration rollback safety), `a3071fc` (domain-event collection), `9b5ff17` (safe registration error mapping), `2d062f8`/`0d91903` (staff role/scope assignments). Migration runner đã pass trên database synthetic trống riêng; DB này được giữ với demo seed nhưng 0 patient rows. Manual checks xác nhận rollback multi-table; 8 queue allocations đồng thời nhận số khác nhau; hai CCCD giống nhau có một success và một lỗi nghiệp vụ. Test patient records được soft-delete.
 
 ## Quy tắc nghiệp vụ cần bảo vệ
@@ -38,11 +38,11 @@
 
 - [ ] Review/publish branch khi các gate của Phase 1 được chấp nhận; các commit hiện vẫn local trên `feature/patient-reception-workflow`.
 - [x] Handler/form đã hỗ trợ chọn và cập nhật hồ sơ cũ/BHYT; application, headless form và SQL Server synthetic tests xác nhận update path và reload, commits `75a218d`/`99d709b`.
-- [x] Chạy integration test SQL Server synthetic cho save/search/update/queue/reload và rollback đa bảng; queue/CCCD concurrency đã kiểm tra thủ công. Test tự động opt-in: `ReceptionSqlServerPersistenceTest` (commit `fcfc62b`).
+- [x] Chạy integration test SQL Server synthetic cho save/search/update/queue/reload và rollback đa bảng; queue/CCCD concurrency đã kiểm tra thủ công. Test tự động opt-in: `TiepDonSQLMayChuLuuTruTest` (commit `fcfc62b`).
 - [x] V1–V9 applied on dedicated empty SQL Server DB `clinic_test_v9_20261106`; V9 active-pair duplicate rejection and replacement after soft delete passed 1/1 opt-in.
 - [ ] Kiểm thử UI-to-DB E2E: lỗi không xóa form, DB I/O ngoài EDT và queue refresh sau đăng ký. Headless panel test không chứng minh luồng tích hợp này.
 - [x] Xác nhận 15 trường form ánh xạ đúng command/entity/patient SQL SELECT/INSERT/UPDATE (`PAT-FIELDS-01`, `b92efd0`). Mở rộng sang các field không có trên form là việc riêng, không được suy ra từ test này.
-- [ ] Xác nhận xem `ClinicRoomStatusPanel` có yêu cầu refresh/polling, hành vi khi DB mất kết nối và quy trình tiếp tục.
+- [ ] Xác nhận xem `PhongKhamPhongTrangThaiManHinh` có yêu cầu refresh/polling, hành vi khi DB mất kết nối và quy trình tiếp tục.
 
 ## Nhân sự
 
@@ -50,7 +50,7 @@
 
 ## Nghiệm thu Phase 1
 
-- [x] Đăng ký patient synthetic trên SQL Server, đọc lại search/BHYT/queue từ JVM process thứ hai qua opt-in test `ReceptionSqlServerProcessRestartTest` (`3e3fe6f`). Đây xác nhận cross-process persistence, chưa kiểm restart cửa sổ Swing.
+- [x] Đăng ký patient synthetic trên SQL Server, đọc lại search/BHYT/queue từ JVM process thứ hai qua opt-in test `TiepDonSQLMayChuProcessKhoiDongLaiTest` (`3e3fe6f`). Đây xác nhận cross-process persistence, chưa kiểm restart cửa sổ Swing.
 - [x] Reception composition SQL Server E2E với employee/role/facility/department assignment tổng hợp thật; xác nhận đăng ký và cập nhật tạo/giữ một active facility link, đúng actor metadata, đọc lại search và queue. Test cleanup soft-deletes các row tổng hợp theo ID.
 - [ ] Chọn hồ sơ cũ và cập nhật; không nhân đôi hồ sơ.
 - [ ] Tạo lượt khám, cấp queue number không trùng trong cùng phạm vi phòng/ngày.

@@ -7,6 +7,7 @@ public enum HuongXuTri {
     CHUYEN_TUYEN_TREN(4, "Chuyển viện tuyến trên"),
     CHUYEN_CHUYEN_KHOA(5, "Chuyển chuyên khoa");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -15,9 +16,12 @@ public enum HuongXuTri {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static HuongXuTri fromValue(int value) {
         for (HuongXuTri item : values()) {
             if (item.value == value) return item;

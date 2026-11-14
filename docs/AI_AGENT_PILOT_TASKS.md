@@ -6,12 +6,12 @@
 
 ## 1. Kết luận rà soát
 
-Luồng Tiếp đón hiện có các thành phần chính trong working tree: `RegisterPatientCommand`/handler, repository bệnh nhân, bảo hiểm, phòng khám, hàng đợi và form Swing. Handler kiểm tra CCCD trước khi insert, sau đó lưu hồ sơ, bảo hiểm và lượt khám trong transaction. Tuy nhiên:
+Luồng Tiếp đón hiện có các thành phần chính trong working tree: `RegisterBenhNhanCommand`/handler, repository bệnh nhân, bảo hiểm, phòng khám, hàng đợi và form Swing. Handler kiểm tra CCCD trước khi insert, sau đó lưu hồ sơ, bảo hiểm và lượt khám trong transaction. Tuy nhiên:
 
 - Kiểm tra CCCD hiện là check-then-insert; hai lượt đăng ký đồng thời vẫn có thể cùng vượt qua bước kiểm tra.
 - SQL Server migration V1 tạo `IX_BenhNhan_CCCD` dạng index thường, chưa có unique constraint/index cho CCCD đang hoạt động.
 - Handler bắt `RuntimeException` và trả thông báo chung, nên lỗi unique từ DB nếu bổ sung sau này cần được phân loại để người tiếp đón biết phải tìm/chọn hồ sơ hiện hữu.
-- `PhoneNumber` có regex `[3|5|7|8|9]`; dấu `|` bên trong character class đang được hiểu là ký tự hợp lệ. Đây là lỗi validation độc lập, nhỏ và phù hợp làm task pilot.
+- `DienThoaiSo` có regex `[3|5|7|8|9]`; dấu `|` bên trong character class đang được hiểu là ký tự hợp lệ. Đây là lỗi validation độc lập, nhỏ và phù hợp làm task pilot.
 - Trước lượt rà soát tài liệu, trạng thái Đợt 1 giữa roadmap và trang phân hệ không thống nhất. Đã đồng bộ trong lần cập nhật này về `[~]` cho đến khi code được commit, kiểm thử và nghiệm thu.
 
 ## 2. Điều kiện trước khi giao task cho Orchestrator
@@ -20,7 +20,7 @@ Checkout hiện có thay đổi chưa commit ở form Tiếp đón, application 
 
 **Không giao Task 2 hoặc Task 3 cho đến khi phần Tiếp đón hiện tại được commit vào branch nguồn mà Orchestrator sử dụng.** Không tự stage/commit thay người phát triển.
 
-Task 1 chỉ dựa trên mã Domain đã có trong repository; có thể chạy độc lập nếu branch nguồn chứa `PhoneNumber` như checkout hiện tại.
+Task 1 chỉ dựa trên mã Domain đã có trong repository; có thể chạy độc lập nếu branch nguồn chứa `DienThoaiSo` như checkout hiện tại.
 
 ## 3. Các task đề xuất
 
@@ -32,7 +32,7 @@ Task 1 chỉ dựa trên mã Domain đã có trong repository; có thể chạy 
 
 **Phạm vi được sửa:**
 
-- `clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/PhoneNumber.java`
+- `clinic-domain/src/main/java/vn/clinicmanagement/domain/common/valueobjects/DienThoaiSo.java`
 - Test tương ứng dưới `clinic-domain/src/test/java/vn/clinicmanagement/domain/common/valueobjects/`
 
 **Tiêu chí nghiệm thu:**
@@ -60,9 +60,9 @@ Task 1 chỉ dựa trên mã Domain đã có trong repository; có thể chạy 
 **Phạm vi dự kiến:**
 
 - `clinic-infrastructure/src/main/resources/migrations/V4__Enforce_Active_Patient_CCCD_Uniqueness.sql`
-- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseMigrationRunner.java`
-- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/patient/BenhNhanRepositoryImpl.java`
-- `clinic-application/src/main/java/vn/clinicmanagement/application/reception/RegisterPatientHandler.java`
+- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/CoSoDuLieuDiCuChay.java`
+- `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/patient/BenhNhanRepository.java`
+- `clinic-application/src/main/java/vn/clinicmanagement/application/reception/RegisterBenhNhanHandler.java`
 - Unit/integration tests liên quan ở `clinic-application` và `clinic-infrastructure`.
 
 **Tiêu chí nghiệm thu:**
@@ -84,8 +84,8 @@ Task 1 chỉ dựa trên mã Domain đã có trong repository; có thể chạy 
 
 **Phạm vi dự kiến:**
 
-- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java`
-- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/PatientRegistrationFormPanel.java`
+- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/TiepDonManHinh.java`
+- `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/components/BenhNhanDangKyBieuMauManHinh.java`
 - Các test UI/model phù hợp nếu dự án đã có hạ tầng kiểm thử Swing.
 
 **Tiêu chí nghiệm thu:**
@@ -100,7 +100,7 @@ Task 1 chỉ dựa trên mã Domain đã có trong repository; có thể chạy 
 
 1. Giao Task 1 cho một Agent để có pilot độc lập, không chồng file.
 2. Giao Task 2 cho một Agent sau khi phần Tiếp đón hiện tại đã nằm trong branch nguồn; thống nhất contract lỗi trước khi chạy.
-3. Giao Task 3 cho Agent khác sau Task 2 được review/commit hoặc cung cấp contract đã chốt. Không cho Task 2 và Task 3 sửa đồng thời cùng `RegisterPatientHandler`/form.
+3. Giao Task 3 cho Agent khác sau Task 2 được review/commit hoặc cung cấp contract đã chốt. Không cho Task 2 và Task 3 sửa đồng thời cùng `RegisterBenhNhanHandler`/form.
 
 Nếu muốn chạy 3 Agent cùng lúc ngay từ đầu, nên chọn 3 task không phụ thuộc nhau và có file scope tách biệt; bộ Task 1–3 ở trên **không hoàn toàn độc lập**, do Task 3 phụ thuộc kết quả Task 2.
 

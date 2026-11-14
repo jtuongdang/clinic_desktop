@@ -6,6 +6,7 @@ public enum LoaiNghiPhep {
     PHEP_RIENG(3, "Phép riêng"),
     KHONG_LUONG(4, "Không lương");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -14,9 +15,12 @@ public enum LoaiNghiPhep {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static LoaiNghiPhep fromValue(int value) {
         for (LoaiNghiPhep item : values()) {
             if (item.value == value) return item;

@@ -13,8 +13,8 @@ if [ -z "$DB_URL" ] && [ -f "$DIR/db.properties" ]; then
     fi
 fi
 
-# Thiết lập kết nối mặc định tới clinicDb_test nếu chưa có
-export DB_URL="${DB_URL:-jdbc:sqlserver://localhost:1433;databaseName=clinicDb_test;encrypt=true;trustServerCertificate=true}"
+# Thiết lập kết nối mặc định tới clinicDb nếu chưa có
+export DB_URL="${DB_URL:-jdbc:sqlserver://localhost:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=true}"
 export DB_USERNAME="${DB_USERNAME:-sa}"
 export DB_PASSWORD="${DB_PASSWORD:-Password123!}"
 

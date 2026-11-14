@@ -1,7 +1,7 @@
 package vn.clinicmanagement.domain.facility;
 
 import org.junit.jupiter.api.Test;
-import vn.clinicmanagement.domain.common.IAggregateRoot;
+import vn.clinicmanagement.domain.common.ITongHopGoc;
 import vn.clinicmanagement.domain.common.enums.LoaiCoSo;
 
 import java.time.LocalDateTime;
@@ -22,7 +22,7 @@ class CoSoTest {
     void initializesDefaultsAndEmptyDepartmentCollection() {
         CoSo facility = new CoSo();
 
-        assertInstanceOf(IAggregateRoot.class, facility);
+        assertInstanceOf(ITongHopGoc.class, facility);
         assertEquals("", facility.getTenCoSo());
         assertEquals("", facility.getDiaChi());
         assertEquals("", facility.getDienThoai());

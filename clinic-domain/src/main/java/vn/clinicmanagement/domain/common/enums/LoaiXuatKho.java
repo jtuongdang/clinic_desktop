@@ -12,6 +12,7 @@ public enum LoaiXuatKho {
     HUY(9, "Hủy"),
     XUAT_NOI_BO_KHOA_PHONG(10, "Xuất nội bộ khoa phòng");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -20,9 +21,12 @@ public enum LoaiXuatKho {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static LoaiXuatKho fromValue(int value) {
         for (LoaiXuatKho item : values()) {
             if (item.value == value) return item;

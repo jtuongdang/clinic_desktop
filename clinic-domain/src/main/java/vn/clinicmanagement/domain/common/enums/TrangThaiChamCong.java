@@ -11,6 +11,7 @@ public enum TrangThaiChamCong {
     THIEU_CHECK_OUT(8, "Thiếu check-out"),
     CHO_XAC_NHAN(9, "Chờ xác nhận");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -19,9 +20,12 @@ public enum TrangThaiChamCong {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static TrangThaiChamCong fromValue(int value) {
         for (TrangThaiChamCong item : values()) {
             if (item.value == value) return item;

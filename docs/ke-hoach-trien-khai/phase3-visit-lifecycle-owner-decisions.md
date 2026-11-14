@@ -17,7 +17,7 @@
 - Nhãn chính xác: **“Ghi chú vận hành (không bắt buộc)”**. Cảnh báo: **“Không nhập thông tin định danh, liên hệ, chẩn đoán hoặc kết quả khám/xét nghiệm.”** Không prefill từ dữ liệu bệnh nhân/lâm sàng. Hiển thị nội dung đã normalize trước khi submit; nội dung bị reject không được xuất hiện trong logs.
 - Chính sách giảm thiểu rủi ro PHI, không bảo đảm ẩn danh và không thể bảo đảm người dùng không nhập PHI.
 
-Mã lý do nghiệp vụ cố định vẫn tách biệt khỏi ghi chú, `AuditReasonCode`/auth audit reason (`NhatKyHeThong.maLyDo`), `lyDoKham` và `lyDoChuyenTuyen`. Physical field/table, storage placement và retention vẫn **OPEN**; approval N2 không phải DDL/schema authorization. Các quyết định triển khai queue, idempotency, linked-work và acceptance vẫn mở theo đúng phạm vi; không quyết định này cấp quyền hoặc mở gate. SEC-01 remains **OPEN**; transfer remains **default-deny**.
+Mã lý do nghiệp vụ cố định vẫn tách biệt khỏi ghi chú, `KiemToanLyDoMa`/auth audit reason (`NhatKyHeThong.maLyDo`), `lyDoKham` và `lyDoChuyenTuyen`. Physical field/table, storage placement và retention vẫn **OPEN**; approval N2 không phải DDL/schema authorization. Các quyết định triển khai queue, idempotency, linked-work và acceptance vẫn mở theo đúng phạm vi; không quyết định này cấp quyền hoặc mở gate. SEC-01 remains **OPEN**; transfer remains **default-deny**.
 
 ### Các quyết định triển khai còn mở — không suy diễn
 
@@ -43,7 +43,7 @@ A transfer requires exactly one of these six business reason codes; the short no
 | `DIAGNOSTIC_EQUIPMENT_NEED` | `DOCTOR` |
 | `CLINICIAN_EMERGENCY_HANDOFF` | `DOCTOR` |
 
-These codes are business fields, never `AuditReasonCode` or `NhatKyHeThong.maLyDo`. Neither the business reason nor the free-text note may be placed in those auth/authorization reason fields. Do not reuse clinical `lyDoKham`.
+These codes are business fields, never `KiemToanLyDoMa` or `NhatKyHeThong.maLyDo`. Neither the business reason nor the free-text note may be placed in those auth/authorization reason fields. Do not reuse clinical `lyDoKham`.
 
 The reason-role mapping is an additional restriction, not a grant or scope exception. For every reason, source and destination facility must equal the session facility. Only `RECEPTIONIST` may change department within that facility; `DOCTOR` must keep source and destination department equal to the selected session department. This includes `PATIENT_SPECIALTY_PREFERENCE`, load balancing, clinical referral and emergency handoff; their labels do not permit a DOCTOR cross-department transfer. All other roles remain denied. Transfer grants no destination patient, history or queue reads.
 
@@ -127,7 +127,7 @@ Status, `ngayKham`, examination timestamps, tính bắt buộc của mã lý do,
 ## Hướng triển khai đề xuất
 
 1. **Không triển khai hủy trước khi xác định được nguồn dữ liệu chỉ định/thu phí.** Trong transaction kiểm tra current status/version, active orders và posted receipts; nếu service không sẵn sàng hoặc kết quả mơ hồ thì từ chối.
-2. **Tách command:** `CancelVisitCommand`, `TransferVisitCommand`, `RecordVitalsCommand` với context lấy từ session; không làm một mutation tổng quát dựa trên enum/setter.
+2. **Tách command:** `CancelLuotKhamCommand`, `TransferLuotKhamCommand`, `RecordVitalsCommand` với context lấy từ session; không làm một mutation tổng quát dựa trên enum/setter.
 3. **Transfer persistence:** cập nhật location/queue theo quy tắc đã duyệt trong transaction nhất quán; lưu queue date ở `queueDate` riêng, không ghi đè `ngayKham` hoặc examination timestamps. Mã lý do cố định là bắt buộc, ghi chú ngắn tùy chọn; taxonomy, note constraints/privacy, transaction sampling và lựa chọn lịch sử riêng/audit-only/cả hai vẫn mở. Không tự chọn loại lưu vết hoặc triển khai migration.
 4. **Sinh hiệu:** lưu actor và measurement time riêng; đọc lại theo authorization/audit. Nếu cho phép sửa, giữ lịch sử hoặc audit diff không chứa narrative thừa.
 5. **Tắt các menu prototype** cho tới khi command và guard đã nối; UI chỉ là lớp thao tác, không thay authorization.

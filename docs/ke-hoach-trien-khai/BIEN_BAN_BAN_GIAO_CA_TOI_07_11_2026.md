@@ -29,28 +29,28 @@ Ca làm việc hôm nay dưới sự chỉ đạo của **`leaderANTI`** đã ho
 
 ### 2.1. Hoàn tất 100% Phase 6 (Dược phẩm, Kho dược FEFO & Cấp phát thuốc `INV-01` đến `INV-06`)
 - Hợp đồng triển khai Phase 6 `5bd6daa9-0c4b-4a16-9243-792d834d2579` đã được thực thi và nghiệm thu toàn bộ:
-  1. **`INV-01` (`7b1dc5b`):** Quản lý danh mục Thuốc & Vật tư y tế (`CreateItemHandler` 5/5 PASS, `GetItemCatalogHandler` 3/3 PASS).
-  2. **`INV-02` (`8582107`):** Tra cứu tồn kho khả dụng & Phân bổ FEFO (`GetStockAvailabilityHandler` 8/8 PASS).
-  3. **`INV-03` (`6a629da`):** Đơn đặt hàng nhà cung cấp (`CreatePurchaseOrderHandler` 6/6 PASS).
-  4. **`INV-04` (`cc96ed3`):** Nhập kho & Quản lý Lô/Hạn dùng (`ReceiveWarehouseStockHandler` 10/10 PASS).
-  5. **`INV-05` (`b0ee056`):** Cấp phát đơn thuốc ngoại trú & Trừ tồn FEFO (`DispensePrescriptionHandler` 11/11 PASS).
-  6. **`INV-06` (`16bd683`):** Phê duyệt kiểm kê & Cân bằng tồn kho (`ApproveStocktakeHandler` 11/11 PASS).
+  1. **`INV-01` (`7b1dc5b`):** Quản lý danh mục Thuốc & Vật tư y tế (`CreateMatHangHandler` 5/5 PASS, `GetMatHangDanhMucHandler` 3/3 PASS).
+  2. **`INV-02` (`8582107`):** Tra cứu tồn kho khả dụng & Phân bổ FEFO (`GetTonKhoKhaDungHandler` 8/8 PASS).
+  3. **`INV-03` (`6a629da`):** Đơn đặt hàng nhà cung cấp (`CreateMuaHangYeuCauHandler` 6/6 PASS).
+  4. **`INV-04` (`cc96ed3`):** Nhập kho & Quản lý Lô/Hạn dùng (`ReceiveKhoTonKhoHandler` 10/10 PASS).
+  5. **`INV-05` (`b0ee056`):** Cấp phát đơn thuốc ngoại trú & Trừ tồn FEFO (`DispenseDonThuocHandler` 11/11 PASS).
+  6. **`INV-06` (`16bd683`):** Phê duyệt kiểm kê & Cân bằng tồn kho (`ApproveKiemKeHandler` 11/11 PASS).
 
 ### 2.2. Hoàn tất 100% Phân hệ Cận lâm sàng & Dịch vụ kỹ thuật (`CLS-01`)
 - Bổ sung cổng lưu trữ domain [`IChiDinhDichVuRepository.java`](../clinic-domain/src/main/java/vn/clinicmanagement/domain/repositories/IChiDinhDichVuRepository.java) và biến `ChiDinhDichVu` thành Aggregate Root hoàn chỉnh.
 - Mở rộng hệ thống Audit: `SERVICE_ORDER`, `SERVICE_ORDERED`, `SERVICE_RESULT_RECORDED`, `SERVICE_CANCELLED`.
 - Triển khai 4 use cases cốt lõi tại `vn.clinicmanagement.application.cls`:
-  1. **`OrderServiceHandler`:** Bác sĩ chỉ định dịch vụ kỹ thuật/xét nghiệm (5/5 PASS).
-  2. **`RecordServiceResultHandler`:** Kỹ thuật viên/Bác sĩ nhập kết quả xét nghiệm chỉ số định lượng (`ChiTietKetQuaXetNghiem`) và link PACS/DICOM (4/4 PASS).
-  3. **`CancelServiceOrderHandler`:** Hủy chỉ định dịch vụ khi chưa thực hiện (3/3 PASS).
-  4. **`GetServicesByVisitHandler`:** Tra cứu danh sách chỉ định và kết quả cận lâm sàng theo lượt khám (3/3 PASS).
+  1. **`YeuCauDichVuHandler`:** Bác sĩ chỉ định dịch vụ kỹ thuật/xét nghiệm (5/5 PASS).
+  2. **`RecordDichVuKetQuaHandler`:** Kỹ thuật viên/Bác sĩ nhập kết quả xét nghiệm chỉ số định lượng (`ChiTietKetQuaXetNghiem`) và link PACS/DICOM (4/4 PASS).
+  3. **`CancelDichVuYeuCauHandler`:** Hủy chỉ định dịch vụ khi chưa thực hiện (3/3 PASS).
+  4. **`GetDichVuTheoLuotKhamHandler`:** Tra cứu danh sách chỉ định và kết quả cận lâm sàng theo lượt khám (3/3 PASS).
 
 ### 2.3. Đấu nối Giao diện Swing Bàn Khám Bác Sĩ & Triệt tiêu Dữ liệu Mẫu Tĩnh
 - **Xóa bỏ dứt điểm dữ liệu mẫu:** Toàn bộ dữ liệu hardcoded `TEST BN 060`, `TEST BN 033`, `TEST BN 032` đã bị loại bỏ 100% khỏi toàn bộ mã nguồn Java.
-- **Đấu nối Worker luồng nền:** [`DoctorStationPanel`](../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java) được kết nối trực tiếp với [`GetDoctorQueueHandler`](../clinic-application/src/main/java/vn/clinicmanagement/application/reception/GetDoctorQueueHandler.java) và [`DoctorCompositionRoot`](../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorCompositionRoot.java) thông qua `SwingWorker`, xử lý empty state an toàn, tải danh sách bệnh nhân thật mượt mà không gây nghẽn giao diện EDT.
+- **Đấu nối Worker luồng nền:** [`BacSiTramManHinh`](../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationPanel.java) được kết nối trực tiếp với [`GetBacSiHangDoiHandler`](../clinic-application/src/main/java/vn/clinicmanagement/application/reception/GetDoctorQueueHandler.java) và [`BacSiGhepNoiGoc`](../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/doctor/DoctorCompositionRoot.java) thông qua `SwingWorker`, xử lý empty state an toàn, tải danh sách bệnh nhân thật mượt mà không gây nghẽn giao diện EDT.
 - **Kiểm thử giao diện:**
-  - Viết mới [`DoctorStationWiringTest.java`](../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationWiringTest.java): **3/3 PASS** (kiểm định phủ định tuyệt đối: không chứa chuỗi `TEST BN`).
-  - Bảo toàn giao diện [`DoctorStationUiPreservationTest.java`](../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationUiPreservationTest.java): **3/3 PASS** (bảo toàn 5 tabs lâm sàng, JSplitPane 250px và bảng 8 cột).
+  - Viết mới [`BacSiTramKetNoiTest.java`](../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationWiringTest.java): **3/3 PASS** (kiểm định phủ định tuyệt đối: không chứa chuỗi `TEST BN`).
+  - Bảo toàn giao diện [`BacSiTramGiaoDienBaoToanTest.java`](../clinic-desktop/src/test/java/vn/clinicmanagement/desktop/modules/doctor/DoctorStationUiPreservationTest.java): **3/3 PASS** (bảo toàn 5 tabs lâm sàng, JSplitPane 250px và bảng 8 cột).
 
 ---
 
@@ -78,19 +78,19 @@ Ca tối sẽ mở **Hợp đồng Triển khai Phase 7: Thu ngân, Hóa đơn &
 ### Nhiệm vụ 1: Triển khai Cổng Domain & Use Case `BILL-01` (Tạo Hóa Đơn Viện Phí)
 - **Domain Aggregates đã sẵn sàng:** `HoaDon`, `ChiTietHoaDon`, `TrangThaiHoaDon`, `IHoaDonRepository`.
 - **Nghiệp vụ cần làm:**
-  - Tạo use case `CreateInvoiceCommand`, `InvoiceItemInput`, `CreateInvoiceReceipt`, `CreateInvoiceHandler`.
+  - Tạo use case `CreateHoaDonCommand`, `HoaDonMatHangDauVao`, `CreateHoaDonBienNhan`, `CreateHoaDonHandler`.
   - Gom các chi phí khám bệnh, dịch vụ kỹ thuật CLS đã hoàn thành, đơn thuốc đã cấp phát để tạo hóa đơn viện phí.
   - Snapshot đơn giá, tính tiền BHYT chi trả, bệnh nhân tự chi trả, trừ tiền tạm ứng, áp dụng giảm giá.
-  - Tạo query `GetInvoiceByVisitQuery`, `InvoiceDto`, `GetInvoiceByVisitHandler`.
+  - Tạo query `GetHoaDonTheoLuotKhamQuery`, `HoaDonDuLieu`, `GetHoaDonTheoLuotKhamHandler`.
   - Viết bộ kiểm thử unit test synthetic cho `BILL-01`.
 
 ### Nhiệm vụ 2: Triển khai Use Case `BILL-02` (Thu Tiền, Phiếu Thu & Quản Lý Công Nợ)
-- **Domain Aggregates đã sẵn sàng:** `PhieuThu`, `CongNoBenhNhan`, `TrangThaiCongNo`, `PhuongThucThanhToan`, `PaymentRecordedEvent`.
+- **Domain Aggregates đã sẵn sàng:** `PhieuThu`, `CongNoBenhNhan`, `TrangThaiCongNo`, `PhuongThucThanhToan`, `ThanhToanDaGhiNhanSuKien`.
 - **Nghiệp vụ cần làm:**
-  - Tạo use case `RecordPaymentCommand`, `RecordPaymentReceipt`, `RecordPaymentHandler`.
+  - Tạo use case `RecordThanhToanCommand`, `RecordThanhToanBienNhan`, `RecordThanhToanHandler`.
   - Hỗ trợ thanh toán toàn bộ (`DA_THANH_TOAN`) hoặc một phần (`THANH_TOAN_MOT_PHAN`).
-  - Ghi nhận `PhieuThu`, phát sinh hoặc cập nhật `CongNoBenhNhan` khi còn thiếu tiền, phát sự kiện `PaymentRecordedEvent`.
-  - Tạo query `GetPatientDebtQuery`, `PatientDebtDto`, `GetPatientDebtHandler`.
+  - Ghi nhận `PhieuThu`, phát sinh hoặc cập nhật `CongNoBenhNhan` khi còn thiếu tiền, phát sự kiện `ThanhToanDaGhiNhanSuKien`.
+  - Tạo query `GetBenhNhanCongNoQuery`, `BenhNhanCongNoDuLieu`, `GetBenhNhanCongNoHandler`.
   - Viết bộ kiểm thử unit test synthetic cho `BILL-02`.
 
 ### Nhiệm vụ 3: Đấu nối Giao diện Thu ngân / Hóa đơn hoặc Hỗ trợ Visual Smoke Test

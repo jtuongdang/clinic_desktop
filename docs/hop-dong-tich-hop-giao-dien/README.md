@@ -17,10 +17,10 @@ Hợp đồng bao gồm 4 gói tích hợp chính tương ứng với các phân
 
 | Gói | Phân hệ | Màn hình trọng tâm | Tầng nghiệp vụ (Handlers có sẵn) | Trạng thái cam kết |
 | :---: | :--- | :--- | :--- | :---: |
-| **GÓI 1** | **Khám Bệnh & Bác Sĩ** (`examination` & `doctor`) | • `DoctorStationPanel` / `DoctorActionBar`<br>• `TreatmentResolutionTabPanel`<br>• `PrescriptionOrderPanel` / `PrescriptionOrderTabPanel`<br>• `ServiceOrderPanel` / `LabOrderTabPanel`<br>• `MedicalRecordTabPanel`<br>• `TransferRoomSelectDialog` | • `StartExamHandler`<br>• `AddDiagnosisHandler`<br>• `CompleteExamHandler`<br>• `PrescribeMedicationHandler`<br>• `OrderServiceHandler`<br>• `UpdateEmrClinicalRecordHandler`<br>• `TransferVisitHandler` | **Ưu tiên 1 (Core)** |
-| **GÓI 2** | **Nhà Thuốc & Kho Dược** (`pharmacy`) | • `PharmacyDispensePanel`<br>• `PharmacyCategoryTreePanel`<br>• `PharmacyTicketTablePanel` | • `DispensePrescriptionHandler`<br>• `ReceiveWarehouseStockHandler`<br>• `GetStockAvailabilityHandler` | **Ưu tiên 2** |
-| **GÓI 3** | **Cận Lâm Sàng & CĐHA** (`paraclinical`) | • `ParaclinicalOrderPanel`<br>• Form nhập kết quả xét nghiệm | • `RecordServiceResultHandler`<br>• `GetServicesByVisitHandler`<br>• `CancelServiceOrderHandler` | **Ưu tiên 2** |
-| **GÓI 4** | **Danh Mục & Hệ Thống** (`catalog` & `system`) | • `CatalogPanel` (CRUD)<br>• `SystemConfigPanel` | • Quản lý danh mục ICD, dịch vụ, thuốc<br>• `SystemRepository` đọc/ghi cấu hình | **Ưu tiên 3** |
+| **GÓI 1** | **Khám Bệnh & Bác Sĩ** (`examination` & `doctor`) | • `BacSiTramManHinh` / `BacSiHanhDongThanh`<br>• `DieuTriXuTriTheManHinh`<br>• `DonThuocYeuCauManHinh` / `DonThuocYeuCauTheManHinh`<br>• `DichVuYeuCauManHinh` / `XetNghiemYeuCauTheManHinh`<br>• `HoSoBenhAnTheManHinh`<br>• `TransferPhongSelectHopThoai` | • `StartKhamHandler`<br>• `AddChanDoanHandler`<br>• `CompleteKhamHandler`<br>• `PrescribeThuocHandler`<br>• `YeuCauDichVuHandler`<br>• `UpdateEMRLamSangRecordHandler`<br>• `TransferLuotKhamHandler` | **Ưu tiên 1 (Core)** |
+| **GÓI 2** | **Nhà Thuốc & Kho Dược** (`pharmacy`) | • `NhaThuocDispenseManHinh`<br>• `NhaThuocDanhMucCayManHinh`<br>• `NhaThuocPhieuBangManHinh` | • `DispenseDonThuocHandler`<br>• `ReceiveKhoTonKhoHandler`<br>• `GetTonKhoKhaDungHandler` | **Ưu tiên 2** |
+| **GÓI 3** | **Cận Lâm Sàng & CĐHA** (`paraclinical`) | • `CanLamSangYeuCauManHinh`<br>• Form nhập kết quả xét nghiệm | • `RecordDichVuKetQuaHandler`<br>• `GetDichVuTheoLuotKhamHandler`<br>• `CancelDichVuYeuCauHandler` | **Ưu tiên 2** |
+| **GÓI 4** | **Danh Mục & Hệ Thống** (`catalog` & `system`) | • `DanhMucManHinh` (CRUD)<br>• `HeThongCauHinhManHinh` | • Quản lý danh mục ICD, dịch vụ, thuốc<br>• `SystemRepository` đọc/ghi cấu hình | **Ưu tiên 3** |
 
 ---
 
@@ -36,6 +36,6 @@ Thư mục hợp đồng bao gồm các tài liệu đặc tả thành phần:
 
 ## 4. NGUYÊN TẮC BẤT DI BẤT DỊCH (NON-NEGOTIABLE PRINCIPLES)
 1. **Tuyệt đối không chạy I/O / JDBC trên Event Dispatch Thread (EDT):** Mọi thao tác ghi/đọc CSDL phải chạy qua `SwingWorker` trong nền kèm theo quản lý vòng đời view (`cancelInFlightWorkers` và `viewSessionEpoch`).
-2. **Tuân thủ phân quyền và kiểm toán:** Tất cả các thao tác nghiệp vụ phải thông qua `AuthorizationContext` và ghi `AuditActorContext` đầy đủ.
+2. **Tuân thủ phân quyền và kiểm toán:** Tất cả các thao tác nghiệp vụ phải thông qua `PhanQuyenNguCanh` và ghi `KiemToanTacNhanNguCanh` đầy đủ.
 3. **Bảo tồn toàn vẹn giao diện (Pixel-Perfect UI Preservation):** Không làm vỡ layout, màu sắc, font chữ và các thành phần giao diện đã nghiệm thu.
 4. **Không làm gãy regression tests:** Toàn bộ 174 bài test hiện tại trong bộ kiểm thử Maven phải tiếp tục `BUILD SUCCESS`.

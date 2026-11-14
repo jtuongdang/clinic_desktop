@@ -3,7 +3,7 @@ package vn.clinicmanagement.domain.billing;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.domain.common.enums.PhuongThucThanhToan;
 import vn.clinicmanagement.domain.common.enums.TrangThaiHoaDon;
-import vn.clinicmanagement.domain.common.events.PaymentRecordedEvent;
+import vn.clinicmanagement.domain.common.events.ThanhToanDaGhiNhanSuKien;
 import vn.clinicmanagement.domain.examination.LuotKham;
 import vn.clinicmanagement.domain.facility.CoSo;
 import vn.clinicmanagement.domain.patient.BenhNhan;
@@ -138,13 +138,13 @@ class HoaDonTest {
         assertEquals(TrangThaiHoaDon.DA_THANH_TOAN, invoice.getTrangThai());
         assertEquals(2, invoice.getPhieuThus().size());
         assertEquals(2, invoice.getDomainEvents().size());
-        PaymentRecordedEvent firstEvent = assertInstanceOf(
-                PaymentRecordedEvent.class, invoice.getDomainEvents().get(0));
+        ThanhToanDaGhiNhanSuKien firstEvent = assertInstanceOf(
+                ThanhToanDaGhiNhanSuKien.class, invoice.getDomainEvents().get(0));
         assertEquals(42, firstEvent.getInvoiceId());
         assertEquals(new BigDecimal("400.00"), firstEvent.getAmountPaid());
         assertEquals(PhuongThucThanhToan.TIEN_MAT.name(), firstEvent.getPaymentMethod());
-        PaymentRecordedEvent secondEvent = assertInstanceOf(
-                PaymentRecordedEvent.class, invoice.getDomainEvents().get(1));
+        ThanhToanDaGhiNhanSuKien secondEvent = assertInstanceOf(
+                ThanhToanDaGhiNhanSuKien.class, invoice.getDomainEvents().get(1));
         assertEquals(42, secondEvent.getInvoiceId());
         assertEquals(new BigDecimal("600.00"), secondEvent.getAmountPaid());
         assertEquals(PhuongThucThanhToan.CHUYEN_KHOAN.name(), secondEvent.getPaymentMethod());

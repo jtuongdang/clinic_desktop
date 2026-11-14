@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import vn.clinicmanagement.domain.common.enums.TrangThaiDonThuoc;
-import vn.clinicmanagement.domain.common.events.DonThuocApprovedEvent;
-import vn.clinicmanagement.domain.common.events.DonThuocDispensedEvent;
+import vn.clinicmanagement.domain.common.events.DonThuocDaDuyetSuKien;
+import vn.clinicmanagement.domain.common.events.DonThuocDaCapPhatSuKien;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,8 +41,8 @@ class DonThuocTest {
 
         assertEquals(TrangThaiDonThuoc.DA_DUYET, prescription.getTrangThai());
         assertEquals(1, prescription.getDomainEvents().size());
-        DonThuocApprovedEvent event = assertInstanceOf(
-                DonThuocApprovedEvent.class, prescription.getDomainEvents().get(0));
+        DonThuocDaDuyetSuKien event = assertInstanceOf(
+                DonThuocDaDuyetSuKien.class, prescription.getDomainEvents().get(0));
         assertEquals(42, event.getPrescriptionId());
         assertEquals(7, event.getVisitId());
         assertEquals(11, event.getDoctorId());
@@ -70,8 +70,8 @@ class DonThuocTest {
         assertEquals(19, prescription.getMaNguoiCapThuoc());
         assertNotNull(prescription.getNgayCapThuoc());
         assertEquals(1, prescription.getDomainEvents().size());
-        DonThuocDispensedEvent event = assertInstanceOf(
-                DonThuocDispensedEvent.class, prescription.getDomainEvents().get(0));
+        DonThuocDaCapPhatSuKien event = assertInstanceOf(
+                DonThuocDaCapPhatSuKien.class, prescription.getDomainEvents().get(0));
         assertEquals(42, event.getPrescriptionId());
         assertEquals(19, event.getDispenserId());
     }
@@ -102,8 +102,8 @@ class DonThuocTest {
         assertEquals(TrangThaiDonThuoc.HUY, prescription.getTrangThai());
         assertTrue(prescription.getGhiChu().contains("Doi phac do khang sinh khac"));
         assertEquals(1, prescription.getDomainEvents().size());
-        vn.clinicmanagement.domain.common.events.DonThuocCancelledEvent event = assertInstanceOf(
-                vn.clinicmanagement.domain.common.events.DonThuocCancelledEvent.class, prescription.getDomainEvents().get(0));
+        vn.clinicmanagement.domain.common.events.DonThuocDaHuySuKien event = assertInstanceOf(
+                vn.clinicmanagement.domain.common.events.DonThuocDaHuySuKien.class, prescription.getDomainEvents().get(0));
         assertEquals(42, event.getPrescriptionId());
         assertEquals("Doi phac do khang sinh khac", event.getReason());
     }

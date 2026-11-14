@@ -61,7 +61,7 @@ Package `vn.clinicmanagement.domain` đóng vai trò là **Trái tim cốt lõi 
        |                  CLINIC DOMAIN LAYER                  |
        |  - Aggregate Roots (BenhNhan, LuotKham, DonThuoc...)  |
        |  - Domain Services (FefoAllocation, SafetyCheck...)   |
-       |  - Domain Events (EmrLockedEvent, Dispensed...)      |
+       |  - Domain Events (EMRDaKhoaSuKien, Dispensed...)      |
        |  - Repository Interfaces & Specifications             |
        +-------------------------------------------------------+
                                   ^
@@ -81,7 +81,7 @@ Package `vn.clinicmanagement.domain` đóng vai trò là **Trái tim cốt lõi 
   * **Domain Events & Event Bus Interfaces:** 14 files
   * **Domain Exceptions:** 5 files
   * **Value Objects:** 3 files
-  * **Domain Services:** 2 services (`FefoAllocationService`, `ClinicalDrugSafetyService`)
+  * **Domain Services:** 2 services (`FEFOPhanBoDichVu`, `LamSangThuocAnToanDichVu`)
   * **Repository & Query Contracts:** 11 files
   * **Các thực thể quan hệ & Bảng nối (Junction/Bridge Entities):** 22 files
 
@@ -94,10 +94,10 @@ Package định nghĩa các lớp nền tảng cho toàn bộ thực thể trong
 
 | Tên File | Loại | Vai trò & Chức năng | Các trường dữ liệu & Phương thức cốt lõi |
 | :--- | :--- | :--- | :--- |
-| **`BaseEntity.java`** | Abstract Class | Lớp cha cơ sở của toàn bộ Entity trong hệ thống. Cung cấp cơ chế quản trị khóa chính Generic (`TId`), Audit Trail, Soft Delete, Optimistic Locking và Domain Event Registration. | **Thuộc tính:**<br>- `id: TId`<br>- `version: Long` (Khóa lạc quan phòng chống ghi đè dữ liệu đồng thời)<br>- `createdAt, createdBy: LocalDateTime, Integer`<br>- `updatedAt, updatedBy: LocalDateTime, Integer`<br>- `isDeleted, deletedAt, deletedBy: boolean, LocalDateTime, Integer`<br>- `domainEvents: transient List<IDomainEvent>`<br>**Phương thức:** `markAsUpdated()`, `softDelete()`, `restore()`, `registerDomainEvent()`, `clearDomainEvents()`. |
-| **`IAggregateRoot.java`** | Interface | Marker interface dùng để đánh dấu một Entity là Aggregate Root. Chỉ Aggregate Root mới có Repository tương ứng và chịu trách nhiệm bảo toàn tính toàn vẹn nghiệp vụ cho cả nhóm thực thể con. | Không có phương thức. |
-| **`IUnitOfWork.java`** | Interface | Định nghĩa giao tác Unit of Work để đảm bảo tính toàn vẹn (Atomic Transaction) khi ghi nhiều entity vào cơ sở dữ liệu cùng lúc. | **Phương thức:**<br>- `int saveChanges()`<br>- `boolean saveEntities()` |
-| **`TrangThaiContract.java`** | Class | Lưu trữ các hằng số trạng thái chuẩn chuỗi (`HOAT_DONG`, `NGUNG_HOAT_DONG`, `TAM_NGUNG`). | Các hằng số `public static final String`. |
+| **`CoSoThucThe.java`** | Abstract Class | Lớp cha cơ sở của toàn bộ Entity trong hệ thống. Cung cấp cơ chế quản trị khóa chính Generic (`TId`), Audit Trail, Soft Delete, Optimistic Locking và Domain Event Registration. | **Thuộc tính:**<br>- `id: TId`<br>- `version: Long` (Khóa lạc quan phòng chống ghi đè dữ liệu đồng thời)<br>- `createdAt, createdBy: LocalDateTime, Integer`<br>- `updatedAt, updatedBy: LocalDateTime, Integer`<br>- `isDeleted, deletedAt, deletedBy: boolean, LocalDateTime, Integer`<br>- `domainEvents: transient List<IMienNghiepVuSuKien>`<br>**Phương thức:** `markAsUpdated()`, `softDelete()`, `restore()`, `registerDomainEvent()`, `clearDomainEvents()`. |
+| **`ITongHopGoc.java`** | Interface | Marker interface dùng để đánh dấu một Entity là Aggregate Root. Chỉ Aggregate Root mới có Repository tương ứng và chịu trách nhiệm bảo toàn tính toàn vẹn nghiệp vụ cho cả nhóm thực thể con. | Không có phương thức. |
+| **`IDonViCuaLamViec.java`** | Interface | Định nghĩa giao tác Unit of Work để đảm bảo tính toàn vẹn (Atomic Transaction) khi ghi nhiều entity vào cơ sở dữ liệu cùng lúc. | **Phương thức:**<br>- `int saveChanges()`<br>- `boolean saveEntities()` |
+| **`TrangThaiHopDong.java`** | Class | Lưu trữ các hằng số trạng thái chuẩn chuỗi (`HOAT_DONG`, `NGUNG_HOAT_DONG`, `TAM_NGUNG`). | Các hằng số `public static final String`. |
 
 ---
 
@@ -106,9 +106,9 @@ Package định nghĩa các lớp nền tảng cho toàn bộ thực thể trong
 
 | Tên File | Loại | Vai trò & Chức năng | Các trường dữ liệu & Phương thức |
 | :--- | :--- | :--- | :--- |
-| **`DateRange.java`** | Final Class | Biểu diễn một khoảng thời gian (từ ngày đến ngày). Tự động validate ngày bắt đầu không được lớn hơn ngày kết thúc. Hỗ trợ khoảng thời gian mở. | **Thuộc tính:**<br>- `startDate: LocalDate`<br>- `endDate: LocalDate`<br>**Phương thức:** `contains(LocalDate date)`, `overlaps(DateRange other)`. |
-| **`Money.java`** | Final Class | Đại diện cho tiền tệ chính xác (Mặc định: VND). Ngăn ngừa sai số dấu phẩy động (Floating point error) thường gặp với `float`/`double`. Hỗ trợ làm tròn tiền tệ. | **Thuộc tính:**<br>- `amount: BigDecimal` (Scale 2, RoundingMode.HALF_UP)<br>- `currency: String` ("VND")<br>**Phương thức:** `add()`, `subtract()`, `multiply()`, `isGreaterThan()`, `of()`, `isPositive()`. |
-| **`PhoneNumber.java`** | Final Class | Đại diện cho số điện thoại hợp lệ tại Việt Nam. Tự động chuẩn hóa (loại bỏ dấu chấm, khoảng trắng, gạch ngang) và kiểm tra định dạng Regex 10 số (03x, 05x, 07x, 08x, 09x). | **Thuộc tính:**<br>- `value: String`<br>**Phương thức:** `getValue()`, tự động ném ngoại lệ nếu sai định dạng. |
+| **`NgayKhoang.java`** | Final Class | Biểu diễn một khoảng thời gian (từ ngày đến ngày). Tự động validate ngày bắt đầu không được lớn hơn ngày kết thúc. Hỗ trợ khoảng thời gian mở. | **Thuộc tính:**<br>- `startDate: LocalDate`<br>- `endDate: LocalDate`<br>**Phương thức:** `contains(LocalDate date)`, `overlaps(NgayKhoang other)`. |
+| **`Tien.java`** | Final Class | Đại diện cho tiền tệ chính xác (Mặc định: VND). Ngăn ngừa sai số dấu phẩy động (Floating point error) thường gặp với `float`/`double`. Hỗ trợ làm tròn tiền tệ. | **Thuộc tính:**<br>- `amount: BigDecimal` (Scale 2, RoundingMode.HALF_UP)<br>- `currency: String` ("VND")<br>**Phương thức:** `add()`, `subtract()`, `multiply()`, `isGreaterThan()`, `of()`, `isPositive()`. |
+| **`DienThoaiSo.java`** | Final Class | Đại diện cho số điện thoại hợp lệ tại Việt Nam. Tự động chuẩn hóa (loại bỏ dấu chấm, khoảng trắng, gạch ngang) và kiểm tra định dạng Regex 10 số (03x, 05x, 07x, 08x, 09x). | **Thuộc tính:**<br>- `value: String`<br>**Phương thức:** `getValue()`, tự động ném ngoại lệ nếu sai định dạng. |
 
 ---
 
@@ -117,20 +117,20 @@ Triển khai mẫu Event-Driven Architecture giúp phân tách các luồng xử
 
 | Tên File | Chức năng nghiệp vụ | Dữ liệu mang theo (Event Payload) |
 | :--- | :--- | :--- |
-| **`IDomainEvent.java`** | Interface gốc của mọi Domain Event. | `getEventId(): UUID`, `getOccurredOn(): LocalDateTime`. |
-| **`AbstractDomainEvent.java`** | Lớp trừu tượng triển khai sẵn Id tự sinh ngẫu nhiên và thời điểm phát sinh. | `eventId`, `occurredOn`. |
-| **`IDomainEventPublisher.java`** | Khế ước dịch vụ phát hành sự kiện. | `publish(IDomainEvent event)`. |
-| **`IDomainEventHandler.java`** | Interface cho các lớp lắng nghe và xử lý sự kiện. | `handle(T event)`. |
-| **`BenhNhanRegisteredEvent.java`** | Phát sinh khi một bệnh nhân mới đăng ký hồ sơ vào hệ thống. | `patientId`, `cccd`, `fullName`. |
-| **`LuotKhamStartedEvent.java`** | Phát sinh khi Bác sĩ bắt đầu ca khám tại phòng khám. | `visitId`, `patientId`, `doctorId`. |
-| **`LuotKhamCompletedEvent.java`** | Phát sinh khi Bác sĩ hoàn thành phiên khám và chỉ định xử trí. | `visitId`, `patientId`, `doctorId`. |
-| **`EmrLockedEvent.java`** | Phát sinh khi Bác sĩ thực hiện Ký số EMR, khóa vĩnh viễn hồ sơ bệnh án. | `visitId`, `doctorId`, `signature` (Chữ ký điện tử). |
-| **`DonThuocApprovedEvent.java`** | Phát sinh khi Bác sĩ duyệt hoàn tất đơn thuốc cho người bệnh. | `prescriptionId`, `visitId`, `doctorId`. |
-| **`DonThuocDispensedEvent.java`** | Phát sinh khi Dược sĩ tại quầy thuốc xuất cấp thuốc thực tế cho bệnh nhân. | `prescriptionId`, `dispenserId`. |
-| **`HoaDonCreatedEvent.java`** | Phát sinh khi tạo mới một hóa đơn viện phí từ lượt khám. | `invoiceId`, `visitId`, `totalAmount`. |
-| **`PaymentRecordedEvent.java`** | Phát sinh khi Thu ngân nhận tiền thanh toán (Tiền mặt, QR, Thẻ). | `invoiceId`, `amountPaid`, `paymentMethod`. |
-| **`LichHenBookedEvent.java`** | Phát sinh khi một lịch hẹn khám được tạo thành công trên hệ thống. | `appointmentId`, `patientId`, `doctorId`, `startTime`. |
-| **`LowStockWarningEvent.java`** | Phát sinh khi tồn kho của một mặt hàng thuốc/vật tư giảm xuống dưới mức tồn tối thiểu. | `itemId`, `itemName`, `currentStock`, `minStock`. |
+| **`IMienNghiepVuSuKien.java`** | Interface gốc của mọi Domain Event. | `getEventId(): UUID`, `getOccurredOn(): LocalDateTime`. |
+| **`TruuTuongMienNghiepVuSuKien.java`** | Lớp trừu tượng triển khai sẵn Id tự sinh ngẫu nhiên và thời điểm phát sinh. | `eventId`, `occurredOn`. |
+| **`IMienNghiepVuSuKienPhatHanh.java`** | Khế ước dịch vụ phát hành sự kiện. | `publish(IMienNghiepVuSuKien event)`. |
+| **`IMienNghiepVuSuKienXuLy.java`** | Interface cho các lớp lắng nghe và xử lý sự kiện. | `handle(T event)`. |
+| **`BenhNhanDaDangKySuKien.java`** | Phát sinh khi một bệnh nhân mới đăng ký hồ sơ vào hệ thống. | `patientId`, `cccd`, `fullName`. |
+| **`LuotKhamDaBatDauSuKien.java`** | Phát sinh khi Bác sĩ bắt đầu ca khám tại phòng khám. | `visitId`, `patientId`, `doctorId`. |
+| **`LuotKhamDaHoanTatSuKien.java`** | Phát sinh khi Bác sĩ hoàn thành phiên khám và chỉ định xử trí. | `visitId`, `patientId`, `doctorId`. |
+| **`EMRDaKhoaSuKien.java`** | Phát sinh khi Bác sĩ thực hiện Ký số EMR, khóa vĩnh viễn hồ sơ bệnh án. | `visitId`, `doctorId`, `signature` (Chữ ký điện tử). |
+| **`DonThuocDaDuyetSuKien.java`** | Phát sinh khi Bác sĩ duyệt hoàn tất đơn thuốc cho người bệnh. | `prescriptionId`, `visitId`, `doctorId`. |
+| **`DonThuocDaCapPhatSuKien.java`** | Phát sinh khi Dược sĩ tại quầy thuốc xuất cấp thuốc thực tế cho bệnh nhân. | `prescriptionId`, `dispenserId`. |
+| **`HoaDonDaTaoSuKien.java`** | Phát sinh khi tạo mới một hóa đơn viện phí từ lượt khám. | `invoiceId`, `visitId`, `totalAmount`. |
+| **`ThanhToanDaGhiNhanSuKien.java`** | Phát sinh khi Thu ngân nhận tiền thanh toán (Tiền mặt, QR, Thẻ). | `invoiceId`, `amountPaid`, `paymentMethod`. |
+| **`LichHenDaDatSuKien.java`** | Phát sinh khi một lịch hẹn khám được tạo thành công trên hệ thống. | `appointmentId`, `patientId`, `doctorId`, `startTime`. |
+| **`ThapTonKhoCanhBaoSuKien.java`** | Phát sinh khi tồn kho của một mặt hàng thuốc/vật tư giảm xuống dưới mức tồn tối thiểu. | `itemId`, `itemName`, `currentStock`, `minStock`. |
 
 ---
 
@@ -139,11 +139,11 @@ Chứa các ngoại lệ định danh chuẩn (Business Domain Exceptions), giú
 
 | Tên File | Ý nghĩa & Tình huống kích hoạt |
 | :--- | :--- |
-| **`DomainException.java`** | Ngoại lệ gốc (kế thừa `RuntimeException`) của toàn bộ lỗi nghiệp vụ miền. |
-| **`BusinessRuleViolationException.java`** | Ném ra khi vi phạm bất biến nghiệp vụ (Invariants), ví dụ: Hủy lịch hẹn đã qua, nhập số lượng âm, v.v. |
-| **`EntityNotFoundException.java`** | Ném ra khi không tìm thấy thực thể theo ID chỉ định trong cơ sở dữ liệu. |
-| **`EmrLockedException.java`** | Ném ra khi người dùng cố gắng chỉnh sửa, thêm dịch vụ, sửa đơn thuốc của Lượt khám đã Ký số và Khóa bệnh án điện tử. |
-| **`InsufficientStockException.java`** | Ném ra khi kho dược không đủ số lượng thuốc thuộc lô yêu cầu để cấp phát. |
+| **`MienNghiepVuNgoaiLe.java`** | Ngoại lệ gốc (kế thừa `RuntimeException`) của toàn bộ lỗi nghiệp vụ miền. |
+| **`NghiepVuQuyTacViPhamNgoaiLe.java`** | Ném ra khi vi phạm bất biến nghiệp vụ (Invariants), ví dụ: Hủy lịch hẹn đã qua, nhập số lượng âm, v.v. |
+| **`ThucTheKhongTimThayNgoaiLe.java`** | Ném ra khi không tìm thấy thực thể theo ID chỉ định trong cơ sở dữ liệu. |
+| **`EMRDaKhoaNgoaiLe.java`** | Ném ra khi người dùng cố gắng chỉnh sửa, thêm dịch vụ, sửa đơn thuốc của Lượt khám đã Ký số và Khóa bệnh án điện tử. |
+| **`KhongDuTonKhoNgoaiLe.java`** | Ném ra khi kho dược không đủ số lượng thuốc thuộc lô yêu cầu để cấp phát. |
 
 ---
 
@@ -156,7 +156,7 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 5. `LoaiCoSo`: PHONG_KHAM, BENH_VIEN, NHA_THUOC, TRUNG_TAM_XET_NGHIEM.
 6. `LoaiDichVu`: KHAM_BENH, XET_NGHIEM, CDHA, THU_THUAT, PHAU_THUAT, GIUONG_BENH.
 7. `LoaiGiaoDichKho`: NHAP_NHA_CUNG_CAP, XUAT_DON_THUOC, XUAT_DIEU_CHUYEN, NHAP_DIEU_CHUYEN, XUAT_HUY, CAN_BANG_KIEM_KE.
-8. `LoaiItem`: THUOC, VAT_TU_Y_TE, HOA_CHAT, SINH_PHAM.
+8. `LoaiMatHang`: THUOC, VAT_TU_Y_TE, HOA_CHAT, SINH_PHAM.
 9. `LoaiKho`: KHO_TONG, KHO_CHAN, KHO_LE, KHO_QUAY_THUOC, TU_TRUC_CAP_CUU.
 10. `LoaiNghiPhep`: NGHI_PHEP_NAM, NGHI_OM, NGHI_THAI_SAN, NGHI_KHONG_LUONG.
 11. `LoaiTienSu`: DI_UNG_THUOC, DI_UNG_THUC_PHAM, BENH_MAN_TINH, TIEN_SU_PHAU_THUAT, TIEN_SU_GIA_DINH.
@@ -172,7 +172,7 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 
 | Tên File | Loại | Chức năng nghiệp vụ | Danh sách các trường dữ liệu |
 | :--- | :--- | :--- | :--- |
-| **`BenhNhan.java`** | Aggregate Root | Quản lý định danh toàn diện hồ sơ bệnh nhân, thông tin liên lạc khẩn cấp và các danh sách lịch sử y tế. | **Thuộc tính:**<br>- `ho, ten: String`<br>- `ngaySinh: LocalDate`<br>- `gioiTinh: GioiTinh`<br>- `dienThoai: String`<br>- `email: String`<br>- `soCCCD: String`<br>- `diaChi: String`<br>- `nguoiLienHeTen, nguoiLienHeDienThoai: String`<br>- `username, passwordHash: String`<br>- *Quan hệ:* `benhNhanCoSo`, `baoHiems`, `tienSuBenhs`, `luotKhams`, `hoaDons`.<br>**Phương thức:** `getHoTen()`. Phát hành `BenhNhanRegisteredEvent`. |
+| **`BenhNhan.java`** | Aggregate Root | Quản lý định danh toàn diện hồ sơ bệnh nhân, thông tin liên lạc khẩn cấp và các danh sách lịch sử y tế. | **Thuộc tính:**<br>- `ho, ten: String`<br>- `ngaySinh: LocalDate`<br>- `gioiTinh: GioiTinh`<br>- `dienThoai: String`<br>- `email: String`<br>- `soCCCD: String`<br>- `diaChi: String`<br>- `nguoiLienHeTen, nguoiLienHeDienThoai: String`<br>- `username, passwordHash: String`<br>- *Quan hệ:* `benhNhanCoSo`, `baoHiems`, `tienSuBenhs`, `luotKhams`, `hoaDons`.<br>**Phương thức:** `getHoTen()`. Phát hành `BenhNhanDaDangKySuKien`. |
 | **`BaoHiem.java`** | Entity | Lưu trữ thông tin thẻ bảo hiểm y tế (BHYT) của người bệnh. | **Thuộc tính:**<br>- `maBenhNhan: int`<br>- `loaiBaoHiem: LoaiBaoHiem`<br>- `soBaoHiem: String` (Mã thẻ BHYT 15 ký tự)<br>- `ngayHetHan: LocalDate`<br>- `mucHuong: int` (Tỷ lệ hưởng 80%, 95%, 100%)<br>- `noiDangKyKCB: String` (Mã nơi ĐKKCB ban đầu). |
 | **`TienSuBenh.java`** | Entity | Ghi nhận tiền sử dị ứng, tiền sử phẫu thuật, bệnh lý mạn tính. | **Thuộc tính:**<br>- `maBenhNhan: int`<br>- `loaiTienSu: LoaiTienSu`<br>- `moTa: String`. |
 | **`BenhNhanCoSo.java`** | Junction Entity | Quản lý mối liên kết giữa bệnh nhân và cơ sở phòng khám nơi đăng ký khám lần đầu. | **Thuộc tính:**<br>- `maBenhNhan: int`<br>- `maCoSo: int`<br>- `ngayDangKy: LocalDateTime`. |
@@ -205,9 +205,9 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 
 | Tên File | Loại | Chức năng nghiệp vụ | Danh sách các trường dữ liệu & Phương thức |
 | :--- | :--- | :--- | :--- |
-| **`DonThuoc.java`** | Aggregate Root | Đại diện cho một đơn thuốc của lượt khám. Quản lý trạng thái phê duyệt của bác sĩ và cấp phát của dược sĩ. | **Thuộc tính:**<br>- `maLuotKham: int`<br>- `maBacSi: int`<br>- `maCoSo: int`<br>- `ngayKe: LocalDateTime`<br>- `trangThai: TrangThaiDonThuoc`<br>- `ghiChu: String`<br>- `ngayCapThuoc: LocalDateTime`<br>- `maNguoiCapThuoc: Integer`<br>- `chiTietDonThuocs: List<ChiTietDonThuoc>`.<br>**Phương thức:** `approve()`, `completeDispense(maNguoiCapThuoc)`. Phát hành `DonThuocApprovedEvent`, `DonThuocDispensedEvent`. |
+| **`DonThuoc.java`** | Aggregate Root | Đại diện cho một đơn thuốc của lượt khám. Quản lý trạng thái phê duyệt của bác sĩ và cấp phát của dược sĩ. | **Thuộc tính:**<br>- `maLuotKham: int`<br>- `maBacSi: int`<br>- `maCoSo: int`<br>- `ngayKe: LocalDateTime`<br>- `trangThai: TrangThaiDonThuoc`<br>- `ghiChu: String`<br>- `ngayCapThuoc: LocalDateTime`<br>- `maNguoiCapThuoc: Integer`<br>- `chiTietDonThuocs: List<ChiTietDonThuoc>`.<br>**Phương thức:** `approve()`, `completeDispense(maNguoiCapThuoc)`. Phát hành `DonThuocDaDuyetSuKien`, `DonThuocDaCapPhatSuKien`. |
 | **`ChiTietDonThuoc.java`** | Entity | Từng dòng thuốc được kê trong đơn thuốc. | **Thuộc tính:**<br>- `maDonThuoc: int`<br>- `maItem: int`<br>- `soLuongKe, soLuongDaXuat: BigDecimal`<br>- `lieuDung: String` (Ví dụ: "1 viên/lần")<br>- `tanSuat: String` (Ví dụ: "2 lần/ngày")<br>- `soNgay: Integer`<br>- `huongDan: String` (Ví dụ: "Uống sau ăn no")<br>- `donGiaKe: BigDecimal`. |
-| **`ClinicalDrugSafetyService.java`** | Domain Service | Dịch vụ kiểm tra an toàn sử dụng thuốc: đối chiếu tiền sử dị ứng của bệnh nhân với hoạt chất của các thuốc kê đơn, phát hiện trùng hoạt chất hoặc tương tác thuốc. | **Record:** `SafetyWarning(itemCode, itemName, warningMessage, isCritical)`.<br>**Phương thức:** `evaluatePrescriptionSafety(BenhNhan, List<Item>)`. |
+| **`LamSangThuocAnToanDichVu.java`** | Domain Service | Dịch vụ kiểm tra an toàn sử dụng thuốc: đối chiếu tiền sử dị ứng của bệnh nhân với hoạt chất của các thuốc kê đơn, phát hiện trùng hoạt chất hoặc tương tác thuốc. | **Record:** `SafetyWarning(itemCode, itemName, warningMessage, isCritical)`.<br>**Phương thức:** `evaluatePrescriptionSafety(BenhNhan, List<MatHang>)`. |
 
 ---
 
@@ -215,18 +215,18 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 
 | Tên File | Loại | Chức năng nghiệp vụ | Danh sách các trường dữ liệu |
 | :--- | :--- | :--- | :--- |
-| **`Item.java`** | Aggregate Root | Quản lý danh mục thuốc, hóa chất, vật tư y tế, định mức tồn an toàn và đơn vị chuyển đổi. | **Thuộc tính:**<br>- `maItem: String`<br>- `tenItem: String`<br>- `loaiItem: LoaiItem`<br>- `hoatChat, hamLuong, donViCoBan, quyCachDongGoi: String`<br>- `giaNhapMacDinh, giaBanMacDinh: BigDecimal`<br>- `tonToiThieu, tonToiDa: BigDecimal`<br>- `hoatDong: boolean`<br>- *Quan hệ:* `donViTinhQuyDois`, `tonKhos`. |
+| **`MatHang.java`** | Aggregate Root | Quản lý danh mục thuốc, hóa chất, vật tư y tế, định mức tồn an toàn và đơn vị chuyển đổi. | **Thuộc tính:**<br>- `maItem: String`<br>- `tenItem: String`<br>- `loaiItem: LoaiMatHang`<br>- `hoatChat, hamLuong, donViCoBan, quyCachDongGoi: String`<br>- `giaNhapMacDinh, giaBanMacDinh: BigDecimal`<br>- `tonToiThieu, tonToiDa: BigDecimal`<br>- `hoatDong: boolean`<br>- *Quan hệ:* `donViTinhQuyDois`, `tonKhos`. |
 | **`Kho.java`** | Aggregate Root | Quản lý danh mục kho vật lý (Kho chẵn, Kho ngoại trú, Tủ trực cấp cứu). | **Thuộc tính:**<br>- `maCoSo: int`<br>- `tenKho: String`<br>- `loaiKho: LoaiKho`<br>- `trangThai: TrangThaiKho`<br>- `maNguoiPhuTrach: Integer`. |
 | **`TonKho.java`** | Entity | Quản lý số lượng tồn thực tế của từng mặt hàng theo từng Lô (`soLo`) và Hạn sử dụng (`hanSuDung`). | **Thuộc tính:**<br>- `maKho: int`<br>- `maItem: int`<br>- `soLo: String`<br>- `hanSuDung: LocalDate`<br>- `soLuongTon, giaNhap, giaBan: BigDecimal`. |
-| **`FefoAllocationService.java`** | Domain Service | Thuật toán phân bổ xuất kho tự động theo tiêu chuẩn dược phẩm **FEFO (First Expired, First Out - Lô có hạn dùng gần nhất sẽ xuất trước)**. | **Record:** `AllocationLine(TonKho batch, BigDecimal quantityToTake, BigDecimal quantityBefore)`.<br>**Phương thức:** `allocateFefo(List<TonKho>, BigDecimal requiredQty)`. |
+| **`FEFOPhanBoDichVu.java`** | Domain Service | Thuật toán phân bổ xuất kho tự động theo tiêu chuẩn dược phẩm **FEFO (First Expired, First Out - Lô có hạn dùng gần nhất sẽ xuất trước)**. | **Record:** `AllocationLine(TonKho batch, BigDecimal quantityToTake, BigDecimal quantityBefore)`.<br>**Phương thức:** `allocateFefo(List<TonKho>, BigDecimal requiredQty)`. |
 | **`PhieuNhapKho.java` & `ChiTietNhapKho.java`** | Aggregate & Entity | Phiếu nhập hàng thuốc/vật tư từ nhà cung cấp vào kho kèm đơn giá nhập, số lô, hạn dùng. | **Thuộc tính:** `soPhieuNhap`, `maKho`, `maNhaCungCap`, `ngayNhap`, `tongTien`, `trangThai`, `chiTiets`. |
 | **`PhieuXuatKho.java` & `ChiTietXuatKho.java`** | Aggregate & Entity | Phiếu xuất kho thuốc theo đơn hoặc xuất điều chuyển nội bộ giữa các kho/tủ trực. | **Thuộc tính:** `soPhieuXuat`, `maKhoXuat`, `loaiXuat`, `maDonThuoc`, `maKhoNhan`, `ngayXuat`, `tongTien`, `chiTiets`. |
 | **`DonDatHang.java` & `ChiTietDonDatHang.java`** | Aggregate & Entity | Đơn đặt hàng vật tư, dược phẩm gửi đến Nhà cung cấp. | **Thuộc tính:** `soDonDatHang`, `maNhaCungCap`, `ngayDat`, `tongTien`, `trangThai`, `chiTiets`. |
 | **`NhaCungCap.java`** | Entity | Danh mục công ty dược phẩm, nhà phân phối thiết bị y tế. | **Thuộc tính:** `tenNhaCungCap`, `maSoThue`, `soDienThoai`, `email`, `diaChi`, `trangThai`. |
-| **`Stocktake.java` & `StocktakeCount.java`** | Aggregate & Entity | Biên bản kiểm kê kho định kỳ, ghi nhận số lượng sổ sách, số lượng đếm thực tế và độ lệch chênh lệch. | **Thuộc tính:** `maKho`, `ngayKiemKe`, `trangThai`, `soLuongSoSach`, `soLuongThucTe`, `chenhLech`. |
-| **`InventoryTransaction.java`** | Entity | Thẻ kho điện tử (Audit trail biến động kho), ghi nhận từng lần thay đổi tồn kho cùng mã chứng từ liên kết. | **Thuộc tính:** `maKho`, `maItem`, `maTonKho`, `loaiGiaoDich`, `soLuongThayDoi`, `tonTruocKhiThayDoi`, `tonSauKhiThayDoi`, `thoiGian`, `maChungTu`. |
+| **`KiemKe.java` & `KiemKeDem.java`** | Aggregate & Entity | Biên bản kiểm kê kho định kỳ, ghi nhận số lượng sổ sách, số lượng đếm thực tế và độ lệch chênh lệch. | **Thuộc tính:** `maKho`, `ngayKiemKe`, `trangThai`, `soLuongSoSach`, `soLuongThucTe`, `chenhLech`. |
+| **`KhoGiaoDich.java`** | Entity | Thẻ kho điện tử (Audit trail biến động kho), ghi nhận từng lần thay đổi tồn kho cùng mã chứng từ liên kết. | **Thuộc tính:** `maKho`, `maItem`, `maTonKho`, `loaiGiaoDich`, `soLuongThayDoi`, `tonTruocKhiThayDoi`, `tonSauKhiThayDoi`, `thoiGian`, `maChungTu`. |
 | **`DonViTinhQuyDoi.java`** | Entity | Quy đổi đơn vị tính (Ví dụ: 1 Hộp = 10 Vỉ = 100 Viên) cùng hệ số quy đổi và giá bán theo đơn vị. | **Thuộc tính:** `maItem`, `tenDonVi`, `tyLeQuyDoi`, `giaBan`. |
-| **`IdempotencyRecord.java`** | Entity | Đảm bảo an toàn giao dịch kho tránh trừ kho 2 lần khi mạng chập chờn hoặc người dùng click đúp. | **Thuộc tính:** `idempotencyKey`, `operationName`, `responsePayload`, `statusCode`, `expiryTime`. |
+| **`TinhIdempotentHoSo.java`** | Entity | Đảm bảo an toàn giao dịch kho tránh trừ kho 2 lần khi mạng chập chờn hoặc người dùng click đúp. | **Thuộc tính:** `idempotencyKey`, `operationName`, `responsePayload`, `statusCode`, `expiryTime`. |
 
 ---
 
@@ -234,7 +234,7 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 
 | Tên File | Loại | Chức năng nghiệp vụ | Danh sách các trường dữ liệu & Phương thức |
 | :--- | :--- | :--- | :--- |
-| **`HoaDon.java`** | Aggregate Root | Hóa đơn thanh toán viện phí của một đợt khám bệnh. Tổng hợp chi phí khám, thuốc, dịch vụ, trừ phần BHYT chi trả. | **Thuộc tính:**<br>- `soHoaDon: String`<br>- `maLuotKham: int`<br>- `maBenhNhan: int`<br>- `maCoSo: int`<br>- `ngayLap: LocalDateTime`<br>- `tongTien, soTienBaoHiemChiTra, soTienBenhNhanChiTra, daThanhToan: BigDecimal`<br>- `trangThai: TrangThaiHoaDon`<br>- `ghiChu: String`<br>- *Quan hệ:* `chiTietHoaDons`, `phieuThus`, `congNoBenhNhan`.<br>**Phương thức:** `recordPayment(amount, phuongThuc, nguoiThu, ghiChu)`. Phát hành `PaymentRecordedEvent`, `HoaDonCreatedEvent`. |
+| **`HoaDon.java`** | Aggregate Root | Hóa đơn thanh toán viện phí của một đợt khám bệnh. Tổng hợp chi phí khám, thuốc, dịch vụ, trừ phần BHYT chi trả. | **Thuộc tính:**<br>- `soHoaDon: String`<br>- `maLuotKham: int`<br>- `maBenhNhan: int`<br>- `maCoSo: int`<br>- `ngayLap: LocalDateTime`<br>- `tongTien, soTienBaoHiemChiTra, soTienBenhNhanChiTra, daThanhToan: BigDecimal`<br>- `trangThai: TrangThaiHoaDon`<br>- `ghiChu: String`<br>- *Quan hệ:* `chiTietHoaDons`, `phieuThus`, `congNoBenhNhan`.<br>**Phương thức:** `recordPayment(amount, phuongThuc, nguoiThu, ghiChu)`. Phát hành `ThanhToanDaGhiNhanSuKien`, `HoaDonDaTaoSuKien`. |
 | **`ChiTietHoaDon.java`** | Entity | Chi tiết từng mục chi phí được xuất trên hóa đơn (Khám bệnh, Xét nghiệm, Đơn thuốc, Vật tư tiêu hao). | **Thuộc tính:**<br>- `maHoaDon: int`<br>- `loaiDoiTuong: String`<br>- `maDoiTuong: int`<br>- `moTa: String`<br>- `soLuong, donGia: BigDecimal`. |
 | **`PhieuThu.java`** | Entity | Biên lai thu tiền từng lần tương ứng với từng giao dịch nộp tiền của bệnh nhân (hỗ trợ thanh toán nhiều lần hoặc tạm ứng). | **Thuộc tính:**<br>- `maHoaDon: int`<br>- `soTien: BigDecimal`<br>- `ngayThu: LocalDateTime`<br>- `phuongThuc: PhuongThucThanhToan`<br>- `nguoiThu: int`<br>- `ghiChu: String`. |
 | **`CongNoBenhNhan.java`** | Entity | Theo dõi số tiền người bệnh còn nợ phòng khám chưa thanh toán đủ. | **Thuộc tính:**<br>- `maHoaDon: int`<br>- `maBenhNhan: int`<br>- `soTienNo, soTienDaTra: BigDecimal`<br>- `hanThanhToan: LocalDate`<br>- `trangThai: TrangThaiCongNo`. |
@@ -245,9 +245,9 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 
 | Tên File | Loại | Chức năng nghiệp vụ | Danh sách các trường dữ liệu & Phương thức |
 | :--- | :--- | :--- | :--- |
-| **`LichHen.java`** | Aggregate Root | Quản lý thông tin đặt lịch khám trước của bệnh nhân, bác sĩ hẹn khám, phòng khám, chi phí cọc giữ chỗ và trạng thái xác nhận. | **Thuộc tính:**<br>- `maBenhNhan: int`<br>- `maBacSi: int`<br>- `maCoSo: int`<br>- `maKhoa: Integer`<br>- `thoiGianBatDau, thoiGianKetThuc: LocalDateTime`<br>- `trangThai: TrangThaiLichHen`<br>- `lyDo, nguonDat: String`<br>- `chiPhiGiuCho: BigDecimal`<br>- `daThanhToanGiuCho: boolean`<br>- `soPhieuThu: String`<br>- `ngayThanhToan: LocalDateTime`<br>- `nguoiThuTien: Integer`<br>- `ghiChuHuy: String`.<br>**Phương thức:** `xacNhanThuTienMat()`, `huyLichHen(lyDo)`. Phát hành `LichHenBookedEvent`. |
-| **`INotificationService.java`** | Service Contract | Khế ước dịch vụ gửi tin nhắn xác nhận lịch hẹn, nhắc hẹn khám và thông báo hủy lịch (qua SMS/Zalo/Email). | **Phương thức:** `sendAppointmentConfirmation()`, `sendAppointmentReminder()`, `sendCancellationNotice()`. |
-| **`IPaymentGatewayService.java`** | Service Contract | Khế ước kết nối cổng thanh toán trực tuyến (VNPay, Momo, Napas) để thu tiền cọc giữ chỗ qua mạng. | **Records:** `PaymentResult`, `PaymentCallbackResult`.<br>**Phương thức:** `createPaymentUrl()`, `processCallback()`. |
+| **`LichHen.java`** | Aggregate Root | Quản lý thông tin đặt lịch khám trước của bệnh nhân, bác sĩ hẹn khám, phòng khám, chi phí cọc giữ chỗ và trạng thái xác nhận. | **Thuộc tính:**<br>- `maBenhNhan: int`<br>- `maBacSi: int`<br>- `maCoSo: int`<br>- `maKhoa: Integer`<br>- `thoiGianBatDau, thoiGianKetThuc: LocalDateTime`<br>- `trangThai: TrangThaiLichHen`<br>- `lyDo, nguonDat: String`<br>- `chiPhiGiuCho: BigDecimal`<br>- `daThanhToanGiuCho: boolean`<br>- `soPhieuThu: String`<br>- `ngayThanhToan: LocalDateTime`<br>- `nguoiThuTien: Integer`<br>- `ghiChuHuy: String`.<br>**Phương thức:** `xacNhanThuTienMat()`, `huyLichHen(lyDo)`. Phát hành `LichHenDaDatSuKien`. |
+| **`IThongBaoDichVu.java`** | Service Contract | Khế ước dịch vụ gửi tin nhắn xác nhận lịch hẹn, nhắc hẹn khám và thông báo hủy lịch (qua SMS/Zalo/Email). | **Phương thức:** `sendAppointmentConfirmation()`, `sendAppointmentReminder()`, `sendCancellationNotice()`. |
+| **`IThanhToanCongKetNoiDichVu.java`** | Service Contract | Khế ước kết nối cổng thanh toán trực tuyến (VNPay, Momo, Napas) để thu tiền cọc giữ chỗ qua mạng. | **Records:** `PaymentResult`, `PaymentCallbackResult`.<br>**Phương thức:** `createPaymentUrl()`, `processCallback()`. |
 
 ---
 
@@ -294,22 +294,22 @@ Bao gồm 31 Enums định nghĩa chuẩn hóa toàn bộ giá trị phân loạ
 | **`NhatKyHoSoBenhAn.java`** | Entity | Nhật ký truy vết hồ sơ bệnh án (Bắt buộc theo Luật Khám bệnh, chữa bệnh 2023): lưu lại nhân viên nào mở xem hoặc in hồ sơ bệnh án của bệnh nhân với lý do gì. | **Thuộc tính:** `maLuotKham`, `maNhanVien`, `hanhDong`, `lyDo`, `thoiGian`. |
 | **`ThamSoHeThong.java`** | Entity | Cấu hình tham số động hệ thống (Ví dụ: Tên bệnh viện, Thời gian tự động logout phiên làm việc, Tiêu đề phiếu in). | **Thuộc tính:** `maThamSo`, `tenThamSo`, `giaTri`, `moTa`. |
 | **`CauHinhTichHop.java`** | Entity | Cấu hình kết nối cổng API ngoại vi (Cổng giám định BHYT Việt Nam, Cổng Hóa đơn điện tử M-Invoice / Viettel, SMS Brandname). | **Thuộc tính:** `maDichVuTichHop`, `endpoint`, `apiKey`, `secretKey`, `hoatDong`. |
-| **`TokenLamMoi.java`** | Entity | Quản lý Refresh Token xác thực người dùng, hỗ trợ cơ chế tự động đăng xuất và kiểm soát phiên làm việc trên từng máy trạm. | **Thuộc tính:** `maNhanVien`, `token`, `hetHan`, `daHuy`, `lyDoHuy`, `ipTao`, `thietBi`. |
+| **`MaXacThucLamMoi.java`** | Entity | Quản lý Refresh Token xác thực người dùng, hỗ trợ cơ chế tự động đăng xuất và kiểm soát phiên làm việc trên từng máy trạm. | **Thuộc tính:** `maNhanVien`, `token`, `hetHan`, `daHuy`, `lyDoHuy`, `ipTao`, `thietBi`. |
 
 ---
 
 ### 2.17. `domain.repositories` - Khế ước Lưu trữ Dữ liệu (Repository Interfaces)
 Các interface trong package định nghĩa hợp đồng độc lập với SQL/JDBC; chúng không khai báo chi tiết triển khai lưu trữ. Các chữ ký dưới đây phản ánh đúng các method được khai báo:
 
-* **`IRepository<T extends BaseEntity<Integer> & IAggregateRoot>`**:
+* **`IRepository<T extends CoSoThucThe<Integer> & ITongHopGoc>`**:
   - `Optional<T> getById(int id)`, `List<T> getAll()`.
-  - `PagedResult<T> getPaged(int pageIndex, int pageSize, ISpecification<T> specification)`, `List<T> find(ISpecification<T> specification)`.
-  - `boolean exists(ISpecification<T> specification)`, `int count(ISpecification<T> specification)`.
+  - `PhanTrangKetQua<T> getPaged(int pageIndex, int pageSize, ITieuChuan<T> specification)`, `List<T> find(ITieuChuan<T> specification)`.
+  - `boolean exists(ITieuChuan<T> specification)`, `int count(ITieuChuan<T> specification)`.
   - `void add(T entity)`, `void update(T entity)`, `void delete(T entity)`.
-  - `IUnitOfWork getUnitOfWork()`.
+  - `IDonViCuaLamViec getUnitOfWork()`.
   Không khai báo `findById`, `findAll` hay `save`.
-* **`ISpecification<T>`** khai báo `boolean isSatisfiedBy(T candidate)` và `Predicate<T> toPredicate()`.
-* **`PagedResult<T>`** chứa `items`, `totalCount`, `pageIndex`, `pageSize`; cung cấp các getter tương ứng, `getTotalPages()`, `hasPreviousPage()` và `hasNextPage()`.
+* **`ITieuChuan<T>`** khai báo `boolean isSatisfiedBy(T candidate)` và `Predicate<T> toPredicate()`.
+* **`PhanTrangKetQua<T>`** chứa `items`, `totalCount`, `pageIndex`, `pageSize`; cung cấp các getter tương ứng, `getTotalPages()`, `hasPreviousPage()` và `hasNextPage()`.
 * **`IBenhNhanRepository extends IRepository<BenhNhan>`**:
   - `Optional<BenhNhan> getByCCCD(String cccd)`, `Optional<BenhNhan> getByPhone(String phone)`.
   - `Optional<BenhNhan> getByIdInScope(int patientId, int facilityId, int departmentId)` và `Optional<BenhNhan> getByCCCDInScope(String cccd, int facilityId, int departmentId)` là default methods trả về `Optional.empty()`.
@@ -319,10 +319,10 @@ Các interface trong package định nghĩa hợp đồng độc lập với SQL
 * **`ILuotKhamRepository extends IRepository<LuotKham>`** khai báo `List<LuotKham> getVisitsByDoctor(int maBacSi, LocalDate date)` và `int getNextQueueNumber(int maCoSo, int maKhoa, LocalDate date)`.
 * **`IDonThuocRepository extends IRepository<DonThuoc>`** chỉ bổ sung `List<DonThuoc> getByLuotKhamId(int maLuotKham)`; không khai báo truy vấn theo trạng thái duyệt hoặc chờ cấp phát.
 * **`IHoaDonRepository extends IRepository<HoaDon>`** bổ sung `Optional<HoaDon> getBySoHoaDon(String soHoaDon)` và `Optional<HoaDon> getByLuotKham(int maLuotKham)`.
-* **`IKhoRepository extends IUnitOfWork`** (không kế thừa `IRepository`) khai báo `Optional<Item> getItemById(int id)` và `List<TonKho> getAvailableBatches(int maKho, int maItem)`. `IUnitOfWork` khai báo `int saveChanges()` và `boolean saveEntities()`; `IKhoRepository` không khai báo thao tác trừ kho hay phân bổ FEFO.
+* **`IKhoRepository extends IDonViCuaLamViec`** (không kế thừa `IRepository`) khai báo `Optional<MatHang> getItemById(int id)` và `List<TonKho> getAvailableBatches(int maKho, int maItem)`. `IDonViCuaLamViec` khai báo `int saveChanges()` và `boolean saveEntities()`; `IKhoRepository` không khai báo thao tác trừ kho hay phân bổ FEFO.
 * **`ILichHenRepository extends IRepository<LichHen>`** khai báo `List<LichHen> getUpcomingAppointments(int patientId)` và `int countAppointmentsInSlot(int doctorId, LocalDateTime start, LocalDateTime end)`.
-* **`INhanVienRepository extends IRepository<NhanVien>`** khai báo `Optional<NhanVien> getByUsername(String username)`, `List<NhanVien> getActiveDoctors(int maCoSo)`, `List<String> getRoleNames(int employeeId)`, `List<VaiTro> getAssignedRoles(int employeeId)`, `List<NhanVienWorkScope> getAssignedWorkScopes(int employeeId)` và `void recordSuccessfulLogin(int employeeId, LocalDateTime loginAt)`. Các chữ ký này không tự quy định xác thực hay kiểm tra quyền.
-* **`ISystemRepository`** (không kế thừa `IRepository`) khai báo `List<MaTranPhanQuyen> getMatrixByRoleId(int roleId)` và `Optional<String> getSystemParameterValue(String key)`.
+* **`INhanVienRepository extends IRepository<NhanVien>`** khai báo `Optional<NhanVien> getByUsername(String username)`, `List<NhanVien> getActiveDoctors(int maCoSo)`, `List<String> getRoleNames(int employeeId)`, `List<VaiTro> getAssignedRoles(int employeeId)`, `List<NhanVienLamViecPhamVi> getAssignedWorkScopes(int employeeId)` và `void recordSuccessfulLogin(int employeeId, LocalDateTime loginAt)`. Các chữ ký này không tự quy định xác thực hay kiểm tra quyền.
+* **`IHeThongRepository`** (không kế thừa `IRepository`) khai báo `List<MaTranPhanQuyen> getMatrixByRoleId(int roleId)` và `Optional<String> getSystemParameterValue(String key)`.
 
 Các khai báo trên chỉ xác nhận contract của Domain. Việc có một port được khai báo không chứng minh đã có adapter Infrastructure, use case Application, workflow UI hay persistence test tương ứng; cần kiểm tra riêng từng phần triển khai để đưa ra kết luận về chúng.
 
@@ -336,7 +336,7 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 > **KẾT LUẬN ĐÁNH GIÁ:**
 > 1. **Về Khung kiến trúc và Nghiệp vụ cốt lõi (Core Domain Logic): ĐẠT 85% - 90%**
 >    - Kiến trúc DDD được xây dựng rất bài bản, rõ ràng, phân định đúng Aggregate Root, Entity, Value Object và Domain Events.
->    - Các luồng nghiệp vụ phức tạp như: Thuật toán cấp phát thuốc FEFO (`FefoAllocationService`), Kiểm tra an toàn dược lâm sàng (`ClinicalDrugSafetyService`), Khóa hồ sơ điện tử có chữ ký số (`emrLocked`, `emrSignature`), Theo dõi Audit Trail và Soft Delete đều đã hoàn thiện.
+>    - Các luồng nghiệp vụ phức tạp như: Thuật toán cấp phát thuốc FEFO (`FEFOPhanBoDichVu`), Kiểm tra an toàn dược lâm sàng (`LamSangThuocAnToanDichVu`), Khóa hồ sơ điện tử có chữ ký số (`emrLocked`, `emrSignature`), Theo dõi Audit Trail và Soft Delete đều đã hoàn thiện.
 > 
 > 2. **Về Mức độ đáp ứng dữ liệu cho Giao diện Desktop (UI Data Completeness): CHƯA ĐỦ HOÀN TOÀN (Đáp ứng ~70% - 75%)**
 >    - Các màn hình Desktop y tế (theo `UI_CODING_STANDARDS.md`) có đặc thù **Mật độ thông tin rất cao (High Information Density)** và tuân thủ các quy định khắt khe của **Bộ Y Tế Việt Nam** (Biểu mẫu Bệnh án ngoại trú số 01/BV, Cổng dữ liệu BHYT Quyết định 4210/130/QĐ-BYT, Đơn thuốc điện tử Thông tư 04/2022/TT-BYT).
@@ -346,7 +346,7 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 
 ### 3.2. Bảng đối soát chi tiết từng Màn hình Desktop (Desktop Forms vs Domain Entities)
 
-#### ① Phân hệ Tiếp đón & Đăng ký khám (`ReceptionPanel.java`, `PatientRegistrationFormPanel.java`)
+#### ① Phân hệ Tiếp đón & Đăng ký khám (`TiepDonManHinh.java`, `BenhNhanDangKyBieuMauManHinh.java`)
 * **Thực thể Domain tương ứng:** `BenhNhan`, `BaoHiem`, `LuotKham`.
 * **Trường dữ liệu đã có trong Domain:**
   - `BenhNhan`: Họ, Tên, Ngày sinh, Giới tính, Số điện thoại, Email, Số CCCD, Địa chỉ, Người liên hệ.
@@ -364,14 +364,14 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 
 ---
 
-#### ② Phân hệ Bàn khám Bác sĩ & Bệnh án ngoại trú (`DoctorStationPanel`, `MedicalRecordTabPanel.java`)
+#### ② Phân hệ Bàn khám Bác sĩ & Bệnh án ngoại trú (`BacSiTramManHinh`, `YTeHoSoTheManHinh.java`)
 * **Thực thể Domain tương ứng:** `LuotKham`, `ChanDoan`, `SinhHieu`.
 * **Trường dữ liệu đã có trong Domain:**
   - `LuotKham`: Lý do khám, Thời gian bắt đầu/kết thúc khám, Chữ ký số EMR, Cờ khóa EMR.
   - `ChanDoan`: Mã ICD-10, Chuỗi chẩn đoán văn bản, Cờ bệnh chính.
   - `SinhHieu`: Mạch, Nhiệt độ, Huyết áp tâm thu/trương, Nhịp thở, Chiều cao, Cân nặng, BMI, SpO2.
 * **Khoảng trống dữ liệu NGHIÊM TRỌNG (Critical Gap):**
-  - Màn hình `MedicalRecordTabPanel` mô phỏng tờ Bệnh án ngoại trú chuẩn Bộ Y Tế. Hiện tại `LuotKham` chỉ có trường duy nhất là `lyDoKham: String`, hoàn toàn thiếu các phân đoạn bệnh án lâm sàng:
+  - Màn hình `YTeHoSoTheManHinh` mô phỏng tờ Bệnh án ngoại trú chuẩn Bộ Y Tế. Hiện tại `LuotKham` chỉ có trường duy nhất là `lyDoKham: String`, hoàn toàn thiếu các phân đoạn bệnh án lâm sàng:
   1. `quaTrinhBenhLy` (Diễn tiến bệnh lý từ khi khởi phát đến nay).
   2. `tienSuBanThanText` & `tienSuGiaDinhText` (Mô tả tự do diễn giải chi tiết tiền sử gia đình, bản thân).
   3. `khamToanThan` (Khám tổng quát thể trạng: Da niêm mạc, hệ thống hạch bạch huyết, tuyến giáp).
@@ -385,7 +385,7 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 
 ---
 
-#### ③ Phân hệ Xử trí & Kết thúc khám (`TreatmentResolutionTabPanel.java`)
+#### ③ Phân hệ Xử trí & Kết thúc khám (`DieuTriXuTriTheManHinh.java`)
 * **Thực thể Domain tương ứng:** `LuotKham`.
 * **Trường dữ liệu đã có trong Domain:** `trangThaiLuotKham` (`DANG_KHAM`, `HOAN_THANH`, `HUY`).
 * **Các trường dữ liệu Desktop đang CẦN nhưng Domain CHƯA CÓ:**
@@ -397,8 +397,8 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 
 ---
 
-#### ④ Phân hệ Kê đơn thuốc ngoại trú (`PrescriptionOrderTabPanel.java`)
-* **Thực thể Domain tương ứng:** `DonThuoc`, `ChiTietDonThuoc`, `Item`.
+#### ④ Phân hệ Kê đơn thuốc ngoại trú (`DonThuocYeuCauTheManHinh.java`)
+* **Thực thể Domain tương ứng:** `DonThuoc`, `ChiTietDonThuoc`, `MatHang`.
 * **Trường dữ liệu đã có trong Domain:**
   - `DonThuoc`: Ngày kê, Trạng thái đơn, Ghi chú, Ngày cấp thuốc, Bác sĩ kê.
   - `ChiTietDonThuoc`: Số lượng kê, Số ngày, Liều dùng, Tần suất, Hướng dẫn, Đơn giá.
@@ -410,7 +410,7 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 
 ---
 
-#### ⑤ Phân hệ Cận lâm sàng & Chẩn đoán hình ảnh (`ParaclinicalOrderPanel.java`)
+#### ⑤ Phân hệ Cận lâm sàng & Chẩn đoán hình ảnh (`CanLamSangYeuCauManHinh.java`)
 * **Thực thể Domain tương ứng:** `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`.
 * **Trường dữ liệu đã có trong Domain:**
   - `ChiDinhDichVu`: Số lượng, Đơn giá, Trạng thái, Kết quả (text), Kết luận (text), Thời gian chỉ định/thực hiện.
@@ -423,7 +423,7 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 
 ---
 
-#### ⑥ Phân hệ Quản lý Viện phí & Hóa đơn (`BillingInvoicePanel.java`)
+#### ⑥ Phân hệ Quản lý Viện phí & Hóa đơn (`VienPhiHoaDonManHinh.java`)
 * **Thực thể Domain tương ứng:** `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`.
 * **Trường dữ liệu đã có trong Domain:**
   - `HoaDon`: Tổng tiền, Tiền BHYT chi trả, Tiền BN chi trả, Đã thanh toán, Trạng thái.
@@ -437,8 +437,8 @@ Các khai báo trên chỉ xác nhận contract của Domain. Việc có một p
 
 ---
 
-#### ⑦ Phân hệ Kho Dược & Tủ trực (`PharmacyDispensePanel.java`)
-* **Thực thể Domain tương ứng:** `Item`, `TonKho`, `PhieuNhapKho`, `PhieuXuatKho`.
+#### ⑦ Phân hệ Kho Dược & Tủ trực (`NhaThuocCapPhatManHinh.java`)
+* **Thực thể Domain tương ứng:** `MatHang`, `TonKho`, `PhieuNhapKho`, `PhieuXuatKho`.
 * **Trường dữ liệu đã có trong Domain:**
   - Mã, Tên, Hoạt chất, Hàm lượng, Đơn vị cơ bản, Quy cách, Giá nhập/bán, Tồn tối thiểu/tối đa, Tồn theo số lô, hạn dùng, Thuật toán FEFO.
 * **Các trường dữ liệu Desktop đang CẦN nhưng Domain CHƯA CÓ:**
@@ -478,7 +478,7 @@ Dưới đây là bảng tổng hợp các trường dữ liệu cần được 
 | **`HoaDon`** | `soTienTamUng` | `BigDecimal` | Số tiền bệnh nhân đã nộp tạm ứng trước đó. |
 | | `soTienGiamGia` | `BigDecimal` | Số tiền miễn giảm / chiết khấu viện phí. |
 | | `soHoaDonDienTu` | `String` | Số hóa đơn điện tử VAT gửi cơ quan Thuế. |
-| **`Item`** | `dangBaoChe` | `String` | Dạng bào chế thuốc (Viên nén, Dung dịch...). |
+| **`MatHang`** | `dangBaoChe` | `String` | Dạng bào chế thuốc (Viên nén, Dung dịch...). |
 | | `soDangKy` | `String` | Số đăng ký lưu hành thuốc (Visa thuốc). |
 
 ---
@@ -506,16 +506,16 @@ Dưới đây là bảng tổng hợp các trường dữ liệu cần được 
 1. **Giai đoạn 1 (Ưu tiên số 1 - Phân hệ Lâm sàng Bác sĩ):**
    * Bổ sung ngay 7 trường bệnh án lâm sàng (`quaTrinhBenhLy`, `khamToanThan`, `khamBoPhan`, `tomTatBenhAn`, `huongDieuTri`, `ketQuaDieuTri`, `huongXuTri`, `ngayHenTaiKham`) vào `LuotKham.java`.
    * Bổ sung `duongDung`, `sang`, `trua`, `chieu`, `toi` vào `ChiTietDonThuoc.java`.
-   * *Kết quả:* Cho phép hoàn thiện ngay 100% chức năng Bàn khám Bác sĩ (`DoctorStationPanel`) và toàn bộ 8 Tab lâm sàng.
+   * *Kết quả:* Cho phép hoàn thiện ngay 100% chức năng Bàn khám Bác sĩ (`BacSiTramManHinh`) và toàn bộ 8 Tab lâm sàng.
 
 2. **Giai đoạn 2 (Ưu tiên số 2 - Tiếp đón & Hành chính BHYT):**
    * Bổ sung `maBenhNhanFormat`, `ngheNghiep`, `danToc`, `quocTich`, `maTinh`/`maHuyen`/`maXa` vào `BenhNhan.java`.
-   * *Kết quả:* Giúp màn hình Đăng ký khám (`ReceptionPanel`) quét được CCCD gắn chip và điền form đầy đủ chuẩn Bộ Y Tế.
+   * *Kết quả:* Giúp màn hình Đăng ký khám (`TiepDonManHinh`) quét được CCCD gắn chip và điền form đầy đủ chuẩn Bộ Y Tế.
 
 3. **Giai đoạn 3 (Ưu tiên số 3 - Viện phí, Kho Dược & Cận lâm sàng):**
    * Bổ sung `soTienTamUng`, `soTienGiamGia`, `soHoaDonDienTu` vào `HoaDon.java`.
    * Bổ sung `danhSachHinhAnhUrl`, `maPhongThucHien` vào `ChiDinhDichVu.java`.
-   * Bổ sung `soDangKy`, `dangBaoChe` vào `Item.java`.
+   * Bổ sung `soDangKy`, `dangBaoChe` vào `MatHang.java`.
    * *Kết quả:* Hoàn thiện phân hệ Thu ngân thanh toán và Kho cấp phát thuốc FEFO.
 
 
@@ -557,7 +557,7 @@ Hệ thống đã chính thức bổ sung đầy đủ các trường dữ liệ
 7. **`HoaDon.java`**:
    - Thêm viện phí: `soTienTamUng`, `soTienGiamGia`, `chietKhauPhanTram`, `lyDoGiamGia`, `soTienHoanTra`.
    - Thêm Hóa đơn điện tử VAT: `soHoaDonDienTu`, `maTraCuuHddt`.
-8. **`Item.java`**:
+8. **`MatHang.java`**:
    - Thêm chuẩn Dược: `dangBaoChe`, `nuocSanXuat`, `hangSanXuat`, `soDangKy` (Visa thuốc).
 
 **Trạng thái hiện tại:** Cả `clinic-domain` và `clinic-desktop` đã được biên dịch kiểm chứng thành công, sẵn sàng 100% để phát triển giao diện và liên kết dữ liệu!
@@ -594,4 +594,4 @@ Hệ thống đã chính thức bổ sung toàn bộ 15 trường dữ liệu ch
    - `loaiDangKyKham: String`: Khám mới / Tái khám / Cấp cứu.
    - `dnVnTien: boolean`: Cờ ưu tiên "ĐN VN tiền".
 
-**Kết quả:** Màn hình Đón tiếp & Đăng ký khám (`PatientRegistrationFormPanel.java`) và Domain Model đã đạt độ tương thích **100%** (Toàn bộ các ô nhập, checkbox, combobox đều đã có trường ánh xạ trực tiếp trong Domain).
+**Kết quả:** Màn hình Đón tiếp & Đăng ký khám (`BenhNhanDangKyBieuMauManHinh.java`) và Domain Model đã đạt độ tương thích **100%** (Toàn bộ các ô nhập, checkbox, combobox đều đã có trường ánh xạ trực tiếp trong Domain).

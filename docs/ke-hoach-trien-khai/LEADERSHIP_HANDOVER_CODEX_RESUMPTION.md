@@ -31,8 +31,8 @@ Trong ca trực điều hành độc lập của `leaderANTI` (sau khi Codex t�
 
 ### A. Cứu hộ Đăng nhập & Vòng đời phiên (`d25e0596`)
 * Khắc phục 3 lỗi biên dịch do đợt phục hồi giao diện gây ra trong `clinic-desktop`.
-* Khôi phục kết nối `AuthenticateUserHandler` (6 tham số) có gắn `AuditWritePort` và `ThrottleStore`.
-* Tái lập `SessionLifecycleService`, `SessionLockOverlay`, `UserSession`, `DashboardNavigationPolicy`.
+* Khôi phục kết nối `AuthenticateNguoiDungHandler` (6 tham số) có gắn `KiemToanWriteCongKetNoi` và `ThrottleStore`.
+* Tái lập `PhienVongDoiDichVu`, `PhienKhoaLopPhu`, `NguoiDungPhien`, `BangDieuKhienDieuHuongChinhSach`.
 * Commit: `0f15eae` (tích hợp vào feature branch).
 
 ### B. Bộ quy trình kiểm thử trực quan cho Owner (`d6c4168f`)
@@ -42,15 +42,15 @@ Trong ca trực điều hành độc lập của `leaderANTI` (sau khi Codex t�
 ### C. Phân hệ Tiếp đón Người bệnh (`REC-01`) — Hoàn thành 100%
 Phân hệ tiếp đón được phân tách và triển khai hoàn chỉnh qua 3 lát cắt (slices):
 1. **Slice 1 — Kiến trúc điều phối & Chính sách lỗi (`eb7cbc16`):**
-   * Khôi phục `ReceptionCompositionRoot.java`: Lắp ráp use case với UoW, Transaction và Audit độc lập.
-   * Khôi phục `ReceptionPanelMessagePolicy.java`: Ánh xạ mã lỗi thành thông báo an toàn, hàm che mờ CCCD (`maskCccd`) đạt chuẩn.
-   * Cập nhật `ReceptionPanel.java`: Lắng nghe vòng đời phiên `SessionLifecycleService`, tự động hủy tác vụ nền và khóa form khi phiên đăng xuất/khóa.
-   * Bổ sung 3 test suite: `ReceptionCompositionRootTest`, `ReceptionPanelMessagePolicyTest`, `ReceptionPanelSessionListenerTest`.
+   * Khôi phục `TiepDonGhepNoiGoc.java`: Lắp ráp use case với UoW, Transaction và Audit độc lập.
+   * Khôi phục `TiepDonManHinhThongBaoChinhSach.java`: Ánh xạ mã lỗi thành thông báo an toàn, hàm che mờ CCCD (`maskCccd`) đạt chuẩn.
+   * Cập nhật `TiepDonManHinh.java`: Lắng nghe vòng đời phiên `PhienVongDoiDichVu`, tự động hủy tác vụ nền và khóa form khi phiên đăng xuất/khóa.
+   * Bổ sung 3 test suite: `TiepDonGhepNoiGocTest`, `TiepDonManHinhThongBaoChinhSachTest`, `TiepDonManHinhPhienBoLangNgheTest`.
    * Commit: `32fdef9`.
 2. **Slice 2 — Gắn kết Form & Bảng trạng thái (`7637041e` do `copilot-cli` thực hiện):**
-   * `PatientRegistrationFormPanel.java`: Đấu nối 15 trường hành chính + BHYT vào `RegisterPatientCommand`, hỗ trợ tính tuổi động, Enter search trên ô SĐT/CCCD.
-   * `ClinicRoomStatusPanel.java`: Đổ động danh sách hàng đợi (Tab 0) và bảng 3 cột trạng thái phòng khám (Tab 2), làm nổi bật màu đỏ phòng khám được chọn.
-   * Bổ sung 3 test suite: `PatientRegistrationFormPanelTest`, `ClinicRoomStatusPanelTest`, `ReceptionActionBindingsTest`.
+   * `BenhNhanDangKyBieuMauManHinh.java`: Đấu nối 15 trường hành chính + BHYT vào `RegisterBenhNhanCommand`, hỗ trợ tính tuổi động, Enter search trên ô SĐT/CCCD.
+   * `PhongKhamPhongTrangThaiManHinh.java`: Đổ động danh sách hàng đợi (Tab 0) và bảng 3 cột trạng thái phòng khám (Tab 2), làm nổi bật màu đỏ phòng khám được chọn.
+   * Bổ sung 3 test suite: `BenhNhanDangKyBieuMauManHinhTest`, `PhongKhamPhongTrangThaiManHinhTest`, `TiepDonHanhDongGanKetTest`.
    * Commit: `d4fbbca`.
 3. **Slice 3 — Đấu nối End-to-End & Phím tắt chân trang:**
    * Nút **Lưu Lại (F2)** gắn với `saveRegistration()` chạy nền qua `SwingWorker` (tách luồng EDT), tự động làm mới hàng đợi và reset form khi thành công.
@@ -75,7 +75,7 @@ Trong CSDL SQLite của Orchestrator (`/Users/jtuong/Documents/ClinicOrchestrato
 Khi Codex quay trở lại làm việc, vui lòng tuân thủ nghiêm ngặt các nguyên tắc sau:
 1. **Không kết nối test tự động vào `clinicDb`:** Mọi test case của Maven (`mvn test`, `mvn verify`) bắt buộc phải chạy 100% in-memory synthetic. CSDL `clinicDb` trên Docker `localhost:1433` (đã migrate đủ V1–V11) được dành riêng cho Owner chạy `./run-app.sh`. Luôn duy trì assert guard: `assertFalse("clinicDb".equalsIgnoreCase(databaseName))`.
 2. **Cổng bảo mật luôn ở trạng thái Default-Deny:** `SEC-01` (Phase 2) và `PAT-02` giữ nguyên trạng thái default-deny cho đến khi có ca sử dụng cụ thể được phê duyệt.
-3. **Bảo tồn giao diện FlatLaf Swing nguyên bản:** Không tùy tiện thay đổi layout, font (`AppFonts`), màu sắc (`UIConstants`), và divider của `JSplitPane` (giữ nguyên 218px).
+3. **Bảo tồn giao diện FlatLaf Swing nguyên bản:** Không tùy tiện thay đổi layout, font (`UngDungPhongChu`), màu sắc (`GiaoDienHangSo`), và divider của `JSplitPane` (giữ nguyên 218px).
 4. **Luôn chạy tác vụ I/O ngoài EDT:** Sử dụng `SwingWorker` cho mọi truy vấn/lưu trữ dữ liệu; chỉ cập nhật UI trên EDT.
 
 ---
@@ -87,7 +87,7 @@ Khi Codex quay trở lại làm việc, vui lòng tuân thủ nghiêm ngặt cá
    * Đăng nhập tài khoản lễ tân (`receptionist / Password123!`) hoặc bác sĩ (`doctor / Password123!`).
    * Kiểm tra giao diện tiếp đón, nhập bệnh nhân thử nghiệm, kiểm tra hiển thị hàng đợi và phòng khám.
 2. **Sải bước tiếp theo trong Backlog:**
-   * **Phân hệ Khám bệnh của Bác sĩ (`PAT-DOCTOR-01` / `EMR-01`):** Nối dây danh sách bệnh nhân chờ khám từ hàng đợi vào màn hình Bác sĩ (`DoctorStationPanel`), hiển thị thông tin sinh hiệu và bệnh sử có phạm vi bảo mật.
+   * **Phân hệ Khám bệnh của Bác sĩ (`PAT-DOCTOR-01` / `EMR-01`):** Nối dây danh sách bệnh nhân chờ khám từ hàng đợi vào màn hình Bác sĩ (`BacSiTramManHinh`), hiển thị thông tin sinh hiệu và bệnh sử có phạm vi bảo mật.
    * **Phân hệ Lịch hẹn (`APPT-01`):** Triển khai quản lý đặt lịch/hủy lịch có chống trùng và audit.
 
 ---
@@ -105,8 +105,8 @@ Ca trực số 2 đã thực thi và tích hợp thành công 42 commits từ `0
 
 1. **Gia cố toàn diện phân hệ Tiếp Đón (`REC-01` Hardening):**
    - **P0.2:** Phân biệt phòng khám trùng tên bằng định danh duy nhất (`TenPhong (#id)`), liên kết phím tắt F1 (Bệnh nhân mới) và F2 (Lưu lại), thiết lập cờ khóa form tạm thời (`in-flight save form lock`) chống double-submit khi worker đang lưu dữ liệu ngầm.
-   - **P1.3:** Ràng buộc chặt chẽ định danh phòng khám đang kích hoạt (`active room identity binding`) và loại bỏ hoàn toàn việc can thiệp phản chiếu (reflective mutation) vào `JList` của `MedicalPopupChooser`.
-   - **P1.4:** Chuẩn hóa việc ủy quyền xóa form từ `ReceptionPanel.clearForm()` sang `PatientRegistrationFormPanel.clearForm()`; đấu nối cập nhật dữ liệu bảng tổng hợp phòng khám qua `statusPanel.setRoomSummaries(...)`.
+   - **P1.3:** Ràng buộc chặt chẽ định danh phòng khám đang kích hoạt (`active room identity binding`) và loại bỏ hoàn toàn việc can thiệp phản chiếu (reflective mutation) vào `JList` của `YTeBatLenBoChon`.
+   - **P1.4:** Chuẩn hóa việc ủy quyền xóa form từ `TiepDonManHinh.clearForm()` sang `BenhNhanDangKyBieuMauManHinh.clearForm()`; đấu nối cập nhật dữ liệu bảng tổng hợp phòng khám qua `statusPanel.setRoomSummaries(...)`.
    - **P1.5:** Quản lý vòng đời tác vụ nền `SwingWorker` bằng thế hệ phiên (`session-generation`) và epoch guards; chuẩn hóa cơ chế khử độc thông báo lỗi (sanitizer) kết hợp Correlation ID an toàn.
    - **P1.6:** Hoàn thiện cơ chế xử lý trùng CCCD (`duplicate-CCCD alignment`): bảo toàn nguyên vẹn dữ liệu nháp (draft preservation) khi phát hiện trùng CCCD, hiển thị hộp thoại xác nhận gợi ý tra cứu hồ sơ cũ mà không xóa thông tin draft.
    - **P1.7:** Chuẩn hóa ngày khám hệ thống theo múi giờ `Asia/Ho_Chi_Minh`; giới hạn kết quả tìm kiếm tối đa 50 bản ghi (`50-result search cap`); tự động dọn sạch bảng phòng khám khi nạp dữ liệu thất bại.
@@ -114,26 +114,26 @@ Ca trực số 2 đã thực thi và tích hợp thành công 42 commits từ `0
 
 2. **Cổng bảo mật & Xác thực danh tính (`SEC-01`):**
    - Khắc phục triệt để các phát hiện bảo mật `FINDING-SEC-01-01`, `FINDING-SEC-01-02`, và `FINDING-SEC-01-03`.
-   - Hộp thoại 'Người Dùng' trên `MainDashboardFrame` đọc dữ liệu xác thực từ `CompletedLoginSession`.
-   - Bổ sung các helper đồng bộ trạng thái thanh Ribbon/khóa màn hình ở chế độ headless và bộ test xác minh `SessionLockOverlay`.
+   - Hộp thoại 'Người Dùng' trên `MainBangDieuKhienCuaSo` đọc dữ liệu xác thực từ `DaHoanTatDangNhapPhien`.
+   - Bổ sung các helper đồng bộ trạng thái thanh Ribbon/khóa màn hình ở chế độ headless và bộ test xác minh `PhienKhoaLopPhu`.
 
 3. **Khắc phục lỗi nền tảng đồ họa & Phím tắt (`PLAT-ERROR-03`):**
-   - `Main.java`: Bổ sung cơ chế fallback an toàn khi cài đặt giao diện `installLookAndFeel` cùng bộ test `MainLookAndFeelTest`.
-   - `ExaminationPanel.java`: Khôi phục `getMenuShortcutKeyMaskEx(Toolkit)` đa nền tảng cùng bộ test `ExaminationShortcutMaskTest`.
+   - `Main.java`: Bổ sung cơ chế fallback an toàn khi cài đặt giao diện `installLookAndFeel` cùng bộ test `ChinhGiaoDienVaCamNhanTest`.
+   - `KhamBenhManHinh.java`: Khôi phục `getMenuShortcutKeyMaskEx(Toolkit)` đa nền tảng cùng bộ test `KhamBenhPhimTatCheTest`.
 
 4. **Bảo mật & Ổn định xuất tài liệu Word (`PLAT-ERROR-DOCX-01`):**
-   - `DocxManager.java`: Khắc phục nguy cơ rò rỉ thông tin nhạy cảm qua thông báo lỗi khi lưu tài liệu DOCX thất bại, chuyển thành thông báo an toàn không làm lộ đường dẫn nội bộ; bổ sung các bộ test `DocxManagerTest` và `DocxDocumentTest`.
+   - `DOCXQuanLy.java`: Khắc phục nguy cơ rò rỉ thông tin nhạy cảm qua thông báo lỗi khi lưu tài liệu DOCX thất bại, chuyển thành thông báo an toàn không làm lộ đường dẫn nội bộ; bổ sung các bộ test `DOCXQuanLyTest` và `DOCXTaiLieuTest`.
 
 5. **Bảo toàn giao diện Bàn khám Bác sĩ & Kế hoạch đấu nối (`PAT-02`):**
-   - Xây dựng `DoctorCompositionRoot` thuần non-UI, tách biệt hoàn toàn logic điều phối và không làm thay đổi giao diện đồ họa.
-   - Bổ sung bộ test kiểm chứng bảo toàn UI: `DoctorStationUiPreservationTest`.
+   - Xây dựng `BacSiGhepNoiGoc` thuần non-UI, tách biệt hoàn toàn logic điều phối và không làm thay đổi giao diện đồ họa.
+   - Bổ sung bộ test kiểm chứng bảo toàn UI: `BacSiTramGiaoDienBaoToanTest`.
    - Ban hành tài liệu quy hoạch chi tiết: `docs/ke-hoach-trien-khai/phase1-doctor-ui-preservation-and-wiring-plan.md`.
 
 6. **Khôi phục bộ kiểm thử tích hợp & Lưu trữ SQL Server:**
    - Khôi phục và đảm bảo độ ổn định cho 3 suite kiểm thử quan trọng:
-     - `ReceptionProtectedReadWiringTest`
-     - `ReceptionSqlServerPersistenceTest`
-     - `ReceptionSqlServerProcessRestartTest`
+     - `TiepDonDuocBaoVeReadKetNoiTest`
+     - `TiepDonSQLMayChuLuuTruTest`
+     - `TiepDonSQLMayChuProcessKhoiDongLaiTest`
 
 ### 6.3. Bằng chứng kiểm định Reactor tại commit `29d99cc`
 Kiểm thử toàn bộ hệ thống bằng Maven Reactor (`mvn test` với `java.awt.headless=true`):

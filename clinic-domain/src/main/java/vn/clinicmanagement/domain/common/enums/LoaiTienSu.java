@@ -7,6 +7,7 @@ public enum LoaiTienSu {
     TIEN_SU_GIA_DINH(4, "Tiền sử gia đình"),
     THOI_QUEN_SINH_HOAT(5, "Thói quen sinh hoạt");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -15,9 +16,12 @@ public enum LoaiTienSu {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static LoaiTienSu fromValue(int value) {
         for (LoaiTienSu item : values()) {
             if (item.value == value) return item;

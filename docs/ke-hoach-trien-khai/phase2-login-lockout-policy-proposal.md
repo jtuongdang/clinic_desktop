@@ -6,9 +6,9 @@
 
 ## Hiện trạng đã kiểm tra
 
-- `AuthenticateUserHandler` trả cùng thông báo khi username không tồn tại, nhân viên bị vô hiệu hóa/xóa mềm hoặc mật khẩu sai; mỗi lần thất bại ghi `AUTH_LOGIN_FAILED` bằng audit độc lập. Lỗi ghi audit làm đăng nhập thất bại an toàn.
+- `AuthenticateNguoiDungHandler` trả cùng thông báo khi username không tồn tại, nhân viên bị vô hiệu hóa/xóa mềm hoặc mật khẩu sai; mỗi lần thất bại ghi `AUTH_LOGIN_FAILED` bằng audit độc lập. Lỗi ghi audit làm đăng nhập thất bại an toàn.
 - Bảng `NhanVien` hiện không có bộ đếm thất bại, thời điểm thất bại gần nhất hoặc thời điểm cho phép đăng nhập lại. Bộ đếm trong bộ nhớ của một ứng dụng desktop không đủ vì nhiều máy có thể cùng dùng một SQL Server.
-- Session metadata dùng UTC theo quyết định `DEC-TIME-01`; `AuthenticateUserHandler` nhận `Clock`, thuận lợi cho kiểm thử thời gian.
+- Session metadata dùng UTC theo quyết định `DEC-TIME-01`; `AuthenticateNguoiDungHandler` nhận `Clock`, thuận lợi cho kiểm thử thời gian.
 - `SEC-01` vẫn chưa hoàn tất. Chính sách này chỉ chốt rate limiting đăng nhập; không tự cấp quyền, đổi thông báo phân quyền, hay triển khai quản trị tài khoản.
 
 ## Cơ sở tham khảo

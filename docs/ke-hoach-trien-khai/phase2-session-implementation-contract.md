@@ -5,13 +5,13 @@
 ## 1. Cấu hình thời hạn
 
 - Lưu tại `ThamSoHeThong` bằng hai key `SESSION_IDLE_TIMEOUT_MINUTES=15` và `SESSION_ABSOLUTE_TIMEOUT_HOURS=12`.
-- Không hardcode timeout trong timer/UI. Composition root đọc cấu hình qua `ISystemRepository`; thiếu/sai giá trị phải giới hạn về policy mặc định đã duyệt, ghi chẩn đoán an toàn và không được biến phiên thành vô hạn.
+- Không hardcode timeout trong timer/UI. Composition root đọc cấu hình qua `IHeThongRepository`; thiếu/sai giá trị phải giới hạn về policy mặc định đã duyệt, ghi chẩn đoán an toàn và không được biến phiên thành vô hạn.
 - Migration seed có điều kiện, chạy được trên DB hiện hữu, không cập nhật/ghi đè giá trị đã cấu hình.
 
 ## 2. Trạng thái phiên
 
 - Mỗi lần đăng nhập tạo `sessionId`, `issuedAt`, `lastActivityAt`, `absoluteExpiresAt` và trạng thái khóa.
-- `UserSession` giữ role ID/code/name cùng một facility/department đã chọn. Station/workstation độc lập và không thay thế department scope.
+- `NguoiDungPhien` giữ role ID/code/name cùng một facility/department đã chọn. Station/workstation độc lập và không thay thế department scope.
 - Tính thời gian bằng `Clock`/`Instant` để kiểm thử xác định; hoạt động sau khi bị khóa không làm mới thời gian idle.
 - Logout hoặc đóng workspace xóa toàn bộ session metadata. Xác thực lại sai/hủy không xóa hay thay đổi context; phiên tiếp tục bị khóa.
 

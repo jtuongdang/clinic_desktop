@@ -4,8 +4,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import vn.clinicmanagement.domain.common.events.AbstractDomainEvent;
-import vn.clinicmanagement.domain.common.events.IDomainEvent;
+import vn.clinicmanagement.domain.common.events.TruuTuongMienNghiepVuSuKien;
+import vn.clinicmanagement.domain.common.events.IMienNghiepVuSuKien;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -130,18 +130,18 @@ class ChiTietKetQuaXetNghiemTest {
     @DisplayName("Should manage domain events through the BaseEntity domain event hub")
     void managesDomainEventsHub() {
         ChiTietKetQuaXetNghiem item = new ChiTietKetQuaXetNghiem();
-        IDomainEvent event = new TestDomainEvent();
+        IMienNghiepVuSuKien event = new TestDomainEvent();
 
         item.registerDomainEvent(event);
-        List<IDomainEvent> events = item.getDomainEvents();
+        List<IMienNghiepVuSuKien> events = item.getDomainEvents();
         assertEquals(1, events.size());
 
-        List<IDomainEvent> pulled = item.pullDomainEvents();
+        List<IMienNghiepVuSuKien> pulled = item.pullDomainEvents();
         assertEquals(1, pulled.size());
         assertTrue(item.getDomainEvents().isEmpty());
     }
 
-    private static class TestDomainEvent extends AbstractDomainEvent {}
+    private static class TestDomainEvent extends TruuTuongMienNghiepVuSuKien {}
 
     @Test
     @DisplayName("Should respect identity-based equality and hash code contracts")

@@ -27,7 +27,7 @@ Sau xác thực và chọn một role, người dùng chọn một cặp cơ s�
 - Tự khóa ứng dụng sau **15 phút không thao tác**; cấu hình qua `ThamSoHeThong`, không hardcode.
 - Giới hạn phiên tối đa **12 giờ**; hết hạn yêu cầu đăng nhập lại.
 - Khi auto-lock, che toàn bộ workspace và yêu cầu xác thực lại cùng tài khoản/vai trò trước khi tiếp tục; không đóng form hoặc xóa bản nháp chưa lưu. Hạn chế rủi ro lộ dữ liệu khi máy dùng chung.
-- Đăng xuất chủ động xóa `UserSession`, đóng workspace và quay về `LoginForm`; cảnh báo rõ nếu form đang có dữ liệu chưa lưu.
+- Đăng xuất chủ động xóa `NguoiDungPhien`, đóng workspace và quay về `DangNhapBieuMau`; cảnh báo rõ nếu form đang có dữ liệu chưa lưu.
 - Vô hiệu hóa tài khoản hoặc thu hồi role/scope có hiệu lực với thao tác nhạy cảm kế tiếp; Application kiểm tra trạng thái hiện hành, không tin dữ liệu role/scope do UI gửi lên.
 
 ### 3. Sự kiện và dữ liệu Audit
@@ -59,7 +59,7 @@ Tài liệu giao diện có nêu ngưỡng 5 lần sai; ngưỡng, thời gian k
 1. Dùng context bất biến do Application tạo sau xác thực, gồm employee ID, một active role, assignments hợp lệ và scope làm việc đã chọn. Từ chối context thiếu/sai; không lấy identity từ setter UI làm nguồn tin cậy.
 2. Chuẩn hóa enums/domain/schema cho action và data scope; seed ma trận quyền tối thiểu theo policy đã duyệt. Bổ sung repository JDBC cho ma trận và audit.
 3. Áp dụng default-deny authorization và filter scope trong Application/query/repository cần thiết; UI chỉ phản ánh quyền để hỗ trợ thao tác.
-4. Nối session lifecycle vào `LoginForm`, `UserSession` và dashboard; kiểm thử login/logout/idle timeout/absolute expiry/revocation bằng clock giả lập.
+4. Nối session lifecycle vào `DangNhapBieuMau`, `NguoiDungPhien` và dashboard; kiểm thử login/logout/idle timeout/absolute expiry/revocation bằng clock giả lập.
 5. Dùng synthetic fixtures để kiểm thử multi-role selection, role không được cấp, scope chéo cơ sở/khoa, audit event completeness/redaction/immutability, transaction rollback khi audit lỗi và truy vấn audit có phân quyền.
 6. Chạy SQL Server integration tests trên database synthetic riêng; không dùng database hoặc hồ sơ bệnh nhân thật.
 

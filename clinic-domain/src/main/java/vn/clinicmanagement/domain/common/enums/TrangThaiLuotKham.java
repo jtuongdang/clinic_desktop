@@ -9,6 +9,7 @@ public enum TrangThaiLuotKham {
     DA_HUY(6, "Đã hủy"),
     CHO_CLS(7, "Chờ cận lâm sàng");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -17,9 +18,12 @@ public enum TrangThaiLuotKham {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static TrangThaiLuotKham fromValue(int value) {
         for (TrangThaiLuotKham item : values()) {
             if (item.value == value) return item;

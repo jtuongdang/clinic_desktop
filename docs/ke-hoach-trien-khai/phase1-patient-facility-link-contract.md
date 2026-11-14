@@ -8,8 +8,8 @@ Ensure every successfully registered patient has an active `BenhNhanCoSo` link t
 
 ## Required behavior
 
-- `RegisterPatientHandler` ensures the link inside the existing registration transaction, after the patient has a persisted ID and before success is returned.
-- Use `AuthorizationContext.facilityId()` as the facility and `AuthorizationContext.employeeId()` as the creator. Do not accept facility/actor IDs from editable form values.
+- `RegisterBenhNhanHandler` ensures the link inside the existing registration transaction, after the patient has a persisted ID and before success is returned.
+- Use `PhanQuyenNguCanh.facilityId()` as the facility and `PhanQuyenNguCanh.employeeId()` as the creator. Do not accept facility/actor IDs from editable form values.
 - The operation is idempotent: an active `(maBenhNhan, maCoSo)` link is left unchanged. If only soft-deleted links exist, insert a new row; do not revive an old row or reuse its ID.
 - The uniqueness invariant is per exact pair: the same patient may have active links to different facilities, but may not have two active links to the same facility.
 - V9's filtered unique index is the database invariant. The repository must serialize the ensure operation safely under concurrent transactions and record one UnitOfWork change only when it inserts a row.

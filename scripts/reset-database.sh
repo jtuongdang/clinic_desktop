@@ -3,9 +3,7 @@
 # TIỆN ÍCH DỌN DẸP / XÓA SẠCH DỮ LIỆU GIAO DỊCH TEST TRONG CSDL (SQL SERVER)
 # ==============================================================================
 # Hướng dẫn sử dụng:
-#   ./scripts/reset-database.sh         -> Xóa sạch dữ liệu test trên CSDL đang liên kết
-#   ./scripts/reset-database.sh test    -> Chuyển sang CSDL test (clinicDb_test) và xóa sạch
-#   ./scripts/reset-database.sh main    -> Chuyển sang CSDL chính (clinicDb) và xóa sạch
+#   ./scripts/reset-database.sh         -> Xóa sạch dữ liệu giao dịch trên CSDL clinicDb
 # ==============================================================================
 
 set -e
@@ -14,14 +12,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 JAVA_BIN="/opt/homebrew/opt/openjdk/bin/java"
 if [ ! -f "$JAVA_BIN" ]; then
     JAVA_BIN="java"
-fi
-
-TARGET_MODE="${1:-current}"
-
-if [ "$TARGET_MODE" = "test" ]; then
-    "$DIR/scripts/switch-db.sh" test
-elif [ "$TARGET_MODE" = "main" ]; then
-    "$DIR/scripts/switch-db.sh" main
 fi
 
 echo "================================================================="
@@ -42,7 +32,7 @@ $DIR/clinic-infrastructure/target/classes:\
 $DIR/clinic-desktop/target/classes"
 
 if [ -f "$DIR/clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar" ]; then
-    "$JAVA_BIN" -cp "$DIR/clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar:$CP" vn.clinicmanagement.infrastructure.persistence.DatabaseResetTool
+    "$JAVA_BIN" -cp "$DIR/clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar:$CP" vn.clinicmanagement.infrastructure.persistence.CoSoDuLieuResetCongCu
 else
-    "$JAVA_BIN" -cp "$CP" vn.clinicmanagement.infrastructure.persistence.DatabaseResetTool
+    "$JAVA_BIN" -cp "$CP" vn.clinicmanagement.infrastructure.persistence.CoSoDuLieuResetCongCu
 fi

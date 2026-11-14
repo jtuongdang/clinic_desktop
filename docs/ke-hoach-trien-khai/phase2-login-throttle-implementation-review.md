@@ -8,7 +8,7 @@
 
 **[Policy]** The controlling policy is approved option B: five bad credentials within a 15-minute observation window do not incur delay; the next attempt starts a 30-second delay, subsequent bad attempts double the delay up to 15 minutes; there is no hard lockout; success resets the sequence; and 24 hours without another failure expires it. State is account-based in SQL Server, persisted in UTC, and required audit failure denies authentication. Disabled/deleted employees must not be reactivated.
 
-**[Observed implementation]** The current authentication path has no throttle state or throttle decision. Credential lookup and verification occur outside the transaction used later to finalize a session. The transaction argument accepted by `AuthenticateUserHandler` is not retained or used. Existing invalid-login audit is persisted independently. Existing generic credential failures, role/scope selection, password handling, and successful-login finalization provide useful patterns, but they do not provide the required atomic throttle transition.
+**[Observed implementation]** The current authentication path has no throttle state or throttle decision. Credential lookup and verification occur outside the transaction used later to finalize a session. The transaction argument accepted by `AuthenticateNguoiDungHandler` is not retained or used. Existing invalid-login audit is persisted independently. Existing generic credential failures, role/scope selection, password handling, and successful-login finalization provide useful patterns, but they do not provide the required atomic throttle transition.
 
 **[Recommendation]** Treat the credential check, throttle-state read/decision, password verification, failure/reset update, and required account-attributed audit as one serialized SQL Server transition. The final implementation must fail closed if that transition or its required audit cannot commit, and must not return an authenticated principal from stale or uncommitted state. Resolve the owner questions below before making edge semantics implicit.
 
@@ -25,7 +25,7 @@
 
 ### P0 — Account state transition must be serialized across desktop clients
 
-**[Observed implementation]** `AuthenticateUserHandler.handle` calls `getByUsername`, then verifies the password, without entering its `TransactionBoundary` (which is accepted but ignored by both transaction-taking constructors); see `AuthenticateUserHandler.java` lines 38–45, 57–81. `NhanVienRepositoryImpl.getByUsername` is a normal query with no row lock (lines 49–53). The JDBC transaction manager keeps the active connection in a `ThreadLocal` (lines 14–15, 27–43), and the connection provider only reuses it on that thread (`JdbcConnectionProvider.java` lines 12–20). The existing transaction in `CompleteLoginSessionHandler` is later in the flow, after password verification and role/scope choice (`CompleteLoginSessionHandler.java` lines 102–120).
+**[Observed implementation]** `AuthenticateNguoiDungHandler.handle` calls `getByUsername`, then verifies the password, without entering its `GiaoDichRanhGioi` (which is accepted but ignored by both transaction-taking constructors); see `AuthenticateNguoiDungHandler.java` lines 38–45, 57–81. `NhanVienRepository.getByUsername` is a normal query with no row lock (lines 49–53). The JDBC transaction manager keeps the active connection in a `ThreadLocal` (lines 14–15, 27–43), and the connection provider only reuses it on that thread (`JdbcKetNoiNhaCungCap.java` lines 12–20). The existing transaction in `CompleteDangNhapPhienHandler` is later in the flow, after password verification and role/scope choice (`CompleteDangNhapPhienHandler.java` lines 102–120).
 
 **[Inference]** A process-local counter, an unlocked read followed by a separate update, or an update performed after password verification can lose simultaneous increments or allow concurrent requests to pass the same pre-throttle state. A later successful-login transaction does not close this race.
 
@@ -41,7 +41,7 @@
 
 ### P1 — Failure audit must be fail-closed and consistent with the throttle transaction
 
-**[Observed implementation]** `AUTH_LOGIN_FAILED` and `AUTH_INVALID` exist (`AuditActionCode.java` line 5; `AuditReasonCode.java` line 4). Throttle has no dedicated reason code yet. `AuthenticateUserHandler` calls `appendIndependently` for invalid credentials (`AuthenticateUserHandler.java` lines 77–81, 119–138), and catches audit failures into `AUTH_UNAVAILABLE` (lines 61–68, 109–112). `JdbcAuditRepositoryImpl` supports both current-transaction and independent inserts (lines 43–57); independent audit commits its own connection (lines 78–94). Its system-event insert persists structured action/reason and null detail rather than credential text (lines 103–129). V6 makes the audit tables append-only (`V6__Enhance_Audit_Tables_Append_Only.sql`, trigger definitions near the end).
+**[Observed implementation]** `AUTH_LOGIN_FAILED` and `AUTH_INVALID` exist (`KiemToanHanhDongMa.java` line 5; `KiemToanLyDoMa.java` line 4). Throttle has no dedicated reason code yet. `AuthenticateNguoiDungHandler` calls `appendIndependently` for invalid credentials (`AuthenticateNguoiDungHandler.java` lines 77–81, 119–138), and catches audit failures into `AUTH_UNAVAILABLE` (lines 61–68, 109–112). `JdbcKiemToanRepository` supports both current-transaction and independent inserts (lines 43–57); independent audit commits its own connection (lines 78–94). Its system-event insert persists structured action/reason and null detail rather than credential text (lines 103–129). V6 makes the audit tables append-only (`V6__Enhance_Audit_Tables_Append_Only.sql`, trigger definitions near the end).
 
 **[Inference]** The current independent audit is fail-closed for authentication, but if the new counter is committed separately from that audit, an audit failure can leave throttle state changed without its required audit, or a state failure can leave a committed audit with no corresponding state transition. The contract requires audit of failure/throttle and no success when state cannot be updated safely.
 
@@ -49,7 +49,7 @@
 
 ### P1 — Successful reset must align with the existing two-stage login flow
 
-**[Observed implementation]** `AuthenticateUserHandler` returns `Result.success(AuthenticatedUser)` after credentials and assignments are read, before any role/scope is selected (`AuthenticateUserHandler.java` lines 84–108). `LoginForm` then asks for role and scope and can be cancelled before finalization (`LoginForm.java` lines 149–163, 266–276). `CompleteLoginSessionHandler` revalidates the employee and assignments, records last login, and writes success audit within a transaction (lines 102–132).
+**[Observed implementation]** `AuthenticateNguoiDungHandler` returns `KetQua.success(DaXacThucNguoiDung)` after credentials and assignments are read, before any role/scope is selected (`AuthenticateNguoiDungHandler.java` lines 84–108). `DangNhapBieuMau` then asks for role and scope and can be cancelled before finalization (`DangNhapBieuMau.java` lines 149–163, 266–276). `CompleteDangNhapPhienHandler` revalidates the employee and assignments, records last login, and writes success audit within a transaction (lines 102–132).
 
 **[Inference]** Resetting throttle state only in finalization means a correct password can be accepted by the credential handler but not clear the sequence if the user cancels selection; resetting earlier means the sequence is cleared before a completed session and its success audit. The contract’s phrase “successful authentication” does not choose between these existing milestones. Concurrent wrong attempts between the two handlers can also reorder the observed sequence unless the reset point is explicit and atomic.
 
@@ -57,7 +57,7 @@
 
 ### P1 — Generic response should cover throttle without disclosing account state
 
-**[Observed implementation]** Missing, inactive/deleted, and wrong-password cases share `AUTH_INVALID` and the same message in `AuthenticateUserHandler.java` lines 25–27 and 73–81. `LoginForm` renders the `Result` message (lines 149–152). Empty fields are separately validated in the UI (line 129), before a username is submitted. Missing role/scope have distinct messages after credentials validate (handler lines 89–104), consistent with the existing role/scope flow rather than the four cases named by the throttle contract.
+**[Observed implementation]** Missing, inactive/deleted, and wrong-password cases share `AUTH_INVALID` and the same message in `AuthenticateNguoiDungHandler.java` lines 25–27 and 73–81. `DangNhapBieuMau` renders the `KetQua` message (lines 149–152). Empty fields are separately validated in the UI (line 129), before a username is submitted. Missing role/scope have distinct messages after credentials validate (handler lines 89–104), consistent with the existing role/scope flow rather than the four cases named by the throttle contract.
 
 **[Inference]** The throttle must use the exact generic credential failure code/message used by the other listed cases; a new “wait N seconds,” “account throttled,” or account-specific response would violate the contract. The existing separate `AUTH_UNAVAILABLE` error is a storage/availability outcome, not one of the four credential outcomes, and should remain safe and free of raw exception details.
 
@@ -65,7 +65,7 @@
 
 ### P1 — Disabled/deleted employees must stay denied; decide only necessary counter semantics
 
-**[Observed implementation]** `NhanVienRepositoryImpl.getByUsername` filters out soft-deleted employees (lines 49–53); `AuthenticateUserHandler` denies inactive/deleted rows before password verification (lines 73–81). The existing test covers missing, inactive, deleted, and incorrect-password results as the same public error (`AuthenticateUserHandlerTest.java` lines 87–146).
+**[Observed implementation]** `NhanVienRepository.getByUsername` filters out soft-deleted employees (lines 49–53); `AuthenticateNguoiDungHandler` denies inactive/deleted rows before password verification (lines 73–81). The existing test covers missing, inactive, deleted, and incorrect-password results as the same public error (`AuthenticateNguoiDungHandlerTest.java` lines 87–146).
 
 **[Policy]** The approved policy explicitly says not to reactivate disabled/deleted employees and forbids a manual unlock workflow (`phase2-login-lockout-policy-proposal.md` line 31).
 
@@ -77,7 +77,7 @@
 
 **[Policy]** The approved policy requires UTC metadata (`phase2-login-lockout-policy-proposal.md` lines 11, 40); the broader contract specifies UTC for technical timestamps and notes that SQL Server `DATETIME2` has no timezone (`phase2-implementation-contract.md` line 8).
 
-**[Observed implementation]** The composition root supplies `Clock.systemUTC()` (`AuthenticationCompositionRoot.java` lines 25–34). Existing successful-login finalization converts `Clock.instant()` to UTC `LocalDateTime` before binding to `DATETIME2` (`CompleteLoginSessionHandler.java` lines 97–103; `NhanVienRepositoryImpl.java` lines 248–258, 367–374). Elsewhere, ordinary employee updates use SQL Server `SYSDATETIME()` (`NhanVienRepositoryImpl.java` lines 112–114).
+**[Observed implementation]** The composition root supplies `Clock.systemUTC()` (`XacThucGhepNoiGoc.java` lines 25–34). Existing successful-login finalization converts `Clock.instant()` to UTC `LocalDateTime` before binding to `DATETIME2` (`CompleteDangNhapPhienHandler.java` lines 97–103; `NhanVienRepository.java` lines 248–258, 367–374). Elsewhere, ordinary employee updates use SQL Server `SYSDATETIME()` (`NhanVienRepository.java` lines 112–114).
 
 **[Inference]** UTC storage alone does not ensure consistent decisions if each desktop clock is the authority for window/cooldown comparisons; clock skew can prematurely expire or extend a delay. A `DATETIME2` value is only UTC by convention and adapter discipline.
 
@@ -85,7 +85,7 @@
 
 ### P2 — Migration must be registered and tested as an upgrade, not only on an empty database
 
-**[Observed implementation]** V1 creates `NhanVien` with existing employee, password, active/deleted, version, and audit fields but no throttle state (`V1__Initial_Clinic_Schema.sql` lines 101–128). The runner currently registers V1–V10 (`DatabaseMigrationRunner.java` lines 43–54) and executes/records migrations transactionally (lines 64–93, 185–194). The fresh database SQL Server test requires a `clinic_test_*` database and checks V1–V10 (`FreshDatabaseMigrationSqlServerTest.java` lines 33–53 and subsequent assertions). V6 already added nullable audit metadata columns.
+**[Observed implementation]** V1 creates `NhanVien` with existing employee, password, active/deleted, version, and audit fields but no throttle state (`V1__Initial_Clinic_Schema.sql` lines 101–128). The runner currently registers V1–V10 (`CoSoDuLieuDiCuChay.java` lines 43–54) and executes/records migrations transactionally (lines 64–93, 185–194). The fresh database SQL Server test requires a `clinic_test_*` database and checks V1–V10 (`MoiCoSoDuLieuDiCuSQLMayChuTest.java` lines 33–53 and subsequent assertions). V6 already added nullable audit metadata columns.
 
 **[Inference]** A new script not added to the runner list will never run through the normal application migration path. Existing synthetic employee rows are not covered by an empty-database migration check. If code requiring new columns ships before the migration is applied, fail-closed behavior may become a login outage, so deployment ordering matters.
 
@@ -119,11 +119,11 @@ The Owner approved the review's proposed implementation semantics on 2026-11-06:
 
 **Repository guidance and policy documents read:** `docs/ke-hoach-trien-khai/README.md`; `docs/ke-hoach-trien-khai/phase2-login-lockout-policy-proposal.md`; `docs/ke-hoach-trien-khai/phase2-implementation-contract.md`.
 
-**Authentication/application sources:** `clinic-application/src/main/java/vn/clinicmanagement/application/auth/AuthenticateUserHandler.java`; `CompleteLoginSessionHandler.java`; `clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditActionCode.java`; `AuditReasonCode.java`; `AuditMetadataValidator.java`.
+**Authentication/application sources:** `clinic-application/src/main/java/vn/clinicmanagement/application/auth/AuthenticateNguoiDungHandler.java`; `CompleteDangNhapPhienHandler.java`; `clinic-application/src/main/java/vn/clinicmanagement/application/audit/KiemToanHanhDongMa.java`; `KiemToanLyDoMa.java`; `KiemToanSieuDuLieuKiemTra.java`.
 
-**Desktop/persistence/migration sources:** `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/AuthenticationCompositionRoot.java`; `LoginForm.java`; `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositoryImpl.java`; `JdbcTransactionManager.java`; `JdbcConnectionProvider.java`; `DatabaseMigrationRunner.java`; `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/system/JdbcAuditRepositoryImpl.java`; `clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql`; `V6__Enhance_Audit_Tables_Append_Only.sql`.
+**Desktop/persistence/migration sources:** `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/auth/XacThucGhepNoiGoc.java`; `DangNhapBieuMau.java`; `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepository.java`; `JdbcGiaoDichQuanLy.java`; `JdbcKetNoiNhaCungCap.java`; `CoSoDuLieuDiCuChay.java`; `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/system/JdbcKiemToanRepository.java`; `clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql`; `V6__Enhance_Audit_Tables_Append_Only.sql`.
 
-**Relevant tests read:** `clinic-application/src/test/java/vn/clinicmanagement/application/auth/AuthenticateUserHandlerTest.java`; `clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/FreshDatabaseMigrationSqlServerTest.java`; `AuditSqlServerPersistenceTest.java`; `clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienLoginAuditAtomicityTest.java`.
+**Relevant tests read:** `clinic-application/src/test/java/vn/clinicmanagement/application/auth/AuthenticateNguoiDungHandlerTest.java`; `clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/MoiCoSoDuLieuDiCuSQLMayChuTest.java`; `KiemToanSQLMayChuLuuTruTest.java`; `clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienDangNhapKiemToanTinhNguyenTuTest.java`.
 
 ## Review-only validation
 

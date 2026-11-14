@@ -7,8 +7,8 @@
 ## Hiện có
 
 - Models: `DanhMucDichVu`, `ChiDinhDichVu`, `ChiTietKetQuaXetNghiem`, `DinhMucVatTuDichVu` và enum trạng thái chỉ định.
-- UI: `ServiceOrderPanel`, `LabOrderTabPanel`, `ParaclinicalOrderPanel`, print preview phiếu chỉ định.
-- `ParaclinicalOrderPanel` đang nạp một dòng mẫu; chưa có form nhập/duyệt kết quả CLS rõ ràng trong module này.
+- UI: `DichVuYeuCauManHinh`, `XetNghiemYeuCauTheManHinh`, `CanLamSangYeuCauManHinh`, print preview phiếu chỉ định.
+- `CanLamSangYeuCauManHinh` đang nạp một dòng mẫu; chưa có form nhập/duyệt kết quả CLS rõ ràng trong module này.
 
 ## Backlog theo model
 

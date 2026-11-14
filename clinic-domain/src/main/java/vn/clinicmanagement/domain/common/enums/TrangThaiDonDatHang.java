@@ -7,6 +7,7 @@ public enum TrangThaiDonDatHang {
     HOAN_THANH(4, "Hoàn thành"),
     DA_HUY(5, "Đã hủy");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -15,9 +16,12 @@ public enum TrangThaiDonDatHang {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static TrangThaiDonDatHang fromValue(int value) {
         for (TrangThaiDonDatHang item : values()) {
             if (item.value == value) return item;

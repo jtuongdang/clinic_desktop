@@ -7,7 +7,7 @@
 
 ```text
 clinic-desktop (Swing)
-    -> clinic-application (commands, queries, handlers, Result)
+    -> clinic-application (commands, queries, handlers, KetQua)
         -> clinic-domain (models, value objects, repository ports, business rules)
 clinic-infrastructure (JDBC repositories, migrations, transactions)
 ```
@@ -18,19 +18,19 @@ clinic-infrastructure (JDBC repositories, migrations, transactions)
 
 | Luồng | UI / entry point | Application | Infrastructure / domain | Trạng thái |
 |---|---|---|---|---|
-| Đăng nhập | `modules/auth/LoginForm`, `AuthenticationCompositionRoot` | `AuthenticateUserCommand`, handler, `PasswordHasher` | `NhanVienRepositoryImpl`, `INhanVienRepository` | Có wiring trong source; cần kiểm thử bảo mật, lỗi kết nối, quyền và session. |
-| Đăng ký/tìm bệnh nhân | `modules/reception/ReceptionPanel`, `PatientRegistrationFormPanel` | `RegisterPatientCommand`/handler, `SearchPatientsQuery`/handler | Patient/insurance/room repositories; `BenhNhan`, `BaoHiem` | Có trong checkout hiện tại; các thay đổi Tiếp đón chưa commit và cần kiểm thử DB. |
-| Hàng đợi tiếp đón | `ReceptionPanel`, `ClinicRoomStatusPanel` | `GetReceptionQueueQuery`, `ReceptionQueuePort` | `ReceptionQueueRepositoryImpl`, `LuotKham` | Tạo lượt khám/đọc hàng đợi có trong flow đăng ký; trạng thái gọi khám, refresh và tranh chấp cần nghiệm thu riêng. |
+| Đăng nhập | `modules/auth/DangNhapBieuMau`, `XacThucGhepNoiGoc` | `AuthenticateNguoiDungCommand`, handler, `MatKhauBoBam` | `NhanVienRepository`, `INhanVienRepository` | Có wiring trong source; cần kiểm thử bảo mật, lỗi kết nối, quyền và session. |
+| Đăng ký/tìm bệnh nhân | `modules/reception/TiepDonManHinh`, `BenhNhanDangKyBieuMauManHinh` | `RegisterBenhNhanCommand`/handler, `SearchBenhNhanQuery`/handler | Patient/insurance/room repositories; `BenhNhan`, `BaoHiem` | Có trong checkout hiện tại; các thay đổi Tiếp đón chưa commit và cần kiểm thử DB. |
+| Hàng đợi tiếp đón | `TiepDonManHinh`, `PhongKhamPhongTrangThaiManHinh` | `GetTiepDonHangDoiQuery`, `TiepDonHangDoiCongKetNoi` | `TiepDonHangDoiRepository`, `LuotKham` | Tạo lượt khám/đọc hàng đợi có trong flow đăng ký; trạng thái gọi khám, refresh và tranh chấp cần nghiệm thu riêng. |
 
 ## 3. Các phân hệ có UI/model nhưng chưa chứng minh luồng persistence
 
 | Phân hệ | UI hiện có | Domain liên quan | Cần xác minh/triển khai |
 |---|---|---|---|
-| Bác sĩ/EMR | `DoctorStationPanel`, `ExaminationPanel`, các tabs/dialogs | `LuotKham`, `ChanDoan`, `SinhHieu`, `TienSuBenh`, ICD | Nạp queue thật; lưu nháp; kiểm soát chuyển trạng thái; lưu và khóa hồ sơ có audit. |
-| Cận lâm sàng | `ParaclinicalOrderPanel`, `LabOrderTabPanel`, `ServiceOrderPanel` | `ChiDinhDichVu`, kết quả xét nghiệm, danh mục dịch vụ | Tạo chỉ định, nhập/duyệt kết quả, trả kết quả cho bàn khám. |
-| Nhà thuốc/kho | `PharmacyDispensePanel` và components | `DonThuoc`, `Item`, `TonKho`, phiếu nhập/xuất, FEFO | Nối đơn đã duyệt, tồn theo lô, transaction xuất kho, kiểm kê và audit. |
-| Viện phí | `BillingInvoicePanel`, phiếu/print panels | `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, công nợ | Nguồn chi phí, tính toán được nghiệp vụ duyệt, thu/hoàn và đối soát. |
-| Danh mục/báo cáo/quản trị | `CatalogPanel`, `ClinicReportPanel`, `SystemConfigPanel` | Catalog, identity, system, các giao dịch nghiệp vụ | CRUD có quyền, định nghĩa báo cáo, phạm vi dữ liệu và audit. |
+| Bác sĩ/EMR | `BacSiTramManHinh`, `KhamBenhManHinh`, các tabs/dialogs | `LuotKham`, `ChanDoan`, `SinhHieu`, `TienSuBenh`, ICD | Nạp queue thật; lưu nháp; kiểm soát chuyển trạng thái; lưu và khóa hồ sơ có audit. |
+| Cận lâm sàng | `CanLamSangYeuCauManHinh`, `XetNghiemYeuCauTheManHinh`, `DichVuYeuCauManHinh` | `ChiDinhDichVu`, kết quả xét nghiệm, danh mục dịch vụ | Tạo chỉ định, nhập/duyệt kết quả, trả kết quả cho bàn khám. |
+| Nhà thuốc/kho | `NhaThuocDispenseManHinh` và components | `DonThuoc`, `MatHang`, `TonKho`, phiếu nhập/xuất, FEFO | Nối đơn đã duyệt, tồn theo lô, transaction xuất kho, kiểm kê và audit. |
+| Viện phí | `VienPhiHoaDonManHinh`, phiếu/print panels | `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, công nợ | Nguồn chi phí, tính toán được nghiệp vụ duyệt, thu/hoàn và đối soát. |
+| Danh mục/báo cáo/quản trị | `DanhMucManHinh`, `PhongKhamBaoCaoManHinh`, `HeThongCauHinhManHinh` | Catalog, identity, system, các giao dịch nghiệp vụ | CRUD có quyền, định nghĩa báo cáo, phạm vi dữ liệu và audit. |
 
 Danh sách này là sơ đồ điều tra theo source hiện tại, không khẳng định mọi class UI đã hoàn thiện hoặc đang dùng dữ liệu thật. Theo dõi backlog chi tiết tại [kế hoạch triển khai](ke-hoach-trien-khai/README.md).
 

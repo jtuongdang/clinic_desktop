@@ -4,11 +4,11 @@
 
 ## Mục tiêu
 
-Nối evaluator default-deny vào vertical slice ghi tiếp đón: tạo/cập nhật hồ sơ bệnh nhân, ghi BHYT và tạo lượt khám. Đưa trusted session scope từ `SessionLifecycleService` tới Application, và xác nhận mọi thay đổi thuộc đúng facility+department.
+Nối evaluator default-deny vào vertical slice ghi tiếp đón: tạo/cập nhật hồ sơ bệnh nhân, ghi BHYT và tạo lượt khám. Đưa trusted session scope từ `PhienVongDoiDichVu` tới Application, và xác nhận mọi thay đổi thuộc đúng facility+department.
 
 ## Luật quyết định
 
-- Dùng `AuthorizationService` trong `clinic-application`; không lấy role/scope từ trường do form tự nhập. `AuthorizationContext` từ desktop chỉ được dựng từ `UserSession` và session UUID; `ActiveSessionPort` phải đọc `SessionLifecycleService` để xác nhận active/unlocked/unexpired và khớp user/role/pair.
+- Dùng `PhanQuyenDichVu` trong `clinic-application`; không lấy role/scope từ trường do form tự nhập. `PhanQuyenNguCanh` từ desktop chỉ được dựng từ `NguoiDungPhien` và session UUID; `HoatDongPhienCongKetNoi` phải đọc `PhienVongDoiDichVu` để xác nhận active/unlocked/unexpired và khớp user/role/pair.
 - Kiểm tra `RECEPTION / TAO` cho lượt tiếp đón, `PATIENT / TAO` cho hồ sơ mới và `PATIENT / SUA` cho hồ sơ hiện có. Chỉ cho phép khi từng permission có một row active duy nhất, ALLOW, scope `KHOA_PHONG`, và pair đích khớp session.
 - Trước khi cập nhật bệnh nhân hiện có, repository chỉ được trả target nếu có lượt khám liên kết với đúng pair `(maCoSo, maKhoa)`; thêm phương thức tìm CCCD có scope bằng SQL `EXISTS` trên `LuotKham`. Không dùng kết quả tìm kiếm toàn cục để điền thông tin hồ sơ.
 - CCCD toàn DB vẫn unique. Nếu CCCD bị ràng buộc bởi hồ sơ ngoài scope, trả một lỗi generic không tiết lộ hồ sơ/giá trị/đơn vị; không update hồ sơ đó, không lộ mã hoặc thông tin trùng.

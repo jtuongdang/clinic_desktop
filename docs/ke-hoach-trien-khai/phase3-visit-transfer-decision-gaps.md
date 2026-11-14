@@ -18,7 +18,7 @@
 - Exact UI label: **“Ghi chú vận hành (không bắt buộc)”**. Warn: **“Không nhập thông tin định danh, liên hệ, chẩn đoán hoặc kết quả khám/xét nghiệm.”** Do not prefill patient/clinical information; show normalized text before submit; rejected note content must not appear in logs.
 - This minimizes PHI risk but cannot guarantee anonymity or prevent PHI from being entered.
 
-Keep the fixed business reason separate from the note, `AuditReasonCode`/auth audit reason (`NhatKyHeThong.maLyDo`), `lyDoKham` and `lyDoChuyenTuyen`. Physical field/table, storage placement and retention remain open. No schema/DDL or runtime authorization follows from N2.
+Keep the fixed business reason separate from the note, `KiemToanLyDoMa`/auth audit reason (`NhatKyHeThong.maLyDo`), `lyDoKham` and `lyDoChuyenTuyen`. Physical field/table, storage placement and retention remain open. No schema/DDL or runtime authorization follows from N2.
 
 ### Remaining implementation decisions — no answers inferred
 
@@ -46,7 +46,7 @@ A transfer requires exactly one of these six business reason codes; the short no
 | `DIAGNOSTIC_EQUIPMENT_NEED` | `DOCTOR` |
 | `CLINICIAN_EMERGENCY_HANDOFF` | `DOCTOR` |
 
-These codes are business fields, never `AuditReasonCode` or `NhatKyHeThong.maLyDo`. Neither the business reason nor the free-text note may be placed in those auth/authorization reason fields. Do not reuse clinical `lyDoKham`.
+These codes are business fields, never `KiemToanLyDoMa` or `NhatKyHeThong.maLyDo`. Neither the business reason nor the free-text note may be placed in those auth/authorization reason fields. Do not reuse clinical `lyDoKham`.
 
 The reason-role mapping is an additional restriction, not a grant or scope exception. For every reason, source and destination facility must equal the session facility. Only `RECEPTIONIST` may change department within that facility; `DOCTOR` must keep source and destination department equal to the selected session department. This includes `PATIENT_SPECIALTY_PREFERENCE`, load balancing, clinical referral and emergency handoff; their labels do not permit a DOCTOR cross-department transfer. All other roles remain denied. Transfer grants no destination patient, history or queue reads.
 
@@ -131,13 +131,13 @@ Các ranh giới sau đây đã được Owner phê duyệt chính thức tại 
 
 | Thành phần | Vị trí mã nguồn | Thực tế ghi nhận |
 |---|---|---|
-| **Prototype điều chuyển trên UI** | [`PatientQueueContextMenu.java:71-75`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/menus/PatientQueueContextMenu.java#L71-L75)<br>[`ExaminationPanel.java:1080-1091`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/ExaminationPanel.java#L1080-L1091) | Menu chuột phải "Chuyển Bệnh Nhân Sang Phòng Khác" mở [`TransferRoomSelectDialog.java:15-34`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/dialogs/TransferRoomSelectDialog.java#L15-L34) chứa danh sách tên phòng hardcode dạng chuỗi (`"Phòng 101 - Khám Nội 1"`,...). Nút "Lưu" chỉ đóng dialog và mở `TransferSlipPrintPreviewDialog` để in phiếu; **hoàn toàn không gọi Application service, không gửi ID lượt khám, không kiểm tra quyền và không cập nhật CSDL**. |
-| **Giao diện tiếp đón** | [`ReceptionPanel.java:77-115`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L77-L115) | Màn hình tiếp đón chỉ tải danh sách phòng khám và hàng đợi trong ngày theo scope phiên; **chưa có bất kỳ nút, menu hay hành động điều chuyển nào**. |
+| **Prototype điều chuyển trên UI** | [`BenhNhanHangDoiNguCanhMenu.java:71-75`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/menus/PatientQueueContextMenu.java#L71-L75)<br>[`KhamBenhManHinh.java:1080-1091`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/ExaminationPanel.java#L1080-L1091) | Menu chuột phải "Chuyển Bệnh Nhân Sang Phòng Khác" mở [`TransferPhongSelectHopThoai.java:15-34`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/dialogs/TransferRoomSelectDialog.java#L15-L34) chứa danh sách tên phòng hardcode dạng chuỗi (`"Phòng 101 - Khám Nội 1"`,...). Nút "Lưu" chỉ đóng dialog và mở `TransferPhieuPrintPreviewHopThoai` để in phiếu; **hoàn toàn không gọi Application service, không gửi ID lượt khám, không kiểm tra quyền và không cập nhật CSDL**. |
+| **Giao diện tiếp đón** | [`TiepDonManHinh.java:77-115`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L77-L115) | Màn hình tiếp đón chỉ tải danh sách phòng khám và hàng đợi trong ngày theo scope phiên; **chưa có bất kỳ nút, menu hay hành động điều chuyển nào**. |
 | **Mô hình Domain `LuotKham`** | [`LuotKham.java:29-55,88-124`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/examination/LuotKham.java#L29-L55) | Thực thể lưu `maCoSo`, `maKhoa`, `maPhongKham` (nullable), `trangThai`, `soThuTu`, `soThuTuDisplay`, `dnVnTien`, và cờ `emrLocked`. Có các phương thức `startExam()`, `completeExam()`, `lockEmr()`, nhưng **không có phương thức `transfer()` hay Domain Event nào liên quan đến điều chuyển**. Trạng thái enum [`TrangThaiLuotKham.java:3-10`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/enums/TrangThaiLuotKham.java#L3-L10) liệt kê giá trị đơn thuần, không có state machine. |
 | **Cơ sở dữ liệu & Schema** | [`V1__Initial_Clinic_Schema.sql:329-380`](../../clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql#L329-L380) | Bảng `LuotKham` có các cột `maCoSo`, `maKhoa`, `maPhongKham`, `version`, `trangThai`. **Không có bảng lịch sử điều chuyển, không lưu vết khoa/phòng nguồn, người thực hiện, thời điểm chuyển, hoặc lý do chuyển**. |
-| **Cổng phân quyền (Authorization)** | [`AuthorizationService.java:51-54`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationService.java#L51-L54) | Phương thức `evaluate()` từ chối mọi yêu cầu có `targetFacilityId != context.facilityId() || targetDepartmentId != context.departmentId()` với mã `TARGET_MISMATCH`. Cơ chế đánh giá chung này **không thể xử lý yêu cầu chuyển liên khoa cùng cơ sở của `RECEPTIONIST`**, đòi hỏi một guard riêng cho use case điều chuyển. |
-| **Cổng tiếp đón & Truy vấn hàng đợi** | [`ReceptionQueuePort.java:9-15`](../../clinic-application/src/main/java/vn/clinicmanagement/application/reception/ReceptionQueuePort.java#L9-L15)<br>[`ReceptionQueueRepositoryImpl.java:125-155`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/ReceptionQueueRepositoryImpl.java#L125-L155) | Cổng hàng đợi chỉ hỗ trợ đăng ký mới (`registerPatient`) và đọc hàng đợi (`getReceptionQueue`, `getRoomSummaries`). Thứ tự hàng đợi được sắp xếp cố định theo `ORDER BY l.dnVnTien DESC, l.soThuTu, l.id` cho đúng cặp `(maCoSo, maKhoa)` của ngày khám; **chưa có hàm cập nhật vị trí/hàng đợi khi chuyển**. |
-| **Hệ thống Audit** | [`AuditActionCode.java:23-34`](../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditActionCode.java#L23-L34) | Đã có mã hành động `VISIT_REGISTERED`, nhưng **chưa có mã hành động `VISIT_TRANSFERRED`**. |
+| **Cổng phân quyền (Authorization)** | [`PhanQuyenDichVu.java:51-54`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationService.java#L51-L54) | Phương thức `evaluate()` từ chối mọi yêu cầu có `targetFacilityId != context.facilityId() || targetDepartmentId != context.departmentId()` với mã `TARGET_MISMATCH`. Cơ chế đánh giá chung này **không thể xử lý yêu cầu chuyển liên khoa cùng cơ sở của `RECEPTIONIST`**, đòi hỏi một guard riêng cho use case điều chuyển. |
+| **Cổng tiếp đón & Truy vấn hàng đợi** | [`TiepDonHangDoiCongKetNoi.java:9-15`](../../clinic-application/src/main/java/vn/clinicmanagement/application/reception/ReceptionQueuePort.java#L9-L15)<br>[`TiepDonHangDoiRepository.java:125-155`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/TiepDonHangDoiRepository.java#L125-L155) | Cổng hàng đợi chỉ hỗ trợ đăng ký mới (`registerPatient`) và đọc hàng đợi (`getReceptionQueue`, `getRoomSummaries`). Thứ tự hàng đợi được sắp xếp cố định theo `ORDER BY l.dnVnTien DESC, l.soThuTu, l.id` cho đúng cặp `(maCoSo, maKhoa)` của ngày khám; **chưa có hàm cập nhật vị trí/hàng đợi khi chuyển**. |
+| **Hệ thống Audit** | [`KiemToanHanhDongMa.java:23-34`](../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditActionCode.java#L23-L34) | Đã có mã hành động `VISIT_REGISTERED`, nhưng **chưa có mã hành động `VISIT_TRANSFERRED`**. |
 
 ### 3.2. Historical approved-policy snapshot (RECON-04)
 
@@ -148,9 +148,9 @@ Các ranh giới sau đây đã được Owner phê duyệt chính thức tại 
 
 ### 3.3. Suy luận kỹ thuật (Inference)
 
-* Để thực hiện điều chuyển mà không phá vỡ tính đóng băng của `AuthorizationService.evaluate()` (vốn bảo vệ toàn bộ các thao tác thông thường), cần một **Transfer Authorization Guard chuyên biệt** trong tầng Application để kiểm tra đồng thời cặp nguồn và cặp đích theo ma trận `DEC-AUTHZ-04b`.
+* Để thực hiện điều chuyển mà không phá vỡ tính đóng băng của `PhanQuyenDichVu.evaluate()` (vốn bảo vệ toàn bộ các thao tác thông thường), cần một **Transfer Authorization Guard chuyên biệt** trong tầng Application để kiểm tra đồng thời cặp nguồn và cặp đích theo ma trận `DEC-AUTHZ-04b`.
 * Luồng điều chuyển cần giữ kết quả tối thiểu và **không trả về thông tin danh sách bệnh nhân hoặc chi tiết hàng đợi của khoa đích**, phù hợp nguyên tắc không cấp quyền đọc liên khoa.
-* Luồng điều chuyển phải bảo đảm transaction consistency trong `TransactionBoundary`. Cách lưu trữ lịch sử (bản ghi riêng, audit-only, hay cả hai) vẫn là lựa chọn mở; chỉ ghi các artifact theo contract Owner sẽ chốt sau, và lỗi ở bất kỳ write bắt buộc nào phải fail-closed/rollback.
+* Luồng điều chuyển phải bảo đảm transaction consistency trong `GiaoDichRanhGioi`. Cách lưu trữ lịch sử (bản ghi riêng, audit-only, hay cả hai) vẫn là lựa chọn mở; chỉ ghi các artifact theo contract Owner sẽ chốt sau, và lỗi ở bất kỳ write bắt buộc nào phải fail-closed/rollback.
 
 ---
 
@@ -195,7 +195,7 @@ Historical snapshot: the original report presented seven candidate gap areas and
     - `DOCTOR`: Được chuyển lượt ở trạng thái `CHO_KHAM`, `DANG_KHAM`, hoặc `CHO_CLS` (phục vụ hội chẩn hoặc chuyển phòng chuyên môn trong khoa). Tuyệt đối cấm chuyển lượt ở trạng thái `HOAN_THANH`, `DA_HUY`, hoặc khi `emrLocked == true`.
   * **Phương án 1C (Toàn diện kèm trạng thái chuyển tiếp):** Cho phép cả `CHO_KHAM` và `DANG_KHAM`, nhưng khi chuyển, hệ thống tự động reset trạng thái lượt khám về `CHO_KHAM` tại đích và xóa thời gian `thoiGianBatDauKham`.
 * **Tác động triển khai:**
-  - Quy định logic kiểm tra invariant trong `LuotKham.transferTo(...)` hoặc `TransferVisitHandler`.
+  - Quy định logic kiểm tra invariant trong `LuotKham.transferTo(...)` hoặc `TransferLuotKhamHandler`.
   - Định nghĩa các mã lỗi nghiệp vụ trả về giao diện: `VISIT_STATUS_INELIGIBLE`, `EMR_LOCKED_CANNOT_TRANSFER`.
 
 ---
@@ -208,14 +208,14 @@ Historical snapshot: the original report presented seven candidate gap areas and
     - Chuyển liên khoa (`RECEPTIONIST`): Chỉ bắt buộc chọn khoa đích (`destinationDepartmentId`); phòng đích (`destinationRoomId`) có thể để trống (null) để bộ phận điều phối tại khoa đích tự phân phòng sau.
     - Chuyển nội bộ khoa (`DOCTOR`): Bắt buộc phải chọn phòng khám đích cụ thể khác với phòng hiện tại.
 * **Tác động triển khai:**
-  - Ảnh hưởng trực tiếp đến validation của `TransferVisitCommand` (cho phép hay không cho phép `destinationRoomId == null`).
+  - Ảnh hưởng trực tiếp đến validation của `TransferLuotKhamCommand` (cho phép hay không cho phép `destinationRoomId == null`).
   - Định nghĩa câu truy vấn xác thực phòng khám đích: `SELECT COUNT(*) FROM PhongKham WHERE id = ? AND maKhoa = ? AND hoatDong = 1`.
   - Giao diện người dùng: Dropdown chọn phòng là bắt buộc hay tùy chọn.
 
 ---
 
 ### Khoảng trống 3: Quy tắc cấp số thứ tự, độ ưu tiên và vị trí hàng đợi tại đích (Queue Numbering & Priority)
-* **Hiện trạng nguồn:** Hàng đợi được sắp xếp theo `dnVnTien DESC, soThuTu, id` ([`ReceptionQueueRepositoryImpl.java:154`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/ReceptionQueueRepositoryImpl.java#L154)). Hiện tại số thứ tự `soThuTu` được cấp tăng dần trong ngày khi tiếp đón đăng ký mới.
+* **Hiện trạng nguồn:** Hàng đợi được sắp xếp theo `dnVnTien DESC, soThuTu, id` ([`TiepDonHangDoiRepository.java:154`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/TiepDonHangDoiRepository.java#L154)). Hiện tại số thứ tự `soThuTu` được cấp tăng dần trong ngày khi tiếp đón đăng ký mới.
 * **Các phương án lựa chọn:**
   * **Phương án 3A (Cấp số mới tại đích):** Cấp số thứ tự (`soThuTu`) mới nhất theo bộ đếm hàng đợi của khoa/phòng đích trong ngày. Số cũ tại khoa nguồn được lưu trữ vào lịch sử điều chuyển.
   * **Phương án 3B (Bảo lưu số cũ):** Giữ nguyên giá trị `soThuTu` ban đầu của bệnh nhân, chỉ thay đổi `maKhoa`/`maPhongKham`. Bệnh nhân sẽ đứng ở vị trí tương ứng với số cũ trong danh sách của phòng đích.
@@ -252,10 +252,10 @@ Historical snapshot: the original report presented seven candidate gap areas and
 ---
 
 ### Khoảng trống 6: Lưu trữ lịch sử điều chuyển, phân loại lý do và Payload Audit
-* **Hiện trạng nguồn:** `AuditActionCode` chưa có mã chuyển lượt. Bảng `LuotKham` chỉ có các trường vị trí hiện tại, không có bảng con lưu lịch sử chuyển vị trí ([`V1__Initial_Clinic_Schema.sql:329-380`](../../clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql#L329-L380)).
+* **Hiện trạng nguồn:** `KiemToanHanhDongMa` chưa có mã chuyển lượt. Bảng `LuotKham` chỉ có các trường vị trí hiện tại, không có bảng con lưu lịch sử chuyển vị trí ([`V1__Initial_Clinic_Schema.sql:329-380`](../../clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql#L329-L380)).
 * **Các phương án lựa chọn:**
   * **Phương án 6A (Chỉ dùng Audit Trail):**
-    - Bổ sung `VISIT_TRANSFERRED` vào `AuditActionCode`.
+    - Bổ sung `VISIT_TRANSFERRED` vào `KiemToanHanhDongMa`.
     - Toàn bộ thông tin nguồn/đích (`sourceFacilityId`, `sourceDepartmentId`, `sourceRoomId`, `targetDepartmentId`, `targetRoomId`, `reasonCode`, `oldQueueNumber`, `newQueueNumber`) được lưu dưới dạng JSON trong metadata của bảng `AuditLog`. Không thay đổi schema bảng nghiệp vụ.
   * **Phương án 6B (Bảng lịch sử quan hệ chuyên biệt + Audit):**
     - Tạo bảng mới `LichSuDieuChuyenLuotKham` (Migration Flyway mới) để phục vụ truy vấn lâm sàng và in ấn phiếu chuyển viện/chuyển khoa.
@@ -271,10 +271,10 @@ Historical snapshot: the original report presented seven candidate gap areas and
 ---
 
 ### Khoảng trống 7: Kiểm soát đồng thời (Concurrency), Khóa lạc quan và Tính lũy nghiệm (Idempotency)
-* **Hiện trạng nguồn:** Bảng `LuotKham` có cột `version BIGINT DEFAULT 0` phục vụ khóa lạc quan ([`V1__Initial_Clinic_Schema.sql:367`](../../clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql#L367), [`BaseEntity.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/BaseEntity.java)).
+* **Hiện trạng nguồn:** Bảng `LuotKham` có cột `version BIGINT DEFAULT 0` phục vụ khóa lạc quan ([`V1__Initial_Clinic_Schema.sql:367`](../../clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql#L367), [`CoSoThucThe.java`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/BaseEntity.java)).
 * **Các phương án lựa chọn:**
   * **Phương án 7A (Khóa lạc quan CAS + Idempotency Key):**
-    - Lệnh điều chuyển `TransferVisitCommand` gửi kèm `expectedVersion` và một `idempotencyKey` sinh từ UI.
+    - Lệnh điều chuyển `TransferLuotKhamCommand` gửi kèm `expectedVersion` và một `idempotencyKey` sinh từ UI.
     - Cập nhật bằng câu lệnh Compare-And-Swap (CAS): `UPDATE LuotKham SET ..., version = version + 1 WHERE id = ? AND version = ?`.
     - Nếu trùng `idempotencyKey` cùng payload: Trả về kết quả thành công của giao tác trước (lũy nghiệm), không thực hiện lại side effect.
     - Nếu version không khớp: Trả về lỗi xung đột `CONCURRENCY_CONFLICT`, yêu cầu client reload dữ liệu.
@@ -308,7 +308,7 @@ The following criteria were drafted against the pre-approval options; they are r
    - Bộ kiểm thử độc lập chứng minh: `RECEPTIONIST` chuyển khác cơ sở -> `DENIED`; `DOCTOR` chuyển khác khoa -> `DENIED`; vai trò khác -> `DENIED`.
    - Chứng minh bằng unit test và test giả lập (mocks/fakes): Quá trình điều chuyển **không gọi bất kỳ hàm đọc bệnh nhân (`getById`, `search`) hay hàm đọc hàng đợi của khoa đích**. Biên nhận trả về chỉ chứa thông tin tối giản của giao tác.
 2. **Giao tác nguyên tử & Fail-closed:**
-   - Cập nhật vị trí `LuotKham` và ghi nhận `AuditLog` phải nằm chung trong một `TransactionBoundary`.
+   - Cập nhật vị trí `LuotKham` và ghi nhận `AuditLog` phải nằm chung trong một `GiaoDichRanhGioi`.
    - Kiểm thử mô phỏng lỗi khi ghi audit: Toàn bộ cập nhật vị trí và số thứ tự phải được rollback hoàn toàn về trạng thái ban đầu.
 3. **Đồng thời & Lũy nghiệm (Concurrency & Idempotency):**
    - Hai request điều chuyển đồng thời trên cùng một version lượt khám: Đúng 1 request thành công, request còn lại nhận lỗi xung đột rõ ràng, không làm hỏng dữ liệu hàng đợi.

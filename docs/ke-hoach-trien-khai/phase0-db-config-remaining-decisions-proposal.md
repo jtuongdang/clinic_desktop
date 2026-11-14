@@ -41,7 +41,7 @@ Các khuyến nghị A1/A3/A5 cũ về reject blank/relative, không trim, fail-
 
 - Đọc Mandatory guidance được cung cấp trước khi sửa: `docs/PROJECT_CONVENTIONS.md` (Orchestrator baseline), `README.md`, các phần trích bị cắt của `DOMAIN_ANALYSIS.md`, `ERD_DIAGRAM.md`; supplied retrieved excerpts của `phase3-appointment-owner-decisions.md`, `phase3-visit-transfer-contract-review.md` và proposal này dưới `docs/ke-hoach-trien-khai/`. Phase 3 excerpts chỉ là bối cảnh retrieval/guidance, không quyết định DB policy.
 - Đọc trực tiếp `README.md`, `docs/ke-hoach-trien-khai/README.md`, toàn bộ proposal này; đối chiếu các đoạn quyết định/evidence liên quan trong `phase0-deployment-config-tls-decision-proposal.md`, `phase0-db-config-resolution-contract.md`, `phase0-db-config-review.md`. Không tìm thấy `AGENTS.md` ở các thư mục cha/scope; checkout không có `CONTRIBUTING.md`, `docs/PROJECT_CONVENTIONS.md`, `docs/DEVELOPMENT_CONVENTIONS.md`, `docs/README.md` hoặc `ARCHITECTURE.md`.
-- Read-only inspection: `DatabaseConfiguration.java`, `DatabaseConnection.java`, `DatabaseConfigurationTest.java`, desktop `Main.java` và phần Shade của `clinic-desktop/pom.xml`. Đây là kiểm tra nguồn để tách facts khỏi policy, không phải kiểm chứng runtime/packaging. Không mở secret config, dump environment, gọi JDBC/DB hoặc chạy launch.
+- Read-only inspection: `CoSoDuLieuCauHinh.java`, `CoSoDuLieuKetNoi.java`, `CoSoDuLieuCauHinhTest.java`, desktop `Main.java` và phần Shade của `clinic-desktop/pom.xml`. Đây là kiểm tra nguồn để tách facts khỏi policy, không phải kiểm chứng runtime/packaging. Không mở secret config, dump environment, gọi JDBC/DB hoặc chạy launch.
 - **RAG first:** lệnh đầu tiên trước repository reads/searches là `/Users/jtuong/Documents/ClinicOrchestrator/.venv/bin/python /Users/jtuong/Documents/ClinicOrchestrator/scripts/rag_search.py --repo clinic-desktop --limit 8 'PHASE0-DB-CONFIG-EXPLICIT-PATH-OWNER-DECISION-01 CLINIC_DB_CONFIG_FILE absolute path A1 remaining decisions environment file precedence TLS certificate validation'`. Exit **1**, `sqlite3.OperationalError: unable to open database file` tại `PRAGMA journal_mode=WAL`; không trả excerpt mới. Thứ tự RAG-first **PASS**, live retrieval **BLOCKED**; dùng supplied excerpts và targeted local reads. Không sửa/copy/move/delete cache/index hay né sandbox.
 - Kiểm định lần này: `git diff --check` và inline Python read-only assertions cho scope một file, decision/open-semantics coverage, bảo toàn nội dung snapshot và balanced fences. Không chạy build/application tests vì task chỉ sửa tài liệu và cấm thay runtime/tests. Kết quả ở mục 5–6 là lịch sử của các vòng trước.
 
@@ -176,19 +176,19 @@ Dựa trên kiểm tra mã nguồn tại repository:
 - Tệp mẫu [`clinic-infrastructure/src/main/resources/db.properties.example:1-7`](../../clinic-infrastructure/src/main/resources/db.properties.example#L1-L7) vẫn được đóng gói trong JAR, nhưng chỉ chứa placeholder và tham số mẫu cục bộ (`encrypt=true;trustServerCertificate=true`).
 
 ### 2.2. Trình nạp Cấu hình Hiện tại (Loader & Resolver Implementation)
-- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java:29-41`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L29-L41), phương thức `loadProperties()` chỉ thực hiện nạp tệp tài nguyên từ classpath thông qua `DatabaseConnection.class.getClassLoader().getResourceAsStream("db.properties")`. Lớp này hoàn toàn không có tham số hay cơ chế nạp file từ hệ thống tệp bên ngoài (`filesystem path`). Mọi lỗi đọc hoặc định dạng tệp đều bị nuốt lặng lẽ (`catch (Exception ignored) { properties.clear(); }`).
-- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java:22-35`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L22-L35), phương thức `resolve()` xử lý ưu tiên giữa `Properties` và `Map<String, String> environment`:
+- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/CoSoDuLieuKetNoi.java:29-41`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L29-L41), phương thức `loadProperties()` chỉ thực hiện nạp tệp tài nguyên từ classpath thông qua `CoSoDuLieuKetNoi.class.getClassLoader().getResourceAsStream("db.properties")`. Lớp này hoàn toàn không có tham số hay cơ chế nạp file từ hệ thống tệp bên ngoài (`filesystem path`). Mọi lỗi đọc hoặc định dạng tệp đều bị nuốt lặng lẽ (`catch (Exception ignored) { properties.clear(); }`).
+- Trong [`clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/CoSoDuLieuCauHinh.java:22-35`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L22-L35), phương thức `resolve()` xử lý ưu tiên giữa `Properties` và `Map<String, String> environment`:
   - `override()` ([dòng 80-82](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L80-L82)): nếu biến môi trường không rỗng (`nonblank`), giá trị môi trường sau khi cắt khoảng trắng thừa (`trim()`) sẽ ghi đè giá trị trong property.
   - `nonblank()` ([dòng 84-86](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L84-L86)): kiểm tra `value != null && !value.isBlank()`. Các biến môi trường rỗng hoặc chỉ có khoảng trắng được coi là vắng mặt (`absent`) và bị bỏ qua, để lộ giá trị trong properties.
   - Biến môi trường `DB_CONNECTION_STRING` ([dòng 26, 32-34](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L26-L34)) được giữ nguyên vẹn và giành quyền ưu tiên tuyệt đối khi xác định `ConnectionTarget` ([dòng 103-106](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L103-L106)).
 
 ### 2.3. Trạng thái Trường `DB_DRIVER` và Đăng ký Driver
-- Trường `DB_DRIVER` và khóa `db.driver` được đọc và gán vào `ResolvedConfiguration.driver()` ([`DatabaseConfiguration.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L31)), nhưng không hề được tham chiếu hay sử dụng trong luồng mở kết nối ([`DatabaseConnection.java:76-98`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L76-L98)).
-- Trình quản lý kết nối tự suy luận driver thông qua tiền tố chuỗi URL bằng phương thức `autoRegisterDriver(url)` ([`DatabaseConnection.java:115-129`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L115-L129)) hoặc cơ chế `ServiceLoader` chuẩn của JDBC 4.0+.
+- Trường `DB_DRIVER` và khóa `db.driver` được đọc và gán vào `ResolvedConfiguration.driver()` ([`CoSoDuLieuCauHinh.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L31)), nhưng không hề được tham chiếu hay sử dụng trong luồng mở kết nối ([`CoSoDuLieuKetNoi.java:76-98`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L76-L98)).
+- Trình quản lý kết nối tự suy luận driver thông qua tiền tố chuỗi URL bằng phương thức `autoRegisterDriver(url)` ([`CoSoDuLieuKetNoi.java:115-129`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L115-L129)) hoặc cơ chế `ServiceLoader` chuẩn của JDBC 4.0+.
 
 ### 2.4. Khử vết Dữ liệu Nhạy cảm (Redaction)
-- Các record nội bộ `ResolvedConfiguration` và `ConnectionTarget` đã cài đè phương thức `toString()` ([`DatabaseConfiguration.java:94-101, 118-125`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L94-L125)) để chỉ in trạng thái hiện diện của giá trị và chế độ kết nối, không in URL hay mật khẩu trong hai biểu diễn này. Điều đó không chứng minh mọi log hoặc ngoại lệ ở các caller đều đã được khử vết.
-- Các bài kiểm thử [`DatabaseConnectionTest.java:76-114`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnectionTest.java#L76-L114) và [`DatabaseConfigurationTest.java:87-101`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L87-L101) kiểm tra diagnostic của `testConnection` và hai biểu diễn record bằng dữ liệu tổng hợp, gồm `synthetic-password-marker`, `synthetic-secret-marker`. Phạm vi kiểm tra này không bảo đảm an toàn cho mọi đường log/lỗi.
+- Các record nội bộ `ResolvedConfiguration` và `ConnectionTarget` đã cài đè phương thức `toString()` ([`CoSoDuLieuCauHinh.java:94-101, 118-125`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L94-L125)) để chỉ in trạng thái hiện diện của giá trị và chế độ kết nối, không in URL hay mật khẩu trong hai biểu diễn này. Điều đó không chứng minh mọi log hoặc ngoại lệ ở các caller đều đã được khử vết.
+- Các bài kiểm thử [`CoSoDuLieuKetNoiTest.java:76-114`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnectionTest.java#L76-L114) và [`CoSoDuLieuCauHinhTest.java:87-101`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L87-L101) kiểm tra diagnostic của `testConnection` và hai biểu diễn record bằng dữ liệu tổng hợp, gồm `synthetic-password-marker`, `synthetic-secret-marker`. Phạm vi kiểm tra này không bảo đảm an toàn cho mọi đường log/lỗi.
 
 ---
 
@@ -219,7 +219,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.1. Snapshot Quyết định 1: Giao diện File Ngoài — RESOLVED; alternatives SUPERSEDED
 
 #### a. Sự thật (Facts)
-- Mã nguồn hiện hành chỉ nạp `db.properties` từ classpath ([`DatabaseConnection.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L31)).
+- Mã nguồn hiện hành chỉ nạp `db.properties` từ classpath ([`CoSoDuLieuKetNoi.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L31)).
 - Tệp JAR đóng gói loại trừ `db.properties` ([`clinic-desktop/pom.xml:49`](../../clinic-desktop/pom.xml#L49)). Do đó, khi chạy packaged JAR ngoài môi trường phát triển, loader hiện tại không đọc file properties ngoài classpath; đây chưa phải bằng chứng về mọi cách thiết lập classpath khi triển khai.
 
 #### b. Suy luận kỹ thuật (Inferences)
@@ -254,8 +254,8 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.2. Quyết định 2: Thứ tự Ưu tiên giữa `DB_CONNECTION_STRING` và Bộ Ba Trường Phân tách (Combined vs Split Precedence)
 
 #### a. Sự thật (Facts)
-- Hiện tại, [`DatabaseConfiguration.java:26-34, 103-106`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L26-L34) (xem thêm [103-106](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L103-L106)) cho phép `DB_CONNECTION_STRING` (khi khác rỗng) giành quyền ưu tiên tuyệt đối trước bộ ba trường `url`, `username`, `password`.
-- Phương thức `DatabaseConfiguration.override()` chỉ áp dụng cho từng trường phân tách (`db.url` vs `DB_URL`, v.v.), không trộn lẫn chuỗi kết nối gộp với các trường phân tách.
+- Hiện tại, [`CoSoDuLieuCauHinh.java:26-34, 103-106`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L26-L34) (xem thêm [103-106](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L103-L106)) cho phép `DB_CONNECTION_STRING` (khi khác rỗng) giành quyền ưu tiên tuyệt đối trước bộ ba trường `url`, `username`, `password`.
+- Phương thức `CoSoDuLieuCauHinh.override()` chỉ áp dụng cho từng trường phân tách (`db.url` vs `DB_URL`, v.v.), không trộn lẫn chuỗi kết nối gộp với các trường phân tách.
 
 #### b. Suy luận kỹ thuật (Inferences)
 - Khi nhà vận hành cấu hình cả chuỗi đầy đủ và các trường phân tách, có thể phát sinh hai tình huống xung đột:
@@ -265,7 +265,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 #### c. Các phương án so sánh (Options)
 - **Phương án 2A — Giữ nguyên Thiết kế Hiện hành (Full String Absolute Win):**  
   `DB_CONNECTION_STRING` (nếu có giá trị) luôn giành quyền ưu tiên trước bộ ba trường `URL/User/Password`, bất kể nguồn gốc của nó.  
-  *Ưu điểm:* Tương thích ngược 100% với mã nguồn hiện tại của `DatabaseConfiguration.java`; hành vi đơn giản, dễ giải thích.  
+  *Ưu điểm:* Tương thích ngược 100% với mã nguồn hiện tại của `CoSoDuLieuCauHinh.java`; hành vi đơn giản, dễ giải thích.  
   *Nhược điểm:* Ngăn cản việc dùng biến môi trường để ghi đè từng phần (ví dụ chỉ ghi đè mật khẩu) khi file nền cung cấp chuỗi kết nối đầy đủ.
 - **Phương án 2B — Phân tầng Ưu tiên theo Nguồn (Source-Aware Precedence):**  
   Tầng Môi trường có quyền ưu tiên cao hơn Tầng File Properties. Trong cùng một tầng, Chuỗi kết nối đầy đủ ưu tiên hơn Trường phân tách. Cụ thể:  
@@ -285,7 +285,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.3. Quyết định 3: Ngữ nghĩa của Biến Môi trường Rỗng hoặc Khoảng trắng (Blank Environment Semantics: Absent vs Invalid)
 
 #### a. Sự thật (Facts)
-- Trong [`DatabaseConfiguration.java:80-86`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L80-L86), hàm `override` sử dụng `nonblank(environmentValue)`:
+- Trong [`CoSoDuLieuCauHinh.java:80-86`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L80-L86), hàm `override` sử dụng `nonblank(environmentValue)`:
   ```java
   private static String override(String propertyValue, String environmentValue) {
       return nonblank(environmentValue) ? environmentValue.trim() : propertyValue;
@@ -305,7 +305,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 #### c. Các phương án so sánh (Options)
 - **Phương án 3A — Duy trì Hành vi Hiện tại (Permissive: Blank == Absent):**  
   Chuỗi rỗng hoặc chỉ có khoảng trắng được coi như không tồn tại, cho phép giá trị trong file hiển thị.  
-  *Ưu điểm:* Linh hoạt với các script shell khởi chạy có định nghĩa sẵn biến nhưng chưa gán giá trị; không làm thay đổi các test hiện có ([`DatabaseConfigurationTest.java:45-60`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L45-L60)).\
+  *Ưu điểm:* Linh hoạt với các script shell khởi chạy có định nghĩa sẵn biến nhưng chưa gán giá trị; không làm thay đổi các test hiện có ([`CoSoDuLieuCauHinhTest.java:45-60`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfigurationTest.java#L45-L60)).\
   *Nhược điểm:* Nguy cơ âm thầm dùng giá trị fallback của file khi secret injection bị hỏng; không có cách nào dùng biến môi trường để "xóa" (clear) một giá trị đã lỡ đặt trong file properties.
 - **Phương án 3B — Kiểm soát Nghiêm ngặt (Fail-Closed: Blank == Invalid / Error):**  
   Nếu một biến môi trường cấu hình DB quan trọng (`DB_URL`, `DB_CONNECTION_STRING`, `DB_USERNAME`) được cung cấp nhưng có giá trị rỗng/khoảng trắng, coi đó là cấu hình sai và ném lỗi khởi động ngay lập tức.  
@@ -324,7 +324,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.4. Quyết định 4: Các Tổ hợp Xác thực JDBC và Thông tin Xác thực Một phần (Valid Partial Credential / JDBC Auth Combinations)
 
 #### a. Sự thật (Facts)
-- Trong [`DatabaseConfiguration.java:107-113`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L107-L113):
+- Trong [`CoSoDuLieuCauHinh.java:107-113`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L107-L113):
   ```java
   if (url != null && !url.isEmpty()) {
       if (username != null && !username.isEmpty()) {
@@ -363,7 +363,7 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.5. Quyết định 5: Ứng xử khi File Cấu hình Chỉ định Bị Lỗi hoặc Không Đọc được (Unreadable/Malformed File Behavior)
 
 #### a. Sự thật (Facts)
-- Trong [`DatabaseConnection.java:29-41`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L29-L41), resource classpath vắng mặt được bỏ qua và ngoại lệ khi đọc/parse được catch. Đây chưa phải cơ chế đọc file ngoài hay bằng chứng về lỗi quyền trên một đường dẫn ngoài:
+- Trong [`CoSoDuLieuKetNoi.java:29-41`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L29-L41), resource classpath vắng mặt được bỏ qua và ngoại lệ khi đọc/parse được catch. Đây chưa phải cơ chế đọc file ngoài hay bằng chứng về lỗi quyền trên một đường dẫn ngoài:
   ```java
   try {
       properties.load(input);
@@ -397,9 +397,9 @@ Phần này phân tách tường minh giữa **Sự thật đã chứng minh (Fa
 ### 3.6. Quyết định 6: Định hướng đối với Biến `DB_DRIVER` và Khóa `db.driver` (Unused Driver Configuration)
 
 #### a. Sự thật (Facts)
-- Hiện tại `DB_DRIVER` và `db.driver` được nạp vào cấu hình ([`DatabaseConfiguration.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L31)) nhưng không được luồng mở kết nối sử dụng ([`DatabaseConnection.java:76-98`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L76-L98)).
+- Hiện tại `DB_DRIVER` và `db.driver` được nạp vào cấu hình ([`CoSoDuLieuCauHinh.java:31`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConfiguration.java#L31)) nhưng không được luồng mở kết nối sử dụng ([`CoSoDuLieuKetNoi.java:76-98`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L76-L98)).
 - Trình điều khiển JDBC hiện đại (từ chuẩn JDBC 4.0 trở đi) tự động đăng ký với `DriverManager` thông qua cơ chế `META-INF/services/java.sql.Driver` nằm trong chính file JAR của driver (chẳng hạn `mssql-jdbc-12.6.1.jre11.jar`).
-- Phương thức `autoRegisterDriver(url)` trong [`DatabaseConnection.java:115-129`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L115-L129) cũng đã tự động gọi `Class.forName()` cho 4 loại CSDL phổ biến (SQL Server, Postgres, MySQL, Oracle).
+- Phương thức `autoRegisterDriver(url)` trong [`CoSoDuLieuKetNoi.java:115-129`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/DatabaseConnection.java#L115-L129) cũng đã tự động gọi `Class.forName()` cho 4 loại CSDL phổ biến (SQL Server, Postgres, MySQL, Oracle).
 
 #### b. Suy luận kỹ thuật (Inferences)
 - Việc duy trì biến `DB_DRIVER` trong tài liệu hướng dẫn và file mẫu `db.properties.example` tạo ra sự hiểu lầm cho người vận hành rằng biến này có tác dụng điều khiển driver, trong khi thực tế nó hoàn toàn vô dụng.
@@ -519,7 +519,7 @@ Lệnh thoát **1**, `sqlite3.OperationalError: unable to open database file`, t
 - Đọc supplied retrieved excerpts: `phase0-deployment-config-tls-decision-proposal.md`, `phase0-db-config-resolution-contract.md`, proposal này, `phase3-visit-transfer-contract-review.md`, `phase3-transfer-linked-work-eligibility-review.md` (đều dưới `docs/ke-hoach-trien-khai/`). Excerpts Phase 3 chỉ cung cấp bối cảnh guidance/retrieval, không quyết định DB policy.
 - Đọc trực tiếp `README.md`, `docs/ke-hoach-trien-khai/README.md`, proposal này, `phase0-db-config-resolution-contract.md`, `phase0-deployment-config-tls-decision-proposal.md` và `phase0-db-config-review.md`. Các nhận định TLS/nguồn chưa chốt trong review/contract cũ là lịch sử, đã được Owner decisions mới supersede đúng phạm vi; không mở lại.
 - Kiểm tra đường dẫn cha và thư mục scope: không tìm thấy `AGENTS.md`. Inventory không có `CONTRIBUTING.md`, `docs/PROJECT_CONVENTIONS.md`, `docs/DEVELOPMENT_CONVENTIONS.md` hoặc `ARCHITECTURE.md`; không suy ra guidance chưa đọc.
-- Read-only implementation inspection: `DatabaseConfiguration.java`, `DatabaseConnection.java`, `DatabaseConfigurationTest.java`, `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/Main.java`, phần Shade của `clinic-desktop/pom.xml`. Resolver hiện hữu xác nhận blank fallback, trim split env, combined thắng, driver unused và diagnostic presence-only; Main chưa có CLI/file selector. Không mở file secret, không đọc process environment, không gọi JDBC/DB.
+- Read-only implementation inspection: `CoSoDuLieuCauHinh.java`, `CoSoDuLieuKetNoi.java`, `CoSoDuLieuCauHinhTest.java`, `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/Main.java`, phần Shade của `clinic-desktop/pom.xml`. Resolver hiện hữu xác nhận blank fallback, trim split env, combined thắng, driver unused và diagnostic presence-only; Main chưa có CLI/file selector. Không mở file secret, không đọc process environment, không gọi JDBC/DB.
 
 ### RAG-first và kết quả kiểm định
 

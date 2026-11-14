@@ -29,17 +29,17 @@ Dưới đây là bảng đối soát chi tiết hiện trạng các thành ph�
 | Phân hệ / Thành phần | Vị trí mã nguồn (File & Line Anchor) | Hiện trạng thực tế (Source Fact) | Hành vi còn thiếu / Vắng mặt (Absent Behavior) |
 |---|---|---|---|
 | **Domain Aggregate `LuotKham`** | [`LuotKham.java:29-55`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/examination/LuotKham.java#L29-L55)<br>[`LuotKham.java:88-124`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/examination/LuotKham.java#L88-L124)<br>[`LuotKham.java:126-221`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/examination/LuotKham.java#L126-L221) | Thực thể lưu giữ `maCoSo`, `maKhoa`, `maPhongKham` (nullable), `trangThai`, `soThuTu`, `soThuTuDisplay`, `dnVnTien`, và cờ `emrLocked`. Có các phương thức `startExam()` (chỉ từ `CHO_KHAM`), `completeExam()` (chuyển sang `HOAN_THANH`), `lockEmr()`. Toàn bộ setter trạng thái/vị trí là public không có guard. | Không có phương thức `transferTo(...)`; không có sự kiện miền `LuotKhamTransferredEvent`; không có kiểm tra guard hợp lệ cho điều chuyển; không lưu vết lịch sử chuyển phòng/khoa. |
-| **Hạ tầng Base Entity** | [`BaseEntity.java:15-35`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/BaseEntity.java#L15-L35)<br>[`BaseEntity.java:62-93`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/BaseEntity.java#L62-L93) | Cung cấp trường khóa lạc quan `version` (kiểu `Long`), cơ chế soft delete (`isDeleted`, `deletedAt`, `deletedBy`), audit trail (`createdAt`, `updatedAt`), và danh sách `domainEvents`. | Chưa có cơ chế compare-and-swap (CAS) chuyên biệt hay phương thức snapshot vị trí phục vụ điều chuyển. |
+| **Hạ tầng Base Entity** | [`CoSoThucThe.java:15-35`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/BaseEntity.java#L15-L35)<br>[`CoSoThucThe.java:62-93`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/BaseEntity.java#L62-L93) | Cung cấp trường khóa lạc quan `version` (kiểu `Long`), cơ chế soft delete (`isDeleted`, `deletedAt`, `deletedBy`), audit trail (`createdAt`, `updatedAt`), và danh sách `domainEvents`. | Chưa có cơ chế compare-and-swap (CAS) chuyên biệt hay phương thức snapshot vị trí phục vụ điều chuyển. |
 | **Enum Trạng thái Lượt khám** | [`TrangThaiLuotKham.java:3-10`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/enums/TrangThaiLuotKham.java#L3-L10)<br>[`TrangThaiLuotKham.java:23-28`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/common/enums/TrangThaiLuotKham.java#L23-L28) | Định nghĩa 7 trạng thái: `CHO_KHAM(1)`, `DANG_KHAM(2)`, `DA_KHAM(3)`, `KET_LUAN(4)`, `HOAN_THANH(5)`, `DA_HUY(6)`, `CHO_CLS(7)`. | Chỉ là danh mục enum lưu trữ thuần túy, không có state machine, không định nghĩa ma trận chuyển tiếp trạng thái (transition rules). |
 | **Mô hình Cơ sở & Khoa phòng** | [`PhongKham.java:4-22`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/facility/PhongKham.java#L4-L22)<br>[`Khoa.java:6-27`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/facility/Khoa.java#L6-L27) | `PhongKham` liên kết tới `Khoa` qua `maKhoa`, có cờ `hoatDong`. `Khoa` liên kết tới `CoSo` qua `maCoSo`, có cờ `hoatDong`. | Chưa có query/validator kiểm tra phân cấp hợp lệ giữa phòng khám - khoa - cơ sở trong use case điều chuyển. |
 | **Repository Port Domain** | [`ILuotKhamRepository.java:6-9`](../../clinic-domain/src/main/java/vn/clinicmanagement/domain/repositories/ILuotKhamRepository.java#L6-L9) | Chỉ khai báo hai phương thức: `getVisitsByDoctor(maBacSi, date)` và `getNextQueueNumber(maCoSo, maKhoa, date)`. | Không có phương thức cập nhật điều chuyển (`transferVisit`), không có phương thức cấp số hàng đợi theo phòng, không tìm thấy class triển khai port này trong repository. |
-| **Ngữ cảnh Phân quyền** | [`AuthorizationContext.java:5-17`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationContext.java#L5-L17) | Đối tượng `record` bất biến chứa đúng 1 phiên: `employeeId`, `roleId`, `roleCode`, `facilityId`, `departmentId`, `sessionId`. | Đại diện cho phiên đơn; không chứa thông tin về phòng khám hiện tại hoặc phòng khám đích. |
-| **Bộ thẩm định Phân quyền** | [`AuthorizationService.java:34-55`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationService.java#L34-L55)<br>[`AuthorizationService.java:57-115`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationService.java#L57-L115) | Kiểm tra nghiêm ngặt: yêu cầu `targetFacilityId == context.facilityId()` và `targetDepartmentId == context.departmentId()`. Nếu khác, trả về `TARGET_MISMATCH` (dòng 51-54). | Evaluator dùng chung này không thể cho phép `RECEPTIONIST` điều chuyển liên khoa cùng cơ sở. Luồng điều chuyển bắt buộc phải có guard phân quyền chuyên biệt (`TransferAuthorizationGuard`). |
-| **Cổng Tiếp đón & Hàng đợi** | [`ReceptionQueuePort.java:9-15`](../../clinic-application/src/main/java/vn/clinicmanagement/application/reception/ReceptionQueuePort.java#L9-L15)<br>[`ReceptionQueueRepositoryImpl.java:37-81`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/ReceptionQueueRepositoryImpl.java#L37-L81)<br>[`ReceptionQueueRepositoryImpl.java:125-155`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/ReceptionQueueRepositoryImpl.java#L125-L155) | Cung cấp đăng ký mới và truy vấn hàng đợi theo cặp `(maCoSo, maKhoa)` của ngày hiện tại, sắp xếp theo `ORDER BY l.dnVnTien DESC, l.soThuTu, l.id`. | Không có phương thức cập nhật điều chuyển hàng đợi hoặc chuyển vị trí lượt khám trong persistence adapter. |
+| **Ngữ cảnh Phân quyền** | [`PhanQuyenNguCanh.java:5-17`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationContext.java#L5-L17) | Đối tượng `record` bất biến chứa đúng 1 phiên: `employeeId`, `roleId`, `roleCode`, `facilityId`, `departmentId`, `sessionId`. | Đại diện cho phiên đơn; không chứa thông tin về phòng khám hiện tại hoặc phòng khám đích. |
+| **Bộ thẩm định Phân quyền** | [`PhanQuyenDichVu.java:34-55`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationService.java#L34-L55)<br>[`PhanQuyenDichVu.java:57-115`](../../clinic-application/src/main/java/vn/clinicmanagement/application/authorization/AuthorizationService.java#L57-L115) | Kiểm tra nghiêm ngặt: yêu cầu `targetFacilityId == context.facilityId()` và `targetDepartmentId == context.departmentId()`. Nếu khác, trả về `TARGET_MISMATCH` (dòng 51-54). | Evaluator dùng chung này không thể cho phép `RECEPTIONIST` điều chuyển liên khoa cùng cơ sở. Luồng điều chuyển bắt buộc phải có guard phân quyền chuyên biệt (`TransferAuthorizationGuard`). |
+| **Cổng Tiếp đón & Hàng đợi** | [`TiepDonHangDoiCongKetNoi.java:9-15`](../../clinic-application/src/main/java/vn/clinicmanagement/application/reception/ReceptionQueuePort.java#L9-L15)<br>[`TiepDonHangDoiRepository.java:37-81`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/TiepDonHangDoiRepository.java#L37-L81)<br>[`TiepDonHangDoiRepository.java:125-155`](../../clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/TiepDonHangDoiRepository.java#L125-L155) | Cung cấp đăng ký mới và truy vấn hàng đợi theo cặp `(maCoSo, maKhoa)` của ngày hiện tại, sắp xếp theo `ORDER BY l.dnVnTien DESC, l.soThuTu, l.id`. | Không có phương thức cập nhật điều chuyển hàng đợi hoặc chuyển vị trí lượt khám trong persistence adapter. |
 | **Cơ sở dữ liệu & Schema SQL** | [`V1__Initial_Clinic_Schema.sql:329-380`](../../clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql#L329-L380) | Bảng `LuotKham` lưu `maCoSo`, `maKhoa`, `maPhongKham` (nullable), `trangThai`, `version`, `soThuTu`, `soThuTuDisplay`, `dnVnTien`, `emrLocked`. Khóa ngoại độc lập. | Không có bảng lưu vết lịch sử điều chuyển (`LichSuDieuChuyenLuotKham`); không có ràng buộc toàn vẹn phức hợp (composite foreign key) giữa `maPhongKham` và `maKhoa`. |
-| **Khế ước Kiểm toán (Audit)** | [`AuditActionCode.java:23-34`](../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditActionCode.java#L23-L34)<br>[`AuditWritePort.java:3-10`](../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditWritePort.java#L3-L10) | Hỗ trợ ghi audit trong transaction hoặc độc lập. Đã có mã `VISIT_REGISTERED`. | Chưa có mã hành động `VISIT_TRANSFERRED`; chưa có định nghĩa payload metadata chuẩn cho điều chuyển. |
-| **Giao diện Desktop Prototype** | [`PatientQueueContextMenu.java:71-75`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/menus/PatientQueueContextMenu.java#L71-L75)<br>[`ExaminationPanel.java:1080-1091`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/ExaminationPanel.java#L1080-L1091)<br>[`TransferRoomSelectDialog.java:15-34`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/dialogs/TransferRoomSelectDialog.java#L15-L34) | Menu chuột phải "Chuyển Bệnh Nhân Sang Phòng Khác" mở dialog chọn tên phòng từ danh sách chuỗi tĩnh và mở `TransferSlipPrintPreviewDialog`. | Chỉ là giao diện mô phỏng (UI prototype/preview); hoàn toàn không gọi Application service, không truyền `visitId`, không kiểm tra quyền, không cập nhật CSDL. |
-| **Màn hình Tiếp đón Desktop** | [`ReceptionPanel.java:77-115`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L77-L115) | Tải phòng khám và hàng đợi theo session; xử lý đăng ký bệnh nhân mới. | Hoàn toàn chưa có nút bấm, menu hoặc chức năng điều chuyển lượt khám. |
+| **Khế ước Kiểm toán (Audit)** | [`KiemToanHanhDongMa.java:23-34`](../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditActionCode.java#L23-L34)<br>[`KiemToanWriteCongKetNoi.java:3-10`](../../clinic-application/src/main/java/vn/clinicmanagement/application/audit/AuditWritePort.java#L3-L10) | Hỗ trợ ghi audit trong transaction hoặc độc lập. Đã có mã `VISIT_REGISTERED`. | Chưa có mã hành động `VISIT_TRANSFERRED`; chưa có định nghĩa payload metadata chuẩn cho điều chuyển. |
+| **Giao diện Desktop Prototype** | [`BenhNhanHangDoiNguCanhMenu.java:71-75`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/menus/PatientQueueContextMenu.java#L71-L75)<br>[`KhamBenhManHinh.java:1080-1091`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/ExaminationPanel.java#L1080-L1091)<br>[`TransferPhongSelectHopThoai.java:15-34`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/dialogs/TransferRoomSelectDialog.java#L15-L34) | Menu chuột phải "Chuyển Bệnh Nhân Sang Phòng Khác" mở dialog chọn tên phòng từ danh sách chuỗi tĩnh và mở `TransferPhieuPrintPreviewHopThoai`. | Chỉ là giao diện mô phỏng (UI prototype/preview); hoàn toàn không gọi Application service, không truyền `visitId`, không kiểm tra quyền, không cập nhật CSDL. |
+| **Màn hình Tiếp đón Desktop** | [`TiepDonManHinh.java:77-115`](../../clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/reception/ReceptionPanel.java#L77-L115) | Tải phòng khám và hàng đợi theo session; xử lý đăng ký bệnh nhân mới. | Hoàn toàn chưa có nút bấm, menu hoặc chức năng điều chuyển lượt khám. |
 
 ---
 
@@ -71,7 +71,7 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
    - Đơn thuốc đã duyệt/cấp phát, kết quả CLS đã xác nhận và giao dịch tài chính đã ghi nhận là bất biến (immutable); mọi điều chỉnh phải thông qua quy trình riêng có thẩm quyền, đối soát và audit.
 6. **Kiểm soát đồng thời, giao tác và thời gian:**
    - Kiểm soát đồng thời bằng khóa lạc quan thông qua `LuotKham.version` (CAS update).
-   - Đảm bảo tính nguyên tử trong một `TransactionBoundary`: cập nhật lượt khám, cấp số hàng đợi và ghi audit. Thất bại ở bất kỳ khâu nào (đặc biệt là audit) phải rollback toàn bộ (fail-closed). (Việc ghi bảng lịch sử chuyên biệt là đề xuất kỹ thuật chưa ngã ngũ).
+   - Đảm bảo tính nguyên tử trong một `GiaoDichRanhGioi`: cập nhật lượt khám, cấp số hàng đợi và ghi audit. Thất bại ở bất kỳ khâu nào (đặc biệt là audit) phải rollback toàn bộ (fail-closed). (Việc ghi bảng lịch sử chuyên biệt là đề xuất kỹ thuật chưa ngã ngũ).
    - Thời gian kỹ thuật và audit metadata lưu bằng UTC (Instant); thời gian nghiệp vụ phòng khám tính theo múi giờ `Asia/Ho_Chi_Minh`. Ranh giới ngày điều chuyển so với ngày khám (`ngayKham`) vẫn là lựa chọn khế ước chưa ngã ngũ (unresolved contract choice); việc phê duyệt quy chuẩn thời gian UTC/local time không tự động đồng nghĩa với quy tắc chỉ cho phép điều chuyển trong ngày hiện tại.
 
 ---
@@ -82,17 +82,17 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 
 ```
 [UI Component: Transfer Dialog]
-               |  (TransferVisitCommand)
+               |  (TransferLuotKhamCommand)
                v
 +-----------------------------------------------------------------------+
-| APPLICATION SERVICE LAYER: TransferVisitHandler                       |
+| APPLICATION SERVICE LAYER: TransferLuotKhamHandler                       |
 |                                                                       |
 |  1. Invariant INV-TX-02 (Scope & Actor Guard)                         |
 |     - Check session active, role assignment, work scope               |
 |     - Verify RECEPTIONIST (same facility) or DOCTOR (same department) |
 |     - Fail-closed: deny if target mismatch or scope violated          |
 |                                                                       |
-|  2. TransactionBoundary:                                              |
+|  2. GiaoDichRanhGioi:                                              |
 |     a. Load LuotKham with pessimistic/optimistic concurrency lock     |
 |     b. Validate INV-TX-03 (EMR Lock & Soft Delete)                    |
 |     c. Validate INV-TX-01 (Actor-Status Compatibility)                |
@@ -130,7 +130,7 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 #### `INV-TX-03`: Bất biến đóng băng Bệnh án & Tính hoàn tất lâm sàng (EMR Lock & Clinical Finality Invariant)
 * **Tầng sở hữu:** Domain Aggregate Root (`LuotKham`).
 * **Nội dung:**
-  - Nếu `visit.isEmrLocked() == true`, mọi nỗ lực điều chuyển phải ném ra ngoại lệ miền `EmrLockedException`, chặn ngay lập tức mà không phụ thuộc vào vai trò hay lý do.
+  - Nếu `visit.isEmrLocked() == true`, mọi nỗ lực điều chuyển phải ném ra ngoại lệ miền `EMRDaKhoaNgoaiLe`, chặn ngay lập tức mà không phụ thuộc vào vai trò hay lý do.
   - Nếu `visit.isDeleted() == true` hoặc `visit.getTrangThai() == TrangThaiLuotKham.DA_HUY`, từ chối với lỗi `VISIT_INACTIVE_OR_CANCELLED`.
   - Nếu `visit.getTrangThai() ∈ {DA_KHAM, KET_LUAN, HOAN_THANH}`, từ chối với lỗi `VISIT_ALREADY_FINALIZED`. Không cho phép điều chuyển các ca khám đã hoàn tất quy trình chuyên môn.
 
@@ -148,7 +148,7 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
   - Nếu tồn tại dịch vụ CLS đang thực hiện dở dang hoặc đơn thuốc đang trong quy trình phát thuốc mà việc chuyển phòng/khoa gây rủi ro mất an toàn lâm sàng (clinical risk), hệ thống phải từ chối điều chuyển với mã `LINKED_WORK_BLOCKING` và yêu cầu nhân viên xử lý dứt điểm công việc tại nguồn.
 
 #### `INV-TX-06`: Bất biến kiểm soát đồng thời lạc quan (Optimistic Concurrency & CAS Invariant)
-* **Tầng sở hữu:** Domain Entity (`BaseEntity`) và Infrastructure SQL Adapter.
+* **Tầng sở hữu:** Domain Entity (`CoSoThucThe`) và Infrastructure SQL Adapter.
 * **Nội dung:**
   - Lệnh điều chuyển bắt buộc phải mang theo `expectedVersion` của `LuotKham`.
   - Thao tác cập nhật vị trí trong CSDL phải sử dụng cơ chế Compare-And-Swap (CAS):
@@ -161,9 +161,9 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
   - Nếu số dòng ảnh hưởng bằng 0 (`rowsAffected == 0`), hệ thống xác định có xung đột ghi đè đồng thời (Concurrent Modification) và ném lỗi `CONCURRENCY_CONFLICT`, hủy bỏ toàn bộ giao tác.
 
 #### `INV-TX-07`: Bất biến giao tác nguyên tử & Thất bại đóng an toàn (Atomic Transaction & Fail-Closed Audit Invariant)
-* **Tầng sở hữu:** Application Service (`TransactionBoundary`).
+* **Tầng sở hữu:** Application Service (`GiaoDichRanhGioi`).
 * **Nội dung:**
-  - Toàn bộ các bước: (1) Kiểm tra điều kiện, (2) Cập nhật `LuotKham`, (3) Cấp số hàng đợi, và (4) Ghi bản ghi kiểm toán `VISIT_TRANSFERRED` (cùng lưu bản ghi lịch sử nếu đề xuất bảng lịch sử chuyên biệt được thông qua) phải nằm trong cùng một giao tác CSDL (`TransactionBoundary.inTransaction(...)`).
+  - Toàn bộ các bước: (1) Kiểm tra điều kiện, (2) Cập nhật `LuotKham`, (3) Cấp số hàng đợi, và (4) Ghi bản ghi kiểm toán `VISIT_TRANSFERRED` (cùng lưu bản ghi lịch sử nếu đề xuất bảng lịch sử chuyên biệt được thông qua) phải nằm trong cùng một giao tác CSDL (`GiaoDichRanhGioi.inTransaction(...)`).
   - Nếu khâu ghi audit thất bại (do lỗi CSDL, vi phạm constraint, hoặc timeout), toàn bộ cập nhật vị trí và hàng đợi phải bị rollback 100%. Không bao giờ chấp nhận tình trạng chuyển vị trí thành công mà không có bản ghi audit đi kèm (Fail-closed principle).
 
 #### `INV-TX-08`: Bất biến chuẩn hóa thời gian kỹ thuật UTC và thời gian nghiệp vụ địa phương (Technical UTC Metadata & Local Business Time Invariant)
@@ -186,11 +186,11 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 |---|:---:|:---:|:---:|:---:|
 | **INV-TX-01 (Actor-Status)** | Thẩm định trạng thái hợp lệ trong `transferTo()` | — | Thẩm định role `RECEPTIONIST` vs `DOCTOR` | — |
 | **INV-TX-02 (Scope & Room)** | Lưu `maKhoa`, `maPhongKham` | Kiểm tra quan hệ phòng - khoa - cơ sở | Guard kiểm tra `targetFacilityId` & `targetDepartmentId` | FK constraints `maKhoa`, `maPhongKham` |
-| **INV-TX-03 (EMR Lock/Final)** | `if (emrLocked) throw EmrLockedException` | — | Chặn trước khi thực hiện logic nặng | Kiểm tra `emrLocked == 0` |
+| **INV-TX-03 (EMR Lock/Final)** | `if (emrLocked) throw EMRDaKhoaNgoaiLe` | — | Chặn trước khi thực hiện logic nặng | Kiểm tra `emrLocked == 0` |
 | **INV-TX-04 (Queue & Priority)** | Cập nhật `soThuTu`, giữ nguyên `dnVnTien` | — | Cấp số mới (scope/date là unresolved proposal) | Sequence / Unique index theo quy tắc cấp số |
 | **INV-TX-05 (Linked Work)** | Giữ nguyên các danh sách con | Thẩm định an toàn công việc liên kết | Điều phối không thay đổi billing/orders | Ràng buộc toàn vẹn khóa ngoại FK |
-| **INV-TX-06 (Concurrency CAS)** | Quản lý `version` (`BaseEntity`) | — | Truyền `expectedVersion` vào command | `WHERE id = ? AND version = ?` |
-| **INV-TX-07 (Atomic Fail-closed)** | Phát sinh `LuotKhamTransferredEvent` | — | Điều phối trong `TransactionBoundary` | Database Transaction Rollback |
+| **INV-TX-06 (Concurrency CAS)** | Quản lý `version` (`CoSoThucThe`) | — | Truyền `expectedVersion` vào command | `WHERE id = ? AND version = ?` |
+| **INV-TX-07 (Atomic Fail-closed)** | Phát sinh `LuotKhamTransferredEvent` | — | Điều phối trong `GiaoDichRanhGioi` | Database Transaction Rollback |
 | **INV-TX-08 (UTC & Local Time)** | Phân định UTC metadata & local time | — | Ghi nhận UTC Instant cho audit; local time cho nghiệp vụ | Audit timestamp UTC; ranh giới ngày khám (unresolved proposal) |
 | **INV-TX-09 (Zero Read)** | — | — | DTO Receipt tối giản, không query đọc | Phân quyền truy vấn `WHERE maKhoa = ?` |
 
@@ -198,25 +198,25 @@ Theo hợp đồng đã duyệt `VIS-TRANSFER-SOURCE-RECON-01` và các văn b�
 
 ## 5. Đặc tả Command, Result DTO và Xử lý lỗi an toàn (Command, Result & Safe Failures)
 
-### 5.1. Cấu trúc Lệnh điều chuyển tối giản (`TransferVisitCommand`)
+### 5.1. Cấu trúc Lệnh điều chuyển tối giản (`TransferLuotKhamCommand`)
 
 Lệnh điều chuyển được thiết kế là một `record` bất biến, chỉ nhận các trường tối thiểu cần thiết để thẩm định và thực thi:
 
 ```java
 package vn.clinicmanagement.application.examination.commands;
 
-import vn.clinicmanagement.application.audit.AuditActorContext;
-import vn.clinicmanagement.application.authorization.AuthorizationContext;
+import vn.clinicmanagement.application.audit.KiemToanTacNhanNguCanh;
+import vn.clinicmanagement.application.authorization.PhanQuyenNguCanh;
 import java.util.UUID;
 
 /**
  * Minimal immutable command for visit transfer workflow.
  * Conforms to DEC-AUTHZ-04b and SEC-01 gates.
  */
-public record TransferVisitCommand(
+public record TransferLuotKhamCommand(
         // Ngữ cảnh phân quyền & actor từ phiên làm việc (Application Boundary)
-        AuthorizationContext authorizationContext,
-        AuditActorContext auditActorContext,
+        PhanQuyenNguCanh authorizationContext,
+        KiemToanTacNhanNguCanh auditActorContext,
 
         // Định danh lượt khám và khóa lạc quan
         int visitId,
@@ -233,7 +233,7 @@ public record TransferVisitCommand(
         // Khóa chống lặp giao tác
         UUID idempotencyKey
 ) {
-    public TransferVisitCommand {
+    public TransferLuotKhamCommand {
         if (authorizationContext == null || !authorizationContext.isValid()) {
             throw new IllegalArgumentException("Ngữ cảnh phân quyền không hợp lệ.");
         }
@@ -292,7 +292,7 @@ public record TransferReceipt(
 
 ### 5.3. Danh mục kết quả lỗi an toàn (Safe Failure Outcomes & Error Catalog)
 
-Mọi trường hợp vi phạm bất biến miền hoặc bất biến phân quyền phải trả về kết quả thất bại an toàn (`Result.failure`), ghi audit an ninh (nếu cần), và bảo đảm không làm biến đổi dữ liệu (Clean Rollback):
+Mọi trường hợp vi phạm bất biến miền hoặc bất biến phân quyền phải trả về kết quả thất bại an toàn (`KetQua.failure`), ghi audit an ninh (nếu cần), và bảo đảm không làm biến đổi dữ liệu (Clean Rollback):
 
 | Mã lỗi (Failure Code) | Bất biến vi phạm | Nguyên nhân / Điều kiện kích hoạt | Trạng thái dữ liệu | Thông điệp an toàn cho Client (User-Safe Message) |
 |---|---|---|---|---|
@@ -326,7 +326,7 @@ Mọi trường hợp vi phạm bất biến miền hoặc bất biến phân qu
   - *Nhược điểm:* Khó truy vấn nhanh trên desktop UI; vi phạm nguyên tắc tách biệt giữa Audit Trail (an ninh) và Lịch sử nghiệp vụ (Domain History).
 
 ### 6.2. Thiết kế Sự kiện miền (`LuotKhamTransferredEvent`)
-* Đề xuất bổ sung sự kiện miền kế thừa `IDomainEvent`, trong đó phân định rõ thời gian kỹ thuật UTC Instant và giờ nghiệp vụ địa phương:
+* Đề xuất bổ sung sự kiện miền kế thừa `IMienNghiepVuSuKien`, trong đó phân định rõ thời gian kỹ thuật UTC Instant và giờ nghiệp vụ địa phương:
   ```java
   package vn.clinicmanagement.domain.common.events;
 
@@ -348,10 +348,10 @@ Mọi trường hợp vi phạm bất biến miền hoặc bất biến phân qu
           int transferredBy,
           Instant occurredAtUtc,            // UTC Instant metadata
           LocalDateTime effectiveLocalTime  // Giờ nghiệp vụ phòng khám (Asia/Ho_Chi_Minh)
-  ) implements IDomainEvent {}
+  ) implements IMienNghiepVuSuKien {}
   ```
 
-### 6.3. Đề xuất Danh mục Mã lý do điều chuyển chuẩn hóa (`TransferReasonCode`) (Unresolved Technical Proposal)
+### 6.3. Đề xuất Danh mục Mã lý do điều chuyển chuẩn hóa (`TransferLyDoMa`) (Unresolved Technical Proposal)
 * **Trạng thái:** Đề xuất kỹ thuật chưa ngã ngũ (Unresolved Proposal). Việc bắt buộc nhập lý do điều chuyển và danh mục mã chuẩn hóa dưới đây chưa phải là quyết định chính sách đã được Owner phê duyệt, mà là khuyến nghị kỹ thuật nhằm ngăn ngừa nhập văn bản tự do chứa thông tin sức khỏe nhạy cảm (PHI) vào audit log:
   1. `CHUYEN_KHOA_CHUYEN_MON`: Chuyển khoa khám chuyên môn sâu hơn.
   2. `YEU_CAU_NGUOI_BENH`: Bệnh nhân hoặc người nhà có nguyện vọng đổi phòng.
@@ -381,18 +381,18 @@ Quá trình rà soát và lập báo cáo này đã nghiên cứu và tuân th�
    - `docs/ke-hoach-trien-khai/phase3-visit-lifecycle-review.md` (Rà soát hiện trạng vòng đời lượt khám).
 3. **Mã nguồn và kịch bản cơ sở dữ liệu đối soát trực tiếp:**
    - `clinic-domain/src/main/java/vn/clinicmanagement/domain/examination/LuotKham.java`
-   - `clinic-domain/src/main/java/vn/clinicmanagement/domain/common/BaseEntity.java`
+   - `clinic-domain/src/main/java/vn/clinicmanagement/domain/common/CoSoThucThe.java`
    - `clinic-domain/src/main/java/vn/clinicmanagement/domain/common/enums/TrangThaiLuotKham.java`
    - `clinic-domain/src/main/java/vn/clinicmanagement/domain/facility/{CoSo,Khoa,PhongKham}.java`
    - `clinic-domain/src/main/java/vn/clinicmanagement/domain/repositories/ILuotKhamRepository.java`
-   - `clinic-application/src/main/java/vn/clinicmanagement/application/authorization/{AuthorizationContext,AuthorizationService}.java`
-   - `clinic-application/src/main/java/vn/clinicmanagement/application/audit/{AuditActionCode,AuditWritePort}.java`
-   - `clinic-application/src/main/java/vn/clinicmanagement/application/reception/{ReceptionQueuePort,RegisterPatientHandler}.java`
+   - `clinic-application/src/main/java/vn/clinicmanagement/application/authorization/{PhanQuyenNguCanh,PhanQuyenDichVu}.java`
+   - `clinic-application/src/main/java/vn/clinicmanagement/application/audit/{KiemToanHanhDongMa,KiemToanWriteCongKetNoi}.java`
+   - `clinic-application/src/main/java/vn/clinicmanagement/application/reception/{TiepDonHangDoiCongKetNoi,RegisterBenhNhanHandler}.java`
    - `clinic-infrastructure/src/main/resources/migrations/V1__Initial_Clinic_Schema.sql`
-   - `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/ReceptionQueueRepositoryImpl.java`
-   - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/ExaminationPanel.java`
-   - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/menus/PatientQueueContextMenu.java`
-   - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/dialogs/TransferRoomSelectDialog.java`
+   - `clinic-infrastructure/src/main/java/vn/clinicmanagement/infrastructure/persistence/reception/TiepDonHangDoiRepository.java`
+   - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/KhamBenhManHinh.java`
+   - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/menus/BenhNhanHangDoiNguCanhMenu.java`
+   - `clinic-desktop/src/main/java/vn/clinicmanagement/desktop/modules/examination/components/dialogs/TransferPhongSelectHopThoai.java`
 
 ### 7.1. Bằng chứng và Quy trình đối soát RAG (RAG Process & Evidence Record)
 

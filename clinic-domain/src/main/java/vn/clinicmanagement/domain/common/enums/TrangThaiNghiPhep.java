@@ -6,6 +6,7 @@ public enum TrangThaiNghiPhep {
     TU_CHOI(3, "Từ chối"),
     HUY(4, "Đã hủy");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -14,9 +15,12 @@ public enum TrangThaiNghiPhep {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static TrangThaiNghiPhep fromValue(int value) {
         for (TrangThaiNghiPhep item : values()) {
             if (item.value == value) return item;

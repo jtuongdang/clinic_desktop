@@ -6,10 +6,10 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import vn.clinicmanagement.domain.common.enums.TrangThaiLuotKham;
-import vn.clinicmanagement.domain.common.events.EmrLockedEvent;
-import vn.clinicmanagement.domain.common.events.LuotKhamCompletedEvent;
-import vn.clinicmanagement.domain.common.events.LuotKhamStartedEvent;
-import vn.clinicmanagement.domain.common.exceptions.EmrLockedException;
+import vn.clinicmanagement.domain.common.events.EMRDaKhoaSuKien;
+import vn.clinicmanagement.domain.common.events.LuotKhamDaHoanTatSuKien;
+import vn.clinicmanagement.domain.common.events.LuotKhamDaBatDauSuKien;
+import vn.clinicmanagement.domain.common.exceptions.EMRDaKhoaNgoaiLe;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,8 +33,8 @@ class LuotKhamTest {
         assertEquals(TrangThaiLuotKham.DANG_KHAM, visit.getTrangThai());
         assertNotNull(visit.getThoiGianBatDauKham());
         assertEquals(1, visit.getDomainEvents().size());
-        LuotKhamStartedEvent event = assertInstanceOf(
-                LuotKhamStartedEvent.class, visit.getDomainEvents().get(0));
+        LuotKhamDaBatDauSuKien event = assertInstanceOf(
+                LuotKhamDaBatDauSuKien.class, visit.getDomainEvents().get(0));
         assertEquals(42, event.getVisitId());
         assertEquals(7, event.getPatientId());
         assertEquals(11, event.getDoctorId());
@@ -46,7 +46,7 @@ class LuotKhamTest {
         LuotKham visit = visitInState(initialState);
         LocalDateTime startTime = LocalDateTime.of(2026, 10, 20, 9, 15);
         visit.setThoiGianBatDauKham(startTime);
-        visit.registerDomainEvent(new LuotKhamStartedEvent(42, 7, 11));
+        visit.registerDomainEvent(new LuotKhamDaBatDauSuKien(42, 7, 11));
         List<?> eventsBefore = visit.getDomainEvents();
 
         assertThrows(IllegalStateException.class, visit::startExam);
@@ -65,8 +65,8 @@ class LuotKhamTest {
         assertEquals(TrangThaiLuotKham.HOAN_THANH, visit.getTrangThai());
         assertNotNull(visit.getThoiGianKetThucKham());
         assertEquals(1, visit.getDomainEvents().size());
-        LuotKhamCompletedEvent event = assertInstanceOf(
-                LuotKhamCompletedEvent.class, visit.getDomainEvents().get(0));
+        LuotKhamDaHoanTatSuKien event = assertInstanceOf(
+                LuotKhamDaHoanTatSuKien.class, visit.getDomainEvents().get(0));
         assertEquals(42, event.getVisitId());
         assertEquals(7, event.getPatientId());
         assertEquals(11, event.getDoctorId());
@@ -78,7 +78,7 @@ class LuotKhamTest {
         LuotKham visit = visitInState(initialState);
         LocalDateTime completionTime = LocalDateTime.of(2026, 10, 20, 9, 15);
         visit.setThoiGianKetThucKham(completionTime);
-        visit.registerDomainEvent(new LuotKhamStartedEvent(42, 7, 11));
+        visit.registerDomainEvent(new LuotKhamDaBatDauSuKien(42, 7, 11));
         List<?> eventsBefore = visit.getDomainEvents();
 
         assertThrows(IllegalStateException.class, visit::completeExam);
@@ -96,7 +96,7 @@ class LuotKhamTest {
         visit.lockEmr("synthetic-signature", 11);
         List<?> eventsBefore = visit.getDomainEvents();
 
-        assertThrows(EmrLockedException.class, visit::completeExam);
+        assertThrows(EMRDaKhoaNgoaiLe.class, visit::completeExam);
 
         assertEquals(TrangThaiLuotKham.DANG_KHAM, visit.getTrangThai());
         assertEquals(completionTime, visit.getThoiGianKetThucKham());
@@ -115,7 +115,7 @@ class LuotKhamTest {
         assertNotNull(visit.getEmrLockedAt());
         assertEquals(11, visit.getEmrLockedBy());
         assertEquals(1, visit.getDomainEvents().size());
-        EmrLockedEvent event = assertInstanceOf(EmrLockedEvent.class, visit.getDomainEvents().get(0));
+        EMRDaKhoaSuKien event = assertInstanceOf(EMRDaKhoaSuKien.class, visit.getDomainEvents().get(0));
         assertEquals(42, event.getVisitId());
         assertEquals(11, event.getDoctorId());
         assertEquals(signature, event.getSignature());
@@ -144,7 +144,7 @@ class LuotKhamTest {
         Integer lockedByBefore = visit.getEmrLockedBy();
         List<?> eventsBefore = List.copyOf(visit.getDomainEvents());
 
-        assertThrows(EmrLockedException.class, () -> visit.lockEmr("replacement-signature", 12));
+        assertThrows(EMRDaKhoaNgoaiLe.class, () -> visit.lockEmr("replacement-signature", 12));
 
         assertEquals(lockedBefore, visit.isEmrLocked());
         assertEquals(signatureBefore, visit.getEmrSignature());
@@ -155,7 +155,7 @@ class LuotKhamTest {
 
     private static void assertInvalidLockArgumentsLeaveVisitUnchanged(String signature, int doctorId) {
         LuotKham visit = visitInState(TrangThaiLuotKham.DANG_KHAM);
-        visit.registerDomainEvent(new LuotKhamStartedEvent(42, 7, 11));
+        visit.registerDomainEvent(new LuotKhamDaBatDauSuKien(42, 7, 11));
         List<?> eventsBefore = List.copyOf(visit.getDomainEvents());
 
         assertThrows(IllegalArgumentException.class, () -> visit.lockEmr(signature, doctorId));
@@ -184,7 +184,7 @@ class LuotKhamTest {
         assertEquals(TrangThaiLuotKham.DANG_KHAM, visit.getTrangThai());
 
         boolean hasReopenedEvent = visit.getDomainEvents().stream()
-                .anyMatch(e -> e instanceof vn.clinicmanagement.domain.common.events.EmrReopenedEvent);
+                .anyMatch(e -> e instanceof vn.clinicmanagement.domain.common.events.EMRDaMoLaiSuKien);
         assertTrue(hasReopenedEvent);
     }
 

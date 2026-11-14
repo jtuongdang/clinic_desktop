@@ -6,6 +6,7 @@ public enum LoaiBaoHiem {
     BAO_HIEM_TAI_NAN(3, "Bảo hiểm tai nạn"),
     KHAC(4, "Khác");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -14,9 +15,12 @@ public enum LoaiBaoHiem {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static LoaiBaoHiem fromValue(int value) {
         for (LoaiBaoHiem item : values()) {
             if (item.value == value) return item;

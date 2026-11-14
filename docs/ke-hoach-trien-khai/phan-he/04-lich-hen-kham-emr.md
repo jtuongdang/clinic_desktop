@@ -6,9 +6,9 @@
 
 ## Hiện có
 
-- Models: `LichHen`, `LuotKham`, `ChanDoan`, `ICD`, `SinhHieu`, `DonThuoc`, `ChiTietDonThuoc`; các enums trạng thái; `ClinicalDrugSafetyService`.
-- UI: `DoctorStationPanel`, `ExaminationPanel`, clinical tabs, các dialog chẩn đoán/đặt dịch vụ/kê đơn/xử trí, print previews.
-- `DoctorStationPanel` có dữ liệu bệnh nhân dựng sẵn và một số tab placeholder; `ExaminationPanel` có nhiều dialog nhưng cần xác định phần nào được nối vào cùng use case.
+- Models: `LichHen`, `LuotKham`, `ChanDoan`, `ICD`, `SinhHieu`, `DonThuoc`, `ChiTietDonThuoc`; các enums trạng thái; `LamSangThuocAnToanDichVu`.
+- UI: `BacSiTramManHinh`, `KhamBenhManHinh`, clinical tabs, các dialog chẩn đoán/đặt dịch vụ/kê đơn/xử trí, print previews.
+- `BacSiTramManHinh` có dữ liệu bệnh nhân dựng sẵn và một số tab placeholder; `KhamBenhManHinh` có nhiều dialog nhưng cần xác định phần nào được nối vào cùng use case.
 - Chưa thấy màn hình lịch hẹn độc lập và chưa thấy các use case lưu EMR/đơn thuốc trong Application.
 
 ## Backlog theo model
@@ -24,7 +24,7 @@
 
 1. **Lịch khám:** tháng/tuần/ngày, bộ lọc bác sĩ/phòng/cơ sở, tạo và đổi lịch; có thể hoãn nếu MVP chỉ tiếp nhận walk-in.
 2. **Chi tiết lượt khám:** timeline bệnh án, dữ liệu dị ứng/BHYT/sinh hiệu, trạng thái save/sync và lịch sử thao tác.
-3. **Tab kết quả/Phản hồi bác sĩ:** hiện tab ở `DoctorStationPanel` là placeholder; cần nối kết quả CLS và trạng thái đã đọc.
+3. **Tab kết quả/Phản hồi bác sĩ:** hiện tab ở `BacSiTramManHinh` là placeholder; cần nối kết quả CLS và trạng thái đã đọc.
 4. **Ký/khóa EMR:** xác nhận tóm tắt trước khóa, thông báo dữ liệu còn thiếu; trang tra cứu audit/read-only.
 5. **Đơn thuốc:** màn hình soát/duyệt nếu người kê và người duyệt là vai trò khác; xem lịch sử cấp phát sau khi tích hợp kho.
 

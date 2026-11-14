@@ -4,10 +4,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import vn.clinicmanagement.domain.common.IAggregateRoot;
+import vn.clinicmanagement.domain.common.ITongHopGoc;
 import vn.clinicmanagement.domain.common.enums.LoaiDichVu;
-import vn.clinicmanagement.domain.common.events.AbstractDomainEvent;
-import vn.clinicmanagement.domain.common.events.IDomainEvent;
+import vn.clinicmanagement.domain.common.events.TruuTuongMienNghiepVuSuKien;
+import vn.clinicmanagement.domain.common.events.IMienNghiepVuSuKien;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,7 +29,7 @@ class DanhMucDichVuTest {
     void initializesWithSensibleDefaults() {
         DanhMucDichVu service = new DanhMucDichVu();
 
-        assertInstanceOf(IAggregateRoot.class, service);
+        assertInstanceOf(ITongHopGoc.class, service);
         assertNull(service.getId());
         assertEquals(0L, service.getVersion());
         assertNotNull(service.getCreatedAt());
@@ -133,18 +133,18 @@ class DanhMucDichVuTest {
     @DisplayName("Should manage domain events through the BaseEntity domain event hub")
     void managesDomainEventsHub() {
         DanhMucDichVu service = new DanhMucDichVu();
-        IDomainEvent event = new TestDomainEvent();
+        IMienNghiepVuSuKien event = new TestDomainEvent();
 
         service.registerDomainEvent(event);
-        List<IDomainEvent> events = service.getDomainEvents();
+        List<IMienNghiepVuSuKien> events = service.getDomainEvents();
         assertEquals(1, events.size());
 
-        List<IDomainEvent> pulled = service.pullDomainEvents();
+        List<IMienNghiepVuSuKien> pulled = service.pullDomainEvents();
         assertEquals(1, pulled.size());
         assertTrue(service.getDomainEvents().isEmpty());
     }
 
-    private static class TestDomainEvent extends AbstractDomainEvent {}
+    private static class TestDomainEvent extends TruuTuongMienNghiepVuSuKien {}
 
     @Test
     @DisplayName("Should respect identity-based equality and hash code contracts")

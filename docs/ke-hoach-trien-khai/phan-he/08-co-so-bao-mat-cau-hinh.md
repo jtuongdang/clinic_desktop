@@ -8,14 +8,14 @@
 
 - Models facility: `CoSo`, `Khoa`, `PhongKham`.
 - Models identity/access: `NhanVien`, `VaiTro`, `NhanVienVaiTro`, `NhanVienKhoa`, `PhanQuyenCoSo`, `MaTranPhanQuyen`.
-- Models system: `ThamSoHeThong`, `CauHinhTichHop`, `NhatKyHeThong`, `NhatKyHoSoBenhAn`, `TokenLamMoi`.
-- UI: `LoginForm`, `SystemConfigPanel`; panel hệ thống hiện là danh sách chức năng tìm kiếm, chưa phải CRUD/permission manager.
+- Models system: `ThamSoHeThong`, `CauHinhTichHop`, `NhatKyHeThong`, `NhatKyHoSoBenhAn`, `MaXacThucLamMoi`.
+- UI: `DangNhapBieuMau`, `HeThongCauHinhManHinh`; panel hệ thống hiện là danh sách chức năng tìm kiếm, chưa phải CRUD/permission manager.
 
 ## Backlog bảo mật P0
 
 Đã có ba báo cáo source review cho Phase 2: [`phase2-auth-persistence-review.md`](../phase2-auth-persistence-review.md), [`phase2-desktop-session-review.md`](../phase2-desktop-session-review.md) và [`phase2-domain-audit-review.md`](../phase2-domain-audit-review.md). Bản [`đề xuất chính sách Phase 2`](../phase2-security-policy-proposal.md) ghi hai quyết định chủ dự án đã xác nhận và các lựa chọn còn chờ duyệt. Các báo cáo không phải bằng chứng gate đã đạt.
 
-- [x] Có luồng xác thực application và repository nhân viên nối với `LoginForm` trong source hiện tại.
+- [x] Có luồng xác thực application và repository nhân viên nối với `DangNhapBieuMau` trong source hiện tại.
 - [ ] Kiểm tra chính sách hash/verify, phản hồi lỗi, khóa tài khoản và lưu session; không kết luận đạt bảo mật chỉ vì đăng nhập SQL Server hoạt động.
 - [ ] Không cho người dùng tự chọn role để cấp quyền; role lấy từ tài khoản và giới hạn theo cơ sở/khoa.
 - [ ] Thêm quản lý user: tạo/khóa/mở khóa, reset mật khẩu, đổi mật khẩu, kiểm tra tài khoản hoạt động.
@@ -30,7 +30,7 @@
 - [ ] **`ThamSoHeThong`:** form có kiểu dữ liệu, validation, mô tả, giá trị hiệu lực và audit; không chỉnh trực tiếp bảng chung.
 - [ ] **`NhatKyHeThong`, `NhatKyHoSoBenhAn`:** trang tra cứu chỉ đọc với filter thời gian/user/model/record/action; kiểm soát quyền xem.
 - [ ] **`CauHinhTichHop`:** chỉ tạo khi tích hợp xác định; secret được mask, không log ra màn hình.
-- [ ] **`TokenLamMoi`:** PO/kỹ thuật xác nhận có dùng với API OAuth hay không; nếu không thì loại khỏi phạm vi UI desktop.
+- [ ] **`MaXacThucLamMoi`:** PO/kỹ thuật xác nhận có dùng với API OAuth hay không; nếu không thì loại khỏi phạm vi UI desktop.
 
 ## Màn hình cần bổ sung
 

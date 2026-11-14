@@ -1,7 +1,7 @@
 package vn.clinicmanagement.desktop;
 
-import vn.clinicmanagement.desktop.core.config.AppFonts;
-import vn.clinicmanagement.desktop.modules.auth.LoginForm;
+import vn.clinicmanagement.desktop.core.config.UngDungPhongChu;
+import vn.clinicmanagement.desktop.modules.auth.DangNhapBieuMau;
 
 import javax.swing.*;
 import java.lang.reflect.InvocationTargetException;
@@ -12,19 +12,21 @@ import java.lang.reflect.InvocationTargetException;
 public final class Main {
     private Main() {}
 
+    /** Hàm `main`: khoidong. */
     public static void main(String[] args) {
         configureLookAndFeel("com.formdev.flatlaf.FlatLightLaf");
 
         // Áp font chuẩn lên mọi thành phần Swing SAU khi đã chọn Look and Feel
-        AppFonts.installGlobally();
+        UngDungPhongChu.installGlobally();
 
         // Khởi chạy cửa sổ đăng nhập trên Swing Event Dispatch Thread (EDT)
         SwingUtilities.invokeLater(() -> {
-            LoginForm loginForm = new LoginForm();
+            DangNhapBieuMau loginForm = new DangNhapBieuMau();
             loginForm.setVisible(true);
         });
     }
 
+    /** Hàm `configureLookAndFeel`: `configure` giao diện va camnhan. */
     static void configureLookAndFeel(String flatLafClassName) {
         try {
             Class<?> flatLafClass = Class.forName(flatLafClassName);
@@ -39,6 +41,7 @@ public final class Main {
         }
     }
 
+    /** Hàm `installSystemLookAndFeel`: `install` hệ thống giao diện va camnhan. */
     private static void installSystemLookAndFeel() {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());

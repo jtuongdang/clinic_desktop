@@ -11,7 +11,7 @@
 
    ```bash
    java -cp clinic-desktop/target/clinic-desktop-1.0.0-SNAPSHOT.jar \
-     vn.clinicmanagement.infrastructure.persistence.DatabaseMigrationRunner
+     vn.clinicmanagement.infrastructure.persistence.CoSoDuLieuDiCuChay
    ```
 
 5. Mở desktop:

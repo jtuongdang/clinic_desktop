@@ -203,7 +203,7 @@ erDiagram
     DanhMucDichVu ||--o{ ChiDinhDichVu : "su_dung"
     ChiDinhDichVu ||--o{ ChiTietKetQuaXetNghiem : "chi_tiet_lab"
     DanhMucDichVu ||--o{ DinhMucVatTuDichVu : "dinh_muc"
-    Item ||--o{ DinhMucVatTuDichVu : "vat_tu_tieu_hao"
+    MatHang ||--o{ DinhMucVatTuDichVu : "vat_tu_tieu_hao"
 
     DanhMucDichVu {
         int id PK
@@ -255,7 +255,7 @@ erDiagram
     %% 5. PHÂN HỆ ĐƠN THUỐC & DƯỢC LÂM SÀNG
     %% ==========================================
     DonThuoc ||--o{ ChiTietDonThuoc : "bao_gom"
-    Item ||--o{ ChiTietDonThuoc : "ke_thuoc"
+    MatHang ||--o{ ChiTietDonThuoc : "ke_thuoc"
     NhanVien ||--o{ DonThuoc : "bac_si_ke"
     Kho ||--o{ DonThuoc : "xuat_tai_kho"
 
@@ -295,24 +295,24 @@ erDiagram
     %% 6. PHÂN HỆ QUẢN TRỊ KHO DƯỢC & VẬT TƯ
     %% ==========================================
     Kho ||--o{ TonKho : "chua"
-    Item ||--o{ TonKho : "ton_theo_lo"
-    Item ||--o{ DonViTinhQuyDoi : "quy_doi"
+    MatHang ||--o{ TonKho : "ton_theo_lo"
+    MatHang ||--o{ DonViTinhQuyDoi : "quy_doi"
     NhaCungCap ||--o{ PhieuNhapKho : "cung_cap"
     Kho ||--o{ PhieuNhapKho : "nhap_vao"
     PhieuNhapKho ||--o{ ChiTietNhapKho : "dong_nhap"
-    Item ||--o{ ChiTietNhapKho : "mat_hang_nhap"
+    MatHang ||--o{ ChiTietNhapKho : "mat_hang_nhap"
     Kho ||--o{ PhieuXuatKho : "xuat_tu"
     PhieuXuatKho ||--o{ ChiTietXuatKho : "dong_xuat"
     TonKho ||--o{ ChiTietXuatKho : "tru_lo_fefo"
     NhaCungCap ||--o{ DonDatHang : "nhan_don"
     DonDatHang ||--o{ ChiTietDonDatHang : "dong_dat"
-    Kho ||--o{ Stocktake : "kiem_ke"
-    Stocktake ||--o{ StocktakeCount : "dong_kiem_ke"
-    TonKho ||--o{ StocktakeCount : "so_khop"
-    Kho ||--o{ InventoryTransaction : "ghi_so"
-    TonKho ||--o{ InventoryTransaction : "bien_dong"
+    Kho ||--o{ KiemKe : "kiem_ke"
+    KiemKe ||--o{ KiemKeDem : "dong_kiem_ke"
+    TonKho ||--o{ KiemKeDem : "so_khop"
+    Kho ||--o{ KhoGiaoDich : "ghi_so"
+    TonKho ||--o{ KhoGiaoDich : "bien_dong"
 
-    Item {
+    MatHang {
         int id PK
         string maItem
         string tenItem
@@ -432,7 +432,7 @@ erDiagram
         decimal donGia
     }
 
-    Stocktake {
+    KiemKe {
         int id PK
         int maKho FK
         datetime ngayKiemKe
@@ -440,7 +440,7 @@ erDiagram
         string ghiChu
     }
 
-    StocktakeCount {
+    KiemKeDem {
         int id PK
         int maStocktake FK
         int maTonKho FK
@@ -449,7 +449,7 @@ erDiagram
         decimal chenhLech
     }
 
-    InventoryTransaction {
+    KhoGiaoDich {
         int id PK
         int maKho FK
         int maItem FK

@@ -8,8 +8,8 @@
 
 ### Models và UI hiện có
 
-- Models: `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`, enum trạng thái/phương thức thanh toán, `IPaymentGatewayService`.
-- UI: `BillingInvoicePanel`, `MedicalBillingSlipPanel`, `MedicalBillingSlipDialog`.
+- Models: `HoaDon`, `ChiTietHoaDon`, `PhieuThu`, `CongNoBenhNhan`, enum trạng thái/phương thức thanh toán, `IThanhToanCongKetNoiDichVu`.
+- UI: `VienPhiHoaDonManHinh`, `YTeVienPhiPhieuManHinh`, `YTeVienPhiPhieuHopThoai`.
 - Bảng hóa đơn/chi tiết hiện có data mẫu; chưa thấy payment gateway hoặc Application use case.
 
 ### Cần triển khai
@@ -34,7 +34,7 @@
 ### Models và UI hiện có
 
 - Models: `KyLuong`, `BangLuong`, `ChiTietBangLuong`, `CauHinhHoaHongLoaiDichVu`; dữ liệu nguồn có thể đến từ lịch công, nhân viên và dịch vụ.
-- Chưa thấy màn hình payroll riêng. Danh mục nhân sự trong `SystemConfigPanel` không thay thế payroll.
+- Chưa thấy màn hình payroll riêng. Danh mục nhân sự trong `HeThongCauHinhManHinh` không thay thế payroll.
 
 ### Cần triển khai và màn hình cần bổ sung
 

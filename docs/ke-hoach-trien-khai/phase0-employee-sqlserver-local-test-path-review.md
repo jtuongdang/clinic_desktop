@@ -2,14 +2,14 @@
 
 **Date:** 2026-11-06
 **Document:** `docs/ke-hoach-trien-khai/phase0-employee-sqlserver-local-test-path-review.md`
-**Target:** [`NhanVienRepositorySqlServerTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java) and companion guard suite [`NhanVienSqlServerTargetGuardTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L540-L705)
+**Target:** [`NhanVienKhoDuLieuSQLMayChuTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java) and companion guard suite [`NhanVienSqlServerTargetGuardTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L540-L705)
 **Status:** Report-only review complete. No production code, test code, database schema, migration, or runtime configuration was modified; no database connection was opened; no credentials were read or generated; employee SQL Server persistence remains unverified.
 
 ---
 
 ## 1. Executive Summary
 
-This independent review evaluates the test-only connection and security guards in [`NhanVienRepositorySqlServerTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java) following direct local SQL Server test attempts that requested `TrustServerCertificate=True`.
+This independent review evaluates the test-only connection and security guards in [`NhanVienKhoDuLieuSQLMayChuTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java) following direct local SQL Server test attempts that requested `TrustServerCertificate=True`.
 
 ### Key Conclusions:
 1. **Root Cause of Local Container Rejection:** The fixture's preflight URL guard (`syntheticDatabaseUrl`) enforces `encrypt=true` and `trustServerCertificate=false` ([lines 499–502, 519–521](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L499-L502)). Attempting to supply `trustServerCertificate=true` fails closed before any socket connection is opened. Conversely, strict TLS validation against this local SQL Server container was rejected by `sqlcmd` because the presented certificate was self-signed and untrusted. The employee JDBC fixture was not run against the server with `trustServerCertificate=false`; its exact JDBC exception and any certificate hostname mismatch remain unverified.
@@ -25,7 +25,7 @@ This independent review evaluates the test-only connection and security guards i
 In accordance with project conventions, document retrieval and cross-referencing were conducted across the repository:
 
 1. **Test Fixture and Guard Implementation:**
-   - [`NhanVienRepositorySqlServerTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java):
+   - [`NhanVienKhoDuLieuSQLMayChuTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java):
      - Gated opt-in execution via `-Dclinic.test.sqlserver=true` ([lines 77–80](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L77-L80)).
      - Synthetic database naming validation ([lines 62–63, 103–110](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L62-L63)).
      - Dedicated environment variables `CLINIC_TEST_SQLSERVER_URL`, `CLINIC_TEST_SQLSERVER_USERNAME`, `CLINIC_TEST_SQLSERVER_PASSWORD` ([lines 444–461](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L444-L461)).
@@ -43,7 +43,7 @@ In accordance with project conventions, document retrieval and cross-referencing
    - [`phase0-deployment-config-tls-decision-proposal.md`](phase0-deployment-config-tls-decision-proposal.md#L41-L46) & [`phase0-db-config-resolution-contract.md`](phase0-db-config-resolution-contract.md):
      - Owner Decision `PHASE0-DB-DEPLOY-DECISION-RECON-02` (confirmed 2026-11-06) mandates TLS transport encryption with validation of both server certificate and server identity (`trustServerCertificate=false`).
      - "Explicitly not approved: `trustServerCertificate=true`, disabled encryption, reliance on JDBC driver-default fallback, or any environment-specific validation/encryption bypass" ([lines 43–45](phase0-deployment-config-tls-decision-proposal.md#L43-L45)).
-     - Reconciled addendum in [`phase0-db-test-isolation-review.md`](phase0-db-test-isolation-review.md#L144-L152) confirms that commit `45bd425` aligned `NhanVienRepositorySqlServerTest` with this policy at the synthetic URL-guard boundary.
+     - Reconciled addendum in [`phase0-db-test-isolation-review.md`](phase0-db-test-isolation-review.md#L144-L152) confirms that commit `45bd425` aligned `NhanVienKhoDuLieuSQLMayChuTest` with this policy at the synthetic URL-guard boundary.
 
 3. **Database Test Isolation Standards & Operations Runbook:**
    - [`OPERATIONS_RUNBOOK.md`](../OPERATIONS_RUNBOOK.md#L12-L18):
@@ -60,7 +60,7 @@ When running tests against a local SQL Server container (such as official `mcr.m
 [Developer URL with trustServerCertificate=true]
                       |
                       v
-       [NhanVienRepositorySqlServerTest]
+       [NhanVienKhoDuLieuSQLMayChuTest]
        [Preflight Guard: syntheticDatabaseUrl]
                       |
         (trustServerCertificate == true?)
@@ -85,7 +85,7 @@ When running tests against a local SQL Server container (such as official `mcr.m
 ```
 
 ### 3.1. Preflight URL Guard Rejection
-In [`NhanVienRepositorySqlServerTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L499-L502):
+In [`NhanVienKhoDuLieuSQLMayChuTest.java`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L499-L502):
 ```java
 if ((normalizedName.equals("encrypt") && !value.equalsIgnoreCase("true"))
         || (normalizedName.equals("trustservercertificate") && !value.equalsIgnoreCase("false"))) {
@@ -123,7 +123,7 @@ Specifically, `hostNameInCertificate` is accepted and preserved by the guard, as
 String tls = TLS + ";hostNameInCertificate=synthetic-host";
 String braced = ";applicationName={synthetic;database=clinicDb;escaped}}value}";
 assertEquals(URL + ";databaseName=" + DATABASE_NAME + braced + tls,
-        NhanVienRepositorySqlServerTest.syntheticDatabaseUrl(URL + ";databaseName=" + DATABASE_NAME
+        NhanVienKhoDuLieuSQLMayChuTest.syntheticDatabaseUrl(URL + ";databaseName=" + DATABASE_NAME
                 + braced + tls, DATABASE_NAME));
 ```
 
@@ -135,7 +135,7 @@ To run the opt-in persistence test against a local container while complying wit
 4. **Execute with Dedicated JVM Arguments:** Run Maven pointing to the dedicated truststore without altering default Java trust:
    ```bash
    mvn -pl clinic-infrastructure test \
-     -Dtest=NhanVienRepositorySqlServerTest \
+     -Dtest=NhanVienKhoDuLieuSQLMayChuTest \
      -Dclinic.test.sqlserver=true \
      -Dclinic.test.sqlserver.databaseName=clinic_test_employee_persistence \
      -Djavax.net.ssl.trustStore=/path/to/test-truststore.p12 \
@@ -160,7 +160,7 @@ Three potential paths forward are evaluated below:
 | **Description** | Provision local container with a development certificate signed by a local dev CA; supply truststore via JVM `-Djavax.net.ssl.trustStore`. | Amend `syntheticDatabaseUrl` to allow `trustServerCertificate=true` only when a new explicit test flag is active (e.g. `-Dclinic.test.sqlserver.allowInsecureCert=true`). | Keep persistence tests skipped during default Maven builds; defer live acceptance until staging/CI with valid PKI is ready. |
 | **Policy Impact** | **Fully Compliant:** Aligns 100% with `PHASE0-DB-DEPLOY-DECISION-RECON-02`. No policy change or owner exception required. | **Requires New Owner Decision:** Directly contradicts `PHASE0-DB-DEPLOY-DECISION-RECON-02` which explicitly barred `trustServerCertificate=true`. | **Fully Compliant:** Maintains current policy; test remains opt-in and skipped in default CI. |
 | **Security & Soundness** | **High:** Verifies authentic TLS handshake and certificate validation mechanics identical to production. | **Low / Regressive:** Disables certificate verification, introduces security divergence, and risks accidental reuse. | **Neutral / Safe:** No security risk introduced; leaves live persistence acceptance unverified. |
-| **Code Changes Required** | **Zero:** No changes to `NhanVienRepositorySqlServerTest.java` or `NhanVienSqlServerTargetGuardTest`. | **Non-Trivial:** Modify guard logic, update regex, update 7 guard unit tests, add security safeguards. | **Zero:** No code changes. |
+| **Code Changes Required** | **Zero:** No changes to `NhanVienKhoDuLieuSQLMayChuTest.java` or `NhanVienSqlServerTargetGuardTest`. | **Non-Trivial:** Modify guard logic, update regex, update 7 guard unit tests, add security safeguards. | **Zero:** No code changes. |
 | **Operational Burden** | Requires one-time generation of a local dev CA/cert and mounting into the local SQL container. | Requires Owner review and governance process to draft and approve an exception contract. | Zero immediate effort; leaves employee SQL acceptance pending. |
 | **Status of FINDING-TEST-02** | Can be resolved to **Closed** once test passes against the secured local target. | Remains **Qualified/Open** (live persistence proven, but TLS validation unverified). | Remains **Open / Low-Informational**. |
 
@@ -215,7 +215,7 @@ In `syntheticDatabaseUrl(configuredUrl, databaseName)` ([lines 463–523](../../
 ### 6.5. Layer 4: Isolation from Application Configuration and Secrets
 - **Dedicated Environment Variables Only:** The fixture exclusively queries `CLINIC_TEST_SQLSERVER_URL`, `CLINIC_TEST_SQLSERVER_USERNAME`, and `CLINIC_TEST_SQLSERVER_PASSWORD` ([lines 446–448](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L446-L448)).
 - **Application Environment Bypassed:** `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `DB_CONNECTION_STRING`, and classpath `db.properties` are completely ignored.
-- **Static State Isolation:** Line 85 sets `DatabaseConnection.setConnectionString(testConnectionString)`. Line 100 in `@AfterAll` unconditionally resets the override with `DatabaseConnection.setConnectionString("")`.
+- **Static State Isolation:** Line 85 sets `CoSoDuLieuKetNoi.setConnectionString(testConnectionString)`. Line 100 in `@AfterAll` unconditionally resets the override with `CoSoDuLieuKetNoi.setConnectionString("")`.
 - **Driver Diagnostics Redaction:** Lines 91–94 catch `SQLException` during catalog check and throw a generic `IllegalStateException` without chaining the cause, preventing credentials or hostnames from leaking into stack traces.
 - **Migration Output Silencing:** Lines 525–536 redirect `System.out` and `System.err` to `OutputStream.nullOutputStream()` during schema migration execution.
 
@@ -231,7 +231,7 @@ In `syntheticDatabaseUrl(configuredUrl, databaseName)` ([lines 463–523](../../
 ### Acceptance Determination: **UNVERIFIED / PENDING**
 - Live employee SQL Server persistence has **not passed** and is **not accepted**.
 - Static analysis and synthetic unit tests ([`NhanVienSqlServerTargetGuardTest`](../../clinic-infrastructure/src/test/java/vn/clinicmanagement/infrastructure/persistence/identity/NhanVienRepositorySqlServerTest.java#L540-L705)) confirm that the URL guard, selector parsing, and credential isolation function as intended without contacting a database.
-- However, `NhanVienRepositorySqlServerTest` has not been executed against an authorized, live SQL Server instance with valid TLS in this review.
+- However, `NhanVienKhoDuLieuSQLMayChuTest` has not been executed against an authorized, live SQL Server instance with valid TLS in this review.
 - In accordance with [`phase0-db-test-isolation-review.md`](phase0-db-test-isolation-review.md#L111,L150):
   - **`FINDING-TEST-02` remains Open / Low-Informational.**
   - Employee SQL Server persistence acceptance remains contingent on live execution against an isolated synthetic database (`clinic_test_*`) with verified TLS negotiation.

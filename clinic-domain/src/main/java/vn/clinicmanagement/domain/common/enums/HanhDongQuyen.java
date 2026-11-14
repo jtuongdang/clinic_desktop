@@ -11,6 +11,7 @@ public enum HanhDongQuyen {
     MO_KHOA_EMR(8, "Mở khóa EMR"),
     AUDIT_READ(9, "Đọc nhật ký kiểm toán");
 
+    /** Trường `value`: giá trị. */
     private final int value;
     private final String description;
 
@@ -19,9 +20,12 @@ public enum HanhDongQuyen {
         this.description = description;
     }
 
+    /** Hàm `getValue`: lấy giá trị. */
     public int getValue() { return value; }
+    /** Hàm `getDescription`: lấy `Description`. */
     public String getDescription() { return description; }
 
+    /** Hàm `fromValue`: tu giá trị. */
     public static HanhDongQuyen fromValue(int value) {
         for (HanhDongQuyen item : values()) {
             if (item.value == value) return item;
