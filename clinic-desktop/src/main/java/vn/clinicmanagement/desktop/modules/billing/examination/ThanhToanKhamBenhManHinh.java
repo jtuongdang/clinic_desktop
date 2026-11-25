@@ -380,25 +380,25 @@ public final class ThanhToanKhamBenhManHinh extends JPanel {
         if(data.invoice()!=null && data.invoice().visitId()>0){
             Window owner=SwingUtilities.getWindowAncestor(this);
             int vid=data.invoice().visitId();
-            new SwingWorker<vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.BillingSlipData,Void>(){
-                @Override protected vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.BillingSlipData doInBackground(){
-                    return vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.loadFromDatabase(vid);
+            new SwingWorker<vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.BillingSlipData,Void>(){
+                @Override protected vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.BillingSlipData doInBackground(){
+                    return vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.loadFromDatabase(vid);
                 }
                 @Override protected void done(){
                     try{
                         var slip=get();
                         if(slip==null && data!=null && data.invoice()!=null){
-                            slip=vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.fromInvoice(data.invoice(),null);
+                            slip=vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.fromInvoice(data.invoice(),null);
                         }
                         if(slip!=null){
-                            new vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuHopThoai(owner,slip).setVisible(true);
+                            new vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuHopThoai(owner,slip).setVisible(true);
                             return;
                         }
                     }catch(Exception ignored){}
                     if(data!=null && data.invoice()!=null){
-                        var fallbackSlip=vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.fromInvoice(data.invoice(),null);
+                        var fallbackSlip=vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.fromInvoice(data.invoice(),null);
                         if(fallbackSlip!=null){
-                            new vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuHopThoai(owner,fallbackSlip).setVisible(true);
+                            new vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuHopThoai(owner,fallbackSlip).setVisible(true);
                             return;
                         }
                     }

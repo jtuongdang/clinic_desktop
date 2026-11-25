@@ -1,5 +1,7 @@
 package vn.clinicmanagement.desktop.modules.pharmacy.components;
 
+
+import vn.clinicmanagement.desktop.modules.print.pharmacy.PhieuNhapNhaCungCapInManHinh;
 import vn.clinicmanagement.application.audit.KiemToanTacNhanNguCanh;
 import vn.clinicmanagement.application.authorization.PhanQuyenNguCanh;
 import vn.clinicmanagement.application.common.KetQua;

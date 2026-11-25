@@ -6,7 +6,7 @@ import vn.clinicmanagement.application.prescription.DonThuocDuLieu;
 import vn.clinicmanagement.application.prescription.DonThuocMatHangDuLieu;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhGhepNoiGoc;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhManHinh;
-import vn.clinicmanagement.desktop.modules.examination.components.print.DonThuocPrintPreviewManHinh;
+import vn.clinicmanagement.desktop.modules.print.examination.DonThuocPrintPreviewManHinh;
 import vn.clinicmanagement.domain.common.enums.TrangThaiDonThuoc;
 
 import java.math.BigDecimal;

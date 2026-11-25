@@ -1,7 +1,7 @@
 package vn.clinicmanagement.desktop.modules.examination.components.tabs;
 
-import vn.clinicmanagement.desktop.modules.examination.components.print.DonThuocPrintPreviewHopThoai;
-import vn.clinicmanagement.desktop.modules.examination.components.print.DonThuocPrintPreviewManHinh;
+import vn.clinicmanagement.desktop.modules.print.examination.DonThuocPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.DonThuocPrintPreviewManHinh;
 import vn.clinicmanagement.application.audit.KiemToanTacNhanNguCanh;
 import vn.clinicmanagement.application.authorization.PhanQuyenNguCanh;
 import vn.clinicmanagement.application.common.KetQua;

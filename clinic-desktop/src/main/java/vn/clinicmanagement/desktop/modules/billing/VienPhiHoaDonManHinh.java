@@ -1,5 +1,7 @@
 package vn.clinicmanagement.desktop.modules.billing;
 
+
+import vn.clinicmanagement.desktop.modules.print.billing.PhieuThanhToanThuocInManHinh;
 import vn.clinicmanagement.application.audit.KiemToanTacNhanNguCanh;
 import vn.clinicmanagement.application.authorization.PhanQuyenNguCanh;
 import vn.clinicmanagement.application.billing.get.GetHoaDonTheoLuotKhamQuery;
@@ -1129,15 +1131,15 @@ public class VienPhiHoaDonManHinh extends CoSoManHinhManHinh {
         }
         var info=visitDetails.get(invoice.visitId());
         Window owner = SwingUtilities.getWindowAncestor(this);
-        new SwingWorker<vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.BillingSlipData, Void>() {
-            @Override protected vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.BillingSlipData doInBackground() {
-                return vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.fromInvoice(invoice, info);
+        new SwingWorker<vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.BillingSlipData, Void>() {
+            @Override protected vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.BillingSlipData doInBackground() {
+                return vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.fromInvoice(invoice, info);
             }
             @Override protected void done() {
                 try {
                     var data = get();
                     if (data != null) {
-                        new vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuHopThoai(owner, data).setVisible(true);
+                        new vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuHopThoai(owner, data).setVisible(true);
                         return;
                     }
                 } catch (Exception ignored) {}

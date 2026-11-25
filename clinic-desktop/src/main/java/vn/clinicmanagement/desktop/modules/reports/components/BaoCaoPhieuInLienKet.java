@@ -2,7 +2,8 @@ package vn.clinicmanagement.desktop.modules.reports.components;
 
 import vn.clinicmanagement.application.reports.PhieuBaoCaoReadCongKetNoi.Loai;
 import vn.clinicmanagement.application.reports.PhieuBaoCaoReadCongKetNoi.Phieu;
-import vn.clinicmanagement.desktop.modules.examination.components.print.*;
+import vn.clinicmanagement.desktop.modules.print.billing.*;
+import vn.clinicmanagement.desktop.modules.print.examination.*;
 import vn.clinicmanagement.infrastructure.persistence.CoSoDuLieuKetNoi;
 
 import javax.swing.*;

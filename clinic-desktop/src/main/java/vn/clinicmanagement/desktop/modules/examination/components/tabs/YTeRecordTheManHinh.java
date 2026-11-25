@@ -4,8 +4,8 @@ import vn.clinicmanagement.application.common.KetQua;
 import vn.clinicmanagement.application.examination.update.UpdateEMRLamSangRecordCommand;
 import vn.clinicmanagement.application.examination.update.UpdateEMRLamSangRecordBienNhan;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhGhepNoiGoc;
-import vn.clinicmanagement.desktop.modules.examination.components.print.YTeRecordPrintPreviewHopThoai;
-import vn.clinicmanagement.desktop.modules.examination.components.print.NgoaiTruYTeRecordPrintHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.YTeRecordPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.NgoaiTruYTeRecordPrintHopThoai;
 
 import vn.clinicmanagement.desktop.core.config.UngDungPhongChu;
 

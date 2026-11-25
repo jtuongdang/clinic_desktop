@@ -5,7 +5,7 @@ import vn.clinicmanagement.application.prescription.DonThuocMatHangDauVao;
 import vn.clinicmanagement.application.prescription.prescribe.PrescribeThuocCommand;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhManHinh.AdminPatientItem;
 import vn.clinicmanagement.desktop.modules.examination.components.common.ExaminationUiFactory;
-import vn.clinicmanagement.desktop.modules.examination.components.print.DonThuocPrintPreviewManHinh;
+import vn.clinicmanagement.desktop.modules.print.examination.DonThuocPrintPreviewManHinh;
 import vn.clinicmanagement.desktop.modules.examination.components.tabs.DonThuocYeuCauManHinh.PrescribedDraftItem;
 
 import java.math.BigDecimal;

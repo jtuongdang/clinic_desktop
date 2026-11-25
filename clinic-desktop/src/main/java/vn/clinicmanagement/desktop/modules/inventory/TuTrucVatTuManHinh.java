@@ -1,5 +1,7 @@
 package vn.clinicmanagement.desktop.modules.inventory;
 
+
+import vn.clinicmanagement.desktop.modules.print.inventory.TuTrucPhieuNhapBuCoSoHopThoai;
 import vn.clinicmanagement.application.inventory.TuTrucCongKetNoi;
 import vn.clinicmanagement.application.inventory.TuTrucCongKetNoi.*;
 import vn.clinicmanagement.application.inventory.NhaThuocDanhSachReadCongKetNoi.Bang;
@@ -316,11 +318,11 @@ public final class TuTrucVatTuManHinh extends CoSoManHinhManHinh {
             message("Đã xuất "+model.getRowCount()+" phiếu.");
         }catch(IOException ex){message("Không ghi được tệp CSV.");}
     }
-    static <T> void async(Supplier<T> work,Consumer<T> success,Consumer<Exception> failure){new SwingWorker<T,Void>(){
+    public static <T> void async(Supplier<T> work,Consumer<T> success,Consumer<Exception> failure){new SwingWorker<T,Void>(){
         protected T doInBackground(){return work.get();}protected void done(){try{success.accept(get());}catch(InterruptedException ex){Thread.currentThread().interrupt();failure.accept(ex);}catch(Exception ex){failure.accept(ex);}}
     }.execute();}
-    static boolean current(String session){var c=KhamBenhPhienNguCanh.current();return c!=null&&c.sessionId().toString().equals(session);}
-    static String normalize(String s){return java.text.Normalizer.normalize(s==null?"":s,java.text.Normalizer.Form.NFD).replaceAll("\\p{M}","").replace('đ','d').replace('Đ','D').toLowerCase(Locale.ROOT).trim();}
+    public static boolean current(String session){var c=KhamBenhPhienNguCanh.current();return c!=null&&c.sessionId().toString().equals(session);}
+    public static String normalize(String s){return java.text.Normalizer.normalize(s==null?"":s,java.text.Normalizer.Form.NFD).replaceAll("\\p{M}","").replace('đ','d').replace('Đ','D').toLowerCase(Locale.ROOT).trim();}
     static DocumentListener listener(Runnable action){return new DocumentListener(){public void insertUpdate(DocumentEvent e){action.run();}public void removeUpdate(DocumentEvent e){action.run();}public void changedUpdate(DocumentEvent e){action.run();}};}
     static DefaultTableModel readonly(String[] columns){return new DefaultTableModel(columns,0){@Override public boolean isCellEditable(int row,int column){return false;}};}
     static DefaultTableModel bang(Bang b){var m=readonly(b.columns().toArray(String[]::new));b.rows().forEach(r->m.addRow(r.toArray()));return m;}
@@ -331,7 +333,7 @@ public final class TuTrucVatTuManHinh extends CoSoManHinhManHinh {
             int x=0;for(int c=0;c<getColumnCount();c++){x+=getColumnModel().getColumn(c).getWidth();g.drawLine(x-1,y,x-1,getHeight());}}
     };t.setRowHeight(24);t.setFont(UngDungPhongChu.TU_TRUC_DU_LIEU);t.setGridColor(GRID);t.setShowGrid(true);t.setIntercellSpacing(new Dimension(1,1));
         t.setFillsViewportHeight(true);t.setBackground(Color.WHITE);t.setSelectionBackground(SELECTED);t.getTableHeader().setFont(UngDungPhongChu.BODY_BOLD);return t;}
-    static String status(Phieu p){return switch(p.status()==null?"":p.status()){
+    public static String status(Phieu p){return switch(p.status()==null?"":p.status()){
         case "CHO_DUYET","TAM","REQUESTED"->"Chờ duyệt";case "PARTIALLY_APPROVED"->"Duyệt một phần";case "DA_DUYET","APPROVED"->"Đã duyệt";
         case "PARTIALLY_ISSUED"->"Xuất một phần";case "ISSUED","DA_XUAT"->"Nhập bù".equals(p.type())?"Đang chuyển":"Đã xuất kho";
         case "PARTIALLY_RECEIVED"->"Nhận một phần";case "RECEIVED","DA_NHAN_HANG","HOAN_THANH"->"Đã nhập tủ";

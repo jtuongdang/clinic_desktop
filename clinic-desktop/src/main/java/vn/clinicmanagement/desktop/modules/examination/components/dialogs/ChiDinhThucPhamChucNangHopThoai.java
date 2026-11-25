@@ -9,7 +9,7 @@ import vn.clinicmanagement.application.prescription.prescribe.PrescribeThuocComm
 import vn.clinicmanagement.desktop.core.config.UngDungPhongChu;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhGhepNoiGoc;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhPhienNguCanh;
-import vn.clinicmanagement.desktop.modules.examination.components.print.PhieuTuVanThucPhamChucNangInHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.PhieuTuVanThucPhamChucNangInHopThoai;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;

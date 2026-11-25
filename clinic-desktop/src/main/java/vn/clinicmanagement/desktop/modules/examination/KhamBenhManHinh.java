@@ -3,12 +3,12 @@ package vn.clinicmanagement.desktop.modules.examination;
 import vn.clinicmanagement.desktop.modules.examination.components.KhamBenhHangDoiThanhBen;
 import vn.clinicmanagement.desktop.modules.examination.components.KhamBenhManHinhIconVaRenderer;
 import static vn.clinicmanagement.desktop.modules.examination.components.KhamBenhManHinhIconVaRenderer.*;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewHopThoai;
 import vn.clinicmanagement.desktop.modules.examination.components.tabs.KhamBenhBenhNhanTheManHinh;
 
 import vn.clinicmanagement.desktop.modules.examination.components.tabs.DieuTriXuTriTheManHinh;
 
-import vn.clinicmanagement.desktop.modules.examination.components.print.TransferPhieuPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.TransferPhieuPrintPreviewHopThoai;
 
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.TransferPhongSelectHopThoai;
 
@@ -44,9 +44,9 @@ import vn.clinicmanagement.desktop.modules.examination.components.dialogs.YTeVat
 
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.YTeRecordLoaiHopThoai;
 
-import vn.clinicmanagement.desktop.modules.examination.components.print.YTeRecordPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.YTeRecordPrintPreviewHopThoai;
 
-import vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuHopThoai;
+import vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuHopThoai;
 
 import vn.clinicmanagement.desktop.modules.examination.components.tabs.XetNghiemYeuCauTheManHinh;
 
@@ -1223,9 +1223,9 @@ public class KhamBenhManHinh extends CoSoManHinhManHinh {
             int vid = curP != null ? curP.visitId : 0;
             Window owner = SwingUtilities.getWindowAncestor(this);
             if (vid > 0) {
-                new SwingWorker<vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.BillingSlipData, Void>() {
-                    @Override protected vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.BillingSlipData doInBackground() {
-                        return vn.clinicmanagement.desktop.modules.examination.components.print.YTeVienPhiPhieuManHinh.loadFromDatabase(vid);
+                new SwingWorker<vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.BillingSlipData, Void>() {
+                    @Override protected vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.BillingSlipData doInBackground() {
+                        return vn.clinicmanagement.desktop.modules.print.billing.YTeVienPhiPhieuManHinh.loadFromDatabase(vid);
                     }
                     @Override protected void done() {
                         try {
@@ -1243,9 +1243,9 @@ public class KhamBenhManHinh extends CoSoManHinhManHinh {
             int vid = curP != null ? curP.visitId : 0;
             Window owner = SwingUtilities.getWindowAncestor(this);
             if (vid > 0) {
-                new SwingWorker<vn.clinicmanagement.desktop.modules.examination.components.print.YTeRecordPrintPreviewManHinh.MedicalRecordData, Void>() {
-                    @Override protected vn.clinicmanagement.desktop.modules.examination.components.print.YTeRecordPrintPreviewManHinh.MedicalRecordData doInBackground() {
-                        return vn.clinicmanagement.desktop.modules.examination.components.print.YTeRecordPrintPreviewManHinh.loadFromDatabase(vid);
+                new SwingWorker<vn.clinicmanagement.desktop.modules.print.examination.YTeRecordPrintPreviewManHinh.MedicalRecordData, Void>() {
+                    @Override protected vn.clinicmanagement.desktop.modules.print.examination.YTeRecordPrintPreviewManHinh.MedicalRecordData doInBackground() {
+                        return vn.clinicmanagement.desktop.modules.print.examination.YTeRecordPrintPreviewManHinh.loadFromDatabase(vid);
                     }
                     @Override protected void done() {
                         try {
@@ -1526,8 +1526,8 @@ public class KhamBenhManHinh extends CoSoManHinhManHinh {
         }
         Window owner = SwingUtilities.getWindowAncestor(this);
         var actor = KhamBenhPhienNguCanh.current();
-        vn.clinicmanagement.desktop.modules.examination.components.print.ToDieuTriPrintHopThoai.showDocument(
-                owner, () -> vn.clinicmanagement.desktop.modules.examination.components.print.ToDieuTriDuLieuNap.load(services, cur, actor));
+        vn.clinicmanagement.desktop.modules.print.examination.ToDieuTriPrintHopThoai.showDocument(
+                owner, () -> vn.clinicmanagement.desktop.modules.print.examination.ToDieuTriDuLieuNap.load(services, cur, actor));
     }
 
     public void selectMedicalRecordTab() { clinicalTabs.setSelectedComponent(medicalRecordTabPanel); }

@@ -1,5 +1,7 @@
 package vn.clinicmanagement.desktop.modules.examination.components.print;
 
+
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewManHinh;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.application.cls.DichVuYeuCauDuLieu;

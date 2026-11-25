@@ -1,6 +1,7 @@
 package vn.clinicmanagement.desktop.modules.pharmacy;
 import org.junit.jupiter.api.*;
 import vn.clinicmanagement.desktop.modules.pharmacy.components.*;
+import vn.clinicmanagement.desktop.modules.print.pharmacy.*;
 import vn.clinicmanagement.desktop.core.session.*;
 import vn.clinicmanagement.application.inventory.NhaThuocDanhSachReadCongKetNoi;
 import javax.swing.*;

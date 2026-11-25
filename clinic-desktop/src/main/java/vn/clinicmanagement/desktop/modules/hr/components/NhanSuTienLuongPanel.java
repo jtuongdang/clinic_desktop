@@ -4,7 +4,7 @@ import vn.clinicmanagement.application.hr.NhanSuReadPort;
 import vn.clinicmanagement.application.hr.NhanSuReadPort.*;
 import vn.clinicmanagement.desktop.core.config.UngDungPhongChu;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhPhienNguCanh;
-import vn.clinicmanagement.desktop.modules.hr.PhieuLuongInHopThoai;
+import vn.clinicmanagement.desktop.modules.print.hr.PhieuLuongInHopThoai;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;

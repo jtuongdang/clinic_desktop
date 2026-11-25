@@ -10,8 +10,8 @@ import vn.clinicmanagement.desktop.core.config.UngDungPhongChu;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhGhepNoiGoc;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhManHinh.AdminPatientItem;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhPhienNguCanh;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewHopThoai;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewManHinh;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewManHinh;
 import vn.clinicmanagement.domain.common.enums.TrangThaiChiDinhDichVu;
 
 import javax.swing.*;

@@ -583,7 +583,7 @@ public class TiepDonManHinh extends CoSoManHinhManHinh {
                 try {
                     var result = get();
                     if (result.isFailure()) { showError(result.getError().map(KetQua.ApplicationError::message).orElse("Không thể tải phiếu.")); return; }
-                    if (!GraphicsEnvironment.isHeadless()) printPreviewDialog = vn.clinicmanagement.desktop.modules.reception.print.PhieuDangKyKhamManHinh.open(
+                    if (!GraphicsEnvironment.isHeadless()) printPreviewDialog = vn.clinicmanagement.desktop.modules.print.reception.PhieuDangKyKhamManHinh.open(
                             SwingUtilities.getWindowAncestor(TiepDonManHinh.this), result.getValue().orElseThrow(),
                             () -> !disposed && viewSessionEpoch.get() == epoch && printSessionActive(),
                             action -> printSlipHandler.handle(new GetPhieuDangKyKhamQuery(visit, authorization, freshAuditActor(actor), action)).isSuccess());

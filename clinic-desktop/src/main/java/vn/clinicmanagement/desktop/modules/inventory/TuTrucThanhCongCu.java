@@ -124,7 +124,7 @@ public final class TuTrucThanhCongCu extends JPanel {
         button.setContentAreaFilled(false); button.setBorder(new EmptyBorder(3,2,3,2));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); return button;
     }
-    static Icon scaled(Icon icon,int size) {
+    public static Icon scaled(Icon icon,int size) {
         return new Icon() {
             public int getIconWidth(){return size;} public int getIconHeight(){return size;}
             public void paintIcon(Component c,Graphics g,int x,int y){

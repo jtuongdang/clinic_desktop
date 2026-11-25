@@ -1,5 +1,7 @@
 package vn.clinicmanagement.desktop.modules.inventory;
 
+
+import vn.clinicmanagement.desktop.modules.print.inventory.TuTrucBaoCaoXuatNhapTonPreviewHopThoai;
 import vn.clinicmanagement.application.inventory.TuTrucCongKetNoi;
 import vn.clinicmanagement.application.inventory.TuTrucCongKetNoi.Kho;
 import vn.clinicmanagement.application.inventory.TuTrucCongKetNoi.Phieu;

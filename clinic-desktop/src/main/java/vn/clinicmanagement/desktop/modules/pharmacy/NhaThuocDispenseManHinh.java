@@ -234,7 +234,7 @@ public class NhaThuocDispenseManHinh extends CoSoManHinhManHinh {
                 try {
                     var data = get();
                     if (!GraphicsEnvironment.isHeadless()) {
-                        var printDialog = new vn.clinicmanagement.desktop.modules.pharmacy.components.BaoCaoXuatNhapTonInHopThoai(
+                        var printDialog = new vn.clinicmanagement.desktop.modules.print.pharmacy.BaoCaoXuatNhapTonInHopThoai(
                                 SwingUtilities.getWindowAncestor(NhaThuocDispenseManHinh.this), data, from, to);
                         printDialog.setVisible(true);
                     }

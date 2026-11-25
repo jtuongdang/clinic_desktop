@@ -13,7 +13,7 @@ import vn.clinicmanagement.desktop.modules.examination.components.common.Examina
 import vn.clinicmanagement.desktop.modules.examination.components.common.ExaminationUiFactory;
 import vn.clinicmanagement.desktop.modules.examination.components.common.IcdDiagnosisSelectorSupport;
 import vn.clinicmanagement.desktop.modules.examination.components.common.PatientOrderBannerPanel;
-import vn.clinicmanagement.desktop.modules.examination.components.print.DonThuocPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.DonThuocPrintPreviewHopThoai;
 import vn.clinicmanagement.domain.common.enums.LoaiMatHang;
 import vn.clinicmanagement.domain.inventory.MatHang;
 import vn.clinicmanagement.domain.inventory.TonKho;

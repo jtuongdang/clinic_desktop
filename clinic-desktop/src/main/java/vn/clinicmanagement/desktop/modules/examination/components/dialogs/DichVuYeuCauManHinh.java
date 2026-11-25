@@ -44,8 +44,8 @@ import vn.clinicmanagement.application.cls.request.YeuCauDichVuBienNhan;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhGhepNoiGoc;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhManHinh;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhPhienNguCanh;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewHopThoai;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewManHinh;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewManHinh;
 
 /**
  * Giao diện màn hình: "ĐHC - Chỉ Định Dịch Vụ"

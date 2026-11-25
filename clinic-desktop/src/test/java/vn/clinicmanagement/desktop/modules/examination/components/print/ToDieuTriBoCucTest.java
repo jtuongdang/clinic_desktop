@@ -1,5 +1,9 @@
 package vn.clinicmanagement.desktop.modules.examination.components.print;
 
+
+import vn.clinicmanagement.desktop.modules.print.examination.ToDieuTriPrintHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.ToDieuTriPrintManHinh;
+import vn.clinicmanagement.desktop.modules.print.examination.ToDieuTriTrangGiay;
 import org.junit.jupiter.api.Test;
 import vn.clinicmanagement.domain.examination.LuotKham;
 import vn.clinicmanagement.domain.inventory.MatHang;

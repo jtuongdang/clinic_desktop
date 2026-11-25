@@ -1,4 +1,7 @@
-package vn.clinicmanagement.desktop.modules.reception.print;
+package vn.clinicmanagement.desktop.modules.print.reception;
+
+import vn.clinicmanagement.desktop.modules.print.reception.PhieuDangKyKhamManHinh;
+import vn.clinicmanagement.desktop.modules.print.reception.PhieuDangKyKhamPdf;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import vn.clinicmanagement.application.reception.PhieuDangKyKhamDuLieu;

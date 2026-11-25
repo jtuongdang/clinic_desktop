@@ -9,7 +9,7 @@ import vn.clinicmanagement.desktop.modules.examination.KhamBenhGhepNoiGoc;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.RaVienTongHopHopThoai;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.ICDDanhMucLuaChonHopThoai;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.ThuPhuChanDoanHopThoai;
-import vn.clinicmanagement.desktop.modules.examination.components.print.TheoTiepLichHenPrintHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.TheoTiepLichHenPrintHopThoai;
 import vn.clinicmanagement.domain.common.enums.HinhThucDieuTri;
 import vn.clinicmanagement.domain.common.enums.HuongXuTri;
 import vn.clinicmanagement.domain.common.enums.KetQuaDieuTri;
@@ -1793,7 +1793,7 @@ public class DieuTriXuTriTheManHinh extends JPanel {
                             String roomLabel = cboKhoaDieuTri != null && cboKhoaDieuTri.getSelectedItem() != null
                                     ? cboKhoaDieuTri.getSelectedItem().toString().trim() : "";
                             Window owner = SwingUtilities.getWindowAncestor(DieuTriXuTriTheManHinh.this);
-                            new vn.clinicmanagement.desktop.modules.examination.components.print.TransferPhieuPrintPreviewHopThoai(
+                            new vn.clinicmanagement.desktop.modules.print.examination.TransferPhieuPrintPreviewHopThoai(
                                     owner, currentPatientName, currentPatientCode, roomLabel).setVisible(true);
                         }
                     } else if (isCompleteExam && direction == HuongXuTri.NHAP_VIEN_NOI_TRU) {
@@ -1829,7 +1829,7 @@ public class DieuTriXuTriTheManHinh extends JPanel {
                 visit = services.examQueue().getVisitDetail(currentVisitId).orElse(null);
             } catch (Exception ignored) {}
         }
-        var data = vn.clinicmanagement.desktop.modules.examination.components.print.PhieuKhamVaoVienPrintManHinh.fromVisit(
+        var data = vn.clinicmanagement.desktop.modules.print.examination.PhieuKhamVaoVienPrintManHinh.fromVisit(
                 visit,
                 currentPatientCode,
                 currentPatientName,
@@ -1840,7 +1840,7 @@ public class DieuTriXuTriTheManHinh extends JPanel {
                 targetDepartment,
                 "PK Khám Bệnh");
         Window owner = SwingUtilities.getWindowAncestor(this);
-        new vn.clinicmanagement.desktop.modules.examination.components.print.PhieuKhamVaoVienPrintHopThoai(owner, data).setVisible(true);
+        new vn.clinicmanagement.desktop.modules.print.examination.PhieuKhamVaoVienPrintHopThoai(owner, data).setVisible(true);
     }
 
     private static String cleanPlaceholder(JTextArea area, String placeholder) {

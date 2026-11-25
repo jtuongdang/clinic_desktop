@@ -15,8 +15,8 @@ import vn.clinicmanagement.desktop.modules.examination.KhamBenhGhepNoiGoc;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhManHinh.AdminPatientItem;
 import vn.clinicmanagement.desktop.modules.examination.KhamBenhPhienNguCanh;
 import vn.clinicmanagement.desktop.modules.examination.components.dialogs.DichVuYeuCauHopThoai;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewHopThoai;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewManHinh;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewHopThoai;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewManHinh;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;

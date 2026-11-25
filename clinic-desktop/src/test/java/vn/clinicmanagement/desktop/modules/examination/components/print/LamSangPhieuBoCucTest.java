@@ -1,8 +1,12 @@
 package vn.clinicmanagement.desktop.modules.examination.components.print;
 
+
+import vn.clinicmanagement.desktop.modules.print.examination.ClsMaVach;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangPhieuTrang;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewManHinh;
 import org.junit.jupiter.api.Test;
-import vn.clinicmanagement.desktop.modules.examination.components.print.LamSangYeuCauPrintPreviewManHinh.*;
-import vn.clinicmanagement.desktop.modules.reception.print.PhieuDangKyKhamPdf;
+import vn.clinicmanagement.desktop.modules.print.examination.LamSangYeuCauPrintPreviewManHinh.*;
+import vn.clinicmanagement.desktop.modules.print.reception.PhieuDangKyKhamPdf;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
