@@ -1,0 +1,34 @@
+package vn.clinicmanagement.domain.inventory;
+import vn.clinicmanagement.domain.common.CoSoThucThe;
+import vn.clinicmanagement.domain.common.ITongHopGoc;
+import vn.clinicmanagement.domain.common.enums.TrangThaiKiemKe;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+public class KiemKe extends CoSoThucThe<Integer> implements ITongHopGoc {
+    private int maKho;
+    private LocalDateTime ngayKiemKe = LocalDateTime.now();
+    private TrangThaiKiemKe trangThai = TrangThaiKiemKe.MOI_TAO;
+    private String ghiChu;
+    private List<KiemKeDem> counts = new ArrayList<>();
+
+    public KiemKe() {}
+    public int getMaKho() { return maKho; }
+    public void setMaKho(int maKho) { this.maKho = maKho; }
+    public LocalDateTime getNgayKiemKe() { return ngayKiemKe; }
+    public void setNgayKiemKe(LocalDateTime ngayKiemKe) { this.ngayKiemKe = ngayKiemKe; }
+    public TrangThaiKiemKe getTrangThai() { return trangThai; }
+    public void setTrangThai(TrangThaiKiemKe trangThai) { this.trangThai = trangThai; }
+    public String getGhiChu() { return ghiChu; }
+    public void setGhiChu(String ghiChu) { this.ghiChu = ghiChu; }
+    public List<KiemKeDem> getCounts() { return counts; }
+    public void setCounts(List<KiemKeDem> counts) { this.counts = counts; }
+
+    public void approve() {
+        if (this.trangThai != TrangThaiKiemKe.DA_NOP && this.trangThai != TrangThaiKiemKe.MOI_TAO) {
+            throw new IllegalStateException("Phiếu kiểm kê không ở trạng thái hợp lệ để duyệt.");
+        }
+        this.trangThai = TrangThaiKiemKe.DA_DUYET;
+    }
+}

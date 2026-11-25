@@ -1,0 +1,38 @@
+package vn.clinicmanagement.domain.system;
+import vn.clinicmanagement.domain.common.CoSoThucThe;
+import java.time.LocalDateTime;
+
+public class NhatKyHoSoBenhAn extends CoSoThucThe<Integer> {
+    private int maLuotKham;
+    private int maNhanVien;
+    private String hanhDong = "";
+    private String lyDo;
+    private LocalDateTime thoiGian = LocalDateTime.now();
+    public NhatKyHoSoBenhAn() {}
+    @Override
+    public void markAsUpdated(int updatedBy) {
+        throw new UnsupportedOperationException("Nhật ký hồ sơ bệnh án không thể cập nhật vòng đời.");
+    }
+    @Override
+    public void softDelete(int deletedBy) {
+        throw new UnsupportedOperationException("Nhật ký hồ sơ bệnh án không thể xóa mềm.");
+    }
+    @Override
+    public void restore() {
+        throw new UnsupportedOperationException("Nhật ký hồ sơ bệnh án không thể khôi phục.");
+    }
+    @Override
+    public void setDeleted(boolean deleted) {
+        throw new UnsupportedOperationException("Không thể thay đổi trạng thái xóa của nhật ký hồ sơ bệnh án.");
+    }
+    public int getMaLuotKham() { return maLuotKham; }
+    public void setMaLuotKham(int maLuotKham) { this.maLuotKham = maLuotKham; }
+    public int getMaNhanVien() { return maNhanVien; }
+    public void setMaNhanVien(int maNhanVien) { this.maNhanVien = maNhanVien; }
+    public String getHanhDong() { return hanhDong; }
+    public void setHanhDong(String hanhDong) { this.hanhDong = hanhDong; }
+    public String getLyDo() { return lyDo; }
+    public void setLyDo(String lyDo) { this.lyDo = lyDo; }
+    public LocalDateTime getThoiGian() { return thoiGian; }
+    public void setThoiGian(LocalDateTime thoiGian) { this.thoiGian = thoiGian; }
+}
