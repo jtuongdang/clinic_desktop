@@ -1,0 +1,7 @@
+# Sao chép file này thành db.properties trên máy phát triển.
+# Không commit db.properties hoặc lưu mật khẩu thật trong repository.
+db.url=jdbc:sqlserver://localhost:1433;databaseName=clinicDb;encrypt=true;trustServerCertificate=true
+db.username=YOUR_LOCAL_DB_USER
+db.password=SET_LOCALLY
+db.driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
+db.pool.maxSize=10
